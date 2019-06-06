@@ -3431,14 +3431,17 @@ for sH=1:length(subplotHandles)
             basicMdlStrings{length(basicMdlStrings)+1}=ExFNIRS.settings.curInfoStr;
         end
         if(plotGroupByBioM&&numBioM>1)
-            basicMdlStrings{length(basicMdlStrings)+1}='BioM';
+            %basicMdlStrings{length(basicMdlStrings)+1}='BioM';
+            warning('GroupBy Biomarker Plots not supported yet\n Only using first biomarker');
+        elseif(numBioM>1)
+            %basicMdlStrings{length(basicMdlStrings)+1}='BioM';
         end
         
         for z=1:length(basicMdlStrings)
             if(z==1)
                 mdlPrtString=basicMdlStrings{z};
             else
-                mdlPrtString=spritnf('%s*%s',mdlPrtString,basicMdlStrings{z});
+                mdlPrtString=sprintf('%s*%s',mdlPrtString,basicMdlStrings{z});
             end
         end
         
