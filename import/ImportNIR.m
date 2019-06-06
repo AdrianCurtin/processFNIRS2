@@ -239,7 +239,7 @@ fNIR.info.baseline=baseline;
 numRawChannels=size(data,2)-1;
 
 switch(numRawChannels)
-    case 49
+    case 48
         fNIR.info.probename='fNIR_Devices_fNIR1000';
     case 54
         fNIR.info.probename='fNIR_Devices_fNIR2000';

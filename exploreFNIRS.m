@@ -130,6 +130,15 @@ initialize_gui(hObject, handles, false);
 
 global ExFNIRS
 
+if(~isfield(ExFNIRS,settings))
+    [ExFNIRS_folder,~,~] = fileparts(mfilename('fullpath'));
+    ExFNIRS.defaultRootPath=ExFNIRS_folder;
+    curdir=cd;
+    cd(ExFNIRS.defaultRootPath);
+    addpath('base','base_functions','base_functions/external','explore','external','functions','import','process');
+    cd(curdir);
+end
+
 
 p=inputParser;
 
@@ -321,7 +330,7 @@ for v =1:length(segInfoVars)
 end
 
 
-processFNIRS2('UseDeviceCFG','device_fNIR1200.cfg');
+%processFNIRS2('UseDeviceCFG','device_fNIR1200.cfg');
 processFNIRS2('blLength',0); %use global mean for import
 
 %ExFNIRS.settings=[];
@@ -401,7 +410,7 @@ ExFNIRS.settings.guiColor=ones(10,3);
 ExFNIRS.settings.use_gui_color=get(handles.checkbox_gui_colors,'Value');
 
 [exF_folder,name,ext] = fileparts(mfilename('fullpath'));
-loadGUIcolors(sprintf('%s/%s',exF_folder,'exploreFNIRS_defaultColors.csv'),handles);
+loadGUIcolors(sprintf('%s/prefs/%s',exF_folder,'exploreFNIRS_defaultColors.csv'),handles);
 
 idx=get(handles.popupmenu_colors,'Value');
 strs=get(handles.popupmenu_colors,'String');
