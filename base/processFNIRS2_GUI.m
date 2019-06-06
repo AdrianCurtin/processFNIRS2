@@ -210,7 +210,8 @@ end
 
 
 if(isempty(data)&&isempty(varargin))
-    load('myNIRsample.mat','myNIRsample');
+    
+    load(sprintf('%s/sampledata/myNIRsample.mat',PF2.defaultRootPath),'myNIRsample');
     disp('No arguments given, program is being loaded in demo mode');
     outputData.ShowGUI=true;
     data=myNIRsample;
