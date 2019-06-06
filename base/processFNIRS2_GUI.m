@@ -210,12 +210,10 @@ end
 
 
 if(isempty(data)&&isempty(varargin))
-    load('sampleNIRdata.mat','testNIR');
+    load('myNIRsample.mat','myNIRsample');
     disp('No arguments given, program is being loaded in demo mode');
     outputData.ShowGUI=true;
-    data.raw=testNIR;
-    data.markers=[500,1;1000,2;1500,3;2000,3;2500,2;3000,1];
-    data.info.Age=32;
+    data=myNIRsample;
     
 elseif(isempty(data)||(isstruct(data)&&isfield(data,'info')&&~isfield(data,'raw')&&~isfield(data,'HbO')))
     disp('No data loaded, initializing settings only');
@@ -379,6 +377,9 @@ if(isstruct(data)) %treat as fNIR struct
     if(~isfield(PF2.data.info,'Block'))
         PF2.data.info.Block='';
     end
+    if(~isfield(PF2.data.info,'probename'))
+        PF2.data.info.probename='';
+    end
     if(~isfield(PF2.data.info,'Condition'))
         PF2.data.info.Condition='';
     end
@@ -415,16 +416,40 @@ if(isstruct(tempOxyStage))
     PF2.data.stage{4}=tempOxyStage; %Assign stage3 if exists
 end
 
-if((isempty(cfgFilePath)&&~isfield(setF,'device'))||(length(cfgFilePath)>5&&~contains(cfgFilePath,'.cfg')))
-    if(~contains('.cfg',cfgFilePath))
-        warning('invalid configuration file path')
-    end
+if(~isempty(p.Results.UseDeviceCFG)) % if command argument given
+    cfgFilePath=p.Results.UseDeviceCFG; % command argument to load cfg file
+elseif(isfield(data,'info')&&isfield(data.info,'probename')&&~contains(data.info.probename,'Unknown')) 
+    %try to load the probename cfg file
+    cfgFilePath=sprintf('%s.cfg',data.info.probename);
+else
+    cfgFilePath='';
+end
+
+
+if(isempty(cfgFilePath)||~contains(cfgFilePath,'.cfg'))
+    
+    warning('Missing or invalid configuration file path\n')
+    
     disp('No device specified. Please load device configuration');
     loadDeviceCfg();
+    if(~isfield(setF,'device'))
+        error('No valid devices selected');
+    end
     
-elseif(~isempty(cfgFilePath))
-    loadDeviceCfg(cfgFilePath);
+elseif(~isempty(cfgFilePath)) % If we're not looking at the GUI, doesn't matter
+    
+    if(isnestedfield(setF,'device.cfg.info.CfgName')) % look to see if they match,...
+            
+        curProbeName=sprintf('%s.cfg',setF.device.cfg.info.CfgName);
+        
+        if(~strcmp(curProbeName,cfgFilePath)) %if they do don't bother loading
+            loadDeviceCfg(cfgFilePath);
+        end
+    else
+        loadDeviceCfg(cfgFilePath);
+    end
 end
+
 
 
 updateCurrentDevice();
@@ -1366,9 +1391,9 @@ if(nargin>0)
     [devCfg_folder,name,ext] = fileparts(deviceCfgFilename);
     
     if fid==-1 && isempty(devCfg_folder)
-        fid = fopen(sprintf('%s/%s',pF2_folder,deviceCfgFilename));
+        fid = fopen(sprintf('%s/../devices/%s',pF2_folder,deviceCfgFilename));
         if(fid~=-1)
-            deviceCfgFilename=sprintf('%s/%s',pF2_folder,deviceCfgFilename);
+            deviceCfgFilename=sprintf('%s/../devices/%s',pF2_folder,deviceCfgFilename);
         end
     end
 
@@ -1376,12 +1401,12 @@ if(nargin>0)
         %fclose(fid);
         warning('Local Config File not found');
     
-        if(~isempty(devCfg_folder))
+        if(isempty(devCfg_folder))
         
-            [file, pathname] = uigetfile({'device_*.cfg';'*.*'},'Please Select Device Configuration file',pF2_folder);
+            [file, pathname] = uigetfile({'*.cfg';'*.*'},'Please Select Device Configuration file',sprintf('%s/../devices',pF2_folder));
         
         else
-            [file, pathname] = uigetfile({'device_*.cfg';'*.*'},'Please Select Device Configuration file',devCfg_folder);
+            [file, pathname] = uigetfile({'*.cfg';'*.*'},'Please Select Device Configuration file',devCfg_folder);
         end
         
         if(isempty(file)||(isnumeric(file)&&file==0))
@@ -1402,7 +1427,7 @@ if(nargin>0)
         setF.device.cfg = INI('File',deviceCfgFilename);
     end
 else
-    [file, pathname] = uigetfile({'device_*.cfg';'*.*'},'Please Select Device Configuration file',pF2_folder);
+    [file, pathname] = uigetfile({'*.cfg';'*.*'},'Please Select Device Configuration file',sprintf('%s/../devices',pF2_folder));
     
     if(isempty(file)||(isnumeric(file)&&file==0))
         return;

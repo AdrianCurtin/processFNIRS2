@@ -57,6 +57,9 @@ global setF
 hObject=1;
 handles=1;
 
+[pF2_folder,~,~] = fileparts(mfilename('fullpath'));
+PF2.defaultRootPath=pF2_folder;
+
 PF2.defaultOxyMethodsPath=sprintf('%s/pf2_oxy_methods_stored_processFNIRS2.cfg',prefdir);
 PF2.defaultRawMethodsPath=sprintf('%s/pf2_raw_methods_stored_processFNIRS2.cfg',prefdir);
 if(~isfield(PF2,'myRawMethods')||~isfield(PF2,'baseline'))
@@ -86,12 +89,12 @@ end
 %
 % Parse inputs here
 
-if(isfield(PF2,'stageRawMethod')&&isfield(PF2.stageRawMethod,'name')&&sum(strcmp(PF2.myRawMethods.cfg.Sections,PF2.stageRawMethod.name))==1)
+if(isnestedfield(PF2,'stageRawMethod.name')&&sum(strcmp(PF2.myRawMethods.cfg.Sections,PF2.stageRawMethod.name))==1)
     defaultRawMethod=PF2.stageRawMethod.name;
 else
     defaultRawMethod='None';
 end
-if(isfield(PF2,'stageOxyMethod')&&isfield(PF2.stageOxyMethod,'name')&&sum(strcmp(PF2.myOxyMethods.cfg.Sections,PF2.stageOxyMethod.name))==1)
+if(isnestedfield(PF2,'stageOxyMethod.name')&&sum(strcmp(PF2.myOxyMethods.cfg.Sections,PF2.stageOxyMethod.name))==1)
     defaultOxyMethod=PF2.stageOxyMethod.name;
 else
     defaultOxyMethod='None';
@@ -142,25 +145,41 @@ PF2.OutputLegacyMarkers=p.Results.OutputLegacyMarkers;
 
 data=p.Results.data;
 
+if(~isempty(p.Results.UseDeviceCFG)) % if command argument given
+    cfgFilePath=p.Results.UseDeviceCFG; % command argument to load cfg file
+elseif(isfield(data,'info')&&isfield(data.info,'probename')&&contains(data.info.probename,'Unkown')) 
+    %try to load the probename cfg file
+    cfgFilePath=sprintf('%s.cfg',data.info.probename);
+else
+    cfgFilePath='';
+end
 
+ShowGUI=p.Results.ShowGUI||isempty(varargin)||(nargout==0&&~isempty(data));
 
-cfgFilePath=p.Results.UseDeviceCFG;
-
-if((isempty(cfgFilePath)&&~isfield(setF,'device'))||(length(cfgFilePath)>5&&~contains(cfgFilePath,'.cfg')))
-    if(~contains('.cfg',cfgFilePath))
-        warning('invalid configuration file path')
-    end
+if(isempty(cfgFilePath)||~contains(cfgFilePath,'.cfg'))&&~ShowGUI %if nothing, invalid, or no data
+    
+    warning('Missing or invalid configuration file path\n')
+    
     disp('No device specified. Please load device configuration');
     loadDeviceCfg();
     if(~isfield(setF,'device'))
         error('No valid devices selected');
     end
     
-elseif(~isempty(cfgFilePath))
-    loadDeviceCfg(cfgFilePath);
+elseif(~isempty(cfgFilePath)) 
+    
+    if(isnestedfield(setF,'device.cfg.info.probename')) % look to see if they match,...
+            
+        curProbeName=sprintf('%s.cfg',setF.device.cfg.info.CfgName);
+        
+        if(~strcmp(curProbeName,cfgFilePath)) %if they do don't bother loading
+            loadDeviceCfg(cfgFilePath);
+        end
+    else
+        loadDeviceCfg(cfgFilePath);
+    end
 end
 
-ShowGUI=p.Results.ShowGUI||isempty(varargin)||(nargout==0&&~isempty(data));
 
 if(ShowGUI)
     if(any(strcmp(p.UsingDefaults,'ShowGUI')))
@@ -908,18 +927,18 @@ end
 function loadDeviceCfg(deviceCfgFilename)
 global setF
 
-[pF2_folder,name,ext] = fileparts(mfilename('fullpath'));
+    [pF2_folder,name,ext] = fileparts(mfilename('fullpath'));
 
 
-if(nargin>0)
+if(nargin>0) % If file name is specified, try to load it
     fid = fopen(deviceCfgFilename);
     
     [devCfg_folder,name,ext] = fileparts(deviceCfgFilename);
     
     if fid==-1 && isempty(devCfg_folder)
-        fid = fopen(sprintf('%s/%s',pF2_folder,deviceCfgFilename));
+        fid = fopen(sprintf('%s/devices/%s',pF2_folder,deviceCfgFilename));
         if(fid~=-1)
-            deviceCfgFilename=sprintf('%s/%s',pF2_folder,deviceCfgFilename);
+            deviceCfgFilename=sprintf('%s/devices/%s',pF2_folder,deviceCfgFilename);
         end
     end
 
@@ -927,12 +946,12 @@ if(nargin>0)
         %fclose(fid);
         warning('Local Config File not found');
     
-        if(~isempty(devCfg_folder))
+        if(isempty(devCfg_folder))
         
-            [file, pathname] = uigetfile({'device_*.cfg';'*.*'},'Please Select Device Configuration file',pF2_folder);
+            [file, pathname] = uigetfile({'*.cfg';'*.*'},'Please Select Device Configuration file',pF2_folder);
         
         else
-            [file, pathname] = uigetfile({'device_*.cfg';'*.*'},'Please Select Device Configuration file',devCfg_folder);
+            [file, pathname] = uigetfile({'*.cfg';'*.*'},'Please Select Device Configuration file',devCfg_folder);
         end
         
         if(isempty(file)||(isnumeric(file)&&file==0))
@@ -952,8 +971,8 @@ if(nargin>0)
     
         setF.device.cfg = INI('File',deviceCfgFilename);
     end
-else
-    [file, pathname] = uigetfile({'device_*.cfg';'*.*'},'Please Select Device Configuration file',pF2_folder);
+else %otherwise try to load the default
+    [file, pathname] = uigetfile({'*.cfg';'*.*'},'Please Select Device Configuration file',sprintf('%s/devices',pF2_folder));
     
     if(isempty(file)||(isnumeric(file)&&file==0))
         return;

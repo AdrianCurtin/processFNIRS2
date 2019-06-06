@@ -172,5 +172,16 @@ if(isfield(fNIR.info,'sd_key')&&isfield(fNIR.info,'sd_mask'))
 end
 
 
+numRawChannels=size(data,1)-1;
+
+switch(numRawChannels)
+    case 49
+        fNIR.info.probename='NIRX_Sport_8x8_Frontal';
+    otherwise
+        warning('Unidentified Probe\n');
+        fNIR.info.probename='Unkown .nirx file';
+end
 
 cd(curdir);
+
+

@@ -119,7 +119,19 @@ end
 fprintf('Importing Complete\n');
 cd(curdir);
 
+numRawChannels=numCh*2;
+
+switch(numRawChannels)
+    case 44
+        fNIR.info.probename='Hitachi_ETG4000_3x5';
+    otherwise
+        warning('Unidentified Probe\n');
+        fNIR.info.probename='Unkown *MES.CSV file';
 end
+
+end
+
+
 
 function Name2 = renameValid(Name)
 

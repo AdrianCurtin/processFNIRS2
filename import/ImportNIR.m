@@ -236,6 +236,18 @@ fNIR.info.baseline=baseline;
 %clear count;
 %clear line;
 
+numRawChannels=size(data,2)-1;
+
+switch(numRawChannels)
+    case 49
+        fNIR.info.probename='fNIR_Devices_fNIR1000';
+    case 54
+        fNIR.info.probename='fNIR_Devices_fNIR2000';
+    otherwise
+        warning('Unidentified Probe\n');
+        fNIR.info.probename='Unknown .nir file';
+end
+
 end
 
 function markers=importMrk(mrk_filename,startCode)
