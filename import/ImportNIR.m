@@ -58,6 +58,15 @@ end
 
 header.fname=nir_filename;
 
+fileroot=nir_filename(1:strfind(lower(nir_filename),'.nir')-1);
+
+%Default names for markers, manual markers, and log file
+log_filename=sprintf('%s.log',fileroot);
+
+log_info=importCOBIlog(log_filename);
+
+
+
 
 lineF=fgetl(fid);
 while(ischar(lineF))
@@ -233,6 +242,34 @@ end
 
 fNIR.info.filename=nir_filename;
 fNIR.info.baseline=baseline;
+
+if(~isempty(log_info)&&isfield(log_info,'SubjectID'))
+    fNIR.info.SubjectID=log_info.SubjectID;
+end
+if(~isempty(log_info)&&isfield(log_info,'Experimenter'))
+    fNIR.info.Experimenter=log_info.Experimenter;
+end
+    
+if(~isempty(log_info)&&isfield(log_info,'ExperimentID'))
+    fNIR.info.Session=log_info.ExperimentID;
+end
+    
+if(~isempty(log_info)&&isfield(log_info,'Sex'))
+    fNIR.info.Sex=log_info.Sex;
+end
+
+if(~isempty(log_info)&&isfield(log_info,'Age')&&~isnan(log_info.Age))
+    fNIR.info.Age=log_info.Age;
+end
+
+if(~isempty(log_info)&&isfield(log_info,'Description'))
+    fNIR.info.Description=log_info.Description;
+end
+
+if(~isempty(log_info)&&isfield(log_info,'Comments'))
+    fNIR.info.Comments=log_info.Comments;
+end
+    
 %clear count;
 %clear line;
 
@@ -377,6 +414,97 @@ function markers=importMrkFile(mrkid)
 end
 
     
+
+function loginfo=importCOBIlog(log_filename)
+    if(isstr(log_filename)&&~isempty(log_filename))
+            logfid = fopen(log_filename);
+        else
+            logfid=-1;
+    end
+        
+    loginfo=[];
+
+    if (logfid==-1&&~isempty(log_filename))
+        disp('Marker nir_filename not found or permission denied: Loading without markers');
+        return;
+    elseif(logfid==-1)
+        %no file provided so just return
+        return
+    end
+    
+    linecount=1;
+    
+     lineF=fgetl(logfid);
+
+    while(ischar(lineF))
+       
+       if(contains(lineF,'COBI log file'))
+           loginfo.version=sscanf(lineF,'COBI log file %f');
+       elseif(contains(lineF,'Experimenter:'))
+           lineF=fgetl(logfid);
+           if(lineF~=-1)
+               loginfo.Experimenter=lineF;
+           end
+       elseif(contains(lineF,'SubjectID:'))
+           lineF=fgetl(logfid);
+           linecount=linecount+1;
+           if(lineF~=-1)
+               loginfo.SubjectID=lineF;
+           end
+       elseif(contains(lineF,'ExperimentID:'))
+           lineF=fgetl(logfid);
+           linecount=linecount+1;
+           if(lineF~=-1)
+               loginfo.ExperimentID=lineF;
+           end
+       elseif(contains(lineF,'Description:'))
+           lineF=fgetl(logfid);
+           linecount=linecount+1;
+           if(lineF~=-1)
+               loginfo.Description=lineF;
+           end
+       elseif(contains(lineF,'Subject Info:'))
+           lineF=fgetl(logfid);
+           linecount=linecount+1;
+           if(lineF~=-1)
+               loginfo.SubjectInfo=lineF;
+           end
+           if(~isempty(loginfo.SubjectInfo))
+               subInfoPart=strsplit(loginfo.SubjectInfo,'-');
+               if(length(subInfoPart)>1)
+                   if(contains(subInfoPart{2},'Male'))
+                       loginfo.Sex='M';
+                   elseif(contains(subInfoPart{2},'Female'))
+                       loginfo.Sex='F';
+                   else
+                      loginfo.Sex=''; 
+                   end
+               else
+                   loginfo.Sex='';
+               end
+               
+               if(~isempty(subInfoPart))
+                   loginfo.Age=str2double(subInfoPart{1});
+               end
+           
+           end
+       elseif(contains(lineF,'Comments:'))
+           lineF=fgetl(logfid);
+           linecount=linecount+1;
+           if(lineF~=-1)
+               loginfo.Comments=lineF;
+           end
+       end
+       lineF=fgetl(logfid);
+       linecount=linecount+1;
+       %disp(lineF)
+
+    end
+    fclose(logfid);
+        
+    
+
+end
 
 
 
