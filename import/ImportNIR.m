@@ -34,12 +34,12 @@ if nargin < 1 % No Arguments - Open fNIRS and mrk file
         mrk_filename=[];
     end
     
-	channelCheck=true; %Plots raw channel light intensity and asks user to mark as either noisy, invalid, or clean
+	channelCheck=false; %Plots raw channel light intensity and asks user to mark as either noisy, invalid, or clean
 elseif nargin<2
-    channelCheck=true; %Plots raw channel light intensity and asks user to mark as either noisy, invalid, or clean
+    channelCheck=false; %Plots raw channel light intensity and asks user to mark as either noisy, invalid, or clean
     mrk_filename=[];
 elseif nargin<3
-    channelCheck=true; %Plots raw channel light intensity and asks user to mark as either noisy, invalid, or clean
+    channelCheck=false; %Plots raw channel light intensity and asks user to mark as either noisy, invalid, or clean
 end
 
 if ~isstr(nir_filename)
@@ -60,11 +60,16 @@ header.fname=nir_filename;
 
 fileroot=nir_filename(1:strfind(lower(nir_filename),'.nir')-1);
 
+if(contains(fileroot,'_Dev'))
+    fileroot=nir_filename(1:strfind(lower(nir_filename),'_Dev')-1);
+end
+
 %Default names for markers, manual markers, and log file
+
+
 log_filename=sprintf('%s.log',fileroot);
 
 log_info=importCOBIlog(log_filename);
-
 
 
 
@@ -113,6 +118,8 @@ while(ischar(lineF))
     
     if(contains(lineF, 'Baseline Started'))
         countCheckFlag=true;
+        lineF=fgetl(fid); %Get Next Line
+
         break;
     end
 end
@@ -122,7 +129,7 @@ if(iscell(mrk_filename))
 	
     tempData=[];
     for i=1:length(mrk_filename)
-		markerCell{i}=importMrk(mrk_filename{i},header.startCode);
+		markerCell{i}=importMrk(mrk_filename{i},header.startCode,i);
         if(isfield(markerCell{i},'data'))
             tempData=[tempData;markerCell{i}.data];
         end
@@ -140,18 +147,25 @@ else
 end
 
 
+spaceParsingMode=false;
 
 while(ischar(lineF))
     
     if(countCheckFlag)
        countCheckFlag=false;
-       numVar=sum(lineF(:)=='	');
+       numVar=sum(lineF(:)=='	');    
+       
+       if(numVar==0)
+            numVar=sum(lineF(:)==' ')+1;
+            spaceParsingMode=true;
+       end
        baseline=nan(1000,numVar);
        blLineCount=0;
     end
     if(contains(lineF, 'Baseline end'))
         baseline(isnan(baseline(:,1)),:)=[]; %trim NaN rows;
         baseline(baseline(:,1)<=0,:)=[]; %remove markerrows and zero rows
+        lineF=fgetl(fid); %Get Next Line
        break; 
     end
     
@@ -168,11 +182,21 @@ end
 if(lineF==-1)
    return;
 else
-    line1=str2double(strsplit(lineF,'\t'));
+    if(~spaceParsingMode)
+        line1=str2double(strsplit(lineF,'\t'));
+    else
+        line1=str2double(strsplit(lineF,' '));
+    end
 end
 
-while (ischar(lineF)&&length(line1>1)&&(line1(1)<0)) %%%%% I CANT BELIEVE THIS IS FUCKING NECESSARY
-    line1=str2double(strsplit(lineF,'\t'));
+while (ischar(lineF)&&length(line1)>1)&&(line1(1)<0) 
+            % Keeps searching for first line with values if it can't find
+            % it for some reason
+    if(~spaceParsingMode)
+        line1=str2double(strsplit(lineF,'\t'));
+    else
+        line1=str2double(strsplit(lineF,' '));
+    end
     lineF=fgetl(fid); %Get Next Line
 end
 
@@ -185,9 +209,16 @@ data=nan(5e5,numVar); %overinitialize array
 
 lineCount=1;
 while(lineF~=-1)
-    numTabs=sum(lineF(:)=='	');
-    if(lineF(end)~='	') %.nir files are terminared with \t\n, but not always true
-        numTabs=numTabs+1;
+    if(~spaceParsingMode)
+        numTabs=sum(lineF(:)=='	');
+        if(lineF(end)~='\t') %.nir files are terminared with \t\n, but not always true
+            numTabs=numTabs+1;
+        end
+    else
+        numTabs=sum(lineF(:)==' ');
+        if(lineF(end)~=' ') %.nir files are terminared with \t\n, but not always true
+            numTabs=numTabs+1;
+        end
     end
     if(numTabs<numVar)
         data(lineCount,:)=zeros(1,numVar);
@@ -203,8 +234,13 @@ end
 data(isnan(data(:,1)),:)=[]; %trim nan rows
 data(data(:,1)<=0,:)=[]; %trim zero or negative rows
 
+data=[[baseline,zeros(size(baseline,1),size(data,2)-size(baseline,2))];data];
+
 fclose(fid);
 clear fid line1 lineCount line
+
+
+
 
 %clear linecount line times count;
 
@@ -221,11 +257,24 @@ end
 
 data(data(:,1)==0,:)=[];
 
+newColTest=diff(data(:,end));
+newColTest(newColTest<-63000)=0; % counts up to about 65k and then resets sample count
+
+if(sum(newColTest<0)==0) % newer COBI, last column is sample time
+    data=data(:,1:end-1);
+else
+    data=data(:,1:end);
+end
+
+
 if(size(baseline,2)==size(data,2))
     data=[baseline;data];
 else
     warning('Mismatched baseline and data size');
 end
+
+
+
 
 fNIR.raw=data;
 fNIR.time=data(:,1);
@@ -262,12 +311,8 @@ if(~isempty(log_info)&&isfield(log_info,'Age')&&~isnan(log_info.Age))
     fNIR.info.Age=log_info.Age;
 end
 
-if(~isempty(log_info)&&isfield(log_info,'Description'))
-    fNIR.info.Description=log_info.Description;
-end
-
-if(~isempty(log_info)&&isfield(log_info,'Comments'))
-    fNIR.info.Comments=log_info.Comments;
+if(~isempty(log_info))
+    fNIR.info.log_info=log_info;
 end
     
 %clear count;
@@ -276,6 +321,10 @@ end
 numRawChannels=size(data,2)-1;
 
 switch(numRawChannels)
+    case 12
+        fNIR.info.probename='fNIR_Devices_fNIR1200_Split4';
+    case 48
+        fNIR.info.probename='fNIR_Devices_fNIR1000';
     case 48
         fNIR.info.probename='fNIR_Devices_fNIR1000';
     case 54
@@ -287,7 +336,10 @@ end
 
 end
 
-function markers=importMrk(mrk_filename,startCode)
+function markers=importMrk(mrk_filename,startCode,mrkSourceID)
+    if(nargin<3)
+        mrkSourceID=0;
+    end
 	if(isstr(mrk_filename)&&~isempty(mrk_filename))
 		mrkid = fopen(mrk_filename);
 	else
@@ -297,7 +349,7 @@ function markers=importMrk(mrk_filename,startCode)
 	markers=[];
 
 	if (mrkid==-1&&~isempty(mrk_filename))
-		disp('Marker nir_filename not found or permission denied: Loading without markers');
+		%disp('Marker nir_filename not found or permission denied: Loading without markers');
 		return;
 	elseif(mrkid==-1)
 		%no file provided so just return
@@ -317,8 +369,8 @@ function markers=importMrk(mrk_filename,startCode)
 	
    if(count~=0)  % Then its a manual marker file
 		markers=importManualMrkFile(mrkid,startCode,true);
-	elseif contains(lineF,'marker') % then its an automatic marker file
-		markers=importMrkFile(mrkid);
+	elseif contains(lower(lineF),'marker') % then its an automatic marker file
+		markers=importMrkFile(mrkid,mrkSourceID);
 	else
 	   markers=[];
 	end
@@ -328,7 +380,6 @@ function markers=importMrk(mrk_filename,startCode)
 	end
 
 end
-
 function markers=importManualMrkFile(mrkid,startCode,useStrSplit)
     if(nargin<3)
         useStrSplit=true;
@@ -346,6 +397,7 @@ function markers=importManualMrkFile(mrkid,startCode,useStrSplit)
         markers.data(:,3)=times(1:2:end)'; % marker time
         markers.data(:,2)=times(2:2:end)'; % marker code
         markers.data(:,1)=markers.data(:,3)-startCode; %adjusted marker time
+        markers.data(:,3)=100; %We don't use marker time here, so just use 100 as the ID
 
     else
         linecount=0;
@@ -367,6 +419,8 @@ function markers=importManualMrkFile(mrkid,startCode,useStrSplit)
            lineF=fgetl(mrkid);
 
         end
+        
+        markers.data(:,3)=100;
     end
 
    clear count;
@@ -374,7 +428,11 @@ function markers=importManualMrkFile(mrkid,startCode,useStrSplit)
    fclose(mrkid);
 end
 
-function markers=importMrkFile(mrkid)
+
+function markers=importMrkFile(mrkid,mrkSrcID)
+    if(nargin<2)
+        mrkSrcID=0;
+    end
 	frewind(mrkid);
 	for i=1:5
 		   lineF=fgetl(mrkid);
@@ -401,15 +459,17 @@ function markers=importMrkFile(mrkid)
 	   
 	   temp=sscanf(lineF,'%f\t%f\t%f')';
 	   if(length(temp)>2)
-			markers.data(linecount,:)=temp(1:3);
+			markers.data(linecount,:)=[temp(1:2),mrkSrcID];
 	   elseif(length(temp)>1)
-		   markers.data(linecount,:)=[temp(1:2),0];
+		   markers.data(linecount,:)=[temp(1:2),mrkSrcID];
 	   else
-		   markers.data(linecount,:)=zeros(1,3);
+		   markers.data(linecount,:)=[zeros(1,2),0];
 	   end
 	   lineF=fgetl(mrkid);
 	   
-	end
+    end
+    
+    markers.data(markers.data(:,2)==0&markers.data(:,1)==0,:)=[];
 	fclose(mrkid);
 end
 
@@ -425,7 +485,7 @@ function loginfo=importCOBIlog(log_filename)
     loginfo=[];
 
     if (logfid==-1&&~isempty(log_filename))
-        disp('Marker nir_filename not found or permission denied: Loading without markers');
+        warning('COBI log file not found, loading without log file');
         return;
     elseif(logfid==-1)
         %no file provided so just return
@@ -460,9 +520,56 @@ function loginfo=importCOBIlog(log_filename)
        elseif(contains(lineF,'Description:'))
            lineF=fgetl(logfid);
            linecount=linecount+1;
-           if(lineF~=-1)
-               loginfo.Description=lineF;
+           loginfo.Description='';
+           while(lineF~=-1)
+               if(isempty(loginfo.Description))
+                   loginfo.Description=lineF;
+               else
+                   loginfo.Description=sprintf('%s\n%s',loginfo.Description,lineF);
+               end
+               lineF=fgetl(logfid);
+               linecount=linecount+1;
            end
+      elseif(contains(lineF,'Data Sources:'))
+           lineF=fgetl(logfid);
+           loginfo.DataSources='';
+           linecount=linecount+1;
+           while(lineF~=-1)
+               if(isempty(loginfo.DataSources))
+                   loginfo.DataSources=lineF;
+               else
+                   loginfo.DataSources=sprintf('%s\n%s',loginfo.DataSources,lineF);
+               end
+               lineF=fgetl(logfid);
+               linecount=linecount+1;
+           end
+     elseif(contains(lineF,'Marker Sources:'))
+           lineF=fgetl(logfid);
+           loginfo.MarkerSources='';
+           linecount=linecount+1;
+           while(lineF~=-1)
+               if(isempty(loginfo.MarkerSources))
+                   loginfo.MarkerSources=lineF;
+               else
+                   loginfo.MarkerSources=sprintf('%s\n%s',loginfo.MarkerSources,lineF);
+               end
+               lineF=fgetl(logfid);
+               linecount=linecount+1;
+           end
+      elseif(contains(lineF,'Broadcasts:'))
+           lineF=fgetl(logfid);
+           loginfo.Broadcasts='';
+           linecount=linecount+1;
+           while(lineF~=-1)
+               if(isempty(loginfo.Broadcasts))
+                   loginfo.Broadcasts=lineF;
+               else
+                   loginfo.Broadcasts=sprintf('%s\n%s',loginfo.Broadcasts,lineF);
+               end
+               lineF=fgetl(logfid);
+               linecount=linecount+1;
+           end
+           
        elseif(contains(lineF,'Subject Info:'))
            lineF=fgetl(logfid);
            linecount=linecount+1;
@@ -491,9 +598,47 @@ function loginfo=importCOBIlog(log_filename)
        elseif(contains(lineF,'Comments:'))
            lineF=fgetl(logfid);
            linecount=linecount+1;
-           if(lineF~=-1)
-               loginfo.Comments=lineF;
+           loginfo.Comments='';
+           while(lineF~=-1)
+               if(isempty(loginfo.Comments))
+                   loginfo.Comments=lineF;
+               else
+                   loginfo.Comments=sprintf('%s\n%s',loginfo.Comments,lineF);
+               end
+               lineF=fgetl(logfid);
+               linecount=linecount+1;
            end
+       elseif(contains(lineF,'Marker Dictionary:'))
+           lineF=fgetl(logfid);
+           linecount=linecount+1;
+           if(lineF~=-1)
+               tableHeaders=strsplit(lineF,'\t');
+               lastItem=tableHeaders{end};
+               if(lastItem(end)==':')
+                   lastItem=lastItem(1:end-1);
+                   tableHeaders{end}=lastItem;
+               end
+               
+           else
+              continue; 
+           end
+           lineF=fgetl(logfid);
+           linecount=linecount+1;
+           
+           cellMarkerDict=cell(1,length(tableHeaders));
+           numMrkDictItems=1;
+           
+           while(lineF~=-1)
+               items=strsplit(lineF,'\t');
+               if(~isempty(items)&&iscell(items))
+                   cellMarkerDict(numMrkDictItems,1:length(items))=items;
+                   numMrkDictItems=numMrkDictItems+1;
+               end
+               lineF=fgetl(logfid);
+               linecount=linecount+1;
+           end
+           loginfo.MarkerDict=cell2table(cellMarkerDict(:,1:length(tableHeaders)),'VariableNames',tableHeaders);
+           
        end
        lineF=fgetl(logfid);
        linecount=linecount+1;
@@ -501,11 +646,7 @@ function loginfo=importCOBIlog(log_filename)
 
     end
     fclose(logfid);
-        
-    
+       
 
 end
 
-
-
- 
