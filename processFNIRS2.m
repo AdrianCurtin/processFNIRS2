@@ -177,9 +177,9 @@ if(isempty(cfgFilePath)||~contains(cfgFilePath,'.cfg'))&&(~ShowGUI&&~isempty(dat
     
 elseif(~isempty(cfgFilePath)) 
     
-    if(isnestedfield(setF,'device.cfg.info.probename')) % look to see if they match,...
+    if(isnestedfield(setF,'device.cfg.Info.CfgName')) % look to see if they match,...
             
-        curProbeName=sprintf('%s.cfg',setF.device.cfg.info.CfgName);
+        curProbeName=sprintf('%s.cfg',setF.device.cfg.Info.CfgName);
         
         if(~strcmp(curProbeName,cfgFilePath)) %if they do don't bother loading
             loadDeviceCfg(cfgFilePath);
@@ -455,7 +455,7 @@ end
 varargout={};
 
 if(~isempty(data))
-    if(~isfield(fData,'fchMask'))
+    if(~isfield(fData,'fchMask')||(isfield(fData,'fchMask')&&isempty(fData.fchMask)))
         fData.fchMask=true(1,length(setF.device.Probe{1}.ChannelList));
     end
     numChannels=length(setF.device.Probe{1}.ChannelList);
@@ -940,11 +940,13 @@ global setF
 
 
 if(nargin>0) % If file name is specified, try to load it
+    
     fid = fopen(deviceCfgFilename);
     
     [devCfg_folder,name,ext] = fileparts(deviceCfgFilename);
     
-    if fid==-1 && isempty(devCfg_folder)
+    if fid==-1 && isempty(devCfg_folder) % if the file wasn't immediately accessible...
+                        %try loading from root/devices
         fid = fopen(sprintf('%s/devices/%s',pF2_folder,deviceCfgFilename));
         if(fid~=-1)
             deviceCfgFilename=sprintf('%s/devices/%s',pF2_folder,deviceCfgFilename);
@@ -952,7 +954,6 @@ if(nargin>0) % If file name is specified, try to load it
     end
 
     if fid==-1
-        %fclose(fid);
         warning('Local Config File not found');
     
         if(isempty(devCfg_folder))
@@ -977,7 +978,7 @@ if(nargin>0) % If file name is specified, try to load it
 
         setF.device.cfg = INI('File',[pathname file]);
     else
-    
+        fclose(fid);
         setF.device.cfg = INI('File',deviceCfgFilename);
     end
 else %otherwise try to load the default

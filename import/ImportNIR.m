@@ -262,7 +262,10 @@ if(channelCheck)
         fchMask=channelCheckGUI(data,nir_filename,markers);
     end
 else
-       
+   if(~isempty(fmask))
+       fNIR.fchMask=(fmask==1); 
+    end
+
 end
 
 
@@ -329,9 +332,6 @@ end
 %clear count;
 %clear line;
 
-if(~isempty(fmask))
-   fNIR.fchMask=(fmask==1); 
-end
 
 numRawChannels=size(data,2)-1;
 

@@ -471,7 +471,7 @@ while(numDataCols~=numDevCols)
     numDevCols=length(setF.device.Probe{1}.ChannelNumbers);  
 end
 
-if(~isfield(PF2.data,'fchMask'))
+if(~isfield(PF2.data,'fchMask')||(isfield(PF2.data,'fchMask')&&isempty(PF2.data.fchMask)))
     PF2.data.fchMask=true(1,length(setF.device.Probe{1}.ChannelList));
 end
 
@@ -1386,7 +1386,8 @@ function loadDeviceCfg(deviceCfgFilename)
 global setF
 
 [pF2_folder,name,ext] = fileparts(mfilename('fullpath'));
-if(nargin>0)
+if(nargin>0) % if the file wasn't immediately accessible...
+                        %try loading from root/devices
      fid = fopen(deviceCfgFilename);
     
     [devCfg_folder,name,ext] = fileparts(deviceCfgFilename);
@@ -1424,7 +1425,7 @@ if(nargin>0)
 
         setF.device.cfg = INI('File',[pathname file]);
     else
-    
+        fclose(fid);
         setF.device.cfg = INI('File',deviceCfgFilename);
     end
 else
