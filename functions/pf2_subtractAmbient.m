@@ -8,12 +8,12 @@ function data=pf2_subtractAmbient(rawData,ambientData,channelList)
 %   Subtract Ambient subtracts the ambient light data from matched raw
 %   channels
 
-[~,i]=unique(channelList);
-uCh=channelList(i);
+[~,idx]=unique(channelList);
+uCh=channelList(idx);
 
 for i=1:length(uCh)
     
-   rawData(:,channelList==uCh(i))=rawData(:,channelList==uCh(i))-ambientData(:,uCh(i)); 
+   rawData(:,channelList==uCh(i))=rawData(:,channelList==uCh(i))-ambientData(:,i); 
 end
 
 data=rawData;
