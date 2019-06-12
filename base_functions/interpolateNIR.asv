@@ -1,9 +1,5 @@
 function interpolateNIR(varargin) %(fNIRarr,minVal,maxVal,interpolationType,transparent,brainStyle,titleTxt,fontSize,clr,showChText)
-% InterpolateNIR functions to draw a 2D interpolated value image onto a 2D
-% brain image
-%   specify the image array and the minimum and maximum values for use
-%   brainStyle will change the background image depending on what you
-%   require
+% Interpola
 
 p=inputParser;
 
@@ -24,7 +20,7 @@ validSPM_mode = @(x) ischar(validatestring(x,{'value','HbR','HbO','HbDiff','HbTo
     % percentage will show the the channel as a percentage
     
 validInterpolation_mode = @(x) ischar(validatestring(x,{'None','Interpolated','Broadened'}));
-validStyle=@(x) ischar(validatestring(x,{'None','Anatomy_Black','Anatomy_White','Anatomy_White_TMS','3D_Black','3D_White','Gray_3D_White','Gray_3D_Black','Gray_3D_White_TMS','Gray_3D_Black_TMS'}));
+validStyle=@(x) ischar(validatestring(x,{'None','Drawing_White','Anatomy_Black','Anatomy_White','Anatomy_White_TMS','3D_Black','3D_White','Gray_3D_White','Gray_3D_Black','Gray_3D_White_TMS','Gray_3D_Black_TMS'}));
 %BrainStyle
 % 0 = Photo Anatomy Project (Black Background)
 % 1 = Photo Anatomy Project (White Background)
@@ -395,7 +391,7 @@ end
 
 switch(brainStyle)
     case 'Drawing_White'
-        %brainImg=imread('blankBrainDrawWhite.bmp'); //not validated yet
+        brainImg=imread('blankBrainDrawWhite.bmp');
     case 'Anatomy_Black'
         brainImg=imread('blankBrainBlack.bmp');
     case 'Anatomy_White'

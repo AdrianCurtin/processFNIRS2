@@ -75,11 +75,10 @@ ch_mask_file=sprintf('%s_CH.mat',fileroot);
 
 try
     fmask=load(ch_mask_file,'fmask');
-    fmask=fmask.fmask;
     fprintf('%i Channels marked bad\n',sum(fmask<1));
 catch
     fprintf('No channel rejection present\n');
-    fmask=[];
+    
 end
 
 
@@ -329,8 +328,8 @@ end
 %clear count;
 %clear line;
 
-if(~isempty(fmask))
-   fNIR.fchMask=(fmask==1); 
+if(exists('fmask'))
+   fNI 
 end
 
 numRawChannels=size(data,2)-1;
