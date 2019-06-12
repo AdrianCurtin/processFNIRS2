@@ -107,21 +107,9 @@ updateCurrentMethods(handles);
 PF2.availableFunctionsPath=sprintf('%s/pf2_functions_stored_processFNIRS2.cfg',prefdir);
 if(~isfield(PF2,'myFunctions'))
    PF2.myFunctions=loadFunctions(PF2.availableFunctionsPath,true);
-   
-   defaultFunctionsPath=sprintf('%s/functions/%s',PF2.defaultRootPath,'pf2_functions_default.cfg');
    if(isnestedfield(PF2.myFunctions,'cfg.Sections'))
        if(isempty(PF2.myFunctions.cfg.Sections))
-           answer = questdlg('No saved functions found! Would you like to import the default function library?','Load Default Functions','Yes','No','Yes');
            
-           switch(answer)
-               case 'Yes'
-                   if(~importFunctions(defaultFunctionsPath))
-                       warning('Unable to find functions at %s! Please load another file',defaultFunctionsPath);
-                       importFunctions();
-                   end
-               case 'No'
-                    
-           end
        end
    else
       error('Unable to import or create stored function file'); 
@@ -1111,7 +1099,7 @@ PF2.myFunctions.cfg.add(cmdName,func);
 PF2.myFunctions.cfg.write();
 
 
-function succeeded=importFunctions(cfgPath)
+function importFunctions(cfgPath)
 
 if(nargin<1)
     [myFunctions]= loadFunctions();
@@ -1120,8 +1108,6 @@ else
 end
 
 if(isempty(myFunctions))
-    
-    succeeded=false;
     return;
 end
 
@@ -1147,10 +1133,6 @@ if(length(myFunctions.cfg.Sections)>0)
 end
 
 PF2.myFunctions.cfg.write()
-
-succeeded=true;
-return;
-
 
 
 function updateCurrentFunctions(handles)
