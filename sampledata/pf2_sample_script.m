@@ -5,7 +5,7 @@ runSkip=true; % if you press run just to see the example, this will skip some op
 % Example: Loading FNIRS data from a .nir file
 
 %load fNIRS data from FNIR devices model 1100 (same layout as 1200)
-[fNIR]=ImportNIR('sampleNIR.nir','sampleNIR.mrk');
+[fNIR]=processFNIRS2.Import.ImportNIR('sampleNIR.nir','sampleNIR.mrk');
 
 % Assign subject age/ other information
 fNIR.info.SubjectID='TestSubject1';
@@ -111,7 +111,7 @@ plotFNIR(trial3,channels2plot,markers2plot)
 title('Sample FNIRS data Trial 3');
 
         %example using getFNIRSmarkers
-                trialTimes=getFNIRSmarkers(FNIR_processed,50,51)
+                trialTimes=getFNIRSmarkers(FNIR_processed,50,51);
                 trial3=getFNIRS(FNIR_processed,trialTimes(3,1),trialTimes(3,2)); %returns only the segment from output from trial start 3 to trial end 3
 
 
@@ -124,7 +124,7 @@ if(~runSkip)
 trial3_fromt0=setT0fnirs(trial3,trialStartTimes(3));
 
 subplot(1,2,1);
-plotFNIR(trial3,1,markers2plot)
+plotFNIR(trial3,1,markers2plot)g
 title('Original Trial 3');
 subplot(1,2,2);
 plotFNIR(trial3_fromt0,1,markers2plot)

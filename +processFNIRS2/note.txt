@@ -1,0 +1,6 @@
+This folder will contain GUI wrapper functions, but also any functions that should be accessible by calling processFNIRS2
+
+GUI branch will contain
+	The main GUI (no arguments)
+	.ConfigureMethods
+	.ConfigureFunctions

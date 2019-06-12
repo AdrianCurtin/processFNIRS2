@@ -137,9 +137,9 @@ auxFieldSizes=[];
 for i=1:numfSeg % Resample and find max/min and num channels
     if(resample)
         if(centerOnT0)
-            FNIRScellArray{i}=nirsAvg(FNIRScellArray{i},resampleSize,'centerOnT0',centerOnT0,'timeOutMode','start','averageAux',true);
+            FNIRScellArray{i}=processFNIRS2.Data.Resample(FNIRScellArray{i},resampleSize,'centerOnT0',centerOnT0,'timeOutMode','start','averageAux',true);
         else
-            FNIRScellArray{i}=nirsAvg(FNIRScellArray{i},resampleSize,'centerOnT0',centerOnT0,'averageAux',true);
+            FNIRScellArray{i}=processFNIRS2.Data.Resample(FNIRScellArray{i},resampleSize,'centerOnT0',centerOnT0,'averageAux',true);
         end
         segmentTimesArr=[segmentTimesArr;FNIRScellArray{i}.segmentTimes];
     elseif(isfield(FNIRScellArray{i},'segmentTimes'))
@@ -283,10 +283,10 @@ for b=1:length(bioMs)
     end
     curBioM=bioMs{b};
     inData= permute(outGA.(curBioM).data,[3,1,2]);
-    [hAvg.(curBioM).Mean,tierLabel,hierarchy]=hierarchicalAverage(inData,hierarchyVars,@nanmean);
-    hAvg.(curBioM).Median=hierarchicalAverage(inData,hierarchyVars,@nanmedian);
-    hAvg.(curBioM).Max=hierarchicalAverage(inData,hierarchyVars,nanmax3);
-    hAvg.(curBioM).Min=hierarchicalAverage(inData,hierarchyVars,nanmin3);
+    [hAvg.(curBioM).Mean,tierLabel,hierarchy]=pf2_base.hierarchicalAverage(inData,hierarchyVars,@nanmean);
+    hAvg.(curBioM).Median=pf2_base.hierarchicalAverage(inData,hierarchyVars,@nanmedian);
+    hAvg.(curBioM).Max=pf2_base.hierarchicalAverage(inData,hierarchyVars,nanmax3);
+    hAvg.(curBioM).Min=pf2_base.hierarchicalAverage(inData,hierarchyVars,nanmin3);
     
     if(b==1)
        outGA.info.Observation=tierLabel; 
@@ -317,10 +317,10 @@ if(averageAux)
           
          
             inData= permute(outGA.Aux.(curAuxField).data,[3,1,2]);
-            [hAvg.Aux.(curAuxField).Mean,tierLabel,hierarchy]=hierarchicalAverage(inData,hierarchyVars,@nanmean);
-            hAvg.Aux.(curAuxField).Median=hierarchicalAverage(inData,hierarchyVars,@nanmedian);
-            hAvg.Aux.(curAuxField).Max=hierarchicalAverage(inData,hierarchyVars,nanmax3);
-            hAvg.Aux.(curAuxField).Min=hierarchicalAverage(inData,hierarchyVars,nanmin3);
+            [hAvg.Aux.(curAuxField).Mean,tierLabel,hierarchy]=pf2_base.hierarchicalAverage(inData,hierarchyVars,@nanmean);
+            hAvg.Aux.(curAuxField).Median=pf2_base.hierarchicalAverage(inData,hierarchyVars,@nanmedian);
+            hAvg.Aux.(curAuxField).Max=pf2_base.hierarchicalAverage(inData,hierarchyVars,nanmax3);
+            hAvg.Aux.(curAuxField).Min=pf2_base.hierarchicalAverage(inData,hierarchyVars,nanmin3);
     end
     
     for aux=1:numAuxFields

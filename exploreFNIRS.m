@@ -1352,11 +1352,11 @@ for i=1:max(gbyIdx)
         waitbar(i2/length(ExFNIRS.gby(i).gbyFNIRS),eHf,sprintf('ExploreFNIRS\nProcessing segment %i of %i',i2,length(ExFNIRS.gby(i).gbyFNIRS)));
         numSeg=numSeg+1;
       
-        blSeg=getFNIRS(ExFNIRS.gby(i).gbyFNIRS{i2},ExFNIRS.settings.baseline_start,ExFNIRS.settings.baseline_end); %baselineining is handled in processing section
+        blSeg=processFNIRS2.Data.Split(ExFNIRS.gby(i).gbyFNIRS{i2},ExFNIRS.settings.baseline_start,ExFNIRS.settings.baseline_end); %baselineining is handled in processing section
         ExFNIRS.gby(i).gbyFNIRS{i2}.time=ExFNIRS.gby(i).gbyFNIRS{i2}.time-ExFNIRS.settings.block_start; %change time so that 0 is start of block
-        ExFNIRS.gby(i).gbyFNIRS_blk{i2}=nirsAvg(ExFNIRS.gby(i).gbyFNIRS{i2}, ExFNIRS.settings.barchart_resample_size,'centerOnT0',true,'timeOutMode','start','blfNIR',blSeg,'averageAux',true);
-        ExFNIRS.gby(i).gbyFNIRS{i2}=getFNIRS(ExFNIRS.gby(i).gbyFNIRS{i2},'blfNIR',blSeg);
-        %ExFNIRS.gby(i).gbyFNIRS{i2}=nirsAvg(ExFNIRS.gby(i).gbyFNIRS{i2},ExFNIRS.settings.grandavg_resample_size,'centerOnT0',true,'timeOutMode','end');
+        ExFNIRS.gby(i).gbyFNIRS_blk{i2}=processFNIRS2.Data.Resample(ExFNIRS.gby(i).gbyFNIRS{i2}, ExFNIRS.settings.barchart_resample_size,'centerOnT0',true,'timeOutMode','start','blfNIR',blSeg,'averageAux',true);
+        ExFNIRS.gby(i).gbyFNIRS{i2}=processFNIRS2.Data.Split(ExFNIRS.gby(i).gbyFNIRS{i2},'blfNIR',blSeg);
+        %ExFNIRS.gby(i).gbyFNIRS{i2}=processFNIRS2.Data.Resample(ExFNIRS.gby(i).gbyFNIRS{i2},ExFNIRS.settings.grandavg_resample_size,'centerOnT0',true,'timeOutMode','end');
     end
     waitbar(0,eHf,sprintf('ExploreFNIRS\nAverging waveforms...'));
    
@@ -1444,7 +1444,7 @@ if(~any(curRawMatchIdx&curOxyMatchIdx))
        if(~isempty(data{i})&&length(data{i}.time)>1)
            data{i}=processFNIRS2(data{i});
            data{i}=applyfMask(data{i});
-           data{i}=nirsAvg(data{i},ExFNIRS.settings.grandavg_resample_size,'centerOnT0',true,'timeOutMode','end','averageAux',false);
+           data{i}=processFNIRS2.Data.Resample(data{i},ExFNIRS.settings.grandavg_resample_size,'centerOnT0',true,'timeOutMode','end','averageAux',false);
        end
     end
     
@@ -2019,8 +2019,8 @@ for i=1:size(sH,1)
                 end
 
                 if(ExFNIRS.settings.plot_task_lines)
-                    vline(sH{i,b}.subH{y,x},[ExFNIRS.settings.baseline_start-ExFNIRS.settings.block_start,ExFNIRS.settings.baseline_end-ExFNIRS.settings.block_start],{'--k','HandleVisibility','off'});
-                    vline(sH{i,b}.subH{y,x},[ExFNIRS.settings.block_start-ExFNIRS.settings.block_start,ExFNIRS.settings.block_end-ExFNIRS.settings.block_start],{'--r','HandleVisibility','off'});
+                    pf2_base.external.vline(sH{i,b}.subH{y,x},[ExFNIRS.settings.baseline_start-ExFNIRS.settings.block_start,ExFNIRS.settings.baseline_end-ExFNIRS.settings.block_start],{'--k','HandleVisibility','off'});
+                    pf2_base.external.vline(sH{i,b}.subH{y,x},[ExFNIRS.settings.block_start-ExFNIRS.settings.block_start,ExFNIRS.settings.block_end-ExFNIRS.settings.block_start],{'--r','HandleVisibility','off'});
                 end
                 
                 hold(sH{i,b}.subH{y,x},'off');
@@ -3319,14 +3319,14 @@ for chIdx=1:numOpt
         end
     
         if(ExFNIRS.settings.plot_bar_err)
-            barweb(barChartData{curChart}(:,:,1),barChartData{curChart}(:,:,2),1,xBarLabels, [], [], [], cIndex,[],gAStrs,[],'hide');
+            pf2_base.external.barweb(barChartData{curChart}(:,:,1),barChartData{curChart}(:,:,2),1,xBarLabels, [], [], [], cIndex,[],gAStrs,[],'hide');
             ylimLower=min(min(barChartData{curChart}(:,:,1)))-max(max(barChartData{curChart}(:,:,2)));
             ylimUpper=max(max(barChartData{curChart}(:,:,1)))+max(max(barChartData{curChart}(:,:,2)));
             yrange=ylimUpper-ylimLower;
             ylim([min(ylimLower-0.1*yrange,0),max(ylimUpper+0.1*yrange,0)]);
             
         else
-            barweb(barChartData{curChart}(:,:,1),[],1,xBarLabels, [], [], [], cIndex,[],gAStrs,[],'hide');
+            pf2_base.external.barweb(barChartData{curChart}(:,:,1),[],1,xBarLabels, [], [], [], cIndex,[],gAStrs,[],'hide');
             ylimLower=min(min(barChartData{curChart}(:,:,1)));
             ylimUpper=max(max(barChartData{curChart}(:,:,1)));
             yrange=ylimUpper-ylimLower;
@@ -4304,7 +4304,7 @@ elseif(sum(~isnan(barChartData(:,:,1)))==0)
 end
 
 if(ExFNIRS.settings.plot_bar_err)
-    barweb(barChartData(:,:,1),barChartData(:,:,2),1,uCurInfoG, [], [], [], cIndex,[],gAStrs,[],'hide');
+    pf2_base.external.barweb(barChartData(:,:,1),barChartData(:,:,2),1,uCurInfoG, [], [], [], cIndex,[],gAStrs,[],'hide');
     ylimLower=min(min(barChartData(:,:,1)))-max(max(barChartData(:,:,2)));
     ylimUpper=max(max(barChartData(:,:,1)))+max(max(barChartData(:,:,2)));
     yrange=ylimUpper-ylimLower;
@@ -4316,7 +4316,7 @@ if(ExFNIRS.settings.plot_bar_err)
        xlabel(curInfoGroup);
     end
 else
-    barweb(barChartData(:,:,1),[],1,uCurInfoG, [], [], [], cIndex,[],gAStrs,[],'hide');
+    pf2_base.external.barweb(barChartData(:,:,1),[],1,uCurInfoG, [], [], [], cIndex,[],gAStrs,[],'hide');
     ylimLower=min(min(barChartData(:,:,1)));
     ylimUpper=max(max(barChartData(:,:,1)));
     yrange=ylimUpper-ylimLower;

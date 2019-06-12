@@ -64,7 +64,7 @@ if(~isfield(PF2,'defaultRootPath'))
     PF2.defaultRootPath=pF2_folder;
     curdir=cd;
     cd(PF2.defaultRootPath);
-    addpath('base','base_functions','base_functions/external','explore','external','functions','import','process');
+    addpath('base_functions','functions','GUI');
     cd(curdir);
 end
 
@@ -98,12 +98,12 @@ end
 %
 % Parse inputs here
 
-if(isnestedfield(PF2,'stageRawMethod.name')&&sum(strcmp(PF2.myRawMethods.cfg.Sections,PF2.stageRawMethod.name))==1)
+if(pf2_base.isnestedfield(PF2,'stageRawMethod.name')&&sum(strcmp(PF2.myRawMethods.cfg.Sections,PF2.stageRawMethod.name))==1)
     defaultRawMethod=PF2.stageRawMethod.name;
 else
     defaultRawMethod='None';
 end
-if(isnestedfield(PF2,'stageOxyMethod.name')&&sum(strcmp(PF2.myOxyMethods.cfg.Sections,PF2.stageOxyMethod.name))==1)
+if(pf2_base.isnestedfield(PF2,'stageOxyMethod.name')&&sum(strcmp(PF2.myOxyMethods.cfg.Sections,PF2.stageOxyMethod.name))==1)
     defaultOxyMethod=PF2.stageOxyMethod.name;
 else
     defaultOxyMethod='None';
@@ -156,7 +156,7 @@ data=p.Results.data;
 
 if(~isempty(p.Results.UseDeviceCFG)) % if command argument given
     cfgFilePath=p.Results.UseDeviceCFG; % command argument to load cfg file
-elseif(isnestedfield(data,'info.probename')&&~contains(data.info.probename,'Unkown')) 
+elseif(pf2_base.isnestedfield(data,'info.probename')&&~contains(data.info.probename,'Unkown')) 
     %try to load the probename cfg file
     cfgFilePath=sprintf('%s.cfg',data.info.probename);
 else
@@ -177,7 +177,7 @@ if(isempty(cfgFilePath)||~contains(cfgFilePath,'.cfg'))&&(~ShowGUI&&~isempty(dat
     
 elseif(~isempty(cfgFilePath)) 
     
-    if(isnestedfield(setF,'device.cfg.Info.CfgName')) % look to see if they match,...
+    if(pf2_base.isnestedfield(setF,'device.cfg.Info.CfgName')) % look to see if they match,...
             
         curProbeName=sprintf('%s.cfg',setF.device.cfg.Info.CfgName);
         
@@ -194,7 +194,7 @@ if(ShowGUI)
     if(any(strcmp(p.UsingDefaults,'ShowGUI')))
        l=length(varargin);
        if(l==0)
-           processFNIRS2_GUI();
+           processFNIRS2.GUI();
            return;
        elseif(~isempty(data))
            varargin(l+1)={'ShowGUI'};
@@ -976,10 +976,10 @@ if(nargin>0) % If file name is specified, try to load it
     
         fclose(fid);
 
-        setF.device.cfg = INI('File',[pathname file]);
+        setF.device.cfg = pf2_base.external.INI('File',[pathname file]);
     else
         fclose(fid);
-        setF.device.cfg = INI('File',deviceCfgFilename);
+        setF.device.cfg = pf2_base.external.INI('File',deviceCfgFilename);
     end
 else %otherwise try to load the default
     [file, pathname] = uigetfile({'*.cfg';'*.*'},'Please Select Device Configuration file',sprintf('%s/devices',sprintf('%s/devices/',pF2_folder)));
@@ -997,7 +997,7 @@ else %otherwise try to load the default
 
     fclose(fid);
 
-    setF.device.cfg = INI('File',[pathname file]);
+    setF.device.cfg = pf2_base.external.INI('File',[pathname file]);
 end
 
 setF.device.cfg.read();

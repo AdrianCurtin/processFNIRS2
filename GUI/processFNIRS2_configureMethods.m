@@ -24,7 +24,7 @@ function varargout = processFNIRS2_configureMethods(varargin)
 
 % Last Modified by GUIDE v2.5 12-Jan-2019 12:52:23
 
-% Begin initialization code - DO NOT EDIT
+% Begin pf2_base.external.INItialization code - DO NOT EDIT
 gui_Singleton = 1;
 gui_State = struct('gui_Name',       mfilename, ...
                    'gui_Singleton',  gui_Singleton, ...
@@ -41,7 +41,7 @@ if nargout
 else
     gui_mainfcn(gui_State, varargin{:});
 end
-% End initialization code - DO NOT EDIT
+% End pf2_base.external.INItialization code - DO NOT EDIT
 
 
 % --- Executes just before processFNIRS2_configureMethods is made visible.
@@ -108,7 +108,7 @@ PF2.availableFunctionsPath=sprintf('%s/pf2_functions_stored_processFNIRS2.cfg',p
 if(~isfield(PF2,'myFunctions'))
    PF2.myFunctions=loadFunctions(PF2.availableFunctionsPath,true);
    
-   defaultFunctionsPath=sprintf('%s/functions/%s',PF2.defaultRootPath,'pf2_functions_default.cfg');
+   defaultFunctionsPath=sprintf('%s/prefs/%s',PF2.defaultRootPath,'pf2_functions_default.cfg');
    if(isnestedfield(PF2.myFunctions,'cfg.Sections'))
        if(isempty(PF2.myFunctions.cfg.Sections))
            answer = questdlg('No saved functions found! Would you like to import the default function library?','Load Default Functions','Yes','No','Yes');
@@ -430,7 +430,7 @@ function pushbutton_rename_Callback(hObject, eventdata, handles)
 
 newName=get(handles.edit_methodName,'String');
 
-newName=cleanNameForINI(newName);
+newName=cleanNameForpf2_base.external.INI(newName);
 
 
 global PF2
@@ -656,7 +656,7 @@ elseif(~isempty(newName)&&~isempty(newName))
         newName=newName{1};
     end
 
-    PF2.currentMethod.name=cleanNameForINI(newName);
+    PF2.currentMethod.name=cleanNameForpf2_base.external.INI(newName);
     set(handles.edit_methodName,'String',PF2.currentMethod.name);
     PF2.currentMethod.F=cell(0);
     PF2.myMethods.cfg.add(PF2.currentMethod.name,PF2.currentMethod.F);
@@ -928,7 +928,7 @@ function [myMethods]= loadMethods(methodsCfgFilename,createIfMissing)
             warning('Local Config File not found');
 
 
-            [file, pathname] = uigetfile({'pf2_methods_*.cfg';'*.cfg';'*.*'},'Please Select Methods Definition file');
+            [file, pathname] = uigetfile({'pf2_methods_*.cfg';'*.cfg';'*.*'},'Please Select Methods Defpf2_base.external.INItion file');
             
             if(isempty(file)||~ischar(file)||(isnumeric(file)&&file==0))
                 return;
@@ -944,10 +944,10 @@ function [myMethods]= loadMethods(methodsCfgFilename,createIfMissing)
 
             fclose(fid);
 
-            myMethods.cfg = INI('File',[pathname file]);
+            myMethods.cfg = pf2_base.external.INI('File',[pathname file]);
         end
 
-        myMethods.cfg = INI('File',methodsCfgFilename);
+        myMethods.cfg = pf2_base.external.INI('File',methodsCfgFilename);
     elseif(nargin==2&&createIfMissing)
         fid = fopen(methodsCfgFilename);
 
@@ -955,15 +955,15 @@ function [myMethods]= loadMethods(methodsCfgFilename,createIfMissing)
             %fclose(fid);
             fprintf('Local Config File not found\nMaking new methods config file');
 
-            myMethods.cfg = INI('File',methodsCfgFilename);
+            myMethods.cfg = pf2_base.external.INI('File',methodsCfgFilename);
             myMethods.cfg.write(); 
             
         else
 
-            myMethods.cfg = INI('File',methodsCfgFilename);
+            myMethods.cfg = pf2_base.external.INI('File',methodsCfgFilename);
         end
     else
-        [file, pathname] = uigetfile({'pf2_methods_*.cfg';'*.cfg';'*.*'},'Please Select Methods Definition file');
+        [file, pathname] = uigetfile({'pf2_methods_*.cfg';'*.cfg';'*.*'},'Please Select Methods Defpf2_base.external.INItion file');
         
         if(isempty(file)||~ischar(file)||(isnumeric(file)&&file==0))
             return;
@@ -977,7 +977,7 @@ function [myMethods]= loadMethods(methodsCfgFilename,createIfMissing)
 
         fclose(fid);
 
-        myMethods.cfg = INI('File',[pathname file]);
+        myMethods.cfg = pf2_base.external.INI('File',[pathname file]);
     end
 
     myMethods.cfg.read();
@@ -1011,7 +1011,7 @@ function [myFunctions]= loadFunctions(functionsCfgFilename,createIfMissing)
             warning('Local Config File not found');
 
 
-            [file, pathname] = uigetfile({'pf2_functions_*.cfg';'*.cfg';'*.*'},'Please Select Functions Definition file');
+            [file, pathname] = uigetfile({'pf2_functions_*.cfg';'*.cfg';'*.*'},'Please Select Functions Defpf2_base.external.INItion file');
             fid = fopen([pathname file]);
             
             if(isempty(file)||~ischar(file)||(isnumeric(file)&&file==0))
@@ -1024,10 +1024,10 @@ function [myFunctions]= loadFunctions(functionsCfgFilename,createIfMissing)
 
             fclose(fid);
 
-            myFunctions.cfg = INI('File',[pathname file]);
+            myFunctions.cfg = pf2_base.external.INI('File',[pathname file]);
         end
 
-        myFunctions.cfg = INI('File',functionsCfgFilename);
+        myFunctions.cfg = pf2_base.external.INI('File',functionsCfgFilename);
     elseif(nargin==2&&createIfMissing)
         fid = fopen(functionsCfgFilename);
 
@@ -1035,15 +1035,15 @@ function [myFunctions]= loadFunctions(functionsCfgFilename,createIfMissing)
             %fclose(fid);
             warning('Local Function Config File not found');
 
-            myFunctions.cfg = INI('File',functionsCfgFilename);
+            myFunctions.cfg = pf2_base.external.INI('File',functionsCfgFilename);
             myFunctions.cfg.write(); 
             
         else
 
-            myFunctions.cfg = INI('File',functionsCfgFilename);
+            myFunctions.cfg = pf2_base.external.INI('File',functionsCfgFilename);
         end
     else
-        [file, pathname] = uigetfile({'pf2_functions_*.cfg';'*.cfg';'*.*'},'Please Select Functions Definition file');
+        [file, pathname] = uigetfile({'pf2_functions_*.cfg';'*.cfg';'*.*'},'Please Select Functions Defpf2_base.external.INItion file');
         if(isempty(file)||~ischar(file)||(isnumeric(file)&&file==0))
             return
         end
@@ -1055,7 +1055,7 @@ function [myFunctions]= loadFunctions(functionsCfgFilename,createIfMissing)
 
         fclose(fid);
 
-        myFunctions.cfg = INI('File',[pathname file]);
+        myFunctions.cfg = pf2_base.external.INI('File',[pathname file]);
     end
 
     myFunctions.cfg.read();
@@ -1251,7 +1251,7 @@ reservedArgs={'Name','Description','validStages','Arguments','x','fs','fTime','f
 
 if(iscell(f2add))
    for i=1:length(f2add)
-		f2add{i}=cleanNameForINI(f2add);
+		f2add{i}=cleanNameForpf2_base.external.INI(f2add);
        %Add and assign default arguments and values
       PF2.currentMethod.F{length(PF2.currentMethod.F)+1}.f=f2add{i}; 
       PF2.currentMethod.F{length(PF2.currentMethod.F)}.args=PF2.myFunctions.cfg.(f2add{i}).Arguments;
@@ -1504,13 +1504,13 @@ function pushbutton_exportMethod_Callback(hObject, eventdata, handles)
 % handles    structure with handles and user data (see GUIDATA)
 global PF2
 
-[file, pathname] = uiputfile({'pf2_methods_*.cfg';'*.cfg';'*.*'},'Save Methods Definition file');
+[file, pathname] = uiputfile({'pf2_methods_*.cfg';'*.cfg';'*.*'},'Save Methods Defpf2_base.external.INItion file');
 if(isempty(file)||~ischar(file)||(isnumeric(file)&&file==0))
     return
 end
 
 PF2.myMethods=packMethods(PF2.myMethods);
-exportMethods.cfg = INI('File',[pathname file]);
+exportMethods.cfg = pf2_base.external.INI('File',[pathname file]);
 
 if(length(PF2.myMethods.cfg.Sections)>0)
    for i=1:length(PF2.myMethods.cfg.Sections)
@@ -1752,12 +1752,12 @@ function pushbutton_avail_function_export_Callback(hObject, eventdata, handles)
 
 global PF2
 
-[file, pathname] = uiputfile({'pf2_functions_*.cfg';'*.cfg';'*.*'},'Save Function Definitions file');
+[file, pathname] = uiputfile({'pf2_functions_*.cfg';'*.cfg';'*.*'},'Save Function Defpf2_base.external.INItions file');
 if(isempty(file)||~ischar(file)||(isnumeric(file)&&file==0))
     return
 end
 
-exportFunctions.cfg = INI('File',[pathname file]);
+exportFunctions.cfg = pf2_base.external.INI('File',[pathname file]);
 
 curFuncIdx=get(handles.listbox_availableFunctions,'Value');
 curFuncStrs=get(handles.listbox_availableFunctions,'String');

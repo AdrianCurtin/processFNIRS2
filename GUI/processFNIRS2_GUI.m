@@ -439,7 +439,7 @@ if(isempty(cfgFilePath)||~contains(cfgFilePath,'.cfg'))
     
 elseif(~isempty(cfgFilePath)) % If we're not looking at the GUI, doesn't matter
     
-    if(isnestedfield(setF,'device.cfg.info.CfgName')) % look to see if they match,...
+    if(pf2_base.isnestedfield(setF,'device.cfg.info.CfgName')) % look to see if they match,...
             
         curProbeName=sprintf('%s.cfg',setF.device.cfg.info.CfgName);
         
@@ -1423,10 +1423,10 @@ if(nargin>0) % if the file wasn't immediately accessible...
     
         fclose(fid);
 
-        setF.device.cfg = INI('File',[pathname file]);
+        setF.device.cfg = pf2_base.external.INI('File',[pathname file]);
     else
         fclose(fid);
-        setF.device.cfg = INI('File',deviceCfgFilename);
+        setF.device.cfg = pf2_base.external.INI('File',deviceCfgFilename);
     end
 else
     [file, pathname] = uigetfile({'*.cfg';'*.*'},'Please Select Device Configuration file',sprintf('%s/../devices',pF2_folder));
@@ -1443,7 +1443,7 @@ else
 
     fclose(fid);
 
-    setF.device.cfg = INI('File',[pathname file]);
+    setF.device.cfg = pf2_base.external.INI('File',[pathname file]);
 end
 
 setF.device.cfg.read();
@@ -1760,9 +1760,9 @@ set(h,'Tag','FullLine');
 hold(timelineAxesHandle,'on');
 h=plot(timelineAxesHandle,PF2.data.time(timeInd),0*PF2.data.time(timeInd),'r','linewidth',2);
 set(h,'Tag','ViewLine');
-h=vline(timelineAxesHandle,PF2.view.startTime,{'r','linewidth',2});
+h=pf2_base.external.vline(timelineAxesHandle,PF2.view.startTime,{'r','linewidth',2});
 set(h,'Tag','StartVLine');
-h=vline(timelineAxesHandle,PF2.view.endTime,{'r','linewidth',2});
+h=pf2_base.external.vline(timelineAxesHandle,PF2.view.endTime,{'r','linewidth',2});
 set(h,'Tag','EndVLine');
 xlim(timelineAxesHandle,[min(PF2.data.time),max(PF2.data.time)]);
 set(timelineAxesHandle,'xtick',[],'ytick',[])
@@ -3417,7 +3417,7 @@ global PF2
 if(isfield(PF2,'curMarkersPlot')&&~isempty(PF2.curMarkersPlot))
     reducedMarkers=PF2.curMarkersPlot((PF2.curMarkersPlot(:,1)>=xl(1)&PF2.curMarkersPlot(:,1)<=xl(2)),:);
     if(~isempty(reducedMarkers))
-        hhh=vline(curAx,reducedMarkers(:,1),'-k',{},'lineTags',cellstr(num2str(reducedMarkers(:,2))));
+        hhh=pf2_base.external.vline(curAx,reducedMarkers(:,1),'-k',{},'lineTags',cellstr(num2str(reducedMarkers(:,2))));
     end
 end
 
