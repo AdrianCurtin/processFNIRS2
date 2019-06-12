@@ -130,7 +130,7 @@ initialize_gui(hObject, handles, false);
 
 global ExFNIRS
 
-if(~isfield(ExFNIRS,settings))
+if(~isfield(ExFNIRS,'defaultRootPath'))
     [ExFNIRS_folder,~,~] = fileparts(mfilename('fullpath'));
     ExFNIRS.defaultRootPath=ExFNIRS_folder;
     curdir=cd;
