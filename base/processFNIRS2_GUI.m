@@ -3708,7 +3708,11 @@ function txt = myupdatefcn(pointDataTip, event_obj)
      txt={''};
  end
  
- 
+for i=1:length(txt)
+   txtprt=txt{i};
+   txtprt(txtprt=='_')=' ';
+   txt{i}=txtprt;
+end
   
  
 
