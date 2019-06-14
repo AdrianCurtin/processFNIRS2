@@ -109,7 +109,7 @@ if(~isfield(PF2,'myFunctions'))
    PF2.myFunctions=loadFunctions(PF2.availableFunctionsPath,true);
    
    defaultFunctionsPath=sprintf('%s/prefs/%s',PF2.defaultRootPath,'pf2_functions_default.cfg');
-   if(isnestedfield(PF2.myFunctions,'cfg.Sections'))
+   if(pf2_base.isnestedfield(PF2.myFunctions,'cfg.Sections'))
        if(isempty(PF2.myFunctions.cfg.Sections))
            answer = questdlg('No saved functions found! Would you like to import the default function library?','Load Default Functions','Yes','No','Yes');
            

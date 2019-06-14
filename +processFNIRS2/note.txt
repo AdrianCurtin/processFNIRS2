@@ -4,3 +4,9 @@ GUI branch will contain
 	The main GUI (no arguments)
 	.ConfigureMethods
 	.ConfigureFunctions
+Import branch will contain
+	various import functions
+Data branch will contain
+	Split
+	Plot
+	Resample
