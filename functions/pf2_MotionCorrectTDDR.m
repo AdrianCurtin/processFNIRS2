@@ -36,7 +36,11 @@ for ii=1:length(lstAct)
     Fc = filter_cutoff * 2/sample_rate;
     if Fc<1
         [fb,fa] = butter(filter_order,Fc);
-        signal_low = filtfilt(fb,fa,dod(:,idx_ch));
+        try
+            signal_low = filtfilt(fb,fa,dod(:,idx_ch));
+        catch 
+            signal_low = pf2_base.external.filtfilt_classic(fb,fa,dod(:,idx_ch));
+        end
     else
         signal_low = dod(:,idx_ch);
     end

@@ -1319,14 +1319,23 @@ ExFNIRS.gby=[];
 ExFNIRS.groupByVars=groupbyRows.Properties.VariableNames;
 
 statusTextStr='Grouping data by ';
+ExFNIRS.statusGroupByStr='';
 for i=1:length(ExFNIRS.groupByVars)
     statusTextStr=sprintf('%s %s X ', statusTextStr,ExFNIRS.groupByVars{i});
+    if(i==1)
+        ExFNIRS.statusGroupByStr=ExFNIRS.groupByVars{i};
+    else
+        ExFNIRS.statusGroupByStr=sprintf('%s X ', ExFNIRS.statusGroupByStr,ExFNIRS.groupByVars{i});
+    end
 end
 
 statusTextStr(end-2:end)=[];
+ExFNIRS.statusGroupByStr(end-2:end)=[];
+
 
 if(isempty(ExFNIRS.groupByVars))
     statusTextStr='Data is ungrouped';
+    ExFNIRS.statusGroupByStr='Ungrouped';
 end
 
 set(handles.text_status_text,'String',statusTextStr);
@@ -1362,10 +1371,13 @@ for i=1:max(gbyIdx)
    
     if(ExFNIRS.settings.within_sub_avg_mode==1)
        hArg=[]; 
+       ExFNIRS.settings.within_sub_avg_mode_label='None';
     elseif(ExFNIRS.settings.within_sub_avg_mode==2)
         hArg=ExFNIRS.gby(i).gbyTables(:,'SubjectID');
+        ExFNIRS.settings.within_sub_avg_mode_label='Flat';
     elseif(ExFNIRS.settings.within_sub_avg_mode==3)
         hArg=ExFNIRS.gby(i).gbyTables(:,ExFNIRS.dataHierarchy);
+        ExFNIRS.settings.within_sub_avg_mode_label='Hierarchy';
     end
     ExFNIRS.gby(i).gbyGrand=grandAvgFNIRS(ExFNIRS.gby(i).gbyFNIRS,false,[],false,hArg,true,false);
     waitbar(0,eHf,sprintf('ExploreFNIRS\nBuilding Chart Data...'));
@@ -1456,6 +1468,9 @@ if(~any(curRawMatchIdx&curOxyMatchIdx))
 else
    ExFNIRS.curProcessedData= ExFNIRS.processedData{curRawMatchIdx&curOxyMatchIdx,3};
 end
+
+ExFNIRS.curMethodName=sprintf('%s : %s',cur_raw_method,cur_oxy_method);
+ExFNIRS.curMethodName(ExFNIRS.curMethodName=='_')='-';
 
 updateSelectedTable(handles);
 
@@ -2027,6 +2042,7 @@ for i=1:size(sH,1)
             end
         end
         
+        addDebugAnnotation(sH{i,b}.h);
         switch(figType)
             case 'bioM'
                 suptitle(sH{i,b}.h,selectedBioM{i});
@@ -2037,8 +2053,12 @@ for i=1:size(sH,1)
 end
 
     
-    
-    
+function addDebugAnnotation(figHandle)
+global ExFNIRS
+curTime = datetime(now,'ConvertFrom','datenum');
+debugString=sprintf('%s\n%s (%s)\n%s',ExFNIRS.curMethodName,ExFNIRS.statusGroupByStr,ExFNIRS.settings.within_sub_avg_mode_label,curTime);
+th=annotation(figHandle,'textbox',[0,1,0,0],'String',debugString,'FitBoxToText','on');
+        
 
 
 function possibleStr=num2strOrNot(possibleStr)
@@ -3026,6 +3046,7 @@ if(showBarChart)
     multiPlot=false;
     ExFNIRS.figHandles.main=figure(1000);
     cla(ExFNIRS.figHandles.main);
+    addDebugAnnotation(ExFNIRS.figHandles.main);
     dcm_obj = datacursormode(ExFNIRS.figHandles.main);
     set(dcm_obj,'UpdateFcn',@myDataTipUpdateFcn);
     % end
@@ -3412,6 +3433,7 @@ ExFNIRS.curChartModelsCoefficents_df=table();
 if(ExFNIRS.settings.LME_enable)
     fprintf('Generating Models...\nAccessed at ExFNIRS.curChartModels\n')
 end
+
 for sH=1:length(subplotHandles)
     
     if(ExFNIRS.settings.LME_enable&&isfield(subplotGby{sH},'gby'))
@@ -3433,8 +3455,6 @@ for sH=1:length(subplotHandles)
         if(plotGroupByBioM&&numBioM>1)
             %basicMdlStrings{length(basicMdlStrings)+1}='BioM';
             warning('GroupBy Biomarker Plots not supported yet\n Only using first biomarker');
-        elseif(numBioM>1)
-            %basicMdlStrings{length(basicMdlStrings)+1}='BioM';
         end
         
         for z=1:length(basicMdlStrings)
@@ -3530,6 +3550,7 @@ if(showTopo)
     else
         
         topoH=figure(2000);
+        addDebugAnnotation(topoH);
         
         chNames=ExFNIRS.curChartModelsCoefficents_tstat.Properties.RowNames;
         coefNames=ExFNIRS.curChartModelsCoefficents_tstat.Properties.VariableNames;
@@ -3539,48 +3560,53 @@ if(showTopo)
             temp=strsplit(chNames{z},'_');
             chArr(z)=sscanf(temp{1},'Opt%i');
             bioMarr(z)=temp(2);
-        end
+         end
+         bioMLabel=cell(0,0);
         
-        for b=1:numBioM
-            for c=1:numCoeff
-                fNIR_t{b,c}=nan(2,8);
-                fNIR_p{b,c}=nan(2,8);
-                fNIR_df{b,c}=nan(2,8);
+        if(~plotGroupByBioM)
+            for b=1:numBioM
+                for c=1:numCoeff
+                    fNIR_t{b,c}=nan(2,8);
+                    fNIR_p{b,c}=nan(2,8);
+                    fNIR_df{b,c}=nan(2,8);
+                end
             end
 
-        
-       
-        
-        
-        for c=1:numCoeff
-            for i=1:size(ExFNIRS.curChartModelsCoefficents_tstat,1)
-               curCh= chArr(i);
-               curIdx=[rem(curCh-1,2)+1,1+floor((curCh-0.01)/2)];
-               curChName=chNames(i);
-               
-               b=find(strcmp(bioMarr{i},selectedBioM));
 
-               fNIR_t{b,c}(curIdx(1),curIdx(2))=ExFNIRS.curChartModelsCoefficents_tstat{curChName,coefNames(c)};
-               fNIR_p{b,c}(curIdx(1),curIdx(2))=ExFNIRS.curChartModelsCoefficents_pval{curChName,coefNames(c)};
-               fNIR_df{b,c}(curIdx(1),curIdx(2))=ExFNIRS.curChartModelsCoefficents_df{curChName,coefNames(c)};
-            end
-        end
-        
-        %for b=1:numBioM
-            for c=1:numCoeff
             
-            subplot(numBioM,numCoeff,c+(b-1)*numCoeff)
-            curT=fNIR_t{b,c};
-            curP=fNIR_p{b,c};
-        
-            interpolateNIR(abs(curT),'Mode','tstat','fontSize',12,'transparent',true,'pValueMask',curP,'TitleText',coefNames{c})%,7,11,2,1,false,'[Hb-Oxy] Natural High Vs. Low',12,'hot',true)
+            for coefIdx=1:size(ExFNIRS.curChartModelsCoefficents_tstat,1)
+                    
+               curCh= chArr(coefIdx);
+               curIdx=[rem(curCh-1,2)+1,1+floor((curCh-0.01)/2)];
+               curChName=chNames(coefIdx);
+
+               b_idx=strcmp(bioMarr{coefIdx},selectedBioM);
+               bioMLabel(b)=selectedBioM(b_idx);
+                   
+               for c=1:numCoeff
+
+                   fNIR_t{b_idx,c}(curIdx(1),curIdx(2))=ExFNIRS.curChartModelsCoefficents_tstat{curChName,coefNames(c)};
+                   fNIR_p{b_idx,c}(curIdx(1),curIdx(2))=ExFNIRS.curChartModelsCoefficents_pval{curChName,coefNames(c)};
+                   fNIR_df{b_idx,c}(curIdx(1),curIdx(2))=ExFNIRS.curChartModelsCoefficents_df{curChName,coefNames(c)};
+                end
+            end
+                   
+            for b=1:numBioM
+                for c=1:numCoeff
+                    subplot(numBioM,numCoeff,c+(b-1)*numCoeff)
+                    curT=fNIR_t{b,c};
+                    curP=fNIR_p{b,c};
+
+                    interpolateNIR(abs(curT),'Mode','tstat','fontSize',12,'transparent',true,'pValueMask',curP,'TitleText',coefNames{c})%,7,11,2,1,false,'[Hb-Oxy] Natural High Vs. Low',12,'hot',true)
+                    if(c==1) % first column
+                        ylabel(selectedBioM(b));
+                    end
+                end
             end
         end
         
     end
 end
-
-
 % --- Executes on selection change in popupmenu_bar_feature.
 function popupmenu_bar_feature_Callback(hObject, eventdata, handles)
 % hObject    handle to popupmenu_bar_feature (see GCBO)
@@ -5355,6 +5381,7 @@ for i=1:size(sH,1)
             end
         end
 
+        addDebugAnnotation(sH{i,b}.h);
         switch(figType)
             case 'bioM'
                 suptitle(sH{i,b}.h,selectedBioM{i});
