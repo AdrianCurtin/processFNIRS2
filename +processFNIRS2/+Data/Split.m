@@ -1,6 +1,6 @@
 function [outfNIR] = Split(varargin)
-%getFNIRS Splice fNIRS segment according to start/end times and optionally rebaseline data
-%   getFNIRS(fNIR,startTime,endTime,segmentLength,relative,blLength,blStartTime,blfNIR)
+%processFNIRS2.Data.Split Splice fNIRS segment according to start/end times and optionally rebaseline data
+%   processFNIRS2.Data.Split(fNIR,startTime,endTime,segmentLength,relative,blLength,blStartTime,blfNIR)
 %   Detailed explanation goes here
 
 % If only start time is given, returns segment from startTime to end
@@ -21,39 +21,39 @@ function [outfNIR] = Split(varargin)
 %blStart, start time of basline in seconds (absolute time or relative)
 
 % Usage examples
-% getFNIRS(fnirData,561) : Returns segment of data from t=561s to end
-%       Equivalent to getFNIRS('fNIR',fnirData,'startTime',561);
+% processFNIRS2.Data.Split(fnirData,561) : Returns segment of data from t=561s to end
+%       Equivalent to processFNIRS2.Data.Split('fNIR',fnirData,'startTime',561);
 %
-% getFNIRS(fnirData,200,282) : Returns segment of data from t=200 to t=282s
-%       Equivalent to getFNIRS('fNIR',fnirData,'startTime',200,'endTime',282);
+% processFNIRS2.Data.Split(fnirData,200,282) : Returns segment of data from t=200 to t=282s
+%       Equivalent to processFNIRS2.Data.Split('fNIR',fnirData,'startTime',200,'endTime',282);
 %
-% getFNIRS(fnirData,200,'segmentLength',40) : Returns segment of data from t=200 to t=240s
-%       Equivalent to getFNIRS('fNIR',fnirData,'startTime',200,'segmentLength',40);
+% processFNIRS2.Data.Split(fnirData,200,'segmentLength',40) : Returns segment of data from t=200 to t=240s
+%       Equivalent to processFNIRS2.Data.Split('fNIR',fnirData,'startTime',200,'segmentLength',40);
 %
-% getFNIRS(fnirData,10,50,'relative',true) : Returns segment of data from 10s after 
+% processFNIRS2.Data.Split(fnirData,10,50,'relative',true) : Returns segment of data from 10s after 
 %               the begining of the segment(min(fnirData.time) to 50s after
-%       Equivalent to getFNIRS('fNIR',fnirData,'startTime',10,'endTime',50,'relative','true');
+%       Equivalent to processFNIRS2.Data.Split('fNIR',fnirData,'startTime',10,'endTime',50,'relative','true');
 %
-% getFNIRS(fnirData,20,'segmentLength',60,'relative',true) : Returns segment of data from 20s after 
+% processFNIRS2.Data.Split(fnirData,20,'segmentLength',60,'relative',true) : Returns segment of data from 20s after 
 %               the begining of the segment(min(fnirData.time) to 60s after
 %               the start time (20s+60s=80s)
 %        
-%       Equivalent to getFNIRS('fNIR',fnirData,'startTime',20,'segmentLength',60,'relative','true');
+%       Equivalent to processFNIRS2.Data.Split('fNIR',fnirData,'startTime',20,'segmentLength',60,'relative','true');
 %
-% getFNIRS(fnirData,20,100,'blLength',10) : Returns segment of data from t=20 to t=100s
+% processFNIRS2.Data.Split(fnirData,20,100,'blLength',10) : Returns segment of data from t=20 to t=100s
 %               with the first 10seconds of the segment (t=0:10) used as
 %               the baseline period for the segment (t=20:100)
-%       Equivalent to getFNIRS('fNIR',fnirData,'startTime',20,'endTime',100,'blLength',10);
+%       Equivalent to processFNIRS2.Data.Split('fNIR',fnirData,'startTime',20,'endTime',100,'blLength',10);
 %
-% getFNIRS(fnirData,20,100,'blLength',10,'blStartTime',20) : Returns segment of data from t=20 to t=100s
+% processFNIRS2.Data.Split(fnirData,20,100,'blLength',10,'blStartTime',20) : Returns segment of data from t=20 to t=100s
 %               with the the segment (t=20:30) used as
 %               the baseline period for the segment (t=20:100)
-%       Equivalent to getFNIRS('fNIR',fnirData,'startTime',20,'endTime',100,'blLength',10,'blStartTime',20);
+%       Equivalent to processFNIRS2.Data.Split('fNIR',fnirData,'startTime',20,'endTime',100,'blLength',10,'blStartTime',20);
 %
-% getFNIRS(fnirData,20,100,'blfNIR',baseline_fnirdata) : Returns segment of data from t=20 to t=100s
+% processFNIRS2.Data.Split(fnirData,20,100,'blfNIR',baseline_fnirdata) : Returns segment of data from t=20 to t=100s
 %               with the entire fNIR struct baseline_fnirdata used as
 %               the baseline period for the segment (t=20:100)
-%       Equivalent to getFNIRS('fNIR',fnirData,'startTime',20,'endTime',100,'blfNIR',baseline_fnirdata);
+%       Equivalent to processFNIRS2.Data.Split('fNIR',fnirData,'startTime',20,'endTime',100,'blfNIR',baseline_fnirdata);
 
 
 
@@ -191,6 +191,7 @@ end
 hasRawField=isfield(fNIR,'raw');
 hasOxyField=isfield(fNIR,'HbO');
 hasCARfield=isfield(fNIR,'CAR');
+hasROIfield=isfield(fNIR,'ROI');
 
 
 indexStart=find(fNIR.time>=startTime,1);
@@ -285,6 +286,22 @@ else
     if(isfield(fNIR,'time'))
         outfNIR.time=fNIR.time(indexStart:indexEnd,1);
     end
+    
+    if(hasROIfield)
+        outfNIR.ROI=outfNIR.ROI;
+        if(pf2base.isnestedfield(fNIR.ROI,'raw'))
+            outfNIR.ROI.raw=fNIR.ROI.raw(indexStart:indexEnd,:);
+        end
+        
+        if(pf2base.isnestedfield(fNIR.ROI,'HbO'));
+            outfNIR.ROI.HbO=fNIR.ROI.HbO(indexStart:indexEnd,:);
+            outfNIR.ROI.HbR=fNIR.ROI.HbR(indexStart:indexEnd,:);
+            outfNIR.ROI.HbDiff=fNIR.ROI.HbDiff(indexStart:indexEnd,:);
+            outfNIR.ROI.CBSI=fNIR.ROI.CBSI(indexStart:indexEnd,:);
+            outfNIR.ROI.HbTotal=fNIR.ROI.HbTotal(indexStart:indexEnd,:);
+        end
+    end
+    
 
 end
 

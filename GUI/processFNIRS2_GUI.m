@@ -399,6 +399,10 @@ if(isstruct(data)) %treat as fNIR struct
         PF2.data.channels=data.channels;
     end
     
+    if(pf2_base.isnestedfield(data,'ROI.info'))
+        PF2.data.ROI=data.ROI;
+    end
+    
     if(isfield(data,'takizawa'))
         PF2.data.takizawa=data.takizawa;
     end
@@ -566,6 +570,7 @@ else
     PF2.data.stage{5}=PF2.data.stage{4};
 end
 
+
 function [outDataOD,outDataRaw]=processStageRaw2OD(data)
  % Raw data processing
 
@@ -640,6 +645,8 @@ else
                     passedArgVals={passedArgVals};
                 end
             end
+            
+
             
             for a=1:length(args)
                if strcmp(args{a},'x')==1
@@ -772,10 +779,17 @@ function outData=processStageFilterHb(data)
 global outputData
 global PF2
 
+bioM_list={'HbO','HbR','HbDiff','HbTotal','CBSI'};
 
 validChannels=false(size(data.channels));
 numChannels=length(data.channels(data.channels>0));
 validChannels(data.channels>0)=data.channels(data.channels>0)&(reshape(PF2.data.fchMask|outputData.ProcessRejected,[1,numChannels]));
+
+curfMask=PF2.data.fchMask|outputData.ProcessRejected;
+
+if(isfield(data,'ROI'))
+    validChannels_roi=true(size(outData.ROI.(bioM_list{bioM})));
+end
 
 firstValidRow=nan;
 for i=1:size(data.HbO,1)
@@ -821,6 +835,7 @@ else
             fmrk_ind=[];
             fAux_ind=[];
             fsd_ind=[];
+            fStruct_ind=[];
             
             if(length(Fidx)>1||~iscell(Fidx.args)) %This is a struct array for some reason?
                %Change it back!
@@ -833,6 +848,26 @@ else
             else
                 args=Fidx.args;
                 passedArgVals=Fidx.argvals;
+            end
+            
+            if(isfield(Fidx,'output'))
+               x_out_ind=[];
+               roi_out_ind=[];
+               fmask_out_ind=[];
+               outputList=Fidx.output;
+               for output_idx=1:length(outputList)
+                   if strcmp(outputList{output_idx},'x')==1
+                        x_out_ind=output_idx;
+                   elseif strcmp(outputList{output_idx},'fchMask')==1
+                       fmask_out_ind=output_idx;
+                   elseif strcmp(outputList{output_idx},'ROI')==1
+                       roi_out_ind=output_idx;
+                   end
+               end
+            else
+                x_out_ind=1;
+                roi_out_ind=[];
+                fmask_out_ind=[];
             end
             
             for a=1:length(args)
@@ -859,28 +894,71 @@ else
                elseif strcmp(args{a},'fAux')==1
                   fAux_ind=a;
                   passedArgVals{fAux_ind}=PF2.data.Aux;
+               elseif strcmp(args{a},'fNIRstruct')==1  % Try not to use, can be inefficient
+                   fStruct_ind=a;
+                   passedArgVals{fStruct_ind}=data;
                end
             end
             
-            if(~isempty(x_ind))
+            if(~isempty(x_ind)||~isempty(fStruct_ind))
                 outData=data;
                 %for ch=1:size(data,2)
-                bioMrk={'HbO','HbR','HbDiff','HbTotal','CBSI'};
-                for bmrkIdx=1:length(bioMrk)
-                    bmrk=bioMrk{bmrkIdx};
+                
+                for bmrkIdx=1:length(bioM_list)
+                    bmrk=bioM_list{bmrkIdx};
                     
-                    passedArgVals{x_ind}=data.(bmrk)(validRows,validChannels);
+                    if(~isempty(x_ind))
+                        passedArgVals{x_ind}=data.(bmrk)(validRows,validChannels);
+                    end
+                    
+                    if(~isempty(fStruct_ind))
+                        passedArgVals{fStruct_ind}=data;
+                    end
+                    
+                    
+                     if(isfield(data,'ROI')&&~isempty(x_ind))
+                        % Note ROI functions may not be able to handle
+                        % functions using channel numbers of SD separation
+                        passedArgVals_roi=passedArgVals;
+                        passedArgVals_roi{x_ind}=data.ROI.(bmrk)(:,validChannels_roi);
+                        
+                    end
                     
                     try
                         if(~errorFlag)
-                            outData.(bmrk)(validRows,validChannels)=func(passedArgVals{:});
+                            funcOutput{:}=func(passedArgVals{:});
+                            if(isfield(data,'ROI'))
+                                funcOutput_roi{:}=func(passedArgVals_roi{:}); 
+                            end
+                            
+                            if(~isempty(x_out_ind)) % Assign values to fNIRS Biomarkers
+                                outData.(bmrk)(validRows,validChannels)=funcOutput{x_out_ind};
+                                if(isfield(data,'ROI')&&isnan(roi_out_ind))
+                                    outData.ROI.(bmrk)(:,validChannels_roi)=funcOutput_roi{x_out_ind};
+                                end
+                            end
+                            
+                            if(~isempty(fmask_out_ind)) % Or with current fmask
+                                curfMask=curfMask&funcOutput{fmask_out_ind};
+                                validChannels(data.channels>0)=data.channels(data.channels>0)&(reshape(curfMask,[1,numChannels]));
+
+                                if(isfield(data,'ROI')&&isnan(roi_out_ind))
+                                    validChannels_roi=validChannels_roi&funcOutput_roi{fmask_out_ind};
+                                end
+                            end
+                            
+                            if(~isempty(roi_out_ind)) % Build ROIs
+                                outData.ROI.(bmrk)=funcOutput{roi_out_ind};
+                                validChannels_roi=true(size(outData.ROI.(bmrk)));
+                            end
+                            
                         else
                             outData.(bmrk)(:,validChannels)=nan;
                         end
                     catch ME
                         %global outputData
                         if(outputData.ShowGUI)
-                            outData(:,validChannels)=nan;
+                            outData.(bmrk)(:,validChannels)=nan;
                             errorFlag=true;  % Set all other biomarkers to na
                             fprintf('Error occured in method %s when processing %s\n',PF2.GUIPF2.stageRawMethod.name,Fidx(1).f);
                             waitfor(errordlg(sprintf('Error occured in method %s when processing %s\n%s\n',PF2.GUIPF2.stageRawMethod.name,Fidx(1).f,ME.message),'Raw Processing Error'));
@@ -893,7 +971,7 @@ else
                 end
 
                 %end
-                %data=outData;
+                data=outData;
             else
                 %outData=data;
                 warning('Unable to identify NIRS input argument\n');
@@ -903,14 +981,19 @@ else
 end
 
 invalidChannels=false(size(data.channels));
-invalidChannels(data.channels>0)=data.channels(data.channels>0)&(reshape(~PF2.data.fchMask&~outputData.ProcessRejected,[1,numChannels]));
+invalidChannels(data.channels>0)=data.channels(data.channels>0)&(reshape(~curfMask&~outputData.ProcessRejected,[1,numChannels]));
+PF2.data.curChMask=curfMask;
 
 
-outData.HbO(:,invalidChannels)=nan;
-outData.HbR(:,invalidChannels)=nan;
-outData.HbDiff(:,invalidChannels)=nan;
-outData.HbTotal(:,invalidChannels)=nan;
-outData.CBSI(:,invalidChannels)=nan;
+
+for bioM=1:length(bioM_list) % go through each biomarker and set invalid cahnnels to nan
+    outData.(bioM_list{bioM})(:,invalidChannels)=nan;
+    
+    if(isfield(outData,'ROI'))
+        outData.ROI.(bioM_list{bioM})(:,~validChannels_roi)=nan;
+    end
+end
+
 
 if(PF2.view.processWindowOnly)
     outData.validRows=validRows;
@@ -1462,6 +1545,28 @@ end
 
 updateCurrentDevice();
 
+function updateAutoRejectedChannelLabels(handles)
+global PF2
+global setF
+
+curCh=[];
+curChMask=[];
+curSelectedOptode=get(handles.listbox_optodes,'Value');
+PF2.curProbes=get(handles.listbox_probes,'Value');
+for i=1:length(PF2.curProbes)
+    curCh=[curCh,setF.device.Probe{PF2.curProbes(i)}.ChannelNumbers];
+    if(isfield(PF2,'data')&&isfield(PF2.data,'fchMask'))
+        curChMask=[curChMask,PF2.data.fchMask]; 
+    else
+        curChMask=[curChMask,true(size(curCh))];
+    end
+end
+curCh=unique(curCh(curCh>0));
+[listCh,idx]=sort(curCh);
+curChMask=curChMask(idx);
+
+newVal=get(handles.checkbox_rejectCh,'Value')==0;
+
 % --- Executes on button press in checkbox_rejectCh.
 function checkbox_rejectCh_Callback(hObject, eventdata, handles)
 % hObject    handle to checkbox_rejectCh (see GCBO)
@@ -1685,6 +1790,7 @@ function updatePlots(handles)
 
 global PF2
 global setF
+UpdateOptodesRejected(handles);
 
 figure(handles.figure1);
 
@@ -2371,6 +2477,63 @@ function listbox_probes_Callback(hObject, eventdata, handles)
 %        contents{get(hObject,'Value')} returns selected item from listbox_probes
 UpdateOptodeList(handles)
 
+function UpdateOptodesRejected(handles)
+global PF2
+global setF
+curCh=[];
+curChMask=[];
+curOptStrs=get(handles.listbox_optodes,'String');
+if(ischar(curOptStrs)&&contains(curOptStrs,'Select'))
+    initLists=true;
+else
+    initLists=false;
+end
+curSelectedOptode=get(handles.listbox_optodes,'Value');
+PF2.curProbes=get(handles.listbox_probes,'Value');
+for i=1:length(PF2.curProbes)
+    curCh=[curCh,setF.device.Probe{PF2.curProbes(i)}.ChannelNumbers];
+    if(isfield(PF2,'data')&&isfield(PF2.data,'fchMask'))
+        curChMask=[curChMask,PF2.data.fchMask]; 
+    else
+        curChMask=[curChMask,true(size(curCh))];
+    end
+end
+
+strCh={};
+curCh=curCh(curCh>0);
+[listCh,idx]=sort(unique(curCh));
+curChMask=curChMask(idx);
+
+numList=0;
+
+if(pf2_base.isnestedfield(PF2,'data.curChMask'))
+    curAutoRejectChMask=curChMask&PF2.data.curChMask;
+else
+    curAutoRejectChMask=true(size(curChMask));
+end
+    
+for i=1:length(listCh)
+    numList=numList+1;
+    if(curChMask(i))
+        strCh{numList}=sprintf('%i',listCh(i));
+    else
+        strCh{numList}=sprintf('%i (R)',listCh(i));
+    end
+    
+    if(~curAutoRejectChMask(i)&&curChMask(i))
+        strCh{numList}=sprintf('%s(AR)',strCh{numList});
+    end
+end
+
+set(handles.listbox_optodes,'string',strCh);
+if(initLists||isempty(curSelectedOptode)||max(curSelectedOptode)>numList)
+    curSelectedOptode=1;
+end
+set(handles.listbox_optodes,'Value',curSelectedOptode);
+
+
+
+
 
 
 function UpdateOptodeList(handles)
@@ -2394,6 +2557,11 @@ for i=1:length(PF2.curProbes)
     else
         curChMask=[curChMask,true(size(curCh))];
     end
+    
+    if(pf2_base.isnestedfield(PF2,'data.curChMask'))
+        curAutoRejectChMask=curChMask&PF2.data.curChMask;
+    end
+    
     curWv=[curWv,setF.device.Probe{PF2.curProbes(i)}.Wavelength];
 end
 
@@ -2409,6 +2577,10 @@ for i=1:length(listCh)
         strCh{numList}=sprintf('%i',listCh(i));
     else
         strCh{numList}=sprintf('%i (R)',listCh(i));
+    end
+    
+    if(curAutoRejectChMask(i))
+        strCh{numList}=sprintf('%i(AR)',strCh{numList});
     end
 end
 

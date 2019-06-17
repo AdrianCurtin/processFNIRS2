@@ -44,12 +44,14 @@ end
 segUnits=cell(size(FNIRScellArray));
 segSampleTimes=nan(size(FNIRScellArray));
 segSampleCount=nan(size(FNIRScellArray));
+segROIpresent=false(size(FNIRScellArray));
 for i=length(FNIRScellArray):-1:1 
     if(isempty(FNIRScellArray{i})||sum(~isnan(FNIRScellArray{i}.time))==0)
         FNIRScellArray(i)=[];
         segSampleTimes(i)=[];
         segSampleCount(i)=[];
         hierarchyVars(i,:)=[];
+        segROIpresent(i)=[];
         segUnits(i)=[];
     elseif(~isfield(FNIRScellArray{i},'fs')&&isfield(FNIRScellArray{i},'time'))
         if(timeAlign)
@@ -60,12 +62,14 @@ for i=length(FNIRScellArray):-1:1
         segUnits{i}=FNIRScellArray{i}.units;
         FNIRScellArray{i}.fs=1/segSampleTimes(i);
         FNIRScellArray{i}.fs=round(FNIRScellArray{i}.fs,3);
+        segROIpresent(i)=pf2_base.isnestedfield(FNIRScellArray{i},'ROI.HbO');
         
     elseif(~isfield(FNIRScellArray{i},'time'))
         FNIRScellArray(i)=[];
         hierarchyVars(i,:)=[];
         segSampleTimes(i)=[];
         segSampleCount(i)=[];
+        segROIpresent(i)=[];
         segUnits(i)=[];
         warning('Cannot use groups which have no time info');
     elseif(timeAlign)
@@ -75,12 +79,14 @@ for i=length(FNIRScellArray):-1:1
         segUnits{i}=FNIRScellArray{i}.units;
         FNIRScellArray{i}.fs=1/segSampleTimes(i);
         FNIRScellArray{i}.fs=round(FNIRScellArray{i}.fs,3);
+        segROIpresent(i)=pf2_base.isnestedfield(FNIRScellArray{i},'ROI.HbO');
     else
         segSampleTimes(i)=median(diff(FNIRScellArray{i}.time));
         segSampleCount(i)=length(FNIRScellArray{i}.time);
         segUnits{i}=FNIRScellArray{i}.units;
         FNIRScellArray{i}.fs=1/segSampleTimes(i);
         FNIRScellArray{i}.fs=round(FNIRScellArray{i}.fs,3);
+        segROIpresent(i)=pf2_base.isnestedfield(FNIRScellArray{i},'ROI.HbO');
     end
 end
 
@@ -118,6 +124,15 @@ if(nargin<3||isempty(resampleSize))
     end
 elseif(sum(segSampleCount>1)>0)
     resample=true;
+end
+
+if(sum(segROIpresent)==length(FNIRScellArray))
+    calcROI=true;
+elseif(sum(segROIpresent)>0)
+    warning('ROI definitions not present in all segments, ROI regions will not be calculated');
+    calcROI=false;
+else
+   calcROI=false; 
 end
 
 minTime=inf;
@@ -254,6 +269,15 @@ for i=1:numfSeg
         outGA.(curBioM).data(validT==1,1:numfCh,i)=curFNIR.(curBioM)(FNIRScellArray{i}.timeIdx(validT==1,2),:,1);
     end
     
+    if(calcROI)
+        numfCh_roi=size(curFNIR.ROI.HbO,2);
+        for b=1:length(bioMs)
+            curBioM=bioMs{b};
+            outGA.ROI.(curBioM).data(validT==1,1:numfCh_roi,i)=curFNIR.ROI.(curBioM)(FNIRScellArray{i}.timeIdx(validT==1,2),:,1);
+        end
+    end
+    
+    
     if(isfield(curFNIR,'Aux')&&averageAux)
         curSegAuxFields=fields(curFNIR.Aux);
         if(~isempty(curSegAuxFields))
@@ -277,7 +301,7 @@ end
 nanmax3=@(x,dim) nanmax(x,[],dim);
 nanmin3=@(x,dim) nanmin(x,[],dim);
 
-for b=1:length(bioMs)
+for b=1:length(bioMs) % Calculate hierarchical Average for each variable
     if(showProgress)
         waitbar(b/length(bioMs),hF,sprintf('grandAvgFNIRS\nAveraging biomarker %i of %i',b,length(bioMs)));
     end
@@ -288,6 +312,14 @@ for b=1:length(bioMs)
     hAvg.(curBioM).Max=pf2_base.hierarchicalAverage(inData,hierarchyVars,nanmax3);
     hAvg.(curBioM).Min=pf2_base.hierarchicalAverage(inData,hierarchyVars,nanmin3);
     
+    if(calcROI)
+        inData= permute(outGA.ROI.(curBioM).data,[3,1,2]);
+        [hAvg.ROI.(curBioM).Mean,tierLabel,hierarchy]=pf2_base.hierarchicalAverage(inData,hierarchyVars,@nanmean);
+        hAvg.ROI.(curBioM).Median=pf2_base.hierarchicalAverage(inData,hierarchyVars,@nanmedian);
+        hAvg.ROI.(curBioM).Max=pf2_base.hierarchicalAverage(inData,hierarchyVars,nanmax3);
+        hAvg.ROI.(curBioM).Min=pf2_base.hierarchicalAverage(inData,hierarchyVars,nanmin3);
+    end
+    
     if(b==1)
        outGA.info.Observation=tierLabel; 
        outGA.info.Hierarchy=hierarchy;
@@ -295,7 +327,7 @@ for b=1:length(bioMs)
     end
 end
 
-for b=1:length(bioMs)
+for b=1:length(bioMs) % reshape and get final statistics
         curBioM=bioMs{b};
         outGA.(curBioM).Mean=permute(mean(hAvg.(curBioM).Mean,1,'omitnan'),[2,3,1]);
         outGA.(curBioM).Median=permute(nanmedian(hAvg.(curBioM).Median,1),[2,3,1]);
@@ -304,6 +336,16 @@ for b=1:length(bioMs)
         outGA.(curBioM).N=permute(sum(~isnan(hAvg.(curBioM).Mean),1),[2,3,1]);
         outGA.(curBioM).SD=permute(std(hAvg.(curBioM).Mean,0,1,'omitnan'),[2,3,1]);
         outGA.(curBioM).SEM=outGA.(curBioM).SD./sqrt(outGA.(curBioM).N);
+        
+        if(calcROI)
+            outGA.ROI.(curBioM).Mean=permute(mean(hAvg.ROI.(curBioM).Mean,1,'omitnan'),[2,3,1]);
+            outGA.ROI.(curBioM).Median=permute(nanmedian(hAvg.ROI.(curBioM).Median,1),[2,3,1]);
+            outGA.ROI.(curBioM).Max=permute(nanmax(hAvg.ROI.(curBioM).Max,[],1),[2,3,1]);
+            outGA.ROI.(curBioM).Min=permute(nanmin(hAvg.ROI.(curBioM).Min,[],1),[2,3,1]);
+            outGA.ROI.(curBioM).N=permute(sum(~isnan(hAvg.ROI.(curBioM).Mean),1),[2,3,1]);
+            outGA.ROI.(curBioM).SD=permute(std(hAvg.ROI.(curBioM).Mean,0,1,'omitnan'),[2,3,1]);
+            outGA.ROI.(curBioM).SEM=outGA.ROI.(curBioM).SD./sqrt(outGA.ROI.(curBioM).N);
+        end
 end
 
 

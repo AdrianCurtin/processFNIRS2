@@ -1374,11 +1374,11 @@ for i=1:length(myMethods.cfg.Sections)
                 F_noarray.args{j}=Fidx(j).args;
                 F_noarray.argvals{j}=Fidx(j).argvals;
                 F_noarray.default_argvals{j}=Fidx(j).default_argvals;
-                if(isfield(Fidx(j),'output'))
+                if(isfield(Fidx(j).output)
                     F_noarray.output{j}=Fidx(j).output;
                 else
-                    F_noarray.output{j}='x';
-                    warning('please make sure your functions have an output feature');
+                    F_noarray.output{j}={'x'};
+                    warning('please
                 end
            end
            x.F{idx}=F_noarray;

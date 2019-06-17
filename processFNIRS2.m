@@ -402,6 +402,10 @@ if(isstruct(data)) %treat as fNIR struct
         fData.info.Sex='';
     end
     
+    if(pf2_base.isnestedfield(data,'ROI.info'))
+        fData.ROI=data.ROI;
+    end
+    
     if(isfield(data,'channels'))
         fData.channels=data.channels;
     end
@@ -485,6 +489,8 @@ if(~isempty(data))
         fData.stage{4}.fchMask=fData.fchMask;
         fData.stage{4}.Aux=fData.Aux;
         fData.stage{4}.markers=fData.markers;
+        fData.stage{4}.time=fData.time;
+        
         fData.stage{5}=processStageFilterHb(fData.stage{4},fData.fs,outputData.ProcessRejected); % Oxy data processing
     else
         %fData.stage{5}=fData.stage{4};
@@ -722,11 +728,16 @@ end
 function outData=processStageFilterHb(data,fs,ProcessRejected)
 % Oxy data processing
 
-
+bioM_list={'HbO','HbR','HbTotal','HbDiff','CBSI'};
 validChannels=false(size(data.channels));
 numChannels=length(data.channels(data.channels>0));
 validChannels(data.channels>0)=data.channels(data.channels>0)&(reshape(data.fchMask|ProcessRejected,[1,numChannels]));
 
+curfMask=data.fchMask|ProcessRejected;
+
+if(isfield(data,'ROI'))
+    validChannels_roi=true(size(outData.ROI.(bioM_list{bioM})));
+end
 
 global PF2
 if(~isfield(PF2,'stageOxyMethod'))
@@ -748,6 +759,8 @@ else
             fmrk_ind=[];
             fAux_ind=[];
             fsd_ind=[];
+            fStruct_ind=[];
+            
             
             if(length(Fidx)>1||~iscell(Fidx.args)) %This is a struct array for some reason?
                %Change it back!
@@ -760,6 +773,26 @@ else
             else
                 args=Fidx.args;
                 passedArgVals=Fidx.argvals;
+            end
+            
+            if(isfield(Fidx,'output'))
+               x_out_ind=[];
+               roi_out_ind=[];
+               fmask_out_ind=[];
+               outputList=Fidx.output;
+               for output_idx=1:length(outputList)
+                   if strcmp(outputList{output_idx},'x')==1 && ~isempty(x_out_ind)
+                        x_out_ind=output_idx;
+                   elseif strcmp(outputList{output_idx},'fchMask')==1 && ~isempty(fmask_out_ind)
+                       fmask_out_ind=output_idx;
+                   elseif strcmp(outputList{output_idx},'ROI')==1 && ~isempty(roi_out_ind)
+                       roi_out_ind=output_idx;
+                   end
+               end
+            else %legacy code missing output
+                x_out_ind=1;
+                roi_out_ind=[];
+                fmask_out_ind=[];
             end
             
             for a=1:length(args)
@@ -786,29 +819,59 @@ else
                elseif strcmp(args{a},'fChannelSD')==1
                   fsd_ind=a;
                   passedArgVals{fsd_ind}=PF2.curSDSet(validChannels);
+               elseif strcmp(args{a},'fNIRstruct')==1  % Try not to use, can be inefficient
+                   fStruct_ind=a;
+                   passedArgVals{fStruct_ind}=data;
                end
+               
             end
             
             
-            if(~isempty(x_ind))
+            if(~isempty(x_ind)||~isempty(fStruct_ind))
                 outData=data;
-                %for ch=1:size(data,2)
-                    passedArgVals{x_ind}=data.HbO(:,validChannels);
-                    outData.HbO(:,validChannels)=func(passedArgVals{:});
+                %TODO move channel mask that doesn't process data outside
+                %of loop 
+                for bioM=1:length(bioM_list) % go through each biomarker and process data
                     
-                    passedArgVals{x_ind}=data.HbR(:,validChannels);
-                    outData.HbR(:,validChannels)=func(passedArgVals{:});
+                    if(~isempty(x_ind))
+                        passedArgVals{x_ind}=data.(bioM_list{bioM})(:,validChannels);
+                    end
                     
-                    passedArgVals{x_ind}=data.HbDiff(:,validChannels);
-                    outData.HbDiff(:,validChannels)=func(passedArgVals{:});
+                    if(~isempty(fStruct_ind))
+                        passedArgVals{fStruct_ind}=data;
+                    end
                     
-                    passedArgVals{x_ind}=data.HbTotal(:,validChannels);
-                    outData.HbTotal(:,validChannels)=func(passedArgVals{:});
+                    funcOutput{:}=func(passedArgVals{:});
                     
-                    passedArgVals{x_ind}=data.CBSI(:,validChannels);
-                    outData.CBSI(:,validChannels)=func(passedArgVals{:});
-                %end
-                %data=outData;
+                    if(isfield(data,'ROI'))
+                        % Note ROI functions may not be able to handle
+                        % functions using channel numbers of SD separation
+                        passedArgVals_roi=passedArgVals;
+                        passedArgVals_roi{x_ind}=data.ROI.(bioM_list{bioM})(:,validChannels_roi);
+                        funcOutput_roi{:}=func(passedArgVals_roi{:}); 
+                    end
+                    
+                    if(~isempty(x_out_ind)) % Assign values to fNIRS Biomarkers
+                        outData.(bioM_list{bioM})(:,validChannels)=funcOutput{x_out_ind};
+                        if(isfield(data,'ROI')&&isnan(roi_out_ind))
+                            outData.ROI.(bioM_list{bioM})(:,validChannels_roi)=funcOutput_roi{x_out_ind};
+                        end
+                    end
+                    
+                    if(~isempty(fmask_out_ind)) % Or with current fmask
+                        curfMask=curfMask&funcOutput{fmask_out_ind};
+                        validChannels=validChannels&curfMask;
+                        
+                        if(isfield(data,'ROI')&&isnan(roi_out_ind))
+                            validChannels_roi=validChannels_roi&funcOutput_roi{fmask_out_ind};
+                        end
+                    end
+                    
+                    if(~isempty(roi_out_ind)) % Build ROIs
+                        outData.ROI.(bioM_list{bioM})=funcOutput{roi_out_ind};
+                        validChannels_roi=true(size(outData.ROI.(bioM_list{bioM})));
+                    end
+                end
             else
                 %outData=data;
                 warning('Unable to identify NIRS input argument\n');
@@ -819,13 +882,15 @@ end
 
 
 invalidChannels=false(size(data.channels));
-invalidChannels(data.channels>0)=data.channels(data.channels>0)&(reshape(~data.fchMask&~ProcessRejected,[1,numChannels]));
+invalidChannels(data.channels>0)=data.channels(data.channels>0)&(reshape(~curfMask,[1,numChannels]));
 
-outData.HbO(:,invalidChannels)=nan;
-outData.HbR(:,invalidChannels)=nan;
-outData.HbDiff(:,invalidChannels)=nan;
-outData.HbTotal(:,invalidChannels)=nan;
-outData.CBSI(:,invalidChannels)=nan;
+for bioM=1:length(bioM_list) % go through each biomarker and set invalid cahnnels to nan
+    outData.(bioM_list{bioM})(:,invalidChannels)=nan;
+    
+    if(isfield(outData,'ROI'))
+        outData.ROI.(bioM_list{bioM})(:,~validChannels_roi)=nan;
+    end
+end
 
 end
 

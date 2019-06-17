@@ -1,7 +1,7 @@
 function [ outFNIR, pFit] = Resample(varargin)
-%NIRSAVG returns time averaged fNIR values according to segLength
+%Data.Resample returns time averaged fNIR values according to segLength
 % effectively resamples data
-%   nirsAvg(fNIR,segmentLength,blLength,blfNIR,'centerOnT0',false,'timeOutMode','start','nanRejectionLevel',0.7)
+%   Data.Resample(fNIR,segmentLength,blLength,blfNIR,'centerOnT0',false,'timeOutMode','start','nanRejectionLevel',0.7)
 %
 %Seg length determines the segment length in seconds, resampling to
 %fs=1/segLength
@@ -20,19 +20,19 @@ function [ outFNIR, pFit] = Resample(varargin)
 %f=0.51; %sampling frequency
 
 % Usage examples
-% nirsAvg(fnirData,10) : Resample data to one sample per 10 seconds (0.1hz)
+% Data.Resample(fnirData,10) : Resample data to one sample per 10 seconds (0.1hz)
 %                       No baselining performed
-%       Equivalent to nirsAvg('fNIR',fnirData,'segmentLength',10);
-% nirsAvg(fnirData,5,5) : Resample data to one sample per 5 seconds, use
+%       Equivalent to Data.Resample('fNIR',fnirData,'segmentLength',10);
+% Data.Resample(fnirData,5,5) : Resample data to one sample per 5 seconds, use
 %                        first 5 seconds as a baseline period
-%       Equivalent to nirsAvg('fNIR',fnirData,'segmentLength',5,'blLength',5);
+%       Equivalent to Data.Resample('fNIR',fnirData,'segmentLength',5,'blLength',5);
 %
-% nirsAvg(fnirData,1,'blfNIR',baselineData) : Resample data to 1 sample per second, use
+% Data.Resample(fnirData,1,'blfNIR',baselineData) : Resample data to 1 sample per second, use
 %                        baselineData fNIR struct as a baseline period
 %                       using a baseline period overrrides blLength
 %                       argument
 %
-% nirsAvg(fnirData,10,'centerOnT0',true) : Resample data to one sample per 10 seconds (0.1hz)
+% Data.Resample(fnirData,10,'centerOnT0',true) : Resample data to one sample per 10 seconds (0.1hz)
 %                       No baselining performed. Forces the inclusion of
 %                       t=0 as a sample. ie all times will be relative to
 %                       t0 (0s,10s,20s,30s) and fNIR data will be binned
@@ -40,20 +40,20 @@ function [ outFNIR, pFit] = Resample(varargin)
 %                       into the [0:10s] bin
 %                           Otherwise if first sample is at 5s time would
 %                           be   (5s,15s,25s)...
-%       Equivalent to nirsAvg('fNIR',fnirData,'segmentLength',10,'centerOnT0',true);
+%       Equivalent to Data.Resample('fNIR',fnirData,'segmentLength',10,'centerOnT0',true);
 %
-%nirsAvg(fnirData,10,'centerOnT0',true,'timeOutMode','start')
+%Data.Resample(fnirData,10,'centerOnT0',true,'timeOutMode','start')
 %                   A sample at t=5, placed within the bin [0:10s] would
 %                   returns the .time structure as the start of the bin
 %                   [0.000001:10]  would return 0s as the sample time
-%nirsAvg(fnirData,10,'centerOnT0',true,'timeOutMode','mid')
+%Data.Resample(fnirData,10,'centerOnT0',true,'timeOutMode','mid')
 %                   A sample at t=5, placed within the bin [0:10s] would
 %                   returns the .time structure would return 5s as the sample time
-%nirsAvg(fnirData,10,'centerOnT0',true,'timeOutMode','end')
+%Data.Resample(fnirData,10,'centerOnT0',true,'timeOutMode','end')
 %                   A sample at t=5, placed within the bin [0:10s] would
 %                   returns the .time structure would return 10s as the sample time
 %
-% nirsAvg(fnirData,10,'nanRejectionLevel',0.5) : Resample data to one sample per 10 seconds (0.1hz)
+% Data.Resample(fnirData,10,'nanRejectionLevel',0.5) : Resample data to one sample per 10 seconds (0.1hz)
 %                       No baselining performed, Segments with more than
 %                       50% of the values listed as nan are rejected
 %                       (includes baseline)
@@ -196,8 +196,41 @@ if(blLength>0)
     blHbDiff=nanmean(blfNIR.HbDiff(:,validCh),1);
     blHbTotal=nanmean(blfNIR.HbTotal(:,validCh),1);
     blCBSI=nanmean(blfNIR.CBSI(:,validCh),1);
+    
+    if(pf2_base.isnestedfield(blfNIR,'ROI.HbO'))
+        blNanCheck_roi=sum(isnan(blfNIR.ROI.HbR),1)/length(blfNIR.time)<nanRejectionLevel; %calculate percentage of invalid values in baseline
+
+        blRejectedCount_roi=sum(~blNanCheck_roi);
+        if(blRejectedCount_roi>1)
+            warning('ROI Baseline Period in %i channels was invalid',blRejectedCount_roi); 
+        end
+        validCh_roi=find(blNanCheck_roi==1);
+
+        blHbR_roi=nanmean(fNIR.ROI.HbR(:,validCh_roi),1);
+        blHbO_roi=nanmean(fNIR.ROI.HbO(:,validCh_roi),1);
+        blHbDiff_roi=nanmean(fNIR.ROI.HbDiff(:,validCh_roi),1);
+        blHbTotal_roi=nanmean(fNIR.ROI.HbTotal(:,validCh_roi),1);
+        blCBSI_roi=nanmean(fNIR.ROI.CBSI(:,validCh_roi),1);
+        
+        if(pf2_base.isnestedfield(fNIR,'ROI.HbO')&&size(blfNIR.ROI.HbO,2)==size(fNIR.ROI.HbO,2))
+            
+            calcROI=true;
+        else
+            warning('ROI mismatch: ROI as defined in baseline not present in main fNIRS segment, calculations not performed');
+            calcROI=false;
+        end
+        
+    else
+        calcROI=false; 
+    end
 else
     validCh=1:numCh;
+    if(pf2_base.isnestedfield(fNIR,'ROI.HbO'))
+       calcROI=true;
+       validCh_roi=1:size(fNIR.ROI.HbO,2);
+    else
+        calcROI=false;
+    end
 end
 
 ind=1;
@@ -210,6 +243,14 @@ fHbO=fNIR.HbO(:,validCh);
 fHbDiff=fNIR.HbDiff(:,validCh);
 fHbTotal=fNIR.HbTotal(:,validCh);
 fCBSI=fNIR.CBSI(:,validCh);
+
+if(calcROI)
+    fHbR_roi=fNIR.ROI.HbR(:,validCh);
+    fHbO_roi=fNIR.ROI.HbO(:,validCh);
+    fHbDiff_roi=fNIR.ROI.HbDiff(:,validCh);
+    fHbTotal_roi=fNIR.ROI.HbTotal(:,validCh);
+    fCBSI_roi=fNIR.ROI.CBSI(:,validCh);
+end
 
 if(strcmp(timeOutMode,'start'))
     timeOutModeMid=false;
@@ -243,6 +284,8 @@ for i=0:numSegs-1
     if(i==0||(isnan(fTimeInd(ind_2))))
         continue;
     end
+    
+
     
     if(averageAux&&~isempty(fNIR.Aux))
         auxFields=fields(fNIR.Aux);
@@ -279,6 +322,11 @@ for i=0:numSegs-1
     nanCheck=(sum(isnan(fHbR(ind_init:ind_2,:)),1)/(ind_2-ind_init+1))<=nanRejectionLevel;     %calculate percentage of invalid values in task
     nanCheckValid=validCh(nanCheck);
     
+    if(calcROI)
+        nanCheck_roi=(sum(isnan(fHbR_roi(ind_init:ind_2,:)),1)/(ind_2-ind_init+1))<=nanRejectionLevel;     %calculate percentage of invalid values in task
+        nanCheckValid_roi=validCh(nanCheck_roi);
+    end
+    
     if(blLength>0)
         HbR(i,nanCheckValid)=nanmean(fHbR(ind_init:ind_2,nanCheck),1)-blHbR(nanCheck);
         HbO(i,nanCheckValid)=nanmean(fHbO(ind_init:ind_2,nanCheck),1)-blHbO(nanCheck);
@@ -291,6 +339,22 @@ for i=0:numSegs-1
         HbDiff(i,nanCheckValid)=nanmean(fHbDiff(ind_init:ind_2,nanCheck),1);
         HbTotal(i,nanCheckValid)=nanmean(fHbTotal(ind_init:ind_2,nanCheck),1);
         CBSI(i,nanCheckValid)=nanmean(fCBSI(ind_init:ind_2,nanCheck),1);
+    end
+    
+    if(calcROI)
+        if(blLength>0)
+            HbR_roi(i,nanCheckValid_roi)=nanmean(fHbR_roi(ind_init:ind_2,nanCheck_roi),1)-blHbR_roi(nanCheck_roi);
+            HbO_roi(i,nanCheckValid_roi)=nanmean(fHbO_roi(ind_init:ind_2,nanCheck_roi),1)-blHbO_roi(nanCheck_roi);
+            HbDiff_roi(i,nanCheckValid_roi)=nanmean(fHbDiff_roi(ind_init:ind_2,nanCheck_roi),1)-blHbDiff_roi(nanCheck_roi);
+            HbTotal_roi(i,nanCheckValid_roi)=nanmean(fHbTotal_roi(ind_init:ind_2,nanCheck_roi),1)-blHbTotal_roi(nanCheck_roi);
+            CBSI_roi(i,nanCheckValid_roi)=nanmean(fCBSI_roi(ind_init:ind_2,nanCheck_roi),1)-blCBSI_roi(nanCheck_roi);
+        else
+            HbR_roi(i,nanCheckValid_roi)=nanmean(fHbR_roi(ind_init:ind_2,nanCheck_roi),1);
+            HbO_roi(i,nanCheckValid_roi)=nanmean(fHbO_roi(ind_init:ind_2,nanCheck_roi),1);
+            HbDiff_roi(i,nanCheckValid_roi)=nanmean(fHbDiff_roi(ind_init:ind_2,nanCheck_roi),1);
+            HbTotal_roi(i,nanCheckValid_roi)=nanmean(fHbTotal_roi(ind_init:ind_2,nanCheck_roi),1);
+            CBSI_roi(i,nanCheckValid_roi)=nanmean(fCBSI_roi(ind_init:ind_2,nanCheck_roi),1);
+        end
     end
     
     for chIdx=1:length(validCh)  
@@ -328,6 +392,17 @@ outFNIR.HbO=HbO(1:end-1,:);
 outFNIR.HbDiff=HbDiff(1:end-1,:);
 outFNIR.HbTotal=HbTotal(1:end-1,:);
 outFNIR.CBSI=CBSI(1:end-1,:);
+
+if(calcROI)
+    outFNIR.ROI=fNIR.ROI;
+    outFNIR.ROI.HbR=HbR_roi(1:end-1,:);
+    outFNIR.ROI.HbO=HbO_roi(1:end-1,:);
+    outFNIR.ROI.HbDiff=HbDiff_roi(1:end-1,:);
+    outFNIR.ROI.HbTotal=HbTotal_roi(1:end-1,:);
+    outFNIR.ROI.CBSI=CBSI_roi(1:end-1,:);
+end
+
+
 times=times(1:size(outFNIR.HbR,1),:);
 outFNIR.segmentTimes=[times,times+segLength/2,times+segLength];
 if(strcmp(timeOutMode,'start'))
