@@ -856,11 +856,11 @@ else
                fmask_out_ind=[];
                outputList=Fidx.output;
                for output_idx=1:length(outputList)
-                   if strcmp(outputList{output_idx},'x')==1
+                   if strcmp(outputList{output_idx},'x')==1 &&isempty(x_out_ind)
                         x_out_ind=output_idx;
-                   elseif strcmp(outputList{output_idx},'fchMask')==1
+                   elseif strcmp(outputList{output_idx},'fchMask')==1  &&isempty(fmask_out_ind)
                        fmask_out_ind=output_idx;
-                   elseif strcmp(outputList{output_idx},'ROI')==1
+                   elseif strcmp(outputList{output_idx},'ROI')==1&&isempty(roi_out_ind)
                        roi_out_ind=output_idx;
                    end
                end
