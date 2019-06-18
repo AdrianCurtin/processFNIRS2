@@ -13,24 +13,24 @@ mdescrip='';
 if(isRaw)
     if(pf2_base.isnestedfield(PF2,'myRawMethods.cfg.Sections'))
         if(isfield(PF2.myRawMethods.cfg,methodName))
-            
+            rawMethod=pf2_base.pf2_unpackMethod(PF2.myRawMethods.cfg.(rawMethodStr));
         else
-           fprintf(2,'\nUnable to find function name %s',methodName); 
+           fprintf(2,'\nDescribe Method Failed: Unable to find function name %s\n\n',methodName); 
         end
     end
 else
     if(pf2_base.isnestedfield(PF2,'myOxyMethods.cfg.Sections'))
         if(isfield(PF2.myOxyMethods.cfg,methodName))
-            
+            oxyMethod=pf2_base.pf2_unpackMethod(PF2.myOxyMethods.cfg.(rawMethodStr));
         else
-           fprintf(2,'\nUnable to find function name %s',methodName); 
+           fprintf(2,'\nDescribe Method Failed: Unable to find function name %s\n\n',methodName); 
         end
     end
 end
 
 
 
-if(varargou==0)
+if(nargout==0)
     fprintf(mdescrip);
     return;
 else    

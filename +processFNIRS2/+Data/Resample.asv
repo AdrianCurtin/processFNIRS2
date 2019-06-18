@@ -397,13 +397,12 @@ if(calcROI)
     outFNIR.ROI=fNIR.ROI;
     hbo_field_length=size(outFNIR.HbO,1);
     roi_field_length=size(HbR_roi,1);
-    field_diff=roi_field_length-hbo_field_length; %Fix for it being different?
-    
-    outFNIR.ROI.HbR=HbR_roi(1:end-field_diff,:);
-    outFNIR.ROI.HbO=HbO_roi(1:end-field_diff,:);
-    outFNIR.ROI.HbDiff=HbDiff_roi(1:end-field_diff,:);
-    outFNIR.ROI.HbTotal=HbTotal_roi(1:end-field_diff,:);
-    outFNIR.ROI.CBSI=CBSI_roi(1:end-field_diff,:);
+    field_diff=roi_field_length-hbo_field_length;
+    outFNIR.ROI.HbR=HbR_roi(1:end-1,:);
+    outFNIR.ROI.HbO=HbO_roi(1:end-1,:);
+    outFNIR.ROI.HbDiff=HbDiff_roi(1:end-1,:);
+    outFNIR.ROI.HbTotal=HbTotal_roi(1:end-1,:);
+    outFNIR.ROI.CBSI=CBSI_roi(1:end-1,:);
 end
 
 

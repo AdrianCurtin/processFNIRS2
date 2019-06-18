@@ -1447,11 +1447,15 @@ if(~any(curRawMatchIdx&curOxyMatchIdx))
     processFNIRS2('blLength',0);
     processFNIRS2('Raw_Method',cur_raw_method,'Oxy_Method',cur_oxy_method); 
     numData=length(data);
-    ProgressHandles.h.hF=waitbar(0,sprintf('ExploreFNIRS\nProcessing Method %s x %s %i of %i',cur_raw_method,cur_oxy_method,1,numData));
+    cur_raw_method_label=cur_raw_method;
+    cur_oxy_method_label=cur_oxy_method;
+    cur_raw_method_label('_')='-';
+    cur_oxy_method_label('_')='-';
+    ProgressHandles.h.hF=waitbar(0,sprintf('ExploreFNIRS\nProcessing Method %s x %s %i of %i',cur_raw_method_label,cur_oxy_method_label,1,numData));
     hF=ProgressHandles.h.hF;
     
     for i=1:numData
-       waitbar(i/numData,hF,sprintf('ExploreFNIRS\nProcessing Method %s x %s %i of %i',cur_raw_method,cur_oxy_method,i,numData));
+       waitbar(i/numData,hF,sprintf('ExploreFNIRS\nProcessing Method %s x %s %i of %i',cur_raw_method_label,cur_oxy_method_label,i,numData));
        
        if(~isempty(data{i})&&length(data{i}.time)>1)
            data{i}=processFNIRS2(data{i});

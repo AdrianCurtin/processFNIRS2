@@ -169,12 +169,7 @@ function out=mergeAndRun(func_handle,x_roi,varg)
         out=func_handle(x_roi,varg{:});
     end
     
-    if(size(x_roi,2)~=length(out))
-       warning('Size mismatch during ROI calculation\n');
-       if(length(out)<=1||isempty(out))
-          out=nan(size(x_roi,2)); 
-       end
-    end
+    if(size(x_r
 
 
 end

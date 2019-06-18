@@ -43,8 +43,12 @@ function outSig=getPCAcomponent(x,componentNumber)
 	[coef,score,latent,tsquared,explained,mu1]=pca(x,'Algorithm','svd');
 
 
-	fprintf('Variance in component %i explains %.1f%% variability\n',componentNumber,(explained(componentNumber)));
+	fprintf('Variance in component %i explains %.1f%% variability in %i Channels\n',componentNumber,(explained(componentNumber)),size(x,1));
 	outSig=coef(:,componentNumber)*sum(abs(score(:,componentNumber)));
+    
+    if(isnan(explained(componentNumber)))
+       outSig=nan(1,size(x,2));
+    end
 
 end
     

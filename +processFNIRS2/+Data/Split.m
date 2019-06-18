@@ -288,12 +288,12 @@ else
     end
     
     if(hasROIfield)
-        outfNIR.ROI=outfNIR.ROI;
-        if(pf2base.isnestedfield(fNIR.ROI,'raw'))
+        outfNIR.ROI=fNIR.ROI;
+        if(pf2_base.isnestedfield(fNIR.ROI,'raw'))
             outfNIR.ROI.raw=fNIR.ROI.raw(indexStart:indexEnd,:);
         end
         
-        if(pf2base.isnestedfield(fNIR.ROI,'HbO'));
+        if(pf2_base.isnestedfield(fNIR.ROI,'HbO'))
             outfNIR.ROI.HbO=fNIR.ROI.HbO(indexStart:indexEnd,:);
             outfNIR.ROI.HbR=fNIR.ROI.HbR(indexStart:indexEnd,:);
             outfNIR.ROI.HbDiff=fNIR.ROI.HbDiff(indexStart:indexEnd,:);

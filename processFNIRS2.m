@@ -218,7 +218,7 @@ rawMethodStr=p.Results.Raw_Method;
 oxyMethodStr=p.Results.Oxy_Method;
 
 if(pf2_base.isnestedfield(PF2,sprintf('myRawMethods.cfg.%s',rawMethodStr)))
-    if(~strcmpi(PF2.stageRawMethod.name,rawMethodStr))
+    if(pf2_base.isnestedfield(PF2,'stageRawMethod.name')&&~strcmpi(PF2.stageRawMethod.name,rawMethodStr))
        fprintf('Setting Raw Method to: %s\n',rawMethodStr); 
     end
     
@@ -230,7 +230,7 @@ end
 
 
 if(pf2_base.isnestedfield(PF2,sprintf('myOxyMethods.cfg.%s',oxyMethodStr)))
-    if(~strcmpi(PF2.stageOxyMethod.name,oxyMethodStr))
+    if(pf2_base.isnestedfield(PF2,'stageOxyMethod.name')&&~strcmpi(PF2.stageOxyMethod.name,oxyMethodStr))
        fprintf('Setting Oxy Method to: %s\n',oxyMethodStr); 
     end
     

@@ -39,7 +39,7 @@ if(pf2_base.isnestedfield(fNIR,'ROI.info'))
 	% Unpack ROI information into channel and roi names
 	if(istable(fNIR.ROI.info))
 		roi_names=fNIR.ROI.info.Properties.RowNames;
-		ch_index=fNIR.ROI.info(:,1);
+		ch_index=fNIR.ROI.info{:,1};
 	elseif(iscell(fNIR.ROI.info)||isnumeric(fNIR.ROI.info))
 		ch_index=fNIR.ROI.info;
 		

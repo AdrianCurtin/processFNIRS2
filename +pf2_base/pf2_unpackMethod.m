@@ -1,6 +1,6 @@
 function x=pf2_unpackMethod(method)
 	% pf2_unpackMethod
-	%	Unpacks methods stored in configureation files into argument values, outputs and other functions
+	%	Unpacks methods stored in configuration files into argument values, outputs and other functions
 	
 	%Converts mymethods function from .S to fields in F
     x=method;
