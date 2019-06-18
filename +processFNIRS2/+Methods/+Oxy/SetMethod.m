@@ -4,7 +4,7 @@ function SetMethod(oxy_method)
 if(nargin<1)
     fprintf(2,'No method provided, Please select a method\n');
 	processFNIRS2.Methods.Oxy();
-    prompt = 'Enter Method Number ';
+    prompt = 'Enter Method Number: ';
     oxy_method = input(prompt);
 end
 

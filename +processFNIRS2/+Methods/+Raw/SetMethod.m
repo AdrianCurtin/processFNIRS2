@@ -3,8 +3,10 @@ function SetMethod(raw_method)
 %   Also will look up the function number
 
 if(nargin<1)
-    fprintf(2,'No Method provided\n');
+    fprintf(2,'No method provided, Please select a method\n');
 	processFNIRS2.Methods.Raw();
+    prompt = 'Enter Method Number: ';
+    raw_method = input(prompt);
 end
 
 

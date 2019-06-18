@@ -10,20 +10,15 @@ if(pf2_base.isnestedfield(PF2,'myRawMethods.cfg.Sections')&&length(PF2.myRawMeth
     
     rawMethods=PF2.myRawMethods.cfg.Sections;
 
-    methodListStr=sprintf('%sCurrently Loaded Oxy Methods:\n\n',methodListStr);
+    methodListStr=sprintf('%s\nCurrently Loaded Raw Methods:\n',methodListStr);
     methodListStr=sprintf('%sRaw Processing Methods (Light->OD):\n',methodListStr);
-
     for i=1:length(rawMethods)
-        methodListStr=sprintf('%s%i. %s\n',methodListStr,i,rawMethods{i});
+        if(strcmpi(PF2.stageRawMethod.name,rawMethods{i}))
+            methodListStr=sprintf('%s%i. %s <strong>(Current Method)</strong>\n',methodListStr,i,rawMethods{i});
+        else
+            methodListStr=sprintf('%s%i. %s\n',methodListStr,i,rawMethods{i});
+        end
     end
-
-    %methodListStr=sprintf('%s\n',methodListStr);
-
-    %methodListStr=sprintf('%sOxy Processing Methods (Hb->Hb-Processed):\n',methodListStr);
-
-    %for i=1:length(oxyMethods)
-    %	methodListStr=sprintf('%s%i. %s\n',methodListStr,i,oxyMethods{i});
-    %end
 
     if(nargout==0)
         fprintf('%s',methodListStr);
