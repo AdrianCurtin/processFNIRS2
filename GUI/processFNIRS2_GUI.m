@@ -211,8 +211,8 @@ end
 
 if(isempty(data)&&isempty(varargin))
     
-    load(sprintf('%s/sampledata/myNIRsample.mat',PF2.defaultRootPath),'myNIRsample');
-    disp('No arguments given, program is being loaded in demo mode');
+    myNIRsample=processFNIRS2.Import.ImportSampleData;
+    disp('No input arguments given, program is being loaded in with sample data');
     outputData.ShowGUI=true;
     data=myNIRsample;
     
