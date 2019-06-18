@@ -553,8 +553,13 @@ if(outputData.ProcessRaw)
     else
         [PF2.data.stage{3},PF2.data.stage{2}]=processStageRaw2OD(PF2.data.stage{1}); % Raw data processing
     end
+    
     if(outputData.ProcessOxy)
         PF2.data.stage{4}=processStageOD2Hb(PF2.data.stage{3},PF2.GUIPF2.curDPF_age); % Beer-Lambert conversion
+    end
+    
+    if(pf2_base.isnestedfield(PF2,'data.ROI.info'))
+        PF2.data.stage{4}.ROI.info=PF2.data.ROI.info; %Regenerate from info
     end
 else
     PF2.data.stage{2}=PF2.data.stage{1};
@@ -562,7 +567,11 @@ else
        PF2.data.stage{4}.channels=setF.device.Probe{1}.ChannelList;
        warning('No channel information given, assuming all columns indexs correspond with channel numbers');
     end
+    if(pf2_base.isnestedfield(PF2,'data.ROI.info'))
+        PF2.data.stage{4}.ROI=PF2.data.ROI; %Use all ROI information
+    end
 end
+
 
 if(outputData.ProcessOxy)
     PF2.data.stage{5}=processStageFilterHb(PF2.data.stage{4}); % Oxy data processing
@@ -787,8 +796,8 @@ validChannels(data.channels>0)=data.channels(data.channels>0)&(reshape(PF2.data.
 
 curfMask=PF2.data.fchMask|outputData.ProcessRejected;
 
-if(isfield(data,'ROI'))
-    validChannels_roi=true(size(outData.ROI.(bioM_list{bioM})));
+if(pf2_base.isnestedfield(data,'ROI.HbO')&&~isempty(data.ROI))
+    validChannels_roi=true(1,size(data.ROI.('HbO'),2));
 end
 
 firstValidRow=nan;
@@ -855,7 +864,7 @@ else
                roi_out_ind=[];
                fmask_out_ind=[];
                outputList=Fidx.output;
-               for output_idx=1:length(outputList)
+               for output_idx=1:length(outputList) % find first argument in output list
                    if strcmp(outputList{output_idx},'x')==1 &&isempty(x_out_ind)
                         x_out_ind=output_idx;
                    elseif strcmp(outputList{output_idx},'fchMask')==1  &&isempty(fmask_out_ind)
@@ -865,8 +874,8 @@ else
                    end
                end
             else
-                x_out_ind=1;
-                roi_out_ind=[];
+                x_out_ind=1; % assume that first index is the signal output
+                roi_out_ind=[]; % leave empty
                 fmask_out_ind=[];
             end
             
@@ -904,11 +913,27 @@ else
                 outData=data;
                 %for ch=1:size(data,2)
                 
+                if(~isempty(fStruct_ind))
+                    runOnce=true;
+                else
+                    runOnce=false;
+                end
+                
                 for bmrkIdx=1:length(bioM_list)
                     bmrk=bioM_list{bmrkIdx};
                     
+                    if(pf2_base.isnestedfield(data,'ROI.HbO'))
+                       passedArgVals_roi=passedArgVals; 
+                    end
+                    
                     if(~isempty(x_ind))
                         passedArgVals{x_ind}=data.(bmrk)(validRows,validChannels);
+                        
+                        if(pf2_base.isnestedfield(data,'ROI.HbO'))
+                        % Note ROI functions may not be able to handle
+                        % functions using channel numbers of SD separation
+                            passedArgVals_roi{x_ind}=data.ROI.(bmrk)(validRows,validChannels_roi);
+                        end
                     end
                     
                     if(~isempty(fStruct_ind))
@@ -916,40 +941,44 @@ else
                     end
                     
                     
-                     if(isfield(data,'ROI')&&~isempty(x_ind))
-                        % Note ROI functions may not be able to handle
-                        % functions using channel numbers of SD separation
-                        passedArgVals_roi=passedArgVals;
-                        passedArgVals_roi{x_ind}=data.ROI.(bmrk)(:,validChannels_roi);
-                        
-                    end
+                     
                     
                     try
                         if(~errorFlag)
+                            
                             funcOutput{:}=func(passedArgVals{:});
-                            if(isfield(data,'ROI'))
+                            if(pf2_base.isnestedfield(data,'ROI.HbO')&&~isempty(x_ind))
                                 funcOutput_roi{:}=func(passedArgVals_roi{:}); 
                             end
                             
                             if(~isempty(x_out_ind)) % Assign values to fNIRS Biomarkers
                                 outData.(bmrk)(validRows,validChannels)=funcOutput{x_out_ind};
-                                if(isfield(data,'ROI')&&isnan(roi_out_ind))
-                                    outData.ROI.(bmrk)(:,validChannels_roi)=funcOutput_roi{x_out_ind};
+                                if(pf2_base.isnestedfield(data,'ROI.HbO'))
+                                    outData.ROI.(bmrk)(validRows,validChannels_roi)=funcOutput_roi{x_out_ind};
                                 end
                             end
                             
                             if(~isempty(fmask_out_ind)) % Or with current fmask
                                 curfMask=curfMask&funcOutput{fmask_out_ind};
-                                validChannels(data.channels>0)=data.channels(data.channels>0)&(reshape(curfMask,[1,numChannels]));
+                                validChannels=data.channels&(reshape(curfMask,[1,numChannels]));
 
-                                if(isfield(data,'ROI')&&isnan(roi_out_ind))
+                                if(pf2_base.isnestedfield(data,'ROI.HbO')&&~isempty(x_ind)) % won't run on full fNIR struct fxs
                                     validChannels_roi=validChannels_roi&funcOutput_roi{fmask_out_ind};
                                 end
                             end
                             
                             if(~isempty(roi_out_ind)) % Build ROIs
-                                outData.ROI.(bmrk)=funcOutput{roi_out_ind};
-                                validChannels_roi=true(size(outData.ROI.(bmrk)));
+                                outData=funcOutput{roi_out_ind};
+                                if(~isempty(outData.ROI))
+                                    validChannels_roi=true(1,size(outData.ROI.(bmrk),2));
+                                else
+                                    clear outData.ROI; 
+                                end
+                                    
+                            end
+                            
+                            if(runOnce)
+                                break;
                             end
                             
                         else
@@ -989,7 +1018,7 @@ PF2.data.curChMask=curfMask;
 for bioM=1:length(bioM_list) % go through each biomarker and set invalid cahnnels to nan
     outData.(bioM_list{bioM})(:,invalidChannels)=nan;
     
-    if(isfield(outData,'ROI'))
+    if(isfield(outData,'ROI')&&isfield(outData.ROI,'HbO'))
         outData.ROI.(bioM_list{bioM})(:,~validChannels_roi)=nan;
     end
 end

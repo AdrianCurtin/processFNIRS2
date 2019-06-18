@@ -221,8 +221,12 @@ oxyMethodStr=p.Results.Oxy_Method;
 PF2.stageRawMethod=unpackMethod(PF2.myRawMethods.cfg.(rawMethodStr));
 PF2.stageRawMethod.name=rawMethodStr;
 
-PF2.stageOxyMethod=unpackMethod(PF2.myOxyMethods.cfg.(oxyMethodStr));
-PF2.stageOxyMethod.name=oxyMethodStr;
+if(pf2_base.isnestedfield(PF2,sprintf('myOxyMethods.cfg.%s',oxyMethodStr)))
+    PF2.stageOxyMethod=unpackMethod(PF2.myOxyMethods.cfg.(oxyMethodStr));
+    PF2.stageOxyMethod.name=oxyMethodStr;
+else
+    error('Unable to find method named: %s',oxyMethodStr);
+end
 
 
 cfgRawImportPath=p.Results.ImportRawMethods;
@@ -475,14 +479,19 @@ if(~isempty(data))
         
         [fData.stage{3},fData.stage{2}]=processStageRaw2OD(fData.stage{1},fData.fs,fData.time,rawMask,fMarkers,fAux); % Raw data processing
         if(outputData.ProcessOxy)
-            
             fData.stage{4}=processStageOD2Hb(fData.stage{3},fData.time,fData.info.Age,outputData.DirtyBaseline); % Beer-Lambert conversion
+        end
+        if(pf2_base.isnestedfield(fData,'ROI.info'))
+            fData.stage{4}.ROI.info=fData.ROI.info; %Regenerate from info
         end
     else
         %fData.stage{2}=fData.stage{1};
         if(~isempty(fData.stage{4})&&~isfield(fData.stage{4},'channels'))
            fData.stage{4}.channels=setF.device.Probe{1}.ChannelList;
            warning('No channel information given, assuming all columns indexs correspond with channel numbers');
+        end
+        if(pf2_base.isnestedfield(fdata,'ROI.info'))
+            fData.stage{4}.ROI=fData.ROI; % Use All ROI information provided
         end
     end
     if(outputData.ProcessOxy)
@@ -735,8 +744,8 @@ validChannels(data.channels>0)=data.channels(data.channels>0)&(reshape(data.fchM
 
 curfMask=data.fchMask|ProcessRejected;
 
-if(isfield(data,'ROI'))
-    validChannels_roi=true(size(outData.ROI.(bioM_list{bioM})));
+if(pf2_base.isnestedfield(data,'ROI.HbO')&&~isempty(data.ROI))
+    validChannels_roi=true(1,size(data.ROI.('HbO'),2));
 end
 
 global PF2
@@ -781,11 +790,11 @@ else
                fmask_out_ind=[];
                outputList=Fidx.output;
                for output_idx=1:length(outputList)
-                   if strcmp(outputList{output_idx},'x')==1 && ~isempty(x_out_ind)
+                   if strcmpi(outputList{output_idx},'x')==1 && isempty(x_out_ind)
                         x_out_ind=output_idx;
-                   elseif strcmp(outputList{output_idx},'fchMask')==1 && ~isempty(fmask_out_ind)
+                   elseif strcmpi(outputList{output_idx},'fchMask')==1 && isempty(fmask_out_ind)
                        fmask_out_ind=output_idx;
-                   elseif strcmp(outputList{output_idx},'ROI')==1 && ~isempty(roi_out_ind)
+                   elseif strcmpi(outputList{output_idx},'ROI')==1 && isempty(roi_out_ind)
                        roi_out_ind=output_idx;
                    end
                end
@@ -831,6 +840,11 @@ else
                 outData=data;
                 %TODO move channel mask that doesn't process data outside
                 %of loop 
+                if(~isempty(fStruct_ind))
+                    runOnce=true;
+                else
+                    runOnce=false;
+                end
                 for bioM=1:length(bioM_list) % go through each biomarker and process data
                     
                     if(~isempty(x_ind))
@@ -843,7 +857,7 @@ else
                     
                     funcOutput{:}=func(passedArgVals{:});
                     
-                    if(isfield(data,'ROI'))
+                    if(pf2_base.isnestedfield(data,'ROI.HbO')&&~isempty(x_ind))
                         % Note ROI functions may not be able to handle
                         % functions using channel numbers of SD separation
                         passedArgVals_roi=passedArgVals;
@@ -851,9 +865,9 @@ else
                         funcOutput_roi{:}=func(passedArgVals_roi{:}); 
                     end
                     
-                    if(~isempty(x_out_ind)) % Assign values to fNIRS Biomarkers
+                    if(~isempty(x_out_ind)) % Assign values to fNIRS Biomarkers and ROIs when available
                         outData.(bioM_list{bioM})(:,validChannels)=funcOutput{x_out_ind};
-                        if(isfield(data,'ROI')&&isnan(roi_out_ind))
+                        if(pf2_base.isnestedfield(data,'ROI.HbO'))
                             outData.ROI.(bioM_list{bioM})(:,validChannels_roi)=funcOutput_roi{x_out_ind};
                         end
                     end
@@ -862,16 +876,22 @@ else
                         curfMask=curfMask&funcOutput{fmask_out_ind};
                         validChannels=validChannels&curfMask;
                         
-                        if(isfield(data,'ROI')&&isnan(roi_out_ind))
+                        if(pf2_base.isnestedfield(data,'ROI.HbO'))
                             validChannels_roi=validChannels_roi&funcOutput_roi{fmask_out_ind};
                         end
                     end
                     
                     if(~isempty(roi_out_ind)) % Build ROIs
-                        outData.ROI.(bioM_list{bioM})=funcOutput{roi_out_ind};
-                        validChannels_roi=true(size(outData.ROI.(bioM_list{bioM})));
+                        outData=funcOutput{roi_out_ind};
+                        validChannels_roi=true(1,size(outData.ROI.(bioM_list{bioM}),2));
+                    end
+                    
+                    if(runOnce)
+                        break;
                     end
                 end
+                
+                data=outData;
             else
                 %outData=data;
                 warning('Unable to identify NIRS input argument\n');
@@ -887,7 +907,7 @@ invalidChannels(data.channels>0)=data.channels(data.channels>0)&(reshape(~curfMa
 for bioM=1:length(bioM_list) % go through each biomarker and set invalid cahnnels to nan
     outData.(bioM_list{bioM})(:,invalidChannels)=nan;
     
-    if(isfield(outData,'ROI'))
+    if(pf2_base.isnestedfield(outData,'ROI.HbO'))
         outData.ROI.(bioM_list{bioM})(:,~validChannels_roi)=nan;
     end
 end

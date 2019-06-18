@@ -24,7 +24,7 @@ function varargout = processFNIRS2_configureMethods(varargin)
 
 % Last Modified by GUIDE v2.5 12-Jan-2019 12:52:23
 
-% Begin pf2_base.external.INItialization code - DO NOT EDIT
+% Begin Initialization code - DO NOT EDIT
 gui_Singleton = 1;
 gui_State = struct('gui_Name',       mfilename, ...
                    'gui_Singleton',  gui_Singleton, ...
@@ -41,7 +41,7 @@ if nargout
 else
     gui_mainfcn(gui_State, varargin{:});
 end
-% End pf2_base.external.INItialization code - DO NOT EDIT
+% End Initialization code - DO NOT EDIT
 
 
 % --- Executes just before processFNIRS2_configureMethods is made visible.
@@ -930,7 +930,7 @@ function [myMethods]= loadMethods(methodsCfgFilename,createIfMissing)
             warning('Local Config File not found');
 
 
-            [file, pathname] = uigetfile({'pf2_methods_*.cfg';'*.cfg';'*.*'},'Please Select Methods Defpf2_base.external.INItion file');
+            [file, pathname] = uigetfile({'pf2_methods_*.cfg';'*.cfg';'*.*'},'Please Select Methods Definition file');
             
             if(isempty(file)||~ischar(file)||(isnumeric(file)&&file==0))
                 return;
@@ -965,7 +965,7 @@ function [myMethods]= loadMethods(methodsCfgFilename,createIfMissing)
             myMethods.cfg = pf2_base.external.INI('File',methodsCfgFilename);
         end
     else
-        [file, pathname] = uigetfile({'pf2_methods_*.cfg';'*.cfg';'*.*'},'Please Select Methods Defpf2_base.external.INItion file');
+        [file, pathname] = uigetfile({'pf2_methods_*.cfg';'*.cfg';'*.*'},'Please Select Methods Definition file');
         
         if(isempty(file)||~ischar(file)||(isnumeric(file)&&file==0))
             return;
@@ -1013,7 +1013,7 @@ function [myFunctions]= loadFunctions(functionsCfgFilename,createIfMissing)
             warning('Local Config File not found');
 
 
-            [file, pathname] = uigetfile({'pf2_functions_*.cfg';'*.cfg';'*.*'},'Please Select Functions Defpf2_base.external.INItion file');
+            [file, pathname] = uigetfile({'pf2_functions_*.cfg';'*.cfg';'*.*'},'Please Select Functions Definition file');
             fid = fopen([pathname file]);
             
             if(isempty(file)||~ischar(file)||(isnumeric(file)&&file==0))
@@ -1045,7 +1045,7 @@ function [myFunctions]= loadFunctions(functionsCfgFilename,createIfMissing)
             myFunctions.cfg = pf2_base.external.INI('File',functionsCfgFilename);
         end
     else
-        [file, pathname] = uigetfile({'pf2_functions_*.cfg';'*.cfg';'*.*'},'Please Select Functions Defpf2_base.external.INItion file');
+        [file, pathname] = uigetfile({'pf2_functions_*.cfg';'*.cfg';'*.*'},'Please Select Functions Definition file');
         if(isempty(file)||~ischar(file)||(isnumeric(file)&&file==0))
             return
         end
@@ -1518,7 +1518,7 @@ function pushbutton_exportMethod_Callback(hObject, eventdata, handles)
 % handles    structure with handles and user data (see GUIDATA)
 global PF2
 
-[file, pathname] = uiputfile({'pf2_methods_*.cfg';'*.cfg';'*.*'},'Save Methods Defpf2_base.external.INItion file');
+[file, pathname] = uiputfile({'pf2_methods_*.cfg';'*.cfg';'*.*'},'Save Methods Definition file');
 if(isempty(file)||~ischar(file)||(isnumeric(file)&&file==0))
     return
 end
@@ -1766,7 +1766,7 @@ function pushbutton_avail_function_export_Callback(hObject, eventdata, handles)
 
 global PF2
 
-[file, pathname] = uiputfile({'pf2_functions_*.cfg';'*.cfg';'*.*'},'Save Function Defpf2_base.external.INItions file');
+[file, pathname] = uiputfile({'pf2_functions_*.cfg';'*.cfg';'*.*'},'Save Function Definitions file');
 if(isempty(file)||~ischar(file)||(isnumeric(file)&&file==0))
     return
 end

@@ -135,7 +135,7 @@ if(~isfield(ExFNIRS,'defaultRootPath'))
     ExFNIRS.defaultRootPath=ExFNIRS_folder;
     curdir=cd;
     cd(ExFNIRS.defaultRootPath);
-    addpath('base','base_functions','base_functions/external','explore','external','functions','import','process');
+    addpath('base_functions','GUI','functions');
     cd(curdir);
 end
 
