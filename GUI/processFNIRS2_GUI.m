@@ -773,7 +773,7 @@ if(isempty(subAge))
 end
     
 [outData.HbO, outData.HbR, outData.HbTotal, outData.HbDiff,outData.CBSI,outData.channels,outData.time,outData.units,outData.DPF_factor]=...
-    pf2_bvoxy(data,setF.device.Probe{1}.ChannelNumbers,setF.device.Probe{1}.Wavelength,setF.device.Probe{1}.SD,baselineSamples,subAge,[],true,'NoPathlength',NoPathlength,'DiffPathlengthFactor',fixedDPF);
+    pf2_base.fnirs.bvoxy(data,setF.device.Probe{1}.ChannelNumbers,setF.device.Probe{1}.Wavelength,setF.device.Probe{1}.SD,baselineSamples,subAge,[],true,'NoPathlength',NoPathlength,'DiffPathlengthFactor',fixedDPF);
 
                                                           %BASELINE
                                                           %START/END

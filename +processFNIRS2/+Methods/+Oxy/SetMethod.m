@@ -21,5 +21,5 @@ if(isnumeric(oxy_method)) % Lookup method based on index
 end
 
 if(isstring(oxy_method)||ischar(oxy_method))
-    processFNIRS2('Oxy_Method',oxy_method_string);
+    processFNIRS2('Oxy_Method',oxy_method);
 end

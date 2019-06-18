@@ -502,7 +502,7 @@ if(~isempty(data))
            fData.stage{4}.channels=setF.device.Probe{1}.ChannelList;
            warning('No channel information given, assuming all columns indexs correspond with channel numbers');
         end
-        if(pf2_base.isnestedfield(fdata,'ROI.info'))
+        if(pf2_base.isnestedfield(fData,'ROI.info'))
             fData.stage{4}.ROI=fData.ROI; % Use All ROI information provided
         end
     end
@@ -736,7 +736,7 @@ end
 
 
 [outData.HbO, outData.HbR, outData.HbTotal, outData.HbDiff,outData.CBSI,outData.channels,~,outData.units,outData.DPF_factor]=...
-    pf2_bvoxy(data,setF.device.Probe{1}.ChannelNumbers,setF.device.Probe{1}.Wavelength,setF.device.Probe{1}.SD,baselineSamples,subjectAge,[],true,'NoPathlength',NoPathlength,'DiffPathlengthFactor',fixedDPF);
+    pf2_base.fnirs.bvoxy(data,setF.device.Probe{1}.ChannelNumbers,setF.device.Probe{1}.Wavelength,setF.device.Probe{1}.SD,baselineSamples,subjectAge,[],true,'NoPathlength',NoPathlength,'DiffPathlengthFactor',fixedDPF);
 
                                                           %BASELINE
                                                           %START/END
@@ -895,7 +895,9 @@ else
                     
                     if(~isempty(roi_out_ind)) % Build ROIs
                         outData=funcOutput{roi_out_ind};
-                        validChannels_roi=true(1,size(outData.ROI.(bioM_list{bioM}),2));
+                        if(isfield(outData,'ROI')&&~isempty(outData.ROI'))
+                            validChannels_roi=true(1,size(outData.ROI.(bioM_list{bioM}),2));
+                        end
                     end
                     
                     if(runOnce)
@@ -973,7 +975,10 @@ if(PF2.mergedProbe) %All channel numbers are unique for merged probes
     data=fData.stage{1};
     
     if(~isempty(data))
-        if(PF2.timeIndex==0)
+        if(isfield(fData,'time')&&~isempty(fData.time))
+            fData.fs=1./median(diff(fData.time));
+            fData.sampleTime=1:length(data(:,1));
+        elseif(PF2.timeIndex==0)
             fData.sampleTime=1:length(data(:,1));
             fData.time=(fData.sampleTime-1)./setF.device.Info.DefaultSamplingRate;
             fData.fs=setF.device.Info.DefaultSamplingRate;
@@ -991,7 +996,10 @@ if(PF2.mergedProbe) %All channel numbers are unique for merged probes
         fData.fs=1./median(diff(fData.time));
     elseif(~isempty(fData.stage{4})) %try to calculate from oxy data
         data=fData.stage{4};
-        if(PF2.timeIndex==0)
+        if(isfield(fData,'time')&&~isempty(fData.time))
+            fData.fs=1./median(diff(fData.time));
+            fData.sampleTime=1:length(data(:,1));
+        elseif(PF2.timeIndex==0)
             fData.sampleTime=1:length(data.HbO(:,1));
             fData.time=(fData.sampleTime-1)./setF.device.Info.DefaultSamplingRate;
             fData.fs=setF.device.Info.DefaultSamplingRate;

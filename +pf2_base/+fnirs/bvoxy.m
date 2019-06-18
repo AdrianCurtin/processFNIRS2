@@ -1,10 +1,12 @@
-function [HbO, HbR, Total, HbDiff,CBSI,channels,time,units,DPF_factor]=pf2_bvoxy(varargin)
+function [HbO, HbR, Total, HbDiff,CBSI,channels,time,units,DPF_factor]=bvoxy(varargin)
 % Blood Volume and Oxygenation calculation.
 % Part of ProcessFNIRS2
 % Uses channel information to calculate hemoglobin changes from changes in
 % light intensity
 %
-% pf2_bvoxy(data,ChannelNumbers,Wavelengths,baselineSamples,DPF,DeviceCoefs,'isOD',true);
+% bvoxy(data,ChannelNumbers,Wavelengths,baselineSamples,DPF,DeviceCoefs,'isOD',true);
+
+% Will return as fNIR struct if only one output is given
 
 p = inputParser;
 validScalarPosNum = @(x) isnumeric(x) && isscalar(x) && (x > 0);
@@ -188,6 +190,21 @@ HbO=[(HbO), data(:,mrkIndex)];
 HbR=[(HbR), data(:,mrkIndex)];
 
 channels=[uCh,(mrkIndex*0-1)];
+
+if(nargout==1) % if one output argument, return all as fNIR struct
+	fNIR.HbO=HbO;
+	fNIR.HbR=HbR;
+	fNIR.HbDiff=HbDiff;
+	fNIR.CBSI=CBSI;
+	fNIR.HbTotal=Total;
+	fNIR.time=time;
+	fNIR.channels=channels;
+	fNIR.DPF_factor=DPF_factor;
+	fNIR.units=units;
+	
+	HbO=fNIR; %return only the struct
+	return;
+end
 
 end
 

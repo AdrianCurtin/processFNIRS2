@@ -20,7 +20,7 @@ else
             curPartName=fieldParts{i};
             isvalidfield=isfield(var,curPartName)|isprop(var,curPartName);
             
-            if(~isvalidfield)
+            if(isempty(isvalidfield)||~isvalidfield)
                 isvalidfield=false;
                 break;
             end
