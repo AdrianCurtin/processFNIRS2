@@ -1,0 +1,30 @@
+function outStr=pf2_describeMethod(methodName,isRaw)
+% pf2_describeMethod will take the method with the given name and in text,
+% illustrate the procesing pipeline
+
+global PF2
+mdescrip='';
+
+if(isRaw)
+    if(pf2_base.isnestedfield(PF2,'myOxyMethods.cfg.Sections'))
+        if(oxy_method<=length(PF2.myOxyMethods.cfg.Sections))
+            oxy_method=PF2.myOxyMethods.cfg.Sections{oxy_method};
+        end
+	end
+    
+    
+else
+    
+    
+end
+
+
+
+if(varargou==0)
+    fprintf(mdescrip);
+    return;
+else    
+    outStr=mdescrip;
+end
+
+end

@@ -176,10 +176,10 @@ data=p.Results.data;
 rawMethodStr=p.Results.Raw_Method;
 oxyMethodStr=p.Results.Oxy_Method;
 
-PF2.stageRawMethod=unpackMethod(PF2.myRawMethods.cfg.(rawMethodStr));
+PF2.stageRawMethod=pf2_base.pf2_unpackMethod(PF2.myRawMethods.cfg.(rawMethodStr));
 PF2.stageRawMethod.name=rawMethodStr;
 
-PF2.stageOxyMethod=unpackMethod(PF2.myOxyMethods.cfg.(oxyMethodStr));
+PF2.stageOxyMethod=pf2_base.pf2_unpackMethod(PF2.myOxyMethods.cfg.(oxyMethodStr));
 PF2.stageOxyMethod.name=oxyMethodStr;
 
 PF2.GUIPF2.handles=handles;
@@ -2894,7 +2894,7 @@ if(~ismember(PF2.myOxyMethods.cfg.Sections,selectedMethod))
     updateCurrentFiltersListbox(handles);
 end
 
-PF2.GUIPF2.stageOxyMethod=unpackMethod(PF2.myOxyMethods.cfg.(selectedMethod));
+PF2.GUIPF2.stageOxyMethod=pf2_base.pf2_unpackMethod(PF2.myOxyMethods.cfg.(selectedMethod));
 PF2.GUIPF2.stageOxyMethod.name=selectedMethod;
 
 processFNIR_GUI();
@@ -3064,64 +3064,10 @@ if(~ismember(PF2.myRawMethods.cfg.Sections,selectedMethod))
     updateCurrentFiltersListbox(handles);
 end
      
-PF2.GUIPF2.stageRawMethod=unpackMethod(PF2.myRawMethods.cfg.(selectedMethod));
+PF2.GUIPF2.stageRawMethod=pf2_base.pf2_unpackMethod(PF2.myRawMethods.cfg.(selectedMethod));
 PF2.GUIPF2.stageRawMethod.name=selectedMethod;
 processFNIR_GUI();
 updatePlots(handles);
-
-
-function x=unpackMethod(method)
-%Converts mymethods function from .S to fields in F
-    x=method;
-    
-    if(iscell(x)&&isfield(x{1},'F'))
-       x=x{1}; 
-    end
-    
-    if(isfield(method,'F'))
-        %return;
-    else
-        if(iscell(x)&&~isstruct(x))
-            t=x;
-            x=cell(0);
-            x.F=t;
-            for i=length(x.F):-1:1
-               if(~isfield(x.F{i},'f'))
-                  x.F(i)=[]; 
-               end
-            end
-            x.name=('Unknown Method');
-        else
-            x.F=cell(0);
-            x_fields=fields(x);
-
-            numMethods=1;
-            for j=1:length(x_fields)
-               if(strcmp(sprintf('S%i',j),x_fields))
-                   x.F{numMethods}=x.(sprintf('S%i',j));
-                   x=rmfield(x,sprintf('S%i',j));
-                   numMethods=numMethods+1;
-               end
-            end
-        end
-    end
-    
-    for idx=1:length(x.F)
-        Fidx=x.F{idx};
-        if(length(Fidx)>1) %This is a struct array for some reason?
-           %Change it back!
-           F_noarray.f=Fidx(1).f;
-           F_noarray.args=cell(0,0);
-           F_noarray.argvals=cell(0,0);
-           F_noarray.default_argvals=cell(0,0);
-           for j=1:length(Fidx)
-                F_noarray.args{j}=Fidx(j).args;
-                F_noarray.argvals{j}=Fidx(j).argvals;
-                F_noarray.default_argvals{j}=Fidx(j).default_argvals;
-           end
-           x.F{idx}=F_noarray;
-        end
-    end
 
 
 % --- Executes on button press in pushbutton_reloadMethods.

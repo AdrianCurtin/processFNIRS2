@@ -565,7 +565,7 @@ end
 if(~isempty(selectedMethod))
     selectedMethodName=get(handles.listbox_myMethods,'String');
     selectedMethodName=selectedMethodName{selectedMethod};
-    PF2.currentMethod=unpackMethod(PF2.myMethods.cfg.(PF2.myMethods.cfg.Sections{selectedMethod}));
+    PF2.currentMethod=pf2_base.pf2_unpackMethod(PF2.myMethods.cfg.(PF2.myMethods.cfg.Sections{selectedMethod}));
 
     PF2.currentMethod.name=selectedMethodName;
     set(handles.edit_methodName,'String',PF2.currentMethod.name);
@@ -1388,57 +1388,6 @@ for i=1:length(myMethods.cfg.Sections)
     myMethods.cfg.remove(x.name);
     myMethods.cfg.add(x.name,x);
 end
-
-function x=unpackMethod(method)
-%Converts method fields from .S to fields in F
-    x=method;
-    if(isempty(method))
-        x.F=cell(0);
-        return
-    elseif(iscell(x))
-        F=x;
-        x=[];
-        x.F=F;
-        clear F;
-        
-    elseif(~isfield(method,'F'))
-        x_fields=fields(x);
-        x.F=cell(0);
-        numMethods=1;
-        for j=1:length(x_fields)
-           if(sum(strcmp(x_fields,sprintf('S%i',j))))
-               x.F{numMethods}=x.(sprintf('S%i',j));
-               x=rmfield(x,sprintf('S%i',j));
-               numMethods=numMethods+1;
-           end
-        end
-    end
-    
-    for idx=1:length(x.F)
-        Fidx=x.F{idx};
-        if(ischar(Fidx)&&contains(Fidx,'struct(''f'))
-            warning('Improperly formatted function found. Some settings may be lost');
-            x.F(idx)=[];
-        elseif(length(Fidx)>1) %This is a struct array for some reason?
-           %Change it back!
-           F_noarray.f=Fidx(1).f;
-           F_noarray.args=cell(0);
-           F_noarray.argvals=cell(0);
-           F_noarray.default_argvals=cell(0);
-           F_noarray.output=cell(0);
-           for j=1:length(Fidx)
-                F_noarray.args{j}=Fidx(j).args;
-                F_noarray.argvals{j}=Fidx(j).argvals;
-                F_noarray.default_argvals{j}=Fidx(j).default_argvals;
-                F_noarray.output{j}=Fidx(j).output;
-           end
-           x.F{idx}=F_noarray;
-        end
-    end
-    
-    
-    
-
 function []=removeFunction(idx)
 global PF2
 
@@ -1578,10 +1527,10 @@ if(length(myMethods.cfg.Sections)>0)
    for i=1:length(myMethods.cfg.Sections)
        if ismember(i,ia)
             myStoredMethods.cfg.remove(myMethods.cfg.Sections{i});
-            myStoredMethods.cfg.add(myMethods.cfg.Sections{i},unpackMethod(myMethods.cfg.(myMethods.cfg.Sections{i})));
+            myStoredMethods.cfg.add(myMethods.cfg.Sections{i},pf2_base.pf2_unpackMethod(myMethods.cfg.(myMethods.cfg.Sections{i})));
             fprintf('Removing and replacing method: %s\n',myMethods.cfg.Sections{i});
        else
-            myStoredMethods.cfg.add(myMethods.cfg.Sections{i},unpackMethod(myMethods.cfg.(myMethods.cfg.Sections{i})));
+            myStoredMethods.cfg.add(myMethods.cfg.Sections{i},pf2_base.pf2_unpackMethod(myMethods.cfg.(myMethods.cfg.Sections{i})));
             fprintf('Adding method: %s\n',myMethods.cfg.Sections{i});
        end
    end
