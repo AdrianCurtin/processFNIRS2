@@ -4,27 +4,42 @@ global PF2
 
 methodListStr='';
 
-rawMethods=PF2.myRawMethods.cfg.Sections;
-%oxyMethods=PF2.myOxyMethods.cfg.Sections;
+%rawMethods=PF2.myRawMethods.cfg.Sections;
+if(pf2_base.isnestedfield(PF2,'myRawMethods.cfg.Sections')&&length(PF2.myRawMethods.cfg.Sections)>0)
 
-methodListStr=sprintf('%sCurrently Loaded Oxy Methods:\n\n',methodListStr);
-methodListStr=sprintf('%sRaw Processing Methods (Light->OD):\n',methodListStr);
+    
+    rawMethods=PF2.myRawMethods.cfg.Sections;
 
-for i=1:length(rawMethods)
-	methodListStr=sprintf('%s%i. %s\n',methodListStr,i,rawMethods{i});
-end
+    methodListStr=sprintf('%sCurrently Loaded Oxy Methods:\n\n',methodListStr);
+    methodListStr=sprintf('%sRaw Processing Methods (Light->OD):\n',methodListStr);
 
-%methodListStr=sprintf('%s\n',methodListStr);
+    for i=1:length(rawMethods)
+        methodListStr=sprintf('%s%i. %s\n',methodListStr,i,rawMethods{i});
+    end
 
-%methodListStr=sprintf('%sOxy Processing Methods (Hb->Hb-Processed):\n',methodListStr);
+    %methodListStr=sprintf('%s\n',methodListStr);
 
-%for i=1:length(oxyMethods)
-%	methodListStr=sprintf('%s%i. %s\n',methodListStr,i,oxyMethods{i});
-%end
+    %methodListStr=sprintf('%sOxy Processing Methods (Hb->Hb-Processed):\n',methodListStr);
 
-if(nargout==0)
-	fprintf('%s',methodListStr);
-	return;
+    %for i=1:length(oxyMethods)
+    %	methodListStr=sprintf('%s%i. %s\n',methodListStr,i,oxyMethods{i});
+    %end
+
+    if(nargout==0)
+        fprintf('%s',methodListStr);
+        return;
+    else
+        outStr=methodListStr;
+    end
+
 else
-	outStr=methodListStr;
+    methodListStr=sprintf('No Oxy Processing Methods Loaded\nPlease import or configure methods first\n');
+   
+   
+    if(nargout==0)
+        fprintf(2,'%s',methodListStr); 
+        return;
+    else
+        outStr=methodListStr;
+    end
 end

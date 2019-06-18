@@ -2,9 +2,10 @@ function SetMethod(oxy_method)
 % This function is a wrapper for the 'oxy_method' argument in processFNIRS2
 
 if(nargin<1)
-    fprintf(2,'No Method provided\n');
+    fprintf(2,'No method provided, Please select a method\n');
 	processFNIRS2.Methods.Oxy();
-    return;
+    prompt = 'Enter Method Number ';
+    oxy_method = input(prompt);
 end
 
 if(isnumeric(oxy_method)) % Lookup method based on index

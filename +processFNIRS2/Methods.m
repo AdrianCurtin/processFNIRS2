@@ -1,30 +1,15 @@
 function outStr=Methods()
 
-global PF2
 
-methodListStr='';
+methodListStr=sprintf('Currently Loaded Methods:');
 
-rawMethods=PF2.myRawMethods.cfg.Sections;
-oxyMethods=PF2.myOxyMethods.cfg.Sections;
+methodListStr=sprintf('%s\n%s',methodListStr,processFNIRS2.Methods.Raw);
 
-methodListStr=sprintf('%sCurrently Loaded Methods:\n\n',methodListStr);
-methodListStr=sprintf('%sRaw Processing Methods (Light->OD):\n',methodListStr);
-
-for i=1:length(rawMethods)
-	methodListStr=sprintf('%s%i. %s\n',methodListStr,i,rawMethods{i});
-end
-
-methodListStr=sprintf('%s\n',methodListStr);
-
-methodListStr=sprintf('%sOxy Processing Methods (Hb->Hb-Processed):\n',methodListStr);
-
-for i=1:length(oxyMethods)
-	methodListStr=sprintf('%s%i. %s\n',methodListStr,i,oxyMethods{i});
-end
+methodListStr=sprintf('%s\n%s',methodListStr,processFNIRS2.Methods.Oxy);
 
 if(nargout==0)
-	fprintf('%s',methodListStr);
-	return;
+   fprintf(methodListStr); 
+   return;
 else
-	outStr=methodListStr;
+   outStr=methodListStr; 
 end
