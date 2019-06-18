@@ -1,8 +1,25 @@
-function SetMethod(oxy_method_string)
-% This function is a wrapper for the 'Raw_Method' argument in processFNIRS2
+function SetMethod(oxy_method)
+% This function is a wrapper for the 'oxy_method' argument in processFNIRS2
 
 if(nargin<1)
-	disp('TODO: Add listbox with current methods');
+    fprintf(2,'No Method provided\n');
+	processFNIRS2.Methods.Oxy();
+    return;
 end
 
-processFNIRS2('Oxy_Method',oxy_method_string);
+if(isnumeric(oxy_method)) % Lookup method based on index
+	global PF2
+	if(pf2_base.isnestedfield(PF2,'myOxyMethods.cfg.Sections'))
+        if(oxy_method<=length(PF2.myOxyMethods.cfg.Sections))
+            oxy_method=PF2.myOxyMethods.cfg.Sections{oxy_method};
+        end
+	end
+	
+	if(isnumeric(oxy_method))
+		error('Unable to find method %i',oxy_method);
+	end
+end
+
+if(isstring(oxy_method)||ischar(oxy_method))
+    processFNIRS2('Oxy_Method',oxy_method_string);
+end

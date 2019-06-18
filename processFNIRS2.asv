@@ -218,11 +218,9 @@ rawMethodStr=p.Results.Raw_Method;
 oxyMethodStr=p.Results.Oxy_Method;
 
 if(pf2_base.isnestedfield(PF2,sprintf('myRawMethods.cfg.%s',rawMethodStr)))
-    if(~strcmpi(PF2.stageRawMethod.name,rawMethodStr))
-       fprintf('Setting Raw Method to: %s\n',rawMethodStr); 
-    end
+    if(
     
-    PF2.stageRawMethod=unpackMethod(PF2.myRawMethods.cfg.(rawMethodStr));
+    PF2.stageRawMethod=unpackMethod(PF2.myOXyMethods.cfg.(rawMethodStr));
     PF2.stageRawMethod.name=rawMethodStr;
 else
     error('Unable to find method named: %s',oxyMethodStr);
@@ -230,10 +228,6 @@ end
 
 
 if(pf2_base.isnestedfield(PF2,sprintf('myOxyMethods.cfg.%s',oxyMethodStr)))
-    if(~strcmpi(PF2.stageOxyMethod.name,oxyMethodStr))
-       fprintf('Setting Oxy Method to: %s\n',oxyMethodStr); 
-    end
-    
     PF2.stageOxyMethod=unpackMethod(PF2.myOxyMethods.cfg.(oxyMethodStr));
     PF2.stageOxyMethod.name=oxyMethodStr;
 else
