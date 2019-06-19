@@ -1,4 +1,4 @@
-function roi_out=buildROI(x,ch_index,roi_names,fieldToUse,roi_func_handle,varargin)
+function roi_out=buildROI(x,ch_index,roi_names,fieldToUse,removeNanChannels,roi_func_handle,varargin)
 % buildROI is a basic matlab function which performs roi calculations based
 %   on the specified function handle and returns the values in column x
 %	fieldToUse is either oxy or raw, but will have to take into account channel numbers and wavelengths for raw (does not do this yet)
@@ -43,11 +43,11 @@ if(isnumeric(x))
     if(~isempty(x))
 		if(isnumeric(ch_index))
 			x=x(:,ch_index);
-			roi_out=mergeAndRun(roi_func_handle,x',varargin);
+			roi_out=mergeAndRun(roi_func_handle,x',removeNanChannels,varargin);
 		elseif(iscell(ch_index))
 			for roi_ind=1:length(ch_index)
 				x_roi=x(:,ch_index{roi_ind});
-				roi_out(:,roi_ind)=mergeAndRun(roi_func_handle,x_roi',varargin);
+				roi_out(:,roi_ind)=mergeAndRun(roi_func_handle,x_roi',removeNanChannels,varargin);
 			end
 		end
     end
@@ -138,14 +138,14 @@ elseif(isstruct(x)&&strcmpi(fieldToUse,'oxy')&&isfield(x,'HbO')&&~isempty(x.HbO)
     if(isnumeric(ch_index))
         for field_ind=1:length(validFields)
             x_roi=x.(validFields{field_ind})(:,ch_index);
-            roi_out.ROI.(validFields{field_ind})=mergeAndRun(roi_func_handle,x_roi',varargin);
+            roi_out.ROI.(validFields{field_ind})=mergeAndRun(roi_func_handle,x_roi',removeNanChannels,varargin);
         end
         roi_out.ROI.info=table({ch_index},{'oxy'},'RowNames',roi_names,'VariableNames',{'Optodes','Type'});
     elseif(iscell(ch_index))
         for roi_ind=1:length(ch_index)
             for field_ind=1:length(validFields)
                 x_roi=x.(validFields{field_ind})(:,ch_index{roi_ind});
-                roi_out.ROI.(validFields{field_ind})(:,roi_ind)=mergeAndRun(roi_func_handle,x_roi',varargin);
+                roi_out.ROI.(validFields{field_ind})(:,roi_ind)=mergeAndRun(roi_func_handle,x_roi',removeNanChannels,varargin);
             end
             if(roi_ind==1)
                 roi_out.ROI.info=table(ch_index(roi_ind),{'oxy'},'RowNames',roi_names(roi_ind),'VariableNames',{'Optodes','Type'});
@@ -158,13 +158,28 @@ end
 
 end
 
-function out=mergeAndRun(func_handle,x_roi,varg)
+function out=mergeAndRun(func_handle,x_roi,removeNanChannels,varg)
+
+    len_x_roi=size(x_roi,2);
+
+    if(removeNanChannels)
+        nnz_x=sum(~isnan(x_roi),2)==0;
+        
+        x_roi=x_roi(~nnz_x,:);
+        fprintf('Removed %i channels from ROI\n',sum(nnz_x));
+    end
+    
+    if(size(x_roi,1)==0) % if all rows removed
+        x_roi=nan(size(1,len_x_roi));
+    end
 
     if(size(x_roi,1)==1)
        warning('Only single channel present in ROI, returning just the one channel');
        out=x_roi; 
        return;
     end
+    
+    
     
     if(isempty(varg)||(length(varg)==1&&isempty(varg{1})))
         out=func_handle(x_roi);

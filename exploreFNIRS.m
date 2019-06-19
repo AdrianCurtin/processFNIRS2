@@ -1814,8 +1814,21 @@ for chIdx=1:numOpt
                            curFigH.legendHandles{curSy,curSx}.h=cell(numUgroups,1);
                        end
                    end
+                   
+                   switch ExFNIRS.settings.ChannelMode
+                       case 'FNIRS'
+                           data2plot=curFNIRS{i};
+                       case 'ROI'
+                           if(~pf2_base.isnestedfield(curGrand,'ROI.HbO.data'))
+                              error('ROI data must be calculated using a build ROI step');
+                          end
+                           data2plot=curFNIRS{i}.ROI;
+                       case 'Aux'
+                           
+                   end
+                   
                   if(plotGroupByBioM)
-                      h=plot(curFigH.subH{curSy,curSx},curFNIRS{i}.time,curFNIRS{i}.(bioM)(:,ch),'color',cIndex(b,:));
+                      h=plot(curFigH.subH{curSy,curSx},curFNIRS{i}.time,data2plot.(bioM)(:,ch),'color',cIndex(b,:));
                       set(h,'Tag',getFormattedTrialString(curFNIRS{i}));
                       if(ExFNIRS.settings.plot_grandaverage||~isempty(curFigH.legendHandles{curSy,curSx}.h{b}))
                         set(h.Annotation.LegendInformation,'IconDisplayStyle','off'); 
@@ -1823,7 +1836,7 @@ for chIdx=1:numOpt
                       gStrs{b}=selectedBioM{b};
                       curFigH.legendHandles{curSy,curSx}.h{b}=h;
                   else
-                      h=plot(curFigH.subH{curSy,curSx},curFNIRS{i}.time,curFNIRS{i}.(bioM)(:,ch),'color',cIndex(curUgroupIdx,:));
+                      h=plot(curFigH.subH{curSy,curSx},curFNIRS{i}.time,data2plot.(bioM)(:,ch),'color',cIndex(curUgroupIdx,:));
                       set(h,'Tag',getFormattedTrialString(curFNIRS{i}));
                       if(ExFNIRS.settings.plot_grandaverage||~isempty(curFigH.legendHandles{curSy,curSx}.h{curUgroupIdx}))
                           if(~isempty(h))
@@ -1852,6 +1865,7 @@ for chIdx=1:numOpt
                       case 'Aux'
            
                   end
+                  
                   
                   if(plotGroupByBioM)
                       hGrand=plot(curFigH.subH{curSy,curSx},curGrand.time,data2plot.(plotFeature)(:,ch),'LineWidth',3,'color',cIndex(b,:));
@@ -1952,6 +1966,16 @@ for chIdx=1:numOpt
                 end
             end
             
+            switch ExFNIRS.settings.ChannelMode
+                case 'FNIR'
+                    chNamePart=sprintf('Opt. %i',ch);
+                    chNamePartLong=sprintf('Optode %i',ch);
+                case 'ROI'
+                    chNamePart=selectedOptStr{chIdx};
+                    chNamePartLong=sprintf('ROI: %s',selectedOptStr{chIdx});
+                case 'Aux'
+            end
+            
             if(~plotGroupByBioM) 
                 ylbl=sprintf('\\Delta[%s] (\\muM)',bioM);
                 if(plotCount)
@@ -1960,7 +1984,7 @@ for chIdx=1:numOpt
                 if(ExFNIRS.settings.plot_error)
                     ylbl=(sprintf('%s (%s)',ylbl,ExFNIRS.settings.plot_error_feature));
                 end
-                ylbl=(sprintf('Opt. %i %s',ch,ylbl));
+                ylbl=(sprintf('%s %s',chNamePart,ylbl));
             elseif(plotGroupByBioM)
                 ylbl=sprintf('\\Delta[X] (\\muM)');
                 if(plotCount)
@@ -1969,14 +1993,14 @@ for chIdx=1:numOpt
                 if(ExFNIRS.settings.plot_error)
                     ylbl=(sprintf('%s (%s)',ylbl,ExFNIRS.settings.plot_error_feature));
                 end
-                ylbl=(sprintf('Opt. %i %s',ch,ylbl));
+                ylbl=(sprintf('%s %s',chNamePart,ylbl));
                 
                 
             end
             
             switch(xType)
                 case 'channels'
-                    title(curFigH.subH{curSy,curSx},sprintf('Optode %i',ch));
+                    title(curFigH.subH{curSy,curSx},chNamePartLong);
                 case 'bioM'
                     title(curFigH.subH{curSy,curSx},bioM);
                 case 'groupby'
@@ -1986,7 +2010,7 @@ for chIdx=1:numOpt
             
             switch(yType)
                 case 'channels'
-                    ylbl={sprintf('Optode %i',ch);ylbl};
+                    ylbl={chNamePartLong;ylbl};
                 case 'bioM'
                     ylbl={bioM;ylbl};
                 case 'groupby'
@@ -2566,18 +2590,40 @@ for g=1:length(gbyTables)
                 chNum=ROIs(c);
                 for t=1:numBarGATimes
                     if(ismember(curBarGA.time(t),times))
-                   if(numTimes==1)
-                      varName=sprintf('%s_ROI%i',curBioM,chNum); 
-                   else
-                      varName=sprintf('%s_ROI%i_t%.0f',curBioM,chNum,curBarGA.time(t)); 
-                   end
-                   varName(varName=='-')='_';
-                   tempTable.(varName)(tempTable{:,'missingFNIRS'}==0,1)=permute(curBarGA.ROI.(curBioM).data(t,chNum,:),[3,1,2]);
+                       if(numTimes==1)
+                          varName=sprintf('%s_ROI%i',curBioM,chNum); 
+                       else
+                          varName=sprintf('%s_ROI%i_t%.0f',curBioM,chNum,curBarGA.time(t)); 
+                       end
+                       varName(varName=='-')='_';
+                       tempTable.(varName)(tempTable{:,'missingFNIRS'}==0,1)=permute(curBarGA.ROI.(curBioM).data(t,chNum,:),[3,1,2]);
                     end
                 end
             end
         end
     end
+    
+     if(exportAux&&isfield(curBarGA,'Aux'))
+         warning('To-do add AUX fields to export wide'); % trouble is syncing up timing between each
+%         curAuxFields=fields(curBarGA.Aux);
+%         for aux=1:length(curAuxFields)
+%            curAuxName=curAuxFields{aux};
+%            curAux= curBarGA.Aux.(curAuxName);
+%            numAuxCh=size(curAux.data,2);
+%            if(numAuxCh==1)
+%                 newAuxName=sprintf('aux_%s',curAuxName);
+%                 tempTable.(newAuxName)(:,1)=nan;
+%                 tempTable.(newAuxName)(tempTable{:,'missingFNIRS'}==0,1)=permute(curAux.data(tDataIdx,1,:),[3,1,2]);
+%            else
+%                for ch=1:numAuxCh
+%                    newAuxName=sprintf('aux_%s_%i',curAuxName,ch);
+%                    tempTable.(newAuxName)(:,1)=nan;
+%                    tempTable.(newAuxName)(tempTable{:,'missingFNIRS'}==0,1)=permute(curAux.data(tDataIdx,ch,:),[3,1,2]);
+%                end
+%            end
+% 
+%         end
+     end
     
     mergedTables=mergeTables(mergedTables,tempTable);
 end
@@ -2617,9 +2663,6 @@ else
     exportFNIR=false;
 end
 
-if(exportAux)
-    
-end
 
 
 if(nargin<2)
@@ -4769,9 +4812,8 @@ numBioM=length(selBioM);
 
 optStrs=get(handles.listbox_optode,'String');
 selOpt=get(handles.listbox_optode,'Value');
-selectedOpt=optStrs(selOpt',:);
-selectedOpt=str2num(selectedOpt);
-numOpt=length(selectedOpt);
+selectedOptStr=optStrs(selOpt',:);
+numOpt=length(selOpt);
 
 if(numOpt==0||numGroups==0||numBioM==0)
     return;
@@ -5056,7 +5098,7 @@ for chIdx=1:numOpt
         curSy=chIdx;
     end
     
-    ch=selectedOpt(chIdx);
+    ch=selOpt(chIdx);
     legendGFXhandles{1}=[];
     legendGFXstrs{1}=cell(0);
     
@@ -5134,11 +5176,11 @@ for chIdx=1:numOpt
             end
             
             if(strcmp(plotFeature,'Count'))
-                [curHAvg,outH]=hierarchicalAverage(curData,curTable(:,dataH),@nnz);
+                [curHAvg,outH]=pf2_base.hierarchicalAverage(curData,curTable(:,dataH),@nnz);
             elseif(strcmp(plotFeature,'Mean'))
-                [curHAvg,outH]=hierarchicalAverage(curData,curTable(:,dataH),@nanmean);
+                [curHAvg,outH]=pf2_base.hierarchicalAverage(curData,curTable(:,dataH),@nanmean);
             elseif(strcmp(plotFeature,'Median'))
-                [curHAvg,outH]=hierarchicalAverage(curData,curTable(:,dataH),@nanmedian);
+                [curHAvg,outH]=pf2_base.hierarchicalAverage(curData,curTable(:,dataH),@nanmedian);
             else
                 error('Unknown parameter');
                 %curHAvg=nanmedian(hierarchicalAverage(curData,curTable(:,dataH),@nanmedian));
@@ -5176,11 +5218,11 @@ for chIdx=1:numOpt
                 curFeatureY=permute(data2plot.data(timeIdx,ch,:),[3,1,2]);
                 
                 if(strcmp(plotFeature,'Count'))
-                    [curFeatureY]=hierarchicalAverage(curFeatureY,curGrand.info.Hierarchy,@nnz);
+                    [curFeatureY]=pf2_base.hierarchicalAverage(curFeatureY,curGrand.info.Hierarchy,@nnz);
                 elseif(strcmp(plotFeature,'Mean'))
-                    [curFeatureY]=hierarchicalAverage(curFeatureY,curGrand.info.Hierarchy,@nanmean);
+                    [curFeatureY]=pf2_base.hierarchicalAverage(curFeatureY,curGrand.info.Hierarchy,@nanmean);
                 elseif(strcmp(plotFeature,'Median'))
-                    [curFeatureY]=hierarchicalAverage(curFeatureY,curGrand.info.Hierarchy,@nanmedian);
+                    [curFeatureY]=pf2_base.hierarchicalAverage(curFeatureY,curGrand.info.Hierarchy,@nanmedian);
                 else
                     error('Unknown parameter');
                     %curHAvg=nanmedian(hierarchicalAverage(curData,curTable(:,dataH),@nanmedian));
@@ -5330,7 +5372,7 @@ for chIdx=1:numOpt
                 if(ExFNIRS.settings.plot_scatter_line||ExFNIRS.settings.plot_scatter_err)
                     if(N>2)
                         [coefficients,PolyS] = polyfit(xVals, yVals, 1);
-                        CI = polyparci(coefficients,PolyS);
+                        CI = pf2_base.external.polyparci(coefficients,PolyS);
                         xFit = linspace(min(xVals), max(xVals), 1000);
                         [yFit,deltaY] = polyval(coefficients, xFit,PolyS);
                         
@@ -6079,6 +6121,8 @@ switch (ExFNIRS.settings.ChannelMode)
         set(handles.listbox_optode,'String',uOpt);
         set(handles.listbox_optode,'Value',1);
         set(handles.listbox_biomarker,'String',{'HbO','HbR','HbDiff','HbTotal','CBSI'});
+        
+        set(handles.pushbutton_lme_plot_topo,'Enable','on');
     case 'ROI'
         uROI={};
         roiNames={};
@@ -6124,6 +6168,7 @@ switch (ExFNIRS.settings.ChannelMode)
         set(handles.listbox_optode,'String',uROInames);
         set(handles.listbox_optode,'Value',1);
         set(handles.listbox_biomarker,'String',{'HbO','HbR','HbDiff','HbTotal','CBSI'});
+        set(handles.pushbutton_lme_plot_topo,'Enable','off');
     case 'Aux'
         set(handles.text_optode_label,'String','Aux');
         set(handles.text_biomarker_label,'String','Aux Signal');
@@ -6132,6 +6177,7 @@ switch (ExFNIRS.settings.ChannelMode)
         set(handles.pushbutton_biomarker_select_none,'Enable','off');
         set(handles.listbox_biomarker,'String',{''});
         set(handles.listbox_optode,'Value',[]);
+        set(handles.pushbutton_lme_plot_topo,'Enable','off');
 end
 
 

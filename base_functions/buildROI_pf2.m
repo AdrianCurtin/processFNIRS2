@@ -59,10 +59,12 @@ end
 
 if(isstruct(fNIR)&&isfield(fNIR,'HbO')&&~isempty(fNIR.HbO))
 	
+    removeNanChannels=true;
+    
     if(~isempty(varargin))
-        roi_out=buildROI(fNIR,ch_index,roi_names,'oxy',roi_func_handle,varargin{:});
+        roi_out=buildROI(fNIR,ch_index,roi_names,'oxy',removeNanChannels,roi_func_handle,varargin{:});
     else
-        roi_out=buildROI(fNIR,ch_index,roi_names,'oxy',roi_func_handle);
+        roi_out=buildROI(fNIR,ch_index,roi_names,'oxy',removeNanChannels,roi_func_handle);
     end
 else
 	% no HbO/HbR information is present to calculate ROIs from

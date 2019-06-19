@@ -501,7 +501,7 @@ InitializeViewSettings(handles);
 
 
 
-
+PF2.GUIPF2.optodeTable=[];
 %processFNIR_GUI();
 UpdateOptodeList(handles);
 updatePlots(handles);
@@ -1903,7 +1903,7 @@ optTable=PF2.GUIPF2.optodeTable;
 
 if(~isempty(data))
     plotOptTable=optTable(PF2.curCh_listIdx,:);
-    plotOptTable=plotOptTable(~plotOptTable.ManualRej,:);
+    %plotOptTable=plotOptTable(~plotOptTable.ManualRej,:);
     
     if(sum(plotOptTable.IsROI)>0)
         plotROITable=plotOptTable(plotOptTable.IsROI==1,:);
@@ -1937,8 +1937,11 @@ if(~isempty(data))
     end
     
     
-    
-    plotIdx=(ismember(PF2.curChSet,plotSingleTable.Optode(:)));
+    if(~isempty(plotSingleTable))
+        plotIdx=(ismember(PF2.curChSet,plotSingleTable.Optode));
+    else
+       plotIdx=false(size(PF2.curChSet));
+    end
     plotIdx2=(ismember(PF2.curWvSet,PF2.curWv));
     plotIdx=find(plotIdx.*plotIdx2);
     num2Plot=length(plotIdx);
@@ -2008,8 +2011,44 @@ else
     data=PF2.data.stage{2};
 end
 
-if(~isempty(data))
-    plotIdx=(ismember(PF2.curChSet,plotSingleTable.Optode(:)));
+cla(stageAxesHandles{2});
+
+plotOptTable=optTable(PF2.curCh_listIdx,:);
+plotOptTable=plotOptTable(~plotOptTable.ManualRej,:);
+    
+if(sum(plotOptTable.IsROI)>0)
+    plotROITable=plotOptTable(plotOptTable.IsROI==1,:);
+    allROIch=[];
+    for idx=1:size(plotROITable)
+        allROIch=[allROIch,plotROITable.Optodes_roi{idx}];
+    end
+    allROIch=unique(allROIch);
+
+    single_roi_idx=~optTable.IsROI&ismember(optTable.Optode,allROIch);
+    if(sum(single_roi_idx)>0)
+        plotSingleROImerge=optTable(single_roi_idx,:);
+    else
+        plotSingleROImerge=[];
+    end
+else
+    plotROITable=[];
+    plotSingleROImerge=[];
+end
+
+
+
+if(sum(~plotOptTable.IsROI)>0)
+    plotSingleTable=plotOptTable(~plotOptTable.IsROI,:);
+else
+    if(~isempty(plotSingleROImerge))
+        plotSingleTable=plotSingleROImerge;
+    else
+        plotSingleTable=[];
+    end
+end
+
+if(~isempty(data)&&~isempty(plotSingleTable))
+    plotIdx=(ismember(PF2.curChSet,plotSingleTable.Optode));
     plotIdx2=(ismember(PF2.curWvSet,PF2.curWv));
     plotIdx=find(plotIdx.*plotIdx2);
     num2Plot=length(plotIdx);
@@ -2031,7 +2070,7 @@ if(~isempty(data))
     end
 
 
-    cla(stageAxesHandles{2});
+    
     for i=1:num2Plot
        h=plot(stageAxesHandles{2},PF2.data.time(timeInd),data(timeInd,plotIdx(i)),'color',cIndex(i,:)); 
        set(h,'Tag',sprintf('Ch%i_%inm',PF2.curChSet(plotIdx(i)),PF2.curWvSet(plotIdx(i))));
@@ -2637,7 +2676,7 @@ global setF
 
 
 curOptStrs=get(handles.listbox_optodes,'String');
-if(ischar(curOptStrs)&&contains(curOptStrs,'Select'))
+if(ischar(curOptStrs)&&contains(curOptStrs,'Select')||isempty(PF2.GUIPF2.optodeTable))
     initLists=true;
     BuildProbeTables();
 else
