@@ -91,7 +91,7 @@ function varargout = exploreFNIRS(varargin) % exploreFNIRS(data,timeShiftTo0,blS
 
 % Edit the above text to modify the response to help exploreFNIRS
 
-% Last Modified by GUIDE v2.5 25-Jan-2019 21:46:05
+% Last Modified by GUIDE v2.5 19-Jun-2019 15:00:47
 
 % Begin initialization code - DO NOT EDIT
 gui_Singleton = 1;
@@ -154,6 +154,8 @@ if(~isfield(ExFNIRS,'settings')||~isfield(ExFNIRS.settings,'baseline_start'))
     ExFNIRS.settings.plot_end=[];
     ExFNIRS.settings.barchart_resample_size=60;
     ExFNIRS.settings.timeShiftTo0=true;
+    ExFNIRS.settings.ChannelMode='fNIR';  % valid is fNIR, ROI, and Aux
+    ExFNIRS.settings.ChannelModes={1,'fNIR';2,'ROI';3,'Aux'};
 end
 
 addOptional(p,'data',[],@iscell); % Your data, as a cell of FNIRS structs (ideally with populated info fields and the task of interest starting at t=0)
@@ -493,7 +495,7 @@ uSession=unique(dataTable.('Session'));
 uTrial=unique(dataTable.('Trial'));
 uCondition=unique(dataTable.('Condition'));
 uBlock=unique(dataTable.('Block'));
-uOptodes=unique(ExFNIRS.data{1}.channels);
+
 
 set(handles.listbox_subjectID,'String',uSub);
 set(handles.listbox_subjectID,'Value',1:length(uSub));
@@ -558,8 +560,7 @@ if(length(uBlock)==1)
     set(handles.checkbox_block_plotby,'Value',0);
     ExFNIRS.settings.plotby.Block=0;
 end
-set(handles.listbox_optode,'String',uOptodes);
-set(handles.listbox_optode,'Value',1);
+
 
 curRawMethods=processFNIRS2_configureMethods('currentRawMethodsCallback',1,[],handles);
 if(~isempty(curRawMethods))
@@ -570,7 +571,8 @@ if(~isempty(curOxyMethods))
    set(handles.listbox_oxy_methods,'String',curOxyMethods); 
 end
 
-set(handles.listbox_biomarker,'String',{'HbO','HbR','HbDiff','HbTotal','CBSI'});
+setExChannelMode('ROI',handles,true)%initialize ROI fields
+setExChannelMode('fNIR',handles);
 
 
 
@@ -1582,8 +1584,9 @@ numBioM=length(selBioM);
 
 optStrs=get(handles.listbox_optode,'String');
 selOpt=get(handles.listbox_optode,'Value');
-selectedOpt=optStrs(selOpt',:);
-selectedOpt=str2num(selectedOpt);
+selectedOptStr=optStrs(selOpt',:);
+%selectedOpt=str2num(selectedOpt);
+selectedOpt=selOpt;
 numOpt=length(selectedOpt);
 
 if(numOpt==0||numGroups==0||numBioM==0)
@@ -1838,11 +1841,24 @@ for chIdx=1:numOpt
             end
 
             if(ExFNIRS.settings.plot_grandaverage)
-                  if(plotGroupByBioM)
-                      hGrand=plot(curFigH.subH{curSy,curSx},curGrand.time,curGrand.(bioM).(plotFeature)(:,ch),'LineWidth',3,'color',cIndex(b,:));
-                  else
-                      hGrand=plot(curFigH.subH{curSy,curSx},curGrand.time,curGrand.(bioM).(plotFeature)(:,ch),'LineWidth',3,'color',cIndex(curUgroupIdx,:));
+                  switch(ExFNIRS.settings.ChannelMode)
+                      case 'fNIR'
+                          data2plot=curGrand.(bioM);
+                      case 'ROI'
+                          if(~pf2_base.isnestedfield(curGrand,'ROI.HbO.data'))
+                              error('ROI data must be calculated using a build ROI step');
+                          end
+                          data2plot=curGrand.ROI.(bioM);
+                      case 'Aux'
+           
                   end
+                  
+                  if(plotGroupByBioM)
+                      hGrand=plot(curFigH.subH{curSy,curSx},curGrand.time,data2plot.(plotFeature)(:,ch),'LineWidth',3,'color',cIndex(b,:));
+                  else
+                      hGrand=plot(curFigH.subH{curSy,curSx},curGrand.time,data2plot.(plotFeature)(:,ch),'LineWidth',3,'color',cIndex(curUgroupIdx,:));
+                  end
+                  
                   if(numUgroups>1||numBioM==1)
                        gStrs{curUgroupIdx}=gbyStrs{g}; 
                        set(hGrand,'Tag',sprintf('%s: %s',plotFeature,gStrs{curUgroupIdx}));
@@ -1883,13 +1899,13 @@ for chIdx=1:numOpt
                     errColor=errColor+(1-errColor)*0.55;
                 end
                 
-                gaFeat=curGrand.(bioM).(plotFeature)(:,ch);
+                gaFeat=curGrand.(bioM);
                 if(strcmp(errorFeature,'MaxMin'))
-                  upperError=curGrand.(bioM).Max(:,ch);
-                  lowerError=curGrand.(bioM).Min(:,ch);
+                  upperError=gaFeat.Max(:,ch);
+                  lowerError=gaFeat.Min(:,ch);
                 else
-                  upperError=gaFeat+curGrand.(bioM).(errorFeature)(:,ch)*errMulitply;
-                  lowerError=gaFeat-curGrand.(bioM).(errorFeature)(:,ch)*errMulitply;
+                  upperError=gaFeat.(plotFeature)(:,ch)+gaFeat.(errorFeature)(:,ch)*errMulitply;
+                  lowerError=gaFeat.(plotFeature)(:,ch)-gaFeat.(errorFeature)(:,ch)*errMulitply;
                 end
                 
                 
@@ -2061,6 +2077,8 @@ function addDebugAnnotation(figHandle)
 global ExFNIRS
 curTime = datetime(now,'ConvertFrom','datenum');
 debugString=sprintf('%s\n%s (%s)\n%s',ExFNIRS.curMethodName,ExFNIRS.statusGroupByStr,ExFNIRS.settings.within_sub_avg_mode_label,curTime);
+
+debugString(debugString==('_'))='-';
 th=annotation(figHandle,'textbox',[0,1,0,0],'String',debugString,'FitBoxToText','on');
         
 
@@ -2314,7 +2332,7 @@ else
 end
 
 
-exportTable=mergeGbyTablesWide(ExFNIRS.gby,bioMList,[],times);
+exportTable=mergeGbyTablesWide(ExFNIRS.gby,bioMList,[],times,true,true);
 
 if(ExFNIRS.settings.export_replace_missing_9999)
     exportTable=nan_to_9999(exportTable);
@@ -2379,7 +2397,7 @@ else
 end
 
 
-exportTable=mergeGbyTablesLong(ExFNIRS.gby,bioMList,[],times,true);
+exportTable=mergeGbyTablesLong(ExFNIRS.gby,bioMList,[],times,true,true);
 
 
 if(ExFNIRS.settings.export_replace_missing_9999)
@@ -2426,18 +2444,42 @@ fprintf('Data exported to %s\n',sprintf('%s%s',pathname,file));
 
 
 
-function mergedTables=mergeGbyTablesWide(gbyTables,bioMarkers,channels,times)
+function mergedTables=mergeGbyTablesWide(gbyTables,bioMarkers,channels,times,exportAux,exportROI)
 % hObject    handle to pushbutton_export_csv (see GCBO)
 % eventdata  reserved - to be defined in a future version of MATLAB
 % handles    structure with handles and user data (see GUIDATA)
+
+if(nargin<6)
+    exportROI=false;
+end
+
+if(nargin<5)
+    exportAux=false;
+end
 
 if(nargin<4)
     times=[];
 end
 
+
 if(nargin<3)
     channels=[];
 end
+
+if(isempty(channels))
+    emptyChannelFlag=true;
+else
+   emptyChannelFlag=false; 
+end
+
+
+if((~exportROI&&~exportAux)||emptyChannelFlag) %isempty used when exporting all data
+    exportFNIR=true;
+else
+    exportFNIR=false;
+end
+
+
 
 if(nargin<2)
     bioMarkers={'HbO','HbR','HbDiff','HbTotal','CBSI'};
@@ -2466,19 +2508,28 @@ for g=1:length(gbyTables)
     
     curBarGA=curGby.gbyGrandBar;
     tempTable=curGby.gbyTables;
-    
-    if(isempty(bioMarkers))
-       times=1;
-       channels=1;
-    end
+   
     
     %numRows=size(tempTable,1);
-    if(isempty(channels))
+    if(emptyChannelFlag&&exportFNIR)
         numCh=size(curBarGA.HbO.data,2);
         channels=1:numCh;
-    else
+    elseif(exportFNIR)
        numCh=length(channels); 
+    else
+       numCh=0; 
     end
+    
+    if(emptyChannelFlag&&exportROI&&pf2_base.isnestedfield(curBarGA,'ROI.HbO'))
+        numROI=size(curBarGA.ROI.HbO.data,2);
+        ROIs=1:numROI;
+    elseif(exportFNIR&&pf2_base.isnestedfield(curBarGA,'ROI.HbO'))
+       numROI=length(channels); 
+       ROIs=channels;
+    else
+       numROI=0; 
+    end
+    
     if(isempty(times))
         numTimes=length(curBarGA.time);
         times=curBarGA.time;
@@ -2486,21 +2537,43 @@ for g=1:length(gbyTables)
         numTimes=length(times);
     end
 
-    numCh=size(curBarGA.HbO.data,2);
     numBarGATimes=length(curBarGA.time);
     
-    for b=1:length(bioMarkers)
-        curBioM=bioMarkers{b};
-        for c=1:numCh
-            for t=1:numBarGATimes
-                if(ismember(curBarGA.time(t),times))
-               if(numTimes==1)
-                  varName=sprintf('%s_Opt%i',curBioM,c); 
-               else
-                  varName=sprintf('%s_Opt%i_t%.0f',curBioM,c,curBarGA.time(t)); 
-               end
-               varName(varName=='-')='_';
-               tempTable.(varName)(tempTable{:,'missingFNIRS'}==0,1)=permute(curBarGA.(curBioM).data(t,c,:),[3,1,2]);
+    if(exportFNIR)
+        for b=1:length(bioMarkers)
+            curBioM=bioMarkers{b};
+            for c=1:numCh
+                chNum=channels(c);
+                for t=1:numBarGATimes
+                    if(ismember(curBarGA.time(t),times))
+                   if(numTimes==1)
+                      varName=sprintf('%s_Opt%i',curBioM,chNum); 
+                   else
+                      varName=sprintf('%s_Opt%i_t%.0f',curBioM,chNum,curBarGA.time(t)); 
+                   end
+                   varName(varName=='-')='_';
+                   tempTable.(varName)(tempTable{:,'missingFNIRS'}==0,1)=permute(curBarGA.(curBioM).data(t,chNum,:),[3,1,2]);
+                    end
+                end
+            end
+        end
+    end
+    
+    if(exportROI&&pf2_base.isnestedfield(curBarGA,'ROI.HbO'))
+        for b=1:length(bioMarkers)
+            curBioM=bioMarkers{b};
+            for c=1:numROI
+                chNum=ROIs(c);
+                for t=1:numBarGATimes
+                    if(ismember(curBarGA.time(t),times))
+                   if(numTimes==1)
+                      varName=sprintf('%s_ROI%i',curBioM,chNum); 
+                   else
+                      varName=sprintf('%s_ROI%i_t%.0f',curBioM,chNum,curBarGA.time(t)); 
+                   end
+                   varName(varName=='-')='_';
+                   tempTable.(varName)(tempTable{:,'missingFNIRS'}==0,1)=permute(curBarGA.ROI.(curBioM).data(t,chNum,:),[3,1,2]);
+                    end
                 end
             end
         end
@@ -2509,17 +2582,17 @@ for g=1:length(gbyTables)
     mergedTables=mergeTables(mergedTables,tempTable);
 end
 
-function mergedTables=mergeGbyTablesLong(gbyTables,bioMarkers,channels,times,exportAux)
+function mergedTables=mergeGbyTablesLong(gbyTables,bioMarkers,channels,times,exportAux,exportROI)
 % hObject    handle to pushbutton_export_csv (see GCBO)
 % eventdata  reserved - to be defined in a future version of MATLAB
 % handles    structure with handles and user data (see GUIDATA)
 
-if(nargin<5)
-    exportAux=true;
+if(nargin<6)
+    exportROI=false;
 end
 
-if(exportAux)
-    
+if(nargin<5)
+    exportAux=false;
 end
 
 if(nargin<4)
@@ -2529,6 +2602,25 @@ end
 if(nargin<3)
     channels=[];
 end
+
+if(isempty(channels))
+   emptyChannelFlag=true;
+else
+    emptyChannelFlag=false;
+end
+
+if((~exportROI&&~exportAux)) % export parameters by themself, or all channels
+   exportFNIR=true; 
+elseif(isempty(channels)) %used in mass export
+   exportFNIR=true; 
+else
+    exportFNIR=false;
+end
+
+if(exportAux)
+    
+end
+
 
 if(nargin<2)
     bioMarkers={'HbO','HbR','HbDiff','HbTotal','CBSI'};
@@ -2557,18 +2649,25 @@ for g=1:length(gbyTables)
     end
     
     curBarGA=curGby.gbyGrandBar;
-    
-    if(isempty(bioMarkers))
-       times=1;
-       channels=1;
+
+    if(exportROI&&(emptyChannelFlag)&&pf2_base.isnestedfield(curBarGA,'ROI.HbO.data'))
+       numROI=size(curBarGA.ROI.HbO.data,2);
+       ROIs=1:numROI;
+    elseif(exportROI&&~emptyChannelFlag&&pf2_base.isnestedfield(curBarGA,'ROI.HbO.data'))
+        numROI=length(channels);
+        ROIs=channels;
+    else
+       numROI=0; 
     end
     
     %numRows=size(tempTable,1);
-    if(isempty(channels))
+    if(emptyChannelFlag&&exportFNIR)
         numCh=size(curBarGA.HbO.data,2);
         channels=1:numCh;
-    else
+    elseif(exportFNIR)
        numCh=length(channels); 
+    else
+       numCH=0; 
     end
     if(isempty(times))
         numTimes=length(curBarGA.time);
@@ -2577,63 +2676,81 @@ for g=1:length(gbyTables)
         numTimes=length(times);
     end
     
-    if(~isempty(bioMarkers))
+    for tIdx=1:numTimes
+        t=times(tIdx);
+        tempTable=curGby.gbyTables;
+        tDataIdx=find(curBarGA.time==t,1);
+        if(isempty(tDataIdx))
+            continue;
+        end
+        t_end=curBarGA.segmentTimes(tDataIdx,3);
+        %tempTable.('BioM')(:,1)=string(curBioM);
+        tempTable.('Time')(:,1)=string(num2str(round(t),'%.0f'));
+        tempTable.('TimeStart')(:,1)=string(num2str(t,'%.2f'));
+        tempTable.('TimeEnd')(:,1)=string(num2str(t_end,'%.2f'));
 
-        for tIdx=1:numTimes
-            t=times(tIdx);
-            tempTable=curGby.gbyTables;
-            tDataIdx=find(curBarGA.time==t,1);
-            if(isempty(tDataIdx))
-                continue;
-            end
-            t_end=curBarGA.segmentTimes(tDataIdx,3);
-            %tempTable.('BioM')(:,1)=string(curBioM);
-            tempTable.('Time')(:,1)=string(num2str(round(t),'%.0f'));
-            tempTable.('TimeStart')(:,1)=string(num2str(t,'%.2f'));
-            tempTable.('TimeEnd')(:,1)=string(num2str(t_end,'%.2f'));
-            
+        if(exportFNIR&&~isempty(bioMarkers))
             for b=1:length(bioMarkers)
                 curBioM=bioMarkers{b};
-                
+
                 for c=1:numCh
                     chNum=channels(c);
                     chName=sprintf('Opt%i_%s',chNum,curBioM); 
 
-                    
+
                     tempTable.(chName)(:,1)=nan;
                     tempTable.(chName)(tempTable{:,'missingFNIRS'}==0,1)=permute(curBarGA.(curBioM).data(tDataIdx,chNum,:),[3,1,2]);
-                    
+
                 end
-                
+
             end
-            
-            if(exportAux&&isfield(curBarGA,'Aux'))
-                curAuxFields=fields(curBarGA.Aux);
-                for aux=1:length(curAuxFields)
-                   curAuxName=curAuxFields{aux};
-                   curAux= curBarGA.Aux.(curAuxName);
-                   numAuxCh=size(curAux.data,2);
-                   if(numAuxCh==1)
-                        newAuxName=sprintf('aux_%s',curAuxName);
-                        tempTable.(newAuxName)(:,1)=nan;
-                        tempTable.(newAuxName)(tempTable{:,'missingFNIRS'}==0,1)=permute(curAux.data(tDataIdx,1,:),[3,1,2]);
-                   else
-                       for ch=1:numAuxCh
-                           newAuxName=sprintf('aux_%s_%i',curAuxName,ch);
-                           tempTable.(newAuxName)(:,1)=nan;
-                           tempTable.(newAuxName)(tempTable{:,'missingFNIRS'}==0,1)=permute(curAux.data(tDataIdx,ch,:),[3,1,2]);
-                       end
-                   end
-                  
-                end
-            end
-            
-            mergedTables=mergeTables(mergedTables,tempTable);
         end
-    else % No fnirs info
-        tempTable=curGby.gbyTables;
+        
+        if(exportROI&&~isempty(bioMarkers)&&pf2_base.isnestedfield(curBarGA,'ROI.HbO.data'))
+            for b=1:length(bioMarkers)
+                curBioM=bioMarkers{b};
+
+                for c=1:numROI
+                    chNum=ROIs(c);
+                    chName=sprintf('ROI%i_%s',chNum,curBioM); 
+
+
+                    tempTable.(chName)(:,1)=nan;
+                    tempTable.(chName)(tempTable{:,'missingFNIRS'}==0,1)=permute(curBarGA.ROI.(curBioM).data(tDataIdx,chNum,:),[3,1,2]);
+
+                end
+
+            end
+        end
+
+        if(exportAux&&isfield(curBarGA,'Aux'))
+            curAuxFields=fields(curBarGA.Aux);
+            for aux=1:length(curAuxFields)
+               curAuxName=curAuxFields{aux};
+               curAux= curBarGA.Aux.(curAuxName);
+               numAuxCh=size(curAux.data,2);
+               if(numAuxCh==1)
+                    newAuxName=sprintf('aux_%s',curAuxName);
+                    tempTable.(newAuxName)(:,1)=nan;
+                    tempTable.(newAuxName)(tempTable{:,'missingFNIRS'}==0,1)=permute(curAux.data(tDataIdx,1,:),[3,1,2]);
+               else
+                   for ch=1:numAuxCh
+                       newAuxName=sprintf('aux_%s_%i',curAuxName,ch);
+                       tempTable.(newAuxName)(:,1)=nan;
+                       tempTable.(newAuxName)(tempTable{:,'missingFNIRS'}==0,1)=permute(curAux.data(tDataIdx,ch,:),[3,1,2]);
+                   end
+               end
+
+            end
+        end
+
         mergedTables=mergeTables(mergedTables,tempTable);
     end
+    
+    %else % No fnirs info
+    %    tempTable=curGby.gbyTables;
+    %    mergedTables=mergeTables(mergedTables,tempTable);
+    %end
     
     
 end
@@ -3032,9 +3149,8 @@ numBioM=length(selBioM);
 
 optStrs=get(handles.listbox_optode,'String');
 selOpt=get(handles.listbox_optode,'Value');
-selectedOpt=optStrs(selOpt',:);
-selectedOpt=str2num(selectedOpt);
-numOpt=length(selectedOpt);
+selectedOptStr=optStrs(selOpt',:);
+numOpt=length(selOpt);
 
 if(numOpt==0||numGroups==0||numBioM==0)
     return;
@@ -3152,7 +3268,7 @@ numCharts=length(subplotHandles);
 
 
 for chIdx=1:numOpt
-    ch=selectedOpt(chIdx);
+    ch=selOpt(chIdx);
     %legendGFXhandles{1}=[];
     %legendGFXstrs{1}=cell(0);
     if(plotGroupByBioM)
@@ -3193,6 +3309,7 @@ for chIdx=1:numOpt
             curFNIRS=ExFNIRS.gby(g).gbyFNIRS_blk;
             curGrand=ExFNIRS.gby(g).gbyGrandBar;
             
+
             if(isfield(chartGby{curChart},'gby'))
                 chartGby{curChart}.gby(end+1)=ExFNIRS.gby(g);
             else
@@ -3204,9 +3321,6 @@ for chIdx=1:numOpt
                     chartGby{curChart}.curBioM=selectedBioM(b);
                 end
             end
-            
-            
-            
             
             
             if(useCurInfoGroup)
@@ -3239,10 +3353,24 @@ for chIdx=1:numOpt
             if(ExFNIRS.settings.plot_bar_ga)
                   [timeIdx,timeIdxRev]=ismember(round(curGrand.time),barChartTimes);
                   timeIdxRev=timeIdxRev(timeIdxRev>0);
+                  
+                  switch(ExFNIRS.settings.ChannelMode)
+                      case 'fNIR'
+                          data2plot=curGrand.(bioM);
+                      case 'ROI'
+                          if(~pf2_base.isnestedfield(curGrand,'ROI.HbO.data'))
+                              error('ROI data must be calculated using a build ROI step');
+                          end
+                          
+                          data2plot=curGrand.ROI.(bioM);
+                      case 'Aux'
+           
+                  end
+   
                   if(plotGroupByBioM)
-                      barChartData{curChart}(timeIdxRev+curGroupIdxOffset,b,1)=curGrand.(bioM).(plotFeature)(timeIdx,ch);
+                      barChartData{curChart}(timeIdxRev+curGroupIdxOffset,b,1)=data2plot.(plotFeature)(timeIdx,ch);
                   else
-                      barChartData{curChart}(timeIdxRev+curGroupIdxOffset,curUgroupIdx,1)=curGrand.(bioM).(plotFeature)(timeIdx,ch);
+                      barChartData{curChart}(timeIdxRev+curGroupIdxOffset,curUgroupIdx,1)=data2plot.(plotFeature)(timeIdx,ch);
                   end
                   if(numUgroups>1||numBioM==1)
                        gAStrs{curUgroupIdx,curChart}=sprintf('%s',gbyStrs{g}); 
@@ -3256,20 +3384,20 @@ for chIdx=1:numOpt
                   errMulitply=ExFNIRS.settings.plot_bar_err_mult;
                   [timeIdx,timeIdxRev]=ismember(round(curGrand.time),barChartTimes);
                   timeIdxRev=timeIdxRev(timeIdxRev>0);
-                  gaFeat=curGrand.(bioM).(plotFeature)(timeIdx,ch);
+                  ga2plot=curGrand.(bioM);
                   if(strcmp(errorFeature,'MaxMin'))
                       if(plotGroupByBioM)
-                          barChartData{curChart}(timeIdxRev+curGroupIdxOffset,b,2)=curGrand.(bioM).Max(timeIdx,ch);
-                          barChartData{curChart}(timeIdxRev+curGroupIdxOffset,b,3)=curGrand.(bioM).Min(timeIdx,ch);
+                          barChartData{curChart}(timeIdxRev+curGroupIdxOffset,b,2)=ga2plot.Max(timeIdx,ch);
+                          barChartData{curChart}(timeIdxRev+curGroupIdxOffset,b,3)=ga2plot.Min(timeIdx,ch);
                       else
-                          barChartData{curChart}(timeIdxRev+curGroupIdxOffset,curUgroupIdx,2)=curGrand.(bioM).Max(timeIdx,ch);
-                          barChartData{curChart}(timeIdxRev+curGroupIdxOffset,curUgroupIdx,3)=curGrand.(bioM).Min(timeIdx,ch);
+                          barChartData{curChart}(timeIdxRev+curGroupIdxOffset,curUgroupIdx,2)=ga2plot.Max(timeIdx,ch);
+                          barChartData{curChart}(timeIdxRev+curGroupIdxOffset,curUgroupIdx,3)=ga2plot.Min(timeIdx,ch);
                       end
                   else
                       if(plotGroupByBioM)
-                          barChartData{curChart}(timeIdxRev+curGroupIdxOffset,b,2)=curGrand.(bioM).(errorFeature)(timeIdx,ch)*errMulitply;
+                          barChartData{curChart}(timeIdxRev+curGroupIdxOffset,b,2)=ga2plot.(errorFeature)(timeIdx,ch)*errMulitply;
                       else
-                          barChartData{curChart}(timeIdxRev+curGroupIdxOffset,curUgroupIdx,2)=curGrand.(bioM).(errorFeature)(timeIdx,ch)*errMulitply;
+                          barChartData{curChart}(timeIdxRev+curGroupIdxOffset,curUgroupIdx,2)=ga2plot.(errorFeature)(timeIdx,ch)*errMulitply;
                       end
                   end
                   if(numUgroups>1||numBioM==1)
@@ -3400,7 +3528,15 @@ for chIdx=1:numOpt
             end
         end
         
-        title(sprintf('Optode %i',ch));
+        
+        switch ExFNIRS.settings.ChannelMode
+            case 'FNIR'
+                title(sprintf('Optode %i',ch));
+            case 'ROI'
+                title(sprintf('ROI: %s',selectedOptStr{ch}));
+            case 'Aux'
+                
+        end
         
         if(useCurInfoGroup&&numChartTimes==1)
             xlabel(sprintf('%s (t=%s)',curInfoGroup,barChartTimeStrings{1}));
@@ -3441,7 +3577,19 @@ end
 for sH=1:length(subplotHandles)
     
     if(ExFNIRS.settings.LME_enable&&isfield(subplotGby{sH},'gby'))
-        mergedTables{sH}=mergeGbyTablesLong(subplotGby{sH}.gby,subplotGby{sH}.curBioM,subplotGby{sH}.curCh,barChartTimes);
+        switch (ExFNIRS.settings.ChannelMode)
+            case 'fNIR'
+                mergedTables{sH}=mergeGbyTablesLong(subplotGby{sH}.gby,subplotGby{sH}.curBioM,subplotGby{sH}.curCh,barChartTimes,false,false);
+                varNameStart='Opt';
+        
+            case 'ROI'     
+                mergedTables{sH}=mergeGbyTablesLong(subplotGby{sH}.gby,subplotGby{sH}.curBioM,subplotGby{sH}.curCh,barChartTimes,false,true);
+                varNameStart='ROI';
+        
+            case 'Aux'
+                mergedTables{sH}=mergeGbyTablesLong(subplotGby{sH}.gby,subplotGby{sH}.curBioM,subplotGby{sH}.curCh,barChartTimes,true,false);
+                varNameStart='Aux';
+        end
         x=ExFNIRS.groupByVars;
         curLMEGbyString='';
         mdlPrtString='';
@@ -3490,7 +3638,9 @@ for sH=1:length(subplotHandles)
             
         end
         
-        lmeString=sprintf('Opt%i_%s~%s+(1|SubjectID)',subplotGby{sH}.curCh,subplotGby{sH}.curBioM{1},curLMEGbyString);
+        
+        
+        lmeString=sprintf('%s%i_%s~%s+(1|SubjectID)',varNameStart,subplotGby{sH}.curCh,subplotGby{sH}.curBioM{1},curLMEGbyString);
 
         try
             curChartLME{sH}=fitlme(mergedTables{sH},lmeString);
@@ -5009,7 +5159,21 @@ for chIdx=1:numOpt
                 [timeIdx,timeIdxRev]=ismember(round(curGrand.time),barChartTimes(t));
                 timeIdxRev=timeIdxRev(timeIdxRev>0);
                 
-                curFeatureY=permute(curGrand.(bioM).data(timeIdx,ch,:),[3,1,2]);
+                
+                
+              switch(ExFNIRS.settings.ChannelMode)
+                  case 'fNIR'
+                      data2plot=curGrand.(bioM);
+                  case 'ROI'
+                      if(~pf2_base.isnestedfield(curGrand,'ROI.HbO.data'))
+                          error('ROI data must be calculated using a build ROI step');
+                      end
+                          
+                      data2plot=curGrand.ROI.(bioM);
+                  case 'Aux'
+
+              end 
+                curFeatureY=permute(data2plot.data(timeIdx,ch,:),[3,1,2]);
                 
                 if(strcmp(plotFeature,'Count'))
                     [curFeatureY]=hierarchicalAverage(curFeatureY,curGrand.info.Hierarchy,@nnz);
@@ -5871,3 +6035,114 @@ function checkbox_export_9999_Callback(hObject, eventdata, handles)
 
 global ExFNIRS
 ExFNIRS.settings.export_replace_missing_9999=get(handles.checkbox_export_9999,'Value');
+
+
+% --- Executes on selection change in popupmenu_ChannelMode.
+function popupmenu_ChannelMode_Callback(hObject, eventdata, handles)
+% hObject    handle to popupmenu_ChannelMode (see GCBO)
+% eventdata  reserved - to be defined in a future version of MATLAB
+% handles    structure with handles and user data (see GUIDATA)
+
+% Hints: contents = cellstr(get(hObject,'String')) returns popupmenu_ChannelMode contents as cell array
+%        contents{get(hObject,'Value')} returns selected item from popupmenu_ChannelMode
+global ExFNIRS
+
+idx=get(handles.popupmenu_ChannelMode,'Value');
+setExChannelMode(ExFNIRS.settings.ChannelModes{idx,2},handles);
+
+function setExChannelMode(modeStr,handles,initROI)
+% sets the channel mode and changes GUI to match
+
+if(nargin<3)
+    initROI=false;
+end
+
+global ExFNIRS
+ExFNIRS.settings.ChannelMode=modeStr;
+
+switch (ExFNIRS.settings.ChannelMode)
+    case 'fNIR'
+        uOpt=[];
+        for i=1:length(ExFNIRS.data)
+            if(isfield(ExFNIRS.data{i},'channels'))
+                uOpt=[uOpt,ExFNIRS.data{i}.channels];
+            end
+        end
+        uOpt=sort(unique(uOpt));
+
+        set(handles.text_optode_label,'String','Optode');
+        set(handles.text_biomarker_label,'String','BioMarker');
+        set(handles.listbox_biomarker,'Enable','on');
+        set(handles.pushbutton_biomarker_select_all,'Enable','on');
+        set(handles.pushbutton_biomarker_select_none,'Enable','on');
+        
+        set(handles.listbox_optode,'String',uOpt);
+        set(handles.listbox_optode,'Value',1);
+        set(handles.listbox_biomarker,'String',{'HbO','HbR','HbDiff','HbTotal','CBSI'});
+    case 'ROI'
+        uROI={};
+        roiNames={};
+        for i=1:length(ExFNIRS.data)
+            if(pf2_base.isnestedfield(ExFNIRS.data{i},'ROI.info'))
+                for roinum=1:size(ExFNIRS.data{i}.ROI.info,1)
+                    if(length(ExFNIRS.data{i}.ROI.info.Properties.RowNames)<roinum)
+                        roiNames=[roiNames,{sprintf('ROI%i',roinum)}];
+                    elseif(isempty(ExFNIRS.data{i}.ROI.info.Properties.RowNames{roinum}))
+                        roiNames=[roiNames,{sprintf('ROI%i',roinum)}];
+                    else
+                        roiNames=[roiNames,ExFNIRS.data{i}.ROI.info.Properties.RowNames(roinum)];
+                    end
+                end
+                uROI=[uROI,ExFNIRS.data{i}.ROI.info{:,1}'];
+            end
+        end
+        %uROI=unique(uROI{:},'rows');
+        
+        [uROInames,b,c]=unique(roiNames);
+        uROInames=roiNames(b);
+        uROI=uROI(b);
+        
+        uROItable=table(uROI(:),'VariableNames',{'Optodes'},'RowNames',uROInames);
+        
+        if(initROI) % standaradize all ROIs on first load
+            fprintf(2,'************\nStandardizing all ROI fields...********\n');
+            for i=1:length(ExFNIRS.data)
+                if(pf2_base.isnestedfield(ExFNIRS.data{i},'raw')&&~iesmpty(ExFNIRS.data{i}))
+                   ExFNIRS.data{i}.ROI.info=uROItable;
+                end
+            end
+        end
+        
+        
+        
+        set(handles.text_optode_label,'String','ROI');
+        set(handles.text_biomarker_label,'String','BioMarker');
+        set(handles.listbox_biomarker,'Enable','on');
+        set(handles.pushbutton_biomarker_select_all,'Enable','on');
+        set(handles.pushbutton_biomarker_select_none,'Enable','on');
+        
+        set(handles.listbox_optode,'String',uROInames);
+        set(handles.listbox_optode,'Value',1);
+        set(handles.listbox_biomarker,'String',{'HbO','HbR','HbDiff','HbTotal','CBSI'});
+    case 'Aux'
+        set(handles.text_optode_label,'String','Aux');
+        set(handles.text_biomarker_label,'String','Aux Signal');
+        set(handles.listbox_biomarker,'Enable','off');
+        set(handles.pushbutton_biomarker_select_all,'Enable','off');
+        set(handles.pushbutton_biomarker_select_none,'Enable','off');
+        set(handles.listbox_biomarker,'String',{''});
+        set(handles.listbox_optode,'Value',[]);
+end
+
+
+% --- Executes during object creation, after setting all properties.
+function popupmenu_ChannelMode_CreateFcn(hObject, eventdata, handles)
+% hObject    handle to popupmenu_ChannelMode (see GCBO)
+% eventdata  reserved - to be defined in a future version of MATLAB
+% handles    empty - handles not created until after all CreateFcns called
+
+% Hint: popupmenu controls usually have a white background on Windows.
+%       See ISPC and COMPUTER.
+if ispc && isequal(get(hObject,'BackgroundColor'), get(0,'defaultUicontrolBackgroundColor'))
+    set(hObject,'BackgroundColor','white');
+end

@@ -204,6 +204,8 @@ end
 cfgRawImportPath=p.Results.ImportRawMethods;
 cfgOxyImportPath=p.Results.ImportOxyMethods;
 
+hObject=1;
+handles=1;
 if(~strcmp(cfgRawImportPath,'NA'))
     processFNIRS2_configureMethods('importMethodsCallback',hObject,[],handles,cfgRawImportPath,true);
 end
