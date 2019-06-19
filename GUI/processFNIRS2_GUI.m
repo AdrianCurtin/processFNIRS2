@@ -58,45 +58,25 @@ function processFNIRS2_GUI_OpeningFcn(hObject, eventdata, handles, varargin)
 
 global PF2
 global setF
-PF2.GUIPF2=struct();
-
 global outputData
+
+
+
+
+
 
 %%
 %Load default paramaters here
 
-
-
-PF2.defaultOxyMethodsPath=sprintf('%s/pf2_oxy_methods_stored_processFNIRS2.cfg',prefdir);
-PF2.defaultRawMethodsPath=sprintf('%s/pf2_raw_methods_stored_processFNIRS2.cfg',prefdir);
-if(~isfield(PF2,'myRawMethods')||~isfield(PF2,'baseline'))
-   disp('Initializing processfNIRS2\n');
-   PF2.myRawMethods=processFNIRS2_configureMethods('loadMethodsCallback',hObject,handles,[],PF2.defaultRawMethodsPath,true);
-   for i=1:length(PF2.myRawMethods.cfg.Sections)
-      fprintf('Loaded Raw method: %s\n',PF2.myRawMethods.cfg.Sections{i}); 
-   end
-   PF2.myOxyMethods=processFNIRS2_configureMethods('loadMethodsCallback',hObject,handles,[],PF2.defaultOxyMethodsPath,true);
-   for i=1:length(PF2.myOxyMethods.cfg.Sections)
-      fprintf('Loaded Oxy method: %s\n',PF2.myOxyMethods.cfg.Sections{i}); 
-   end
-   PF2.curDPF_fixed=5.93;   %Default differential pathlength for adult human head (van der Zee 1992)
-   PF2.dpf_mode='Calc';   %Default age to calculate differential pathlength factor from.
-   PF2.curDPF_age=25;   %Default age to calculate differential pathlength factor from.
-   fprintf('Initializing default age for DPF calculation to %.0f\n',PF2.curDPF_age);
-   PF2.baseline=[];
-   PF2.baseline.startTime=0; %or minimum time
-   
-   PF2.baseline.useAbsoluteTime=false; %enable to force baseline from absolute time instead of relative time (non-GUI only)
-   PF2.baseline.windowStartTime=0; % time from start of viewing window (GUI only)
-   PF2.baseline.blLength=10; % time in seconds from start time
-   fprintf('Defaulting to %.1f second baseline from t=%.1f\n',PF2.baseline.blLength,PF2.baseline.startTime);
-  %processFNIRS2_configureMethods() 
+if(isempty(PF2))
+   pf2_base.pf2_initialize(); 
 end
 
+
+PF2.GUIPF2=struct();
 PF2.view.processWindowOnly=false; %GUI option to only process the current window of data
 
 
-   %processFNIRS2_configureMethods() 
 %%
 % Parse inputs here
 
@@ -105,6 +85,7 @@ if(isfield(PF2,'stageRawMethod')&&isfield(PF2.stageRawMethod,'name')&&sum(strcmp
 else
     defaultRawMethod='None';
 end
+
 if(isfield(PF2,'stageOxyMethod')&&isfield(PF2.stageOxyMethod,'name')&&sum(strcmp(PF2.myOxyMethods.cfg.Sections,PF2.stageOxyMethod.name))==1)
     defaultOxyMethod=PF2.stageOxyMethod.name;
 else
@@ -518,11 +499,14 @@ guidata(hObject, handles);
 InitializeViewSettings(handles);
 
 
-UpdateOptodeList(handles);
+
+
 
 %processFNIR_GUI();
+UpdateOptodeList(handles);
 updatePlots(handles);
-edit_DPF_age_Callback([], [], handles);
+
+
 
 % This sets up the initial plot - only do when we are invisible
 % so window can get raised using processFNIRS2_GUI.
@@ -947,23 +931,25 @@ else
                         if(~errorFlag)
                             
                             funcOutput{:}=func(passedArgVals{:});
-                            if(pf2_base.isnestedfield(data,'ROI.HbO')&&~isempty(x_ind))
+                            if(pf2_base.isnestedfield(outData,'ROI.HbO')&&~isempty(x_ind))
                                 funcOutput_roi{:}=func(passedArgVals_roi{:}); 
                             end
                             
                             if(~isempty(x_out_ind)) % Assign values to fNIRS Biomarkers
                                 outData.(bmrk)(validRows,validChannels)=funcOutput{x_out_ind};
-                                if(pf2_base.isnestedfield(data,'ROI.HbO'))
+                                if(pf2_base.isnestedfield(outData,'ROI.HbO'))
                                     outData.ROI.(bmrk)(validRows,validChannels_roi)=funcOutput_roi{x_out_ind};
                                 end
                             end
                             
                             if(~isempty(fmask_out_ind)) % Or with current fmask
                                 curfMask=curfMask&funcOutput{fmask_out_ind};
-                                validChannels=data.channels&(reshape(curfMask,[1,numChannels]));
+                                validChannels=outData.channels&(reshape(curfMask,[1,numChannels]));
+                                outData.(bmrk)(:,~validChannels)=nan;
 
-                                if(pf2_base.isnestedfield(data,'ROI.HbO')&&~isempty(x_ind)) % won't run on full fNIR struct fxs
+                                if(pf2_base.isnestedfield(outData,'ROI.HbO')&&~isempty(x_ind)) % won't run on full fNIR struct fxs
                                     validChannels_roi=validChannels_roi&funcOutput_roi{fmask_out_ind};
+                                    outData.ROI.(bmrk)(:,~validChannels_roi)=nan;
                                 end
                             end
                             
@@ -1630,8 +1616,9 @@ if(length(PF2.curProbes)==1)
     PF2.data.rawMask=ismember(setF.device.Probe{1}.ChannelNumbers,setF.device.Probe{1}.ChannelList(PF2.data.fchMask|outputData.ProcessRejected));
 end
 
-UpdateOptodeList(handles);
+
 processFNIR_GUI();
+UpdateOptodeList(handles);
 updatePlots(handles);
 
 function edit_back(hObject, eventdata, handles)
@@ -1809,7 +1796,7 @@ if(~isempty(optIdx))
        set(handles.checkbox_rejectCh,'Enable','off');
    else
        set(handles.checkbox_rejectCh,'Enable','on');
-       set(handles.checkbox_rejectCh,'Value',contains(optStr{optIdx},'(R)'));
+       set(handles.checkbox_rejectCh,'Value',contains(optStr{optIdx},'(AR)')||contains(optStr{optIdx},'(R)'));
    end
 end
 
@@ -1819,12 +1806,11 @@ function updatePlots(handles)
 
 global PF2
 global setF
-UpdateOptodesRejected(handles);
 
 figure(handles.figure1);
 
 PF2.curProbe=get(handles.listbox_probes,'Value');
-PF2.curCh=get(handles.listbox_optodes,'Value');
+PF2.curCh_listIdx=get(handles.listbox_optodes,'Value');
 PF2.curWv=get(handles.listbox_wavelengths,'Value');
 PF2.curConc=get(handles.listbox_conc,'Value');
 PF2.curChSet=[];
@@ -1915,7 +1901,7 @@ axes(stageAxesHandles{1});
 data=PF2.data.stage{1};
 
 if(~isempty(data))
-    plotIdx=(ismember(PF2.curChSet,PF2.curCh));
+    plotIdx=(ismember(PF2.curChSet,PF2.curCh_listIdx));
     plotIdx2=(ismember(PF2.curWvSet,PF2.curWv));
     plotIdx=find(plotIdx.*plotIdx2);
     num2Plot=length(plotIdx);
@@ -1959,7 +1945,7 @@ if(~isempty(data))
 
     xl=[PF2.view.startTime,PF2.view.endTime]; plotMarkers(xl,stageAxesHandles{1});
     hold(stageAxesHandles{1},'off');
-
+    xlim(xl);
     if(setF.device.Info.TimeIsSampleCount)
         xlabel(stageAxesHandles{1},'Time (samples)');
     else
@@ -1986,7 +1972,7 @@ else
 end
 
 if(~isempty(data))
-    plotIdx=(ismember(PF2.curChSet,PF2.curCh));
+    plotIdx=(ismember(PF2.curChSet,PF2.curCh_listIdx));
     plotIdx2=(ismember(PF2.curWvSet,PF2.curWv));
     plotIdx=find(plotIdx.*plotIdx2);
     num2Plot=length(plotIdx);
@@ -2032,7 +2018,7 @@ if(~isempty(data))
 
     xl=[PF2.view.startTime,PF2.view.endTime]; plotMarkers(xl,stageAxesHandles{2});
     hold(stageAxesHandles{2},'off');
-
+    xlim(xl);
     if(setF.device.Info.TimeIsSampleCount)
         xlabel(stageAxesHandles{2},'Time (samples)');
     else
@@ -2056,11 +2042,47 @@ axes(stageAxesHandles{3});
 %    hold on;
 %end
 data=PF2.data.stage{4};
+optTable=PF2.GUIPF2.optodeTable;
 
 if(~isempty(data))
-    plotIdx=(ismember(data.channels,PF2.curCh));
+    plotOptTable=optTable(PF2.curCh_listIdx,:);
+    plotOptTable=plotOptTable(~plotOptTable.ManualRej,:);
+    
+    if(sum(plotOptTable.IsROI)>0)
+        plotROITable=plotOptTable(plotOptTable.IsROI==1,:);
+        allROIch=[];
+        for idx=1:size(plotROITable)
+            allROIch=[allROIch,plotROITable.Optodes_roi{idx}];
+        end
+        allROIch=unique(allROIch);
+        
+        single_roi_idx=~optTable.IsROI&ismember(optTable.Optode,allROIch);
+        if(sum(single_roi_idx)>0)
+            plotSingleROImerge=optTable(single_roi_idx,:);
+        else
+            plotSingleROImerge=[];
+        end
+    else
+        plotROITable=[];
+        plotSingleROImerge=[];
+    end
+    
+    
+    
+    if(sum(~plotOptTable.IsROI)>0)
+        plotSingleTable=plotOptTable(~plotOptTable.IsROI,:);
+    else
+        if(~isempty(plotSingleROImerge))
+            plotSingleTable=plotSingleROImerge;
+        else
+            plotSingleTable=[];
+        end
+    end
+    
+
+
     %plotIdx2=(ismember(PF2.curConcSet,PF2.curConc));
-    plotIdx=find(plotIdx);%.*plotIdx2);
+    
 
     % if(PF2.view.OxyColorAuto)
     %     [wvUnique]=sort(unique(round(PF2.curWvSet)));
@@ -2080,52 +2102,28 @@ if(~isempty(data))
     yl=[PF2.view.OxyMin,PF2.view.OxyMax];
 
     cla(stageAxesHandles{3})
-    if(sum(ismember(PF2.curConc,1))>0)
-        for i=1:length(plotIdx)
-           h=plot(stageAxesHandles{3},PF2.data.time(timeInd),data.HbO(timeInd,plotIdx(i)),'r'); 
-           set(h,'Tag',sprintf('Opt%i_HbO',data.channels(plotIdx(i))));
-           hold(stageAxesHandles{3},'on');
+    
+    bioM={'HbO','HbR','HbDiff','HbTotal','CBSI'};
+    bioMclr={[1,0,0],[0,0,1],[0.6,0,0.6],[0,0,0],[0,0.7,0.7]};
+    numBioM=length(bioM);
+    
+    for b=1:numBioM
+        if(sum(ismember(PF2.curConc,b))>0)
+            for i=1:size(plotSingleTable,1)
+               h=plot(stageAxesHandles{3},PF2.data.time(timeInd),data.(bioM{b})(timeInd,plotSingleTable.Optode(i)),'color',bioMclr{b}); 
+               set(h,'Tag',sprintf('Opt%i_%s',plotSingleTable.Optode(i),bioM{b}));
+               hold(stageAxesHandles{3},'on');
+            end
         end
     end
 
-    if(sum(ismember(PF2.curConc,2))>0)
-        for i=1:length(plotIdx)
-           h=plot(stageAxesHandles{3},PF2.data.time(timeInd),data.HbR(timeInd,plotIdx(i)),'b'); 
-           set(h,'Tag',sprintf('Opt%i_HbR',data.channels(plotIdx(i))));
-           hold(stageAxesHandles{3},'on');
-        end
-    end
-
-    if(sum(ismember(PF2.curConc,3))>0)
-        for i=1:length(plotIdx)
-           h=plot(stageAxesHandles{3},PF2.data.time(timeInd),data.HbDiff(timeInd,plotIdx(i)),'k'); 
-           set(h,'Tag',sprintf('Opt%i_HbDiff',data.channels(plotIdx(i))));
-           hold(stageAxesHandles{3},'on');
-        end
-    end
-
-    if(sum(ismember(PF2.curConc,4))>0)
-        for i=1:length(plotIdx)
-           h=plot(stageAxesHandles{3},PF2.data.time(timeInd),data.HbTotal(timeInd,plotIdx(i)),'color',[0.6,0,0.6]);
-           set(h,'Tag',sprintf('Opt%i_HbTotal',data.channels(plotIdx(i))));
-           hold(stageAxesHandles{3},'on');
-        end
-    end
-
-    if(sum(ismember(PF2.curConc,5))>0)
-        for i=1:length(plotIdx)
-           h=plot(stageAxesHandles{3},PF2.data.time(timeInd),data.CBSI(timeInd,plotIdx(i)),'color',[0,0.7,0.7]); 
-           set(h,'Tag',sprintf('Opt%i_CBSI',data.channels(plotIdx(i))));
-           hold(stageAxesHandles{3},'on');
-        end
-    end
 
     if(~PF2.view.OxyAuto)
        ylim(stageAxesHandles{3},[PF2.view.OxyMin,PF2.view.OxyMax]); 
     end
 
 
-    if(~isempty(plotIdx))
+    if(size(plotOptTable,1)>0)
        yl=ylim(stageAxesHandles{3});
 
        plot(stageAxesHandles{3},PF2.data.time(timeInd),PF2.data.time(timeInd)*0,'--k','linewidth',1);
@@ -2133,7 +2131,7 @@ if(~isempty(data))
 
     xl=[PF2.view.startTime,PF2.view.endTime]; plotMarkers(xl,stageAxesHandles{3});
     hold(stageAxesHandles{3},'off');
-
+    xlim(xl);
     if(setF.device.Info.TimeIsSampleCount)
         xlabel(stageAxesHandles{3},'Time (samples)');
     else
@@ -2159,52 +2157,48 @@ axes(stageAxesHandles{4});
 data=PF2.data.stage{5};
 
 if(~isempty(data))
-
-    plotIdx=(ismember(data.channels,PF2.curCh));
-    %plotIdx2=(ismember(PF2.curConcSet,PF2.curConc));
-    plotIdx=find(plotIdx);%.*plotIdx2);
-
+    plotOptTable=plotOptTable(~plotOptTable.AutoRej,:);
+    
+    if(sum(~plotOptTable.IsROI)>0)
+        plotST_idx=~plotOptTable.IsROI&~plotOptTable.AutoRej&~plotOptTable.ManualRej;
+        if(sum(plotST_idx)>0)
+            plotSingleTable=plotOptTable(plotST_idx,:);
+        else
+            plotSingleTable=[];
+        end
+    else
+        plotSingleTable=[];
+    end
 
     cla(stageAxesHandles{4});
-    if(sum(ismember(PF2.curConc,1))>0)
-        for i=1:length(plotIdx)
-           h=plot(stageAxesHandles{4},PF2.data.time(timeInd),data.HbO(timeInd,plotIdx(i)),'r'); 
-           set(h,'Tag',sprintf('Opt%i_HbO',data.channels(plotIdx(i))));
-           hold(stageAxesHandles{4},'on');
+    for b=1:numBioM
+        if(sum(ismember(PF2.curConc,b))>0)
+            for i=1:size(plotSingleTable,1)
+               h=plot(stageAxesHandles{4},PF2.data.time(timeInd),data.(bioM{b})(timeInd,plotSingleTable.Optode(i)),'color',bioMclr{b}); 
+               set(h,'Tag',sprintf('Opt%i_%s',plotSingleTable.Optode(i),bioM{b}));
+               hold(stageAxesHandles{4},'on');
+            end
         end
+    end
+    
+    if(isfield(data.ROI,'HbO'))
+        for b=1:numBioM
+        
+            if(sum(ismember(PF2.curConc,b))>0)
+
+                for i=1:size(plotROITable,1)
+                   h=plot(stageAxesHandles{4},PF2.data.time(timeInd),data.ROI.(bioM{b})(timeInd,plotROITable.Optode(i)),'color',bioMclr{b}*0.8,'linewidth',1); 
+                   set(h,'Tag',sprintf('%s_%s',plotROITable.Label{i},bioM{b}));
+                   hold(stageAxesHandles{4},'on');
+                end
+
+            end
+        
+        end
+    else
+        fprintf(2,'ROIs have not been built, use a function in Oxy Stage to build ROIs\n');
     end
 
-    if(sum(ismember(PF2.curConc,2))>0)
-        for i=1:length(plotIdx)
-           h=plot(stageAxesHandles{4},PF2.data.time(timeInd),data.HbR(timeInd,plotIdx(i)),'b'); 
-           set(h,'Tag',sprintf('Opt%i_HbR',data.channels(plotIdx(i))));
-           hold(stageAxesHandles{4},'on');
-        end
-    end
-
-    if(sum(ismember(PF2.curConc,3))>0)
-        for i=1:length(plotIdx)
-           h=plot(stageAxesHandles{4},PF2.data.time(timeInd),data.HbDiff(timeInd,plotIdx(i)),'k'); 
-           set(h,'Tag',sprintf('Opt%i_HbDiff',data.channels(plotIdx(i))));
-           hold(stageAxesHandles{4},'on');
-        end
-    end
-
-    if(sum(ismember(PF2.curConc,4))>0)
-        for i=1:length(plotIdx)
-           h=plot(stageAxesHandles{4},PF2.data.time(timeInd),data.HbTotal(timeInd,plotIdx(i)),'color',[0.6,0,0.6]); 
-           set(h,'Tag',sprintf('Opt%i_HbTotal',data.channels(plotIdx(i))));
-           hold(stageAxesHandles{4},'on');
-        end
-    end
-
-    if(sum(ismember(PF2.curConc,5))>0)
-        for i=1:length(plotIdx)
-           h=plot(stageAxesHandles{4},PF2.data.time(timeInd),data.CBSI(timeInd,plotIdx(i)),'color',[0,0.7,0.7]); 
-           set(h,'Tag',sprintf('Opt%i_CBSI',data.channels(plotIdx(i))));
-           hold(stageAxesHandles{4},'on');
-        end
-    end
 
 
     if(~PF2.view.OxyAuto)
@@ -2215,13 +2209,14 @@ if(~isempty(data))
     end
 
 
-    if(~isempty(plotIdx))
+    if(size(plotOptTable,1)>0)
        yl=ylim(stageAxesHandles{4});
 
        plot(stageAxesHandles{4},PF2.data.time(timeInd),PF2.data.time(timeInd)*0,'--k','linewidth',1);
     end
 
     xl=[PF2.view.startTime,PF2.view.endTime]; plotMarkers(xl,stageAxesHandles{4});
+    xlim(xl);
     hold(stageAxesHandles{4},'off');
 
     if(setF.device.Info.TimeIsSampleCount)
@@ -2506,121 +2501,173 @@ function listbox_probes_Callback(hObject, eventdata, handles)
 %        contents{get(hObject,'Value')} returns selected item from listbox_probes
 UpdateOptodeList(handles)
 
-function UpdateOptodesRejected(handles)
+function BuildProbeTables()
 global PF2
 global setF
-curCh=[];
-curChMask=[];
-curOptStrs=get(handles.listbox_optodes,'String');
-if(ischar(curOptStrs)&&contains(curOptStrs,'Select'))
-    initLists=true;
-else
-    initLists=false;
-end
-curSelectedOptode=get(handles.listbox_optodes,'Value');
-PF2.curProbes=get(handles.listbox_probes,'Value');
-for i=1:length(PF2.curProbes)
-    curCh=[curCh,setF.device.Probe{PF2.curProbes(i)}.ChannelNumbers];
-    if(isfield(PF2,'data')&&isfield(PF2.data,'fchMask'))
-        curChMask=[curChMask,PF2.data.fchMask]; 
-    else
-        curChMask=[curChMask,true(size(curCh))];
-    end
-end
 
-strCh={};
-curCh=curCh(curCh>0);
-[listCh,idx]=sort(unique(curCh));
-curChMask=curChMask(idx);
-
-numList=0;
-
-if(pf2_base.isnestedfield(PF2,'data.curChMask'))
-    curAutoRejectChMask=curChMask&PF2.data.curChMask;
-else
-    curAutoRejectChMask=true(size(curChMask));
-end
+probeTable=table([],[],[],[],[],'VariableNames',{'ProbeNum','Index','Optode','Wv','Label'});
+optodeTable=table([],[],[],[],[],'',{},'VariableNames',{'ProbeNum','Optode','ManualRej','AutoRej','IsROI','Label','Optodes_roi'});
+for i=1:length(setF.device.Probe)
+    probeNum=i;
+    rawChannels=setF.device.Probe{probeNum}.ChannelNumbers;
+    numCh=length(rawChannels);
+    probeChIdx=1:numCh;
+    startIdx_probe=size(probeTable,1)+1;
+    endIdx_probe=numCh;
+    probeTable.Index(startIdx_probe:endIdx_probe)=probeChIdx;
+    probeTable.Optode(startIdx_probe:endIdx_probe)=rawChannels;
+    probeTable.ProbeNum(startIdx_probe:endIdx_probe)=probeNum;
+    probeTable.Wv(startIdx_probe:endIdx_probe)=setF.device.Probe{probeNum}.Wavelength;
     
-for i=1:length(listCh)
-    numList=numList+1;
-    if(curChMask(i))
-        strCh{numList}=sprintf('%i',listCh(i));
-    else
-        strCh{numList}=sprintf('%i (R)',listCh(i));
+    if(i==1)%need to convert to string only the first time
+        probeTable.Label=cellstr(num2str(probeTable.Label));
     end
     
-    if(~curAutoRejectChMask(i)&&curChMask(i))
-        strCh{numList}=sprintf('%s(AR)',strCh{numList});
+    for ch=1:numCh
+        idx=startIdx_probe+ch-1;
+        probeTable.Label{idx}=sprintf('P%iC%iW%.0f',probeNum,probeTable.Optode(idx),probeTable.Wv(idx));
+    end
+    
+    probeOptodes=unique(rawChannels(rawChannels>0));
+    
+    numOpt=length(probeOptodes);
+    startIdx_opt=size(optodeTable,1)+1;
+    endIdx_opt=numOpt;
+    
+    optodeTable.ProbeNum(startIdx_opt:endIdx_opt)=probeNum;
+    optodeTable.Optode(startIdx_opt:endIdx_opt)=probeOptodes;
+    optodeTable.IsROI(startIdx_opt:endIdx_opt)=false;
+    
+
+    if(i==1)
+        optodeTable.Label=cellstr(num2str(optodeTable.Label));
     end
 end
 
-set(handles.listbox_optodes,'string',strCh);
-if(initLists||isempty(curSelectedOptode)||max(curSelectedOptode)>numList)
-    curSelectedOptode=1;
+
+PF2.GUIPF2.optodeTable=optodeTable;
+PF2.GUIPF2.probeTable=probeTable;
+
+function updateOptodeTablesROI()
+
+global PF2
+global setF
+
+PF2.GUIPF2.optodeTable=PF2.GUIPF2.optodeTable(PF2.GUIPF2.optodeTable.IsROI==false,:);
+
+numProbes=length(setF.device.Probe);
+
+if(pf2_base.isnestedfield(PF2,'data.ROI.info'))
+   for probeNum=1:numProbes
+       if(iscell(PF2.data.ROI.info)) % If its a cell, make it a better format
+           rownames=cell(1,length(PF2.data.ROI.info));
+           for r=1:length(PF2.data.ROI.info)
+               rownames{r}=sprintf('ROI%i',r);
+           end
+           PF2.data.ROI.info=table(PF2.data.ROI.info,'VariableNames',{'Optodes'},'RowNames',rownames);
+       end
+       
+       if(istable(PF2.data.ROI.info))
+           roi_names=PF2.data.ROI.info.Properties.RowNames;
+           start_idx=size(PF2.GUIPF2.optodeTable,1);
+            for roi=1:size(PF2.data.ROI.info,1)
+                
+                idx=start_idx+roi;
+
+                PF2.GUIPF2.optodeTable.ProbeNum(idx)=probeNum;
+                PF2.GUIPF2.optodeTable.Optode(idx)=roi;
+                PF2.GUIPF2.optodeTable.IsROI(idx)=true;
+                PF2.GUIPF2.optodeTable.Optodes_roi(idx)=PF2.data.ROI.info.Optodes(roi);
+                
+                if(numProbes>1)
+                    PF2.GUIPF2.optodeTable.Label{idx}=sprintf('P%i-%s',probeNum,roi_names{roi});
+                else
+                    PF2.GUIPF2.optodeTable.Label(idx)=roi_names(roi);
+                end
+            end
+       end
+   end
 end
-set(handles.listbox_optodes,'Value',curSelectedOptode);
-
-
-
+    
+    
 
 
 
 function UpdateOptodeList(handles)
 global PF2
 global setF
-curCh=[];
-curWv=[];
-curChMask=[];
+
+
+
 curOptStrs=get(handles.listbox_optodes,'String');
 if(ischar(curOptStrs)&&contains(curOptStrs,'Select'))
     initLists=true;
+    BuildProbeTables();
 else
     initLists=false;
 end
-curSelectedOptode=get(handles.listbox_optodes,'Value');
+
+
 PF2.curProbes=get(handles.listbox_probes,'Value');
-for i=1:length(PF2.curProbes)
-    curCh=[curCh,setF.device.Probe{PF2.curProbes(i)}.ChannelNumbers];
-    if(isfield(PF2,'data')&&isfield(PF2.data,'fchMask'))
-        curChMask=[curChMask,PF2.data.fchMask]; 
-    else
-        curChMask=[curChMask,true(size(curCh))];
-    end
+numProbes=length(setF.device.Probe);
+
+for probeNum=1:numProbes
+    probeOptIdx=(PF2.GUIPF2.optodeTable.ProbeNum==probeNum&~PF2.GUIPF2.optodeTable.IsROI);
     
     if(pf2_base.isnestedfield(PF2,'data.curChMask'))
-        curAutoRejectChMask=curChMask&PF2.data.curChMask;
-    end
-    
-    curWv=[curWv,setF.device.Probe{PF2.curProbes(i)}.Wavelength];
-end
-
-strCh={};
-curCh=curCh(curCh>0);
-[listCh,idx]=sort(unique(curCh));
-curChMask=curChMask(idx);
-
-numList=0;
-for i=1:length(listCh)
-    numList=numList+1;
-    if(curChMask(i))
-        strCh{numList}=sprintf('%i',listCh(i));
+        PF2.GUIPF2.optodeTable.AutoRej(probeOptIdx)=~PF2.data.curChMask;
     else
-        strCh{numList}=sprintf('%i (R)',listCh(i));
+        PF2.GUIPF2.optodeTable.AutoRej(probeOptIdx)=false;
     end
     
-    if(curAutoRejectChMask(i))
-        strCh{numList}=sprintf('%i(AR)',strCh{numList});
+    if(isfield(PF2,'data')&&isfield(PF2.data,'fchMask'))
+        PF2.GUIPF2.optodeTable.ManualRej(probeOptIdx)=~PF2.data.fchMask; 
+    else
+        PF2.GUIPF2.optodeTable.ManualRej(probeOptIdx)=false;
+    end
+    
+    
+
+    probeRow=find(probeOptIdx);
+    numOpt=length(probeRow);
+    
+    if(numProbes>1)
+       opt_start_string=sprintf('P%i-',probeNum); 
+    else
+       opt_start_string='';
+    end
+    
+    for opt=1:numOpt
+        idx=probeRow(opt);
+        if(PF2.GUIPF2.optodeTable.ManualRej(idx))
+            PF2.GUIPF2.optodeTable.Label{idx}=sprintf('%s%i(R)',opt_start_string,PF2.GUIPF2.optodeTable.Optode(idx));
+        elseif(PF2.GUIPF2.optodeTable.AutoRej(idx))
+            PF2.GUIPF2.optodeTable.Label{idx}=sprintf('%s%i(AR)',opt_start_string,PF2.GUIPF2.optodeTable.Optode(idx));
+        else
+            PF2.GUIPF2.optodeTable.Label{idx}=sprintf('%s%i',opt_start_string,PF2.GUIPF2.optodeTable.Optode(idx)); 
+        end
     end
 end
 
-set(handles.listbox_optodes,'string',strCh);
-if(initLists||isempty(curSelectedOptode)||max(curSelectedOptode)>numList)
+updateOptodeTablesROI();
+
+%if(isfield())
+curSelectedOptode=get(handles.listbox_optodes,'Value');
+    
+%end
+totalOpt=size(PF2.GUIPF2.optodeTable.Label,1);
+
+set(handles.listbox_optodes,'string',PF2.GUIPF2.optodeTable.Label);
+
+
+if(initLists||isempty(curSelectedOptode)||max(curSelectedOptode)>totalOpt)
     curSelectedOptode=1;
 end
+
 set(handles.listbox_optodes,'Value',curSelectedOptode);
 
 strWv={};
-listWv=sort(unique(curWv));
+listWv=sort(unique(PF2.GUIPF2.probeTable.Wv));
 numList=0;
 for i=1:length(listWv)
    if(listWv(i)>0)
@@ -2655,7 +2702,7 @@ if(initLists||isempty(curSelectedConc)||max(curSelectedConc)>numList)
     curSelectedConc=1:3;
 end
 set(handles.listbox_conc,'Value',curSelectedConc);
-updatePlots(handles)
+
 
 
 
@@ -3101,7 +3148,7 @@ function plotOxyArranged(handles,preProcessed)
 global PF2
 global setF
 PF2.curProbe=get(handles.listbox_probes,'Value');
-PF2.curCh=get(handles.listbox_optodes,'Value');
+PF2.curCh_listIdx=get(handles.listbox_optodes,'Value');
 PF2.curWv=get(handles.listbox_wavelengths,'Value');
 PF2.curConc=get(handles.listbox_conc,'Value');
 PF2.curChSet=[];
@@ -3283,7 +3330,7 @@ end
 global PF2
 global setF
 PF2.curProbe=get(handles.listbox_probes,'Value');
-PF2.curCh=get(handles.listbox_optodes,'Value');
+PF2.curCh_listIdx=get(handles.listbox_optodes,'Value');
 PF2.curWv=get(handles.listbox_wavelengths,'Value');
 PF2.curConc=get(handles.listbox_conc,'Value');
 PF2.curChSet=[];

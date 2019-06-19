@@ -7,12 +7,12 @@ function roi_out=buildROI_pf2(fNIR,funcString,varargin)
 % 	and a single column with the Optodes for each ROI
 
 %	ex:	
-%	fNIR.info=table({[1,2,3,4];[2,3,4]},'VariableNames','Optodes','RowNames',{'MyROI1','MyROI2'});
+%	fNIR.info=table({[1,2,3,4];[2,3,4]},'VariableNames',{'Optodes'},'RowNames',{'MyROI1','MyROI2'});
 
 %	ex2:
 %	myOptodes={[1,2,3,4],[10,11,12]};
 %	myROInames={'thisROI','thatROI'};
-%	fNIR.info=table(myOptodex,'VariableNames','Optode','RowNames',myROInames);
+%	fNIR.info=table(myOptodex,'VariableNames',{'Optode'},'RowNames',myROInames);
 
 %	Weaklydefined ROIs can also be used
 %		a cell array of optode numbers will be interpreted as each optode

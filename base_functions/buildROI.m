@@ -127,9 +127,7 @@ elseif(isstruct(x)&&strcmpi(fieldToUse,'raw')&&isfield(x,'raw')&&~isempty(x.raw)
                     roi_out.ROI.info=[roi_out.ROI.info;table(ch_index(roi_ind),{'oxy'},'RowNames',roi_names(roi_ind),'VariableNames',{'Optodes','Type'})];
                 end
             end
-        end
-        
-        
+        end  
     end
     
 elseif(isstruct(x)&&strcmpi(fieldToUse,'oxy')&&isfield(x,'HbO')&&~isempty(x.HbO))
@@ -162,6 +160,11 @@ end
 
 function out=mergeAndRun(func_handle,x_roi,varg)
 
+    if(size(x_roi,1)==1)
+       warning('Only single channel present in ROI, returning just the one channel');
+       out=x_roi; 
+       return;
+    end
     
     if(isempty(varg)||(length(varg)==1&&isempty(varg{1})))
         out=func_handle(x_roi);

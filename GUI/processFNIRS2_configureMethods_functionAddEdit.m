@@ -22,7 +22,7 @@ function varargout = processFNIRS2_configureMethods_functionAddEdit(varargin)
 
 % Edit the above text to modify the response to help processFNIRS2_configureMethods_functionAddEdit
 
-% Last Modified by GUIDE v2.5 12-Jan-2019 12:56:48
+% Last Modified by GUIDE v2.5 18-Jun-2019 23:36:05
 
 % Begin initialization code - DO NOT EDIT
 gui_Singleton = 1;
@@ -79,8 +79,11 @@ compareMode.isEdit=strcmp(compareMode.type,'Edit');
 
 set(handles.figure1,'Name',sprintf('%s Function',compareMode.type));
 
-
-
+outputType=cell(3,1);
+outputType{1}='x';
+outputType{2}='fchMask';
+outputType{3}='ROI';
+set(handles.popupmenu_output_types,'String',outputType);
 
 argumentTypes=cell(9,1);
 argumentTypes{1}='Num/Logical';
@@ -94,6 +97,10 @@ argumentTypes{8}='SD Dist';
 argumentTypes{9}='Markers';
 argumentTypes{10}='Aux';
 argumentTypes{11}='AmbientChannels';
+argumentTypes{12}='Full fNIR struct';
+
+
+set(handles.popupmenu_argument_types,'String',argumentTypes);
 
 
 
@@ -108,6 +115,12 @@ else
     populateExistingFunctionFields(handles);
 end
 
+if(~isfield(curFunction,'Output')||isempty(curFunction.Output))
+    set(handles.popupmenu_output_types,'Value',1);
+else
+    set(handles.popupmenu_output_types,'Value',find(contains(outputType,curFunction.Output{1})));
+end
+
 curFunction.ReservedArgumentNames=cell(9,1);
 curFunction.ReservedArgumentNames{1}='Not Reserved';
 curFunction.ReservedArgumentNames{2}='Not Reserved';
@@ -120,8 +133,8 @@ curFunction.ReservedArgumentNames{8}='fChannelSD';
 curFunction.ReservedArgumentNames{9}='fMarkers';
 curFunction.ReservedArgumentNames{10}='fAux';
 curFunction.ReservedArgumentNames{11}='fAmbient';
+curFunction.ReservedArgumentNames{12}='fNIRstruct';
 
-set(handles.popupmenu_argument_types,'String',argumentTypes);
 if(~isempty(curFunction.Arguments))
     set(handles.listbox_function_arguments,'Value',1);
 end
@@ -163,7 +176,7 @@ set(handles.checkbox_valid_oxy,'Value',any(curFunction.validStages==2));
 
 argStr=cell(0);
 
-reservedArgs={'Name','Description','validStages','Arguments','DefaultValues','ArgumentTypes'};
+reservedArgs={'Name','Description','validStages','Arguments','DefaultValues','ArgumentTypes','Output'};
 for i=length(curFunction.Arguments):-1:1
     if(contains(reservedArgs,curFunction.Arguments{i}))
         warning('Warning: Argument %s is a reserved argument name in processFNIRS2',curFunction.Arguments{i});
@@ -204,6 +217,9 @@ for i=1:length(curFunction.Arguments)
     elseif(strcmp(argStr{i},'fAmbient'))
         curFunction.DefaultValues{i}='AmbientChannels';
         curFunction.ArgumentTypes(i)=11;    
+    elseif(strcmp(argStr{i},'fNIRstruct'))
+        curFunction.DefaultValues{i}='Full fNIR struct';
+        curFunction.ArgumentTypes(i)=12;    
     else
         curFunction.DefaultValues{i}='Unknown';
         curFunction.ArgumentTypes(i)=3; %assume its input?
@@ -211,7 +227,9 @@ for i=1:length(curFunction.Arguments)
 end
 set(handles.listbox_function_arguments,'String',argStr);
 
+function args=reservedArgs()
 
+args={'Name','Description','validStages','Arguments','x','fs','fTime','fchMask','fChannelNumbers','fMarkers','fAux','fAmbient','fChannelSD','fNIRstruct'};
 
 function myOutFunction=saveExistingFields(handles)
 global curFunction
@@ -226,6 +244,7 @@ end
 
 myOutFunction.Name=get(handles.edit_function_name,'String');
 myOutFunction.Description=get(handles.edit_function_description,'String');
+myOutFunction.Output={get(handles.popupmenu_output_types,'String')};
 
 myOutFunction.validStages=[];
 if(get(handles.checkbox_valid_raw,'Value'))
@@ -242,9 +261,10 @@ end
 
 myOutFunction.Arguments=get(handles.listbox_function_arguments,'String');
 
-reservedArgs={'Name','Description','validStages','Arguments','x','fs','fTime','fchMask','fChannelNumbers','fMarkers','fAux','fAmbient','fChannelSD'};
+
+
 for i=1:length(myOutFunction.Arguments)
-    if(~contains(reservedArgs,myOutFunction.Arguments{i}))
+    if(~contains(reservedArgs(),myOutFunction.Arguments{i}))
         defaultValue=curFunction.DefaultValues{i};
         if(curFunction.ArgumentTypes(i)==1) %numeric
             if(ischar(defaultValue))
@@ -716,4 +736,29 @@ global curFunction
 if(~isempty(answer)||~isempty(answer(1)))
     curFunction.Command=cleanNameForINI(answer{1});
     set(handles.edit_function_matlab_command,'String',curFunction.Command);
+end
+
+
+% --- Executes on selection change in popupmenu_output_types.
+function popupmenu_output_types_Callback(hObject, eventdata, handles)
+% hObject    handle to popupmenu_output_types (see GCBO)
+% eventdata  reserved - to be defined in a future version of MATLAB
+% handles    structure with handles and user data (see GUIDATA)
+
+% Hints: contents = cellstr(get(hObject,'String')) returns popupmenu_output_types contents as cell array
+%        contents{get(hObject,'Value')} returns selected item from popupmenu_output_types
+outStr=get(handles.popupmenu_output_types,'String');
+global curFunction
+curFunction.Output={outStr};
+
+% --- Executes during object creation, after setting all properties.
+function popupmenu_output_types_CreateFcn(hObject, eventdata, handles)
+% hObject    handle to popupmenu_output_types (see GCBO)
+% eventdata  reserved - to be defined in a future version of MATLAB
+% handles    empty - handles not created until after all CreateFcns called
+
+% Hint: popupmenu controls usually have a white background on Windows.
+%       See ISPC and COMPUTER.
+if ispc && isequal(get(hObject,'BackgroundColor'), get(0,'defaultUicontrolBackgroundColor'))
+    set(hObject,'BackgroundColor','white');
 end

@@ -108,7 +108,7 @@ PF2.availableFunctionsPath=sprintf('%s/pf2_functions_stored_processFNIRS2.cfg',p
 if(~isfield(PF2,'myFunctions'))
    PF2.myFunctions=loadFunctions(PF2.availableFunctionsPath,true);
    
-   defaultFunctionsPath=sprintf('%s/prefs/%s',PF2.defaultRootPath,'pf2_functions_default.cfg');
+   defaultFunctionsPath=sprintf('%s/prefs/%s',pf2_base.pf2_defaultRootPath,'pf2_functions_default.cfg');
    if(pf2_base.isnestedfield(PF2.myFunctions,'cfg.Sections'))
        if(isempty(PF2.myFunctions.cfg.Sections))
            answer = questdlg('No saved functions found! Would you like to import the default function library?','Load Default Functions','Yes','No','Yes');
@@ -1378,7 +1378,7 @@ for i=1:length(myMethods.cfg.Sections)
                     F_noarray.output{j}=Fidx(j).output;
                 else
                     F_noarray.output{j}='x';
-                    warning('please make sure your functions have an output feature');
+                    %warning('please make sure your functions have an output feature');
                 end
            end
            x.F{idx}=F_noarray;
@@ -1627,7 +1627,7 @@ curFuncStrs=get(handles.listbox_availableFunctions,'String');
 if(ismember(newFunction.Command,curFuncStrs))
     opts.Interpreter = 'tex';
     opts.Default='No';
-    answer = questdlg(sprintf('Warning: Function ''%s'' already exits\nReplace function?',newFunction.Command),'Overwrite Existing Function','Yes','No',opts);
+    answer = questdlg(sprintf('Warning: Function ''%s'' already exits\nReplace function?',cleanForDialog(newFunction.Command)),'Overwrite Existing Function','Yes','No',opts);
     % Handle response
     switch answer
         case 'Yes'
@@ -1643,6 +1643,9 @@ updateCurrentFunctions(handles);
 listbox_currentFunctions_Callback(hObject, eventdata, handles);
 
 
+function str=cleanForDialog(str)
+
+str('_')='-';
 
 
 % --- Executes on button press in pushbutton_avail_function_edit.
@@ -1687,7 +1690,7 @@ if(~isempty(curFuncStrs))
     if(ismember(editedFunction.Command,curFuncStrs))
         opts.Interpreter = 'tex';
         opts.Default='No';
-        answer = questdlg(sprintf('Save changes to Function ''%s''?',editedFunction.Command),'Overwrite Existing Function','Yes','No',opts);
+        answer = questdlg(sprintf('Save changes to Function ''%s''?',cleanForDialog(editedFunction.Command)),'Overwrite Existing Function','Yes','No',opts);
         % Handle response
         switch answer
             case 'Yes'

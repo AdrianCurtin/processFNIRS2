@@ -5,7 +5,10 @@ function x=pf2_unpackMethod(method)
 	%Converts mymethods function from .S to fields in F
     x=method;
     
-    if(iscell(x)&&isfield(x{1},'F'))
+    if(isempty(method))
+        x.F=cell(0);
+        return
+    elseif(iscell(x)&&isfield(x{1},'F'))
        x=x{1}; 
     end
     
