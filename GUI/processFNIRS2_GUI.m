@@ -1899,9 +1899,46 @@ axes(stageAxesHandles{1});
 %    hold on;
 %end
 data=PF2.data.stage{1};
+optTable=PF2.GUIPF2.optodeTable;
 
 if(~isempty(data))
-    plotIdx=(ismember(PF2.curChSet,PF2.curCh_listIdx));
+    plotOptTable=optTable(PF2.curCh_listIdx,:);
+    plotOptTable=plotOptTable(~plotOptTable.ManualRej,:);
+    
+    if(sum(plotOptTable.IsROI)>0)
+        plotROITable=plotOptTable(plotOptTable.IsROI==1,:);
+        allROIch=[];
+        for idx=1:size(plotROITable)
+            allROIch=[allROIch,plotROITable.Optodes_roi{idx}];
+        end
+        allROIch=unique(allROIch);
+        
+        single_roi_idx=~optTable.IsROI&ismember(optTable.Optode,allROIch);
+        if(sum(single_roi_idx)>0)
+            plotSingleROImerge=optTable(single_roi_idx,:);
+        else
+            plotSingleROImerge=[];
+        end
+    else
+        plotROITable=[];
+        plotSingleROImerge=[];
+    end
+    
+    
+    
+    if(sum(~plotOptTable.IsROI)>0)
+        plotSingleTable=plotOptTable(~plotOptTable.IsROI,:);
+    else
+        if(~isempty(plotSingleROImerge))
+            plotSingleTable=plotSingleROImerge;
+        else
+            plotSingleTable=[];
+        end
+    end
+    
+    
+    
+    plotIdx=(ismember(PF2.curChSet,plotSingleTable.Optode(:)));
     plotIdx2=(ismember(PF2.curWvSet,PF2.curWv));
     plotIdx=find(plotIdx.*plotIdx2);
     num2Plot=length(plotIdx);
@@ -1972,7 +2009,7 @@ else
 end
 
 if(~isempty(data))
-    plotIdx=(ismember(PF2.curChSet,PF2.curCh_listIdx));
+    plotIdx=(ismember(PF2.curChSet,plotSingleTable.Optode(:)));
     plotIdx2=(ismember(PF2.curWvSet,PF2.curWv));
     plotIdx=find(plotIdx.*plotIdx2);
     num2Plot=length(plotIdx);
@@ -2042,7 +2079,7 @@ axes(stageAxesHandles{3});
 %    hold on;
 %end
 data=PF2.data.stage{4};
-optTable=PF2.GUIPF2.optodeTable;
+
 
 if(~isempty(data))
     plotOptTable=optTable(PF2.curCh_listIdx,:);
@@ -2506,7 +2543,7 @@ global PF2
 global setF
 
 probeTable=table([],[],[],[],[],'VariableNames',{'ProbeNum','Index','Optode','Wv','Label'});
-optodeTable=table([],[],[],[],[],'',{},'VariableNames',{'ProbeNum','Optode','ManualRej','AutoRej','IsROI','Label','Optodes_roi'});
+optodeTable=table([],[],[],[],[],[],{},'VariableNames',{'ProbeNum','Optode','ManualRej','AutoRej','IsROI','Label','Optodes_roi'});
 for i=1:length(setF.device.Probe)
     probeNum=i;
     rawChannels=setF.device.Probe{probeNum}.ChannelNumbers;

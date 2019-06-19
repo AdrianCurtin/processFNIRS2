@@ -6105,9 +6105,9 @@ switch (ExFNIRS.settings.ChannelMode)
         uROItable=table(uROI(:),'VariableNames',{'Optodes'},'RowNames',uROInames);
         
         if(initROI) % standaradize all ROIs on first load
-            fprintf(2,'************\nStandardizing all ROI fields...********\n');
+            fprintf(2,'************\nStandardizing all ROI fields..\n********\n');
             for i=1:length(ExFNIRS.data)
-                if(pf2_base.isnestedfield(ExFNIRS.data{i},'raw')&&~iesmpty(ExFNIRS.data{i}))
+                if(pf2_base.isnestedfield(ExFNIRS.data{i},'raw')&&~isempty(ExFNIRS.data{i}))
                    ExFNIRS.data{i}.ROI.info=uROItable;
                 end
             end
