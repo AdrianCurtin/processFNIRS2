@@ -111,9 +111,9 @@ for j=1:length(probeInfo.cfg.Sections)
         
         if(isfield(p,'OptPosX')&&isfield(p,'OptPosY'))
            if(isfield(p,'OptPosZ')) % Calculate 3D SD
-               p.SD=sqrt((p.DetPosX-p.SrcPosX).^2+(p.DetPosY-p.SrcPosY).^2+(p.DetPosZ-p.SrcPosZ).^2);
+               p.SD=sqrt((p.DetPosX-p.SrcPosX).^2+
            else % Calculate 2D SD
-               p.SD=sqrt((p.DetPosX-p.SrcPosX).^2+(p.DetPosY-p.SrcPosY).^2);
+               
            end
         end
         

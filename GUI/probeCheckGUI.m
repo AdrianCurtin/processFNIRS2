@@ -207,8 +207,7 @@ if(~isfield(probInfo,'OptLayout2D'))
 end
 
 
-for c=1:probInfo.NumOptodes
-    
+for c=1:length(probInfo.OptLayout2D)
      chAxesHandles{c} = axes(uiP);
      plot([1:20],[1:20]);
      chAxesHandles{c}.OuterPosition=probInfo.OptLayout2D{c};
