@@ -7,7 +7,7 @@ end
 pF2_folder=pf2_base.pf2_defaultRootPath();
 
 
-if(nargin>0) % If file name is specified, try to load it
+if(nargin>0||isempty(deviceCfgFilename)) % If file name is specified, try to load it
     
     fid = fopen(deviceCfgFilename);
     
@@ -149,14 +149,14 @@ for i=1:numCh
     x2=x2/numCh;
     x1=x1/numCh;
     
-    opt_2d_coords{i}=[x1,y1,x2-x1,y2-y1];
+    opt_2d_coords{i}=[x1,y1,x2,y2];
 end
 end
 
 function opt_2d_coords=setUp2DAxes(ChxList,ChyList)
 
 plotFigs=false;
-fprintf('Autoplacing Channels');
+fprintf('Autoplacing Channels\n');
     
 global chAxesHandles
 

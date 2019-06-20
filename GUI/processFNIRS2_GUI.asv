@@ -3201,14 +3201,19 @@ if(~isempty(data))
         
         if(preProcessed)
             PF2.oxyTopo_pre{prb}=figure(200+prb+10*preProcessed);
-            clf(PF2.oxyTopo_pre{prb});
-            annotstr=sprintf('Probe %i: Preprocessed Oxy',prb); 
-            th=annotation(PF2.oxyTopo_pre{prb},'textbox',[0,1,0,0],'String',annotstr,'FitBoxToText','on');
+            if(preProcessed)
+               suptitle(sprintf('Probe %i: Preprocessed Oxy',prb)); 
+            else
+                suptitle(sprintf('Probe %i: Processed Oxy',prb)); 
+            end
+            
         else
             PF2.oxyTopo{prb}=figure(200+prb+10*preProcessed);
-            clf(PF2.oxyTopo{prb});
-            annotstr=sprintf('Probe %i: Processed Oxy',prb); 
-            th=annotation(PF2.oxyTopo{prb},'textbox',[0,1,0,0],'String',annotstr,'FitBoxToText','on');
+            if(preProcessed)
+               suptitle(sprintf('Probe %i: Preprocessed Oxy',prb)); 
+            else
+                suptitle(sprintf('Probe %i: Processed Oxy',prb)); 
+            end
             
         end
 
@@ -3218,8 +3223,9 @@ if(~isempty(data))
 
             h=subplot(1,numOptodes,optIdx);
             h.OuterPosition=curTopoInfo{optIdx};
+            opt=optodes(optIdx);
 
-            plotIdx=(ismember(data.channels,optIdx));
+            plotIdx=(ismember(data.channels,opt));
             %plotIdx2=(ismember(PF2.curConcSet,PF2.curConc));
             plotIdx=find(plotIdx);%.*plotIdx2);
 
@@ -3296,7 +3302,7 @@ if(~isempty(data))
             end
 
             %*%xlim([PF2.view.startTime,PF2.view.endTime])
-            title(sprintf('P%i: Opt%i',prb,optIdx));
+            title(sprintf('P%i: Opt%i',prb,opt));
             if(strcmp(PF2.GUIPF2.dpf_mode,'None'))
                 ylabel('\Delta[X] (mM*mm)');
             else
@@ -3391,20 +3397,10 @@ if(~isempty(data))
         curTopoInfo=PF2.topoPlotInfo{prb};
         if(preProcessed)
              PF2.rawTopo_pre{prb}=figure(100+prb+10*preProcessed);
-             clf(PF2.rawTopo_pre{prb});
-            annotstr=sprintf('Probe %i: Preprocessed Raw',prb);
-            th=annotation(PF2.rawTopo_pre{prb},'textbox',[0,1,0,0],'String',annotstr,'FitBoxToText','on');
         elseif(plotIntensity)
             PF2.rawTopo_I{prb}=figure(100+prb+10*preProcessed+20*plotIntensity);
-            clf(PF2.rawTopo_I{prb});
-            annotstr=sprintf('Probe %i: Partially Processed Intensity',prb);
-            th=annotation(PF2.rawTopo_I{prb},'textbox',[0,1,0,0],'String',annotstr,'FitBoxToText','on');
         else
-
             PF2.rawTopo{prb}=figure(100+prb+10*preProcessed);
-            clf(PF2.rawTopo{prb});
-            annotstr=sprintf('Probe %i: Processed Raw',prb);
-            th=annotation(PF2.rawTopo{prb},'textbox',[0,1,0,0],'String',annotstr,'FitBoxToText','on');
         end
         numoptodes=length(curTopoInfo);
         
@@ -3472,6 +3468,12 @@ if(~isempty(data))
                 ylabel('\Delta OD');
             end
                 
+        end
+        
+        if(preProcessed)
+           suptitle(sprintf('Probe %i: Preprocessed Raw',prb)); 
+        else
+            suptitle(sprintf('Probe %i: Processed Raw',prb)); 
         end
     end 
 end

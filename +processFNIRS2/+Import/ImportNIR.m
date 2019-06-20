@@ -19,6 +19,8 @@ markers=[];
 baseline=[];
 fchMask=[];
 
+forceChannelCheck=false;
+
 if nargin < 1 % No Arguments - Open fNIRS and mrk file
 	[nir_filename, pathname] = uigetfile({'*.nir';'*.*'},'Open fNIRS nir_filename');
 	nir_filename=[pathname nir_filename];
@@ -34,12 +36,16 @@ if nargin < 1 % No Arguments - Open fNIRS and mrk file
         mrk_filename=[];
     end
     
-	channelCheck=false; %Plots raw channel light intensity and asks user to mark as either noisy, invalid, or clean
+	channelCheck=true; %Plots raw channel light intensity and asks user to mark as either noisy, invalid, or clean
 elseif nargin<2
-    channelCheck=false; %Plots raw channel light intensity and asks user to mark as either noisy, invalid, or clean
+    channelCheck=true; %Plots raw channel light intensity and asks user to mark as either noisy, invalid, or clean
     mrk_filename=[];
 elseif nargin<3
-    channelCheck=false; %Plots raw channel light intensity and asks user to mark as either noisy, invalid, or clean
+    channelCheck=true; %Plots raw channel light intensity and asks user to mark as either noisy, invalid, or clean
+elseif nargin<5
+    forceChannelCheck=true;
+    % if channel Check is enabled, will force the GUI to load even if the
+    % file already exists
 end
 
 if ~isstr(nir_filename)
@@ -71,6 +77,7 @@ log_filename=sprintf('%s.log',fileroot);
 
 log_info=importCOBIlog(log_filename);
 
+if(~channelCheck)
 ch_mask_file=sprintf('%s_CH.mat',fileroot);
 
 try
@@ -80,6 +87,9 @@ try
 catch
     fprintf('No channel rejection present\n');
     fmask=[];
+end
+else
+   fmask=[]; 
 end
 
 
@@ -340,7 +350,7 @@ end
 %clear linecount line times count;
 
 if(channelCheck)
-    fNIR=probeCheckGUI(fNIR);
+    fNIR=probeCheckGUI(fNIR,nir_filename,forceChannelCheck);
 else
    if(~isempty(fmask))
        fNIR.fchMask=(fmask==1); 

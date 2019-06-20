@@ -6,8 +6,7 @@ function varargout = probeCheckGUI(varargin)
 %      and can optionally be used to mask the data for poor/lowquality
 %      data.
 %
-%      Currently data is only useful for the fNIRS 1100 type sensor, code
-%      may need to be modified for future fNIRS devices
+%     
 %
 %      H = PROBECHECKGUI returns the handle to a new PROBECHECKGUI or the handle to
 %      the existing singleton*.
@@ -29,10 +28,10 @@ function varargout = probeCheckGUI(varargin)
 % Edit the above text to modify the response to help probeCheckGUI
 
 %Channel check GUI changelog
-%3/29/2019 - Modified marker display to stop after 500 markers to speed up
+%3/29/2019 - Modified marker display to stop after 500 pf2ChannelCheck.markers to speed up
 %loading/ display time
 
-% Last Modified by GUIDE v2.5 19-Jun-2019 21:43:47
+% Last Modified by GUIDE v2.5 20-Jun-2019 14:46:00
 
 % Begin initialization code - DO NOT EDIT
 gui_Singleton = 1;
@@ -67,23 +66,18 @@ handles.output = hObject;
 % Update handles structure
 guidata(hObject, handles);
 
-global nirsData;
-global filepath;
-global fmask;
-global numChannels;
-global curChannel;
-global markers;
-global showMarkers;
-global probeNum;
-global chAxesHandles;
+global pf2ChannelCheck
+pf2ChannelCheck=[];
 
-if(isempty(showMarkers))
-    showMarkers=true;
+
+
+if(~isfield(pf2ChannelCheck,'showMarkers'))
+    pf2ChannelCheck.showMarkers=true;
     set(handles.marker_listbox,'Enable','on');
 else
-    set(handles.markerCheck,'Value',showMarkers);
-    if(showMarkers)
-    set(handles.marker_listbox,'Enable','on');
+    set(handles.markerCheck,'Value',pf2ChannelCheck.showMarkers);
+    if(pf2ChannelCheck.showMarkers)
+        set(handles.marker_listbox,'Enable','on');
     else
         set(handles.marker_listbox,'Enable','off');
     end
@@ -92,93 +86,116 @@ end
 
 
 
-if (nargin <1||isempty(varargin))
-    nirsData=[];
-    nirsData.raw=rand(1000,49)*500+1000;
-    nirsData.time=0.5:0.5:500;
+if (isempty(varargin))
+    pf2ChannelCheck.nirsData=[];
+    pf2ChannelCheck.nirsData.raw=rand(1000,49)*500+1000;
+    pf2ChannelCheck.nirsData.time=0.5:0.5:500;
     %error('No data');
     fprintf(2,'Using simulated Data\n');
+    pf2ChannelCheck.filepath=[];
 else
-    nirsData=varargin{1};
+    pf2ChannelCheck.nirsData=varargin{1};
     
-    if(isempty(nirsData)||~isfield(nirsData,'Raw'))
+    if(isempty(pf2ChannelCheck.nirsData)||~isfield(pf2ChannelCheck.nirsData,'raw'))
        error('Empty dataset'); 
     end
-end
-
-
-if(isfield(nirsData,'info')&&isfield(nirsData.info,'probename')&&~contains(nirsData.info.probename,'Unknown')) 
-    %try to load the probename cfg file
-    cfgFilePath=sprintf('%s.cfg',data.info.probename);
-else
-    cfgFilePath='';
-end
-
-nirsData.info.probe=pf2_base.loadDeviceCfg(cfgFilePath,true);
     
-probeNum=1;
-
-setUpAxes(handles,nirsData.info.probe.Probe{probeNum});
-
-global curMarkerSet;
-global curMarkers;
-
-
-
-if(length(varargin)<3)
-    markers=[];
-    set(handles.marker_listbox,'String',{''});
-    curMarkerSet=[];
-    curMarkers=[];
-else
-    markers=varargin{3}.data;
-    uMrk=sort(unique(markers(:,2)));
-    curMarkerSet=uMrk;
-    mrkStr=cell(length(uMrk),1);
-    for i=1:length(uMrk)
-       mrkStr{i}=sprintf('%i',uMrk(i));
-       
+    
+    if(length(varargin)>1) % pf2ChannelCheck.filepath
+        pf2ChannelCheck.filepath=varargin{2};
     end
     
-    set(handles.marker_listbox,'String',mrkStr);
-    if(showMarkers)
-        set(handles.marker_listbox,'Value',1:length(uMrk));
-        curMarkers=curMarkerSet;
-    else
-        set(handles.marker_listbox,'Value',[]);
-        curMarkers=[];
+    if(length(varargin)>2) % pf2ChannelCheck.filepath
+        pf2ChannelCheck.overwriteExisting=varargin{3};
     end
 end
 
 
-    [pathstr, name, ext] = fileparts(filepath)
+if(~isempty(pf2ChannelCheck.filepath))
+    [pathstr, name, ext] = fileparts(pf2ChannelCheck.filepath);
     if(length(pathstr)>0)
         filestr=[pathstr,'/',name,'_CH.mat'];
     else
         filestr=[name,'_CH.mat'];
     end
     
-    
+
     if exist(filestr, 'file') == 2
-        load(filestr);
+        chMaskFile=load(filestr,'fmask');
+        pf2ChannelCheck.fmask=chMaskFile.fmask;
+        fprintf('Channel mask loaded from: %s\n',filestr);
+        
+    else
+        pf2ChannelCheck.fmask=[];
+    end
+    
+    if(~pf2ChannelCheck.overwriteExisting&&~isempty(pf2ChannelCheck.fmask))
         exitAndReturn(hObject, eventdata, handles,true)
         return;
     end
     
+else
+   name='Demo Mode'; 
+end
+
+
+if(isfield(pf2ChannelCheck.nirsData,'info')&&isfield(pf2ChannelCheck.nirsData.info,'probename')&&~contains(pf2ChannelCheck.nirsData.info.probename,'Unknown')) 
+    %try to load the probename cfg file
+    cfgFilePath=sprintf('%s.cfg',pf2ChannelCheck.nirsData.info.probename);
+else
+    cfgFilePath='';
+end
+
+pf2ChannelCheck.nirsData.info.probe=pf2_base.loadDeviceCfg(cfgFilePath,true);
+    
+pf2ChannelCheck.probeNum=1;
+
+setUpAxes(handles,pf2ChannelCheck.nirsData.info.probe.Probe{pf2ChannelCheck.probeNum});
+
+
+if(~isfield(pf2ChannelCheck.nirsData,'markers')||isempty(pf2ChannelCheck.nirsData.markers))
+     pf2ChannelCheck.markers=[];
+    set(handles.marker_listbox,'String',{''});
+    set(handles.marker_listbox,'Value',[]);
+    set(handles.marker_listbox,'Enable','off');
+else
+    pf2ChannelCheck.markers=pf2ChannelCheck.nirsData.markers;
+    uMrk=sort(unique(pf2ChannelCheck.markers(:,2)));
+    pf2ChannelCheck.pf2ChannelCheck.curMarkerset=uMrk;
+    mrkStr=cell(length(uMrk),1);
+    for i=1:length(uMrk)
+       mrkStr{i}=sprintf('%i (#%i)',uMrk(i),sum(pf2ChannelCheck.markers(:,2)==uMrk(i)));
+       
+    end
+    
+    set(handles.marker_listbox,'String',mrkStr);
+    if(pf2ChannelCheck.showMarkers)
+        set(handles.marker_listbox,'Value',1:length(uMrk));
+        pf2ChannelCheck.curMarkers=pf2ChannelCheck.pf2ChannelCheck.curMarkerset;
+    else
+        set(handles.marker_listbox,'Value',[]);
+        pf2ChannelCheck.curMarkers=[];
+    end
+end
+
+    
+    
 set(handles.currentfiletext,'String',name);
     
 
-nirsData.raw(nirsData.raw(:,1)==0,:)=[];
+pf2ChannelCheck.nirsData.raw(pf2ChannelCheck.nirsData.raw(:,1)==0,:)=[];
 
 %Count num Channels
-numChannels=nirsData.info.probe.Probe{probeNum}.NumOptodes;
+pf2ChannelCheck.numChannels=pf2ChannelCheck.nirsData.info.probe.Probe{pf2ChannelCheck.probeNum}.NumOptodes;
 
-fmask=ones(1,numChannels);
+if(isempty(pf2ChannelCheck.fmask))
+    pf2ChannelCheck.fmask=ones(1,pf2ChannelCheck.numChannels);
+end
 
-if(numChannels>0)
-    curChannel=1;
+if(pf2ChannelCheck.numChannels>0)
+    pf2ChannelCheck.curChannel=1;
 else
-    curChannel=0;
+    pf2ChannelCheck.curChannel=0;
 end
 % This sets up the initial plot - only do when we are invisible
 % so window can get raised using probeCheckGUI.
@@ -195,12 +212,13 @@ uiwait(handles.figure1);
 
 
 function setUpAxes(handles,probInfo)
-
-fprintf('Autoplacing Channels\n');
+    
+      
+global pf2ChannelCheck
+    pf2ChannelCheck.chCurAxesHandle=handles.chAxes;
 
 uiP=handles.uipanel_arranged;
-    
-global chAxesHandles
+  
 
 if(~isfield(probInfo,'OptLayout2D'))
     error('Unable to find 2D Optode Layout: Please build layout first');
@@ -208,27 +226,31 @@ end
 
 
 for c=1:length(probInfo.OptLayout2D)
-     chAxesHandles{c} = axes(uiP);
+     pf2ChannelCheck.pf2ChannelCheck.chCurAxesHandle{c} = axes(uiP);
      plot([1:20],[1:20]);
-     chAxesHandles{c}.OuterPosition=probInfo.OptLayout2D{c};
+     pf2ChannelCheck.pf2ChannelCheck.chCurAxesHandle{c}.OuterPosition=probInfo.OptLayout2D{c};
+     set(pf2ChannelCheck.pf2ChannelCheck.chCurAxesHandle{c},'Tag',sprintf('ChAxes%i',c));
+     
+     pf2ChannelCheck.pf2ChannelCheck.chCurAxesHandle{c}.ButtonDownFcn = @myupdatefcn;
 end
 
+function myupdatefcn(hObject, eventdata, handles)
+    
+curChTag=get(hObject,'Tag');
+
+curChNum=str2double(curChTag(7:end));
+
+
+markUnmarkChannel(curChNum,eventdata);
+    
     
 
         
 
 function [handle]= plotChannel(ch,plotMarkers,withTitle)
 
-global nirsData;
-global filepath;
-global fmask;
-global numChannels;
-global markers;
-global curChannel;
-global curMarkers;
-global probeNum
-
-
+      
+global pf2ChannelCheck
 if(nargin<3)
     withTitle=false;
 end
@@ -238,11 +260,19 @@ if(nargin<2)
 end
 
 if(nargin<1)
-    ch=curChannel;
+    ch=pf2ChannelCheck.curChannel;
 end
 
-curCh=find(nirsData.info.probe.Probe{probeNum}.ChannelNumbers==ch);
-curWv=nirsData.info.probe.Probe{probeNum}.Wavelength(curCh);
+curCh=find(pf2ChannelCheck.nirsData.info.probe.Probe{pf2ChannelCheck.probeNum}.ChannelNumbers==ch);
+curWv=pf2ChannelCheck.nirsData.info.probe.Probe{pf2ChannelCheck.probeNum}.Wavelength(curCh);
+
+if(~isfield(pf2ChannelCheck,'viewTimeStart'))
+   pf2ChannelCheck.viewTimeStart=min(pf2ChannelCheck.nirsData.time);
+end
+
+if(~isfield(pf2ChannelCheck,'viewTimeEnd'))
+   pf2ChannelCheck.viewTimeEnd=max(pf2ChannelCheck.nirsData.time);
+end
 
     
     hold off;
@@ -250,49 +280,57 @@ curWv=nirsData.info.probe.Probe{probeNum}.Wavelength(curCh);
     for i=1:length(curCh)
         x=curCh(i);
         temp=get(gca);
-        temp=temp.ButtonDownFcn;
-        handle=plot(nirsData.time,nirsData.raw(:,x));
-        set(gca,'ButtonDownFcn',temp);
+        
+        handle=plot(pf2ChannelCheck.nirsData.time,pf2ChannelCheck.nirsData.raw(:,x),'linewidth',2);
+        set(gca,'ButtonDownFcn',temp.ButtonDownFcn);
+        set(gca,'Tag',temp.Tag);
         hold on;
     end
     
-    xl=xlim();
-    
-    if(isfield(nirsData.info.probe.Info,'RawMax'))
+   xlim([pf2ChannelCheck.viewTimeStart,pf2ChannelCheck.viewTimeEnd]);
+   xl=xlim; 
+
+    if(isfield(pf2ChannelCheck.nirsData.info.probe.Info,'RawMax'))
         
-        plot(xl,ones(size(xl))*nirsData.info.probe.Info.RawMax,'--k');
+        plot(xl,ones(size(xl))*pf2ChannelCheck.nirsData.info.probe.Info.RawMax,'--k');
         
         yl=ylim();
-        ylim([0,nirsData.info.probe.Info.RawMax*1.1]);
+        ylim([0,pf2ChannelCheck.nirsData.info.probe.Info.RawMax*1.1]);
     end
     
-    if(isfield(nirsData.info.probe.Info,'RawMin'))
+    if(isfield(pf2ChannelCheck.nirsData.info.probe.Info,'RawMin'))
         
-        plot(xl,ones(size(xl))*nirsData.info.probe.Info.RawMin,'--k');
+        plot(xl,ones(size(xl))*pf2ChannelCheck.nirsData.info.probe.Info.RawMin,'--k');
     end
     
     yl=ylim();
-    
-    if(~fmask(ch)) % big red x to mark rejected
-        text(max(nirsData.time)/2+15,yl/2,'X','FontSize',40,'color',[1,0,0]);
+
+    if(pf2ChannelCheck.fmask(ch)==0) % big red x to mark rejected
+        th=text(mean(xl)/2+15,mean(yl),'X','FontSize',40,'color',[1,0,0]);
+        set(th,'ButtonDownFcn',temp.ButtonDownFcn);
+        set(th,'Tag',temp.Tag);
         hold on;
-    elseif(fmask(ch)==0.5)
-        text(max(nirsData.time)/2+15,yl/2,'~','FontSize',50,'color',[ 0.9100,0.4100,0.1700]);
+    elseif(pf2ChannelCheck.fmask(ch)==0.5)
+        th=text(mean(xl)/2+15,mean(yl),'~','FontSize',50,'color',[ 0.9100,0.4100,0.1700]);
+        set(th,'ButtonDownFcn',temp.ButtonDownFcn);
+        set(th,'Tag',temp.Tag);
         hold on;
     end
     
     
     
-    if(plotMarkers&&~isempty(markers))
-        reducedMarkers=markers(ismember(markers(:,2),curMarkers),:);
+    if(plotMarkers&&~isempty(pf2ChannelCheck.markers))
+        reducedMarkers=pf2ChannelCheck.markers(ismember(pf2ChannelCheck.markers(:,2),pf2ChannelCheck.curMarkers),:);
         
         numMarkers=length(reducedMarkers(:,1));
-        if(numMarkers>1000)
-               fprintf(2,'Num Markers exceeds 500, only plotting first 500. Please select fewer markers\n');
+        
+        maxMarkers=200;
+        if(numMarkers>maxMarkers)
+               fprintf(2,'Num Markers exceeds 200, only plotting first 200. Please select fewer pf2ChannelCheck.markers\n');
         end
         
-        for i=1:min(length(reducedMarkers(:,1)),500)
-            vline(reducedMarkers(i,1),'-k');
+        for i=1:min(length(reducedMarkers(:,1)),maxMarkers)
+            pf2_base.external.vline(reducedMarkers(i,1),'-k');
         end
        
     end
@@ -300,9 +338,12 @@ curWv=nirsData.info.probe.Probe{probeNum}.Wavelength(curCh);
     hold off;
     if(withTitle)
         xlabel('Time (s)');
-        ylabel('Light Intensity mV');
-        title(sprintf('Channel %i of %i',ch,numChannels));
+        ylabel('Light Intensity');
+        title(sprintf('Channel %i of %i',ch,pf2ChannelCheck.numChannels));
     end
+    
+        xlim([pf2ChannelCheck.viewTimeStart,pf2ChannelCheck.viewTimeEnd]);
+    
 
 
 % --- Outputs from this function are returned to the command line.
@@ -313,11 +354,11 @@ function varargout = probeCheckGUI_OutputFcn(hObject, eventdata, handles)
 % handles    structure with handles and user data (see GUIDATA)
 
 % Get default command line output from handles structure
-global fmask;
-%varargout{1} = handles.output;
-varargout{1} = fmask;
 
-clear fmask;
+global pf2ChannelCheck
+varargout = {pf2ChannelCheck.fmask};
+pf2ChannelCheck=[];
+clear pf2ChannelCheck;
 
 
 % --------------------------------------------------------------------
@@ -346,61 +387,16 @@ function figure1_CreateFcn(hObject, eventdata, handles)
 % handles    empty - handles not created until after all CreateFcns called
 
 
-% --- Executes on button press in prevButton.
-function prevButton_Callback(hObject, eventdata, handles)
-% hObject    handle to prevButton (see GCBO)
-% eventdata  reserved - to be defined in a future version of MATLAB
-% handles    structure with handles and user data (see GUIDATA)
-global curChannel;
-global showMarkers;
 
-if(curChannel>1)
-    curChannel=curChannel-1;
-
-else
-    curChannel=1;
-    
-end
-
-axes(handles.chAxes);
-plotChannel(curChannel,showMarkers,true);
-
-
-
-
-% --- Executes on button press in nextButton.
-function nextButton_Callback(hObject, eventdata, handles)
-% hObject    handle to nextButton (see GCBO)
-% eventdata  reserved - to be defined in a future version of MATLAB
-% handles    structure with handles and user data (see GUIDATA)
-
-global curChannel;
-global numChannels;
-global showMarkers;
-
-if(curChannel<numChannels)
-    curChannel=curChannel+1;
-
-else
-    curChannel=numChannels;
-    
-end
-
-axes(handles.chAxes);
-plotChannel(curChannel,showMarkers,true);
 
 function updateChannels(handles)
-
-global curChannel;
-global showMarkers;
-global numChannels;
-global chAxesHandles;
-
+  
+global pf2ChannelCheck
 axes(handles.chAxes);
-plotChannel(curChannel,showMarkers,true);
+plotChannel(pf2ChannelCheck.curChannel,pf2ChannelCheck.showMarkers,true);
 
-for i=1:numChannels
-    axes(chAxesHandles{i});
+for i=1:pf2ChannelCheck.numChannels
+    axes(pf2ChannelCheck.pf2ChannelCheck.chCurAxesHandle{i});
     plotChannel(i,false);
 end
 % --- Executes on button press in rejectButton.
@@ -408,19 +404,14 @@ function rejectButton_Callback(hObject, eventdata, handles)
 % hObject    handle to rejectButton (see GCBO)
 % eventdata  reserved - to be defined in a future version of MATLAB
 % handles    structure with handles and user data (see GUIDATA)
+  
+global pf2ChannelCheck
 
-global curChannel
-global numChannels
-global fmask
-global chAxesHandles;
-global showMarkers;
-
-
-fmask(curChannel)=0;
-axes(chAxesHandles{curChannel});
-plotChannel(curChannel,false);
+pf2ChannelCheck.fmask(pf2ChannelCheck.curChannel)=0;
+axes(pf2ChannelCheck.pf2ChannelCheck.chCurAxesHandle{pf2ChannelCheck.curChannel});
+plotChannel(pf2ChannelCheck.curChannel,false);
 axes(handles.chAxes);
-plotChannel(curChannel,showMarkers,true);
+plotChannel(pf2ChannelCheck.curChannel,pf2ChannelCheck.showMarkers,true);
 
 
 % --- Executes on button press in noisyButton.
@@ -428,18 +419,13 @@ function noisyButton_Callback(hObject, eventdata, handles)
 % hObject    handle to noisyButton (see GCBO)
 % eventdata  reserved - to be defined in a future version of MATLAB
 % handles    structure with handles and user data (see GUIDATA)
-
-global curChannel
-global numChannels
-global fmask
-global showMarkers
-global chAxesHandles;
-
-fmask(curChannel)=0.5;
-axes(chAxesHandles{curChannel});
-plotChannel(curChannel,false);
+  
+global pf2ChannelCheck
+pf2ChannelCheck.fmask(pf2ChannelCheck.curChannel)=0.5;
+axes(pf2ChannelCheck.pf2ChannelCheck.chCurAxesHandle{pf2ChannelCheck.curChannel});
+plotChannel(pf2ChannelCheck.curChannel,false);
 axes(handles.chAxes);
-plotChannel(curChannel,showMarkers,true);
+plotChannel(pf2ChannelCheck.curChannel,pf2ChannelCheck.showMarkers,true);
 
 
 %nextButton_Callback(hObject, eventdata, handles);
@@ -450,17 +436,13 @@ function cleanButton_Callback(hObject, eventdata, handles)
 % hObject    handle to cleanButton (see GCBO)
 % eventdata  reserved - to be defined in a future version of MATLAB
 % handles    structure with handles and user data (see GUIDATA)
-global curChannel
-global numChannels
-global fmask
-global chAxesHandles;
-global showMarkers;
-
-fmask(curChannel)=1;
-axes(chAxesHandles{curChannel});
-plotChannel(curChannel,false);
+  
+global pf2ChannelCheck
+pf2ChannelCheck.fmask(pf2ChannelCheck.curChannel)=1;
+axes(pf2ChannelCheck.pf2ChannelCheck.chCurAxesHandle{pf2ChannelCheck.curChannel});
+plotChannel(pf2ChannelCheck.curChannel,false);
 axes(handles.chAxes);
-plotChannel(curChannel,showMarkers,true);
+plotChannel(pf2ChannelCheck.curChannel,pf2ChannelCheck.showMarkers,true);
 
 
 
@@ -481,22 +463,15 @@ end
 function []=exitAndReturn(hObject, eventdata, handles,skipSave)
 if(nargin<4)
     skipSave=false;
-end
-global nirsData;
-global filepath;
-global numChannels;
-global curChannel;
-global markers;
-global showMarkers;
+end  
+global pf2ChannelCheck
 
 
 
-
-global fmask;
 %If not already loaded write output
-if(~isempty(fmask)&&sum(fmask<0)==0)
+if(~isfield(pf2ChannelCheck,'fmask')&&sum(pf2ChannelCheck.fmask<0)==0)
    % doc fileparts:
-    [pathstr, name, ext] = fileparts(filepath);
+    [pathstr, name, ext] = fileparts(pf2ChannelCheck.filepath);
     pathstr=sprintf('%s/',pathstr);
     filestr=sprintf('%s_CH.mat',name);
     if(length(pathstr)>1)
@@ -504,15 +479,17 @@ if(~isempty(fmask)&&sum(fmask<0)==0)
     end
     %filestr=[pathstr,'/',name,'_CH.mat'];
     if(~skipSave)
+        fmask=pf2ChannelCheck.fmask;
         save(filestr,'fmask');
+        fprintf('Channel mask saved to %s\n',filestr);
     end
 end
 
-clear curChannel numChannels nirsData markers filepath showMarkers;
-probeCheckGUI_OutputFcn(hObject, eventdata, handles);
-delete(gca);
-delete(handles.figure1);
+if(isfield(handles,'figure1'))
+   delete(handles.figure1); 
+end
 
+close()
 
 % --- Executes on button press in markerCheck.
 function markerCheck_Callback(hObject, eventdata, handles)
@@ -521,160 +498,56 @@ function markerCheck_Callback(hObject, eventdata, handles)
 % handles    structure with handles and user data (see GUIDATA)
 
 % Hint: get(hObject,'Value') returns toggle state of markerCheck
+  
+global pf2ChannelCheck
+pf2ChannelCheck.showMarkers=get(handles.markerCheck,'Value');
 
-global curChannel;
-global showMarkers;
+if(pf2ChannelCheck.showMarkers)
+    set(handles.marker_listbox,'Enable','on');
+    
+    pf2ChannelCheck.curMarkersInd=get(handles.marker_listbox,'Value');
 
-showMarkers=get(handles.markerCheck,'Value');
-global curMarkerSet;
-global curMarkers;
+    if(~isfield(pf2ChannelCheck,'pf2ChannelCheck.curMarkerset')||isempty(pf2ChannelCheck.pf2ChannelCheck.curMarkerset))
+        return;
+    end
 
-curMarkersInd=get(handles.marker_listbox,'Value');
-curMarkers=curMarkerSet(curMarkersInd);
+    pf2ChannelCheck.curMarkers=pf2ChannelCheck.pf2ChannelCheck.curMarkerset(pf2ChannelCheck.curMarkersInd);
 
-if(showMarkers)
-set(handles.marker_listbox,'Enable','on');
+    axes(handles.chAxes);
+    plotChannel(pf2ChannelCheck.curChannel,pf2ChannelCheck.showMarkers,true);
 else
+    pf2ChannelCheck.curMarkers=[];
     set(handles.marker_listbox,'Enable','off');
+    plotChannel(pf2ChannelCheck.curChannel,pf2ChannelCheck.showMarkers,true);
 end
-axes(handles.chAxes);
-plotChannel(curChannel,showMarkers,true);
 
 
-% --- Executes on mouse press over axes background.
-function chRawAxes1_ButtonDownFcn(hObject, eventdata, handles)
-% hObject    handle to chRawAxes1 (see GCBO)
-% eventdata  reserved - to be defined in a future version of MATLAB
-% handles    structure with handles and user data (see GUIDATA)
 
-markUnmarkChannel(1,eventdata,handles);
 
-% --- Executes on mouse press over axes background.
-function chRawAxes2_ButtonDownFcn(hObject, eventdata, handles)
-% hObject    handle to chRawAxes1 (see GCBO)
-% eventdata  reserved - to be defined in a future version of MATLAB
-% handles    structure with handles and user data (see GUIDATA)
+function markUnmarkChannel(ch,eventdata)
+  
+global pf2ChannelCheck
+pf2ChannelCheck.curChannel=ch;
 
-markUnmarkChannel(2,eventdata,handles);
-% --- Executes on mouse press over axes background.
-function chRawAxes3_ButtonDownFcn(hObject, eventdata, handles)
-% hObject    handle to chRawAxes1 (see GCBO)
-% eventdata  reserved - to be defined in a future version of MATLAB
-% handles    structure with handles and user data (see GUIDATA)
-
-markUnmarkChannel(3,eventdata,handles);
-% --- Executes on mouse press over axes background.
-function chRawAxes4_ButtonDownFcn(hObject, eventdata, handles)
-% hObject    handle to chRawAxes1 (see GCBO)
-% eventdata  reserved - to be defined in a future version of MATLAB
-% handles    structure with handles and user data (see GUIDATA)
-
-markUnmarkChannel(4,eventdata,handles);
-% --- Executes on mouse press over axes background.
-function chRawAxes5_ButtonDownFcn(hObject, eventdata, handles)
-% hObject    handle to chRawAxes1 (see GCBO)
-% eventdata  reserved - to be defined in a future version of MATLAB
-% handles    structure with handles and user data (see GUIDATA)
-
-markUnmarkChannel(5,eventdata,handles);
-% --- Executes on mouse press over axes background.
-function chRawAxes6_ButtonDownFcn(hObject, eventdata, handles)
-% hObject    handle to chRawAxes1 (see GCBO)
-% eventdata  reserved - to be defined in a future version of MATLAB
-% handles    structure with handles and user data (see GUIDATA)
-
-markUnmarkChannel(6,eventdata,handles);
-% --- Executes on mouse press over axes background.
-function chRawAxes7_ButtonDownFcn(hObject, eventdata, handles)
-% hObject    handle to chRawAxes1 (see GCBO)
-% eventdata  reserved - to be defined in a future version of MATLAB
-% handles    structure with handles and user data (see GUIDATA)
-
-markUnmarkChannel(7,eventdata,handles);
-% --- Executes on mouse press over axes background.
-function chRawAxes8_ButtonDownFcn(hObject, eventdata, handles)
-% hObject    handle to chRawAxes1 (see GCBO)
-% eventdata  reserved - to be defined in a future version of MATLAB
-% handles    structure with handles and user data (see GUIDATA)
-
-markUnmarkChannel(8,eventdata,handles);
-% --- Executes on mouse press over axes background.
-function chRawAxes9_ButtonDownFcn(hObject, eventdata, handles)
-% hObject    handle to chRawAxes1 (see GCBO)
-% eventdata  reserved - to be defined in a future version of MATLAB
-% handles    structure with handles and user data (see GUIDATA)
-
-markUnmarkChannel(9,eventdata,handles);
-% --- Executes on mouse press over axes background.
-function chRawAxes10_ButtonDownFcn(hObject, eventdata, handles)
-% hObject    handle to chRawAxes1 (see GCBO)
-% eventdata  reserved - to be defined in a future version of MATLAB
-% handles    structure with handles and user data (see GUIDATA)
-
-markUnmarkChannel(10,eventdata,handles);
-% --- Executes on mouse press over axes background.
-function chRawAxes11_ButtonDownFcn(hObject, eventdata, handles)
-% hObject    handle to chRawAxes1 (see GCBO)
-% eventdata  reserved - to be defined in a future version of MATLAB
-% handles    structure with handles and user data (see GUIDATA)
-
-markUnmarkChannel(11,eventdata,handles);
-% --- Executes on mouse press over axes background.
-function chRawAxes12_ButtonDownFcn(hObject, eventdata, handles)
-% hObject    handle to chRawAxes1 (see GCBO)
-% eventdata  reserved - to be defined in a future version of MATLAB
-% handles    structure with handles and user data (see GUIDATA)
-
-markUnmarkChannel(12,eventdata,handles);
-% --- Executes on mouse press over axes background.
-function chRawAxes13_ButtonDownFcn(hObject, eventdata, handles)
-% hObject    handle to chRawAxes1 (see GCBO)
-% eventdata  reserved - to be defined in a future version of MATLAB
-% handles    structure with handles and user data (see GUIDATA)
-
-markUnmarkChannel(13,eventdata,handles);
-% --- Executes on mouse press over axes background.
-function chRawAxes14_ButtonDownFcn(hObject, eventdata, handles)
-% hObject    handle to chRawAxes1 (see GCBO)
-% eventdata  reserved - to be defined in a future version of MATLAB
-% handles    structure with handles and user data (see GUIDATA)
-
-markUnmarkChannel(14,eventdata,handles);
-% --- Executes on mouse press over axes background.
-function chRawAxes15_ButtonDownFcn(hObject, eventdata, handles)
-% hObject    handle to chRawAxes1 (see GCBO)
-% eventdata  reserved - to be defined in a future version of MATLAB
-% handles    structure with handles and user data (see GUIDATA)
-
-markUnmarkChannel(15,eventdata,handles);
-% --- Executes on mouse press over axes background.
-function chRawAxes16_ButtonDownFcn(hObject, eventdata, handles)
-% hObject    handle to chRawAxes1 (see GCBO)
-% eventdata  reserved - to be defined in a future version of MATLAB
-% handles    structure with handles and user data (see GUIDATA)
-
-markUnmarkChannel(16,eventdata,handles);
-
-function markUnmarkChannel(ch,eventdata,handles)
 b = eventdata.Button;
-global fmask;
-global chAxesHandles;
-global curChannel;
-global showMarkers
-
-curChannel=ch;
-
 if b==1
     
 else
-    fmask(ch)=~fmask(ch);
+    switch pf2ChannelCheck.fmask(ch)
+        case 0
+            pf2ChannelCheck.fmask(ch)=0.5;
+        case 0.5
+            pf2ChannelCheck.fmask(ch)=1;
+        case 1
+            pf2ChannelCheck.fmask(ch)=0;
+    end
 end
 
-axes(chAxesHandles{ch});
+axes(pf2ChannelCheck.pf2ChannelCheck.chCurAxesHandle{ch});
 plotChannel(ch,false);
 
-axes(handles.chAxes);
-plotChannel(ch,showMarkers,true);
+axes(pf2ChannelCheck.chCurAxesHandle);
+plotChannel(ch,pf2ChannelCheck.showMarkers,true);
 
 
  function figure1_WindowKeyPressFcn(hObject, eventdata, handles)
@@ -688,18 +561,22 @@ function savebutton_Callback(hObject, eventdata, handles)
 % hObject    handle to savebutton (see GCBO)
 % eventdata  reserved - to be defined in a future version of MATLAB
 % handles    structure with handles and user data (see GUIDATA)
-global filepath
-global fmask
-
-    [pathstr, name, ext] = fileparts(filepath);
+  
+global pf2ChannelCheck
+if(~isempty(pf2ChannelCheck.filepath))
+    [pathstr, name, ext] = fileparts(pf2ChannelCheck.filepath);
     pathstr=sprintf('%s/',pathstr);
     filestr=sprintf('%s_CH.mat',name);
     if(length(pathstr)>1)
         filestr=[pathstr,filestr];
     end
     %filestr=[pathstr,'/',name,'_CH.mat'];
+    fmask=pf2ChannelCheck.fmask;
     save(filestr,'fmask');
-   exitAndReturn(hObject, eventdata, handles);
+    
+    fprintf('Channel mask saved to %s\n',filestr);
+end
+exitAndReturn(hObject, eventdata, true);
 
 
 % --- Executes on mouse press over axes background.
@@ -707,9 +584,9 @@ function chAxes_ButtonDownFcn(hObject, eventdata, handles)
 % hObject    handle to chAxes (see GCBO)
 % eventdata  reserved - to be defined in a future version of MATLAB
 % handles    structure with handles and user data (see GUIDATA)
-global curChannel;
-
-markUnmarkChannel(curChannel,eventdata,handles);
+  
+global pf2ChannelCheck
+markUnmarkChannel(pf2ChannelCheck.curChannel,eventdata);
 
 
 % --- Executes on button press in newfigurebutton.
@@ -717,10 +594,9 @@ function newfigurebutton_Callback(hObject, eventdata, handles)
 % hObject    handle to newfigurebutton (see GCBO)
 % eventdata  reserved - to be defined in a future version of MATLAB
 % handles    structure with handles and user data (see GUIDATA)
-figure(1);
-global curChannel;global markers;
-global showMarkers;
-plotChannel(curChannel,showMarkers,true);
+figure(1);  
+global pf2ChannelCheck
+plotChannel(pf2ChannelCheck.curChannel,pf2ChannelCheck.showMarkers,true);
 
 
 % --------------------------------------------------------------------
@@ -782,8 +658,9 @@ function menu_close_Callback(hObject, eventdata, handles)
 % hObject    handle to menu_close (see GCBO)
 % eventdata  reserved - to be defined in a future version of MATLAB
 % handles    structure with handles and user data (see GUIDATA)
-global fmask
-fmask=[];
+  
+global pf2ChannelCheck
+pf2ChannelCheck.fmask=[];
 exitAndReturn(hObject, eventdata, handles)
 
 
@@ -792,8 +669,9 @@ function cancelbutton_Callback(hObject, eventdata, handles)
 % hObject    handle to cancelbutton (see GCBO)
 % eventdata  reserved - to be defined in a future version of MATLAB
 % handles    structure with handles and user data (see GUIDATA)
-global fmask
-fmask=[];
+  
+global pf2ChannelCheck
+pf2ChannelCheck.fmask=[];
 exitAndReturn(hObject, eventdata, handles,true)
 
 
@@ -818,20 +696,16 @@ function marker_listbox_Callback(hObject, eventdata, handles)
 
 % Hints: contents = cellstr(get(hObject,'String')) returns marker_listbox contents as cell array
 %        contents{get(hObject,'Value')} returns selected item from marker_listbox
-global chAxesHandles;
-global curChannel;
-global showMarkers;
-global curMarkerSet;
-global curMarkers;
-
-curMarkersInd=get(handles.marker_listbox,'Value');
-curMarkers=curMarkerSet(curMarkersInd);
+  
+global pf2ChannelCheck
+pf2ChannelCheck.curMarkersInd=get(handles.marker_listbox,'Value');
+pf2ChannelCheck.curMarkers=pf2ChannelCheck.pf2ChannelCheck.curMarkerset(pf2ChannelCheck.curMarkersInd);
 
 axes(handles.chAxes);
-plotChannel(curChannel,showMarkers,true);
+plotChannel(pf2ChannelCheck.curChannel,pf2ChannelCheck.showMarkers,true);
 
-axes(chAxesHandles{curChannel});
-plotChannel(curChannel,false,false);
+axes(pf2ChannelCheck.pf2ChannelCheck.chCurAxesHandle{pf2ChannelCheck.curChannel});
+plotChannel(pf2ChannelCheck.curChannel,false,false);
 
 % --- Executes during object creation, after setting all properties.
 function marker_listbox_CreateFcn(hObject, eventdata, handles)
@@ -844,3 +718,75 @@ function marker_listbox_CreateFcn(hObject, eventdata, handles)
 if ispc && isequal(get(hObject,'BackgroundColor'), get(0,'defaultUicontrolBackgroundColor'))
     set(hObject,'BackgroundColor','white');
 end
+
+
+% --- Executes on button press in checkbox_multiFigureMode.
+function checkbox_multiFigureMode_Callback(hObject, eventdata, handles)
+% hObject    handle to checkbox_multiFigureMode (see GCBO)
+% eventdata  reserved - to be defined in a future version of MATLAB
+% handles    structure with handles and user data (see GUIDATA)
+
+% Hint: get(hObject,'Value') returns toggle state of checkbox_multiFigureMode
+
+
+% --- Executes on button press in pushbutton_mrk_all.
+function pushbutton_mrk_all_Callback(hObject, eventdata, handles)
+% hObject    handle to pushbutton_mrk_all (see GCBO)
+% eventdata  reserved - to be defined in a future version of MATLAB
+% handles    structure with handles and user data (see GUIDATA)
+
+global pf2ChannelCheck
+if(isfield(pf2ChannelCheck,'pf2ChannelCheck.curMarkerset')&&~isempty(pf2ChannelCheck.pf2ChannelCheck.curMarkerset))
+
+set(handles.marker_listbox,'Value',1:length(pf2ChannelCheck.pf2ChannelCheck.curMarkerset));
+
+end
+
+
+% --- Executes on button press in pushbutton_mrk_none.
+function pushbutton_mrk_none_Callback(hObject, eventdata, handles)
+% hObject    handle to pushbutton_mrk_none (see GCBO)
+% eventdata  reserved - to be defined in a future version of MATLAB
+% handles    structure with handles and user data (see GUIDATA)
+
+
+set(handles.marker_listbox,'Value',[]);
+
+
+% --- Executes on button press in pushbutton_prev.
+function pushbutton_prev_Callback(hObject, eventdata, handles)
+% hObject    handle to pushbutton_prev (see GCBO)
+% eventdata  reserved - to be defined in a future version of MATLAB
+% handles    structure with handles and user data (see GUIDATA)
+  
+global pf2ChannelCheck
+if(pf2ChannelCheck.curChannel>1)
+    pf2ChannelCheck.curChannel=pf2ChannelCheck.curChannel-1;
+
+else
+    pf2ChannelCheck.curChannel=1;
+    
+end
+
+axes(handles.chAxes);
+plotChannel(pf2ChannelCheck.curChannel,pf2ChannelCheck.showMarkers,true);
+
+
+% --- Executes on button press in pushbutton_next.
+function pushbutton_next_Callback(hObject, eventdata, handles)
+% hObject    handle to pushbutton_next (see GCBO)
+% eventdata  reserved - to be defined in a future version of MATLAB
+% handles    structure with handles and user data (see GUIDATA)
+
+  
+global pf2ChannelCheck
+if(pf2ChannelCheck.curChannel<pf2ChannelCheck.numChannels)
+    pf2ChannelCheck.curChannel=pf2ChannelCheck.curChannel+1;
+
+else
+    pf2ChannelCheck.curChannel=pf2ChannelCheck.numChannels;
+    
+end
+
+axes(handles.chAxes);
+plotChannel(pf2ChannelCheck.curChannel,pf2ChannelCheck.showMarkers,true);
