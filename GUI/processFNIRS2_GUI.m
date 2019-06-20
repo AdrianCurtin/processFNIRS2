@@ -58,12 +58,12 @@ function processFNIRS2_GUI_OpeningFcn(hObject, eventdata, handles, varargin)
 
 global PF2
 global setF
-global outputData
+global outputData 
 
 
 
 
-
+warning('OFF','MATLAB:table:RowsAddedExistingVars');
 
 %%
 %Load default paramaters here
@@ -417,7 +417,7 @@ if(isempty(cfgFilePath)||~contains(cfgFilePath,'.cfg'))
     warning('Missing or invalid configuration file path\n')
     
     disp('No device specified. Please load device configuration');
-    loadDeviceCfg();
+    pf2_base.loadDeviceCfg();
     if(~isfield(setF,'device'))
         error('No valid devices selected');
     end
@@ -429,10 +429,10 @@ elseif(~isempty(cfgFilePath)) % If we're not looking at the GUI, doesn't matter
         curProbeName=sprintf('%s.cfg',setF.device.cfg.info.CfgName);
         
         if(~strcmp(curProbeName,cfgFilePath)) %if they do don't bother loading
-            loadDeviceCfg(cfgFilePath);
+            pf2_base.loadDeviceCfg(cfgFilePath);
         end
     else
-        loadDeviceCfg(cfgFilePath);
+        pf2_base.loadDeviceCfg(cfgFilePath);
     end
 end
 
@@ -450,7 +450,7 @@ while(numDataCols~=numDevCols)
     else
        fprintf('Data size %i x %i: Expected %i columns in loaded device',numDevCols);
        warning('Channel/Device mismatch, please load new configuration file');
-       loadDeviceCfg();
+       pf2_base.loadDeviceCfg();
     end
     [numDataRows,numDataCols]=size(PF2.data.stage{1});
     numDevCols=length(setF.device.Probe{1}.ChannelNumbers);  
@@ -1475,90 +1475,11 @@ function pushbutton_loadDeviceCfg_Callback(hObject, eventdata, handles)
 % hObject    handle to pushbutton_loadDeviceCfg (see GCBO)
 % eventdata  reserved - to be defined in a future version of MATLAB
 % handles    structure with handles and user data (see GUIDATA)
-loadDeviceCfg();
-
-
-
-
-function loadDeviceCfg(deviceCfgFilename)
-global setF
-
-[pF2_folder,name,ext] = fileparts(mfilename('fullpath'));
-if(nargin>0) % if the file wasn't immediately accessible...
-                        %try loading from root/devices
-     fid = fopen(deviceCfgFilename);
-    
-    [devCfg_folder,name,ext] = fileparts(deviceCfgFilename);
-    
-    if fid==-1 && isempty(devCfg_folder)
-        fid = fopen(sprintf('%s/../devices/%s',pF2_folder,deviceCfgFilename));
-        if(fid~=-1)
-            deviceCfgFilename=sprintf('%s/../devices/%s',pF2_folder,deviceCfgFilename);
-        end
-    end
-
-    if fid==-1
-        %fclose(fid);
-        warning('Local Config File not found');
-    
-        if(isempty(devCfg_folder))
-        
-            [file, pathname] = uigetfile({'*.cfg';'*.*'},'Please Select Device Configuration file',sprintf('%s/../devices',pF2_folder));
-        
-        else
-            [file, pathname] = uigetfile({'*.cfg';'*.*'},'Please Select Device Configuration file',devCfg_folder);
-        end
-        
-        if(isempty(file)||(isnumeric(file)&&file==0))
-            return;
-        end
-        
-        fid = fopen([pathname file]);
-
-        if fid==-1
-            error('Data file not found or permission denied');
-        end
-    
-        fclose(fid);
-
-        setF.device.cfg = pf2_base.external.INI('File',[pathname file]);
-    else
-        fclose(fid);
-        setF.device.cfg = pf2_base.external.INI('File',deviceCfgFilename);
-    end
-else
-    [file, pathname] = uigetfile({'*.cfg';'*.*'},'Please Select Device Configuration file',sprintf('%s/../devices',pF2_folder));
-    
-    if(isempty(file)||(isnumeric(file)&&file==0))
-        return;
-    end
-    
-    fid = fopen([pathname file]);
-
-    if fid==-1
-      error('Data file not found or permission denied');
-    end
-
-    fclose(fid);
-
-    setF.device.cfg = pf2_base.external.INI('File',[pathname file]);
-end
-
-setF.device.cfg.read();
-
-setF.device.Info=setF.device.cfg.Info;
-
-probeCount=0;
-for j=1:length(setF.device.cfg.Sections)
-	if strfind(setF.device.cfg.Sections{j},'Probe')
-    	probeCount=probeCount+1;
-        setF.device.Probe{probeCount}=get(setF.device.cfg,setF.device.cfg.Sections{j});
-        tempChannels=unique(setF.device.Probe{probeCount}.ChannelNumbers);
-        setF.device.Probe{probeCount}.ChannelList=tempChannels(tempChannels>0);
-	end
-end
+pf2_base.loadDeviceCfg();
 
 updateCurrentDevice();
+
+
 
 function updateAutoRejectedChannelLabels(handles)
 global PF2
@@ -2257,23 +2178,22 @@ if(~isempty(data))
         end
     end
     
-    if(isfield(data.ROI,'HbO'))
-        for b=1:numBioM
-        
-            if(sum(ismember(PF2.curConc,b))>0)
-
-                for i=1:size(plotROITable,1)
+    
+    for i=1:size(plotROITable,1)
+        if(pf2_base.isnestedfield(data,'ROI.HbO'))
+            for b=1:numBioM
+                if(sum(ismember(PF2.curConc,b))>0)
                    h=plot(stageAxesHandles{4},PF2.data.time(timeInd),data.ROI.(bioM{b})(timeInd,plotROITable.Optode(i)),'color',bioMclr{b}*0.8,'linewidth',1); 
                    set(h,'Tag',sprintf('%s_%s',plotROITable.Label{i},bioM{b}));
                    hold(stageAxesHandles{4},'on');
                 end
 
             end
-        
-        end
-    else
-        fprintf(2,'ROIs have not been built, use a function in Oxy Stage to build ROIs\n');
+          else
+            fprintf(2,'ROIs have not been built, use a function in Oxy Stage to build ROIs\n');
+        end  
     end
+    
 
 
 

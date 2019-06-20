@@ -129,7 +129,7 @@ if(isempty(cfgFilePath)||~contains(cfgFilePath,'.cfg'))&&(~ShowGUI&&~isempty(dat
     warning('Missing or invalid configuration file path\n')
     
     disp('No device specified. Please load device configuration');
-    loadDeviceCfg();
+    pf2_base.loadDeviceCfg();
     if(~isfield(setF,'device'))
         error('No valid devices selected');
     end
@@ -141,10 +141,10 @@ elseif(~isempty(cfgFilePath))
         curProbeName=sprintf('%s.cfg',setF.device.cfg.Info.CfgName);
         
         if(~strcmp(curProbeName,cfgFilePath)) %if they do don't bother loading
-            loadDeviceCfg(cfgFilePath);
+            pf2_base.loadDeviceCfg(cfgFilePath);
         end
     else
-        loadDeviceCfg(cfgFilePath);
+        pf2_base.loadDeviceCfg(cfgFilePath);
     end
 end
 
@@ -425,7 +425,7 @@ while(numDataCols~=numDevCols)
     else
        fprintf('Data size %i x %i: Expected %i columns in loaded device',numDevCols);
        warning('Channel/Device mismatch, please load new configuration file');
-       loadDeviceCfg();
+       pf2_base.loadDeviceCfg();
     end
     [numDataRows,numDataCols]=size(fData.stage{1});
     numDevCols=length(setF.device.Probe{1}.ChannelNumbers);  
@@ -1001,85 +1001,3 @@ end
 
 
 
-function loadDeviceCfg(deviceCfgFilename)
-global setF
-
-    [pF2_folder,name,ext] = fileparts(mfilename('fullpath'));
-
-
-if(nargin>0) % If file name is specified, try to load it
-    
-    fid = fopen(deviceCfgFilename);
-    
-    [devCfg_folder,name,ext] = fileparts(deviceCfgFilename);
-    
-    if fid==-1 && isempty(devCfg_folder) % if the file wasn't immediately accessible...
-                        %try loading from root/devices
-        fid = fopen(sprintf('%s/devices/%s',pF2_folder,deviceCfgFilename));
-        if(fid~=-1)
-            deviceCfgFilename=sprintf('%s/devices/%s',pF2_folder,deviceCfgFilename);
-        end
-    end
-
-    if fid==-1
-        warning('Local Config File not found');
-    
-        if(isempty(devCfg_folder))
-        
-            [file, pathname] = uigetfile({'*.cfg';'*.*'},'Please Select Device Configuration file',sprintf('%s/devices/',pF2_folder));
-        
-        else
-            [file, pathname] = uigetfile({'*.cfg';'*.*'},'Please Select Device Configuration file',devCfg_folder);
-        end
-        
-        if(isempty(file)||(isnumeric(file)&&file==0))
-            return;
-        end
-        
-        fid = fopen([pathname file]);
-
-        if fid==-1
-            error('Data file not found or permission denied');
-        end
-    
-        fclose(fid);
-
-        setF.device.cfg = pf2_base.external.INI('File',[pathname file]);
-    else
-        fclose(fid);
-        setF.device.cfg = pf2_base.external.INI('File',deviceCfgFilename);
-    end
-else %otherwise try to load the default
-    [file, pathname] = uigetfile({'*.cfg';'*.*'},'Please Select Device Configuration file',sprintf('%s/devices',sprintf('%s/devices/',pF2_folder)));
-    
-    if(isempty(file)||(isnumeric(file)&&file==0))
-        return;
-    end
-    fid = fopen([pathname file]);
-    
-
-
-    if fid==-1
-      error('Data file not found or permission denied');
-    end
-
-    fclose(fid);
-
-    setF.device.cfg = pf2_base.external.INI('File',[pathname file]);
-end
-
-setF.device.cfg.read();
-
-setF.device.Info=setF.device.cfg.Info;
-
-probeCount=0;
-for j=1:length(setF.device.cfg.Sections)
-	if(strfind(setF.device.cfg.Sections{j},'Probe'))
-    	probeCount=probeCount+1;
-        setF.device.Probe{probeCount}=get(setF.device.cfg,setF.device.cfg.Sections{j});
-        tempChannels=unique(setF.device.Probe{probeCount}.ChannelNumbers);
-        setF.device.Probe{probeCount}.ChannelList=tempChannels(tempChannels>0);
-    end
-end
-
-end

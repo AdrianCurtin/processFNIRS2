@@ -139,7 +139,7 @@ if(~isfield(ExFNIRS,'defaultRootPath'))
     cd(curdir);
 end
 
-
+warning('OFF','MATLAB:table:RowsAddedExistingVars')
 p=inputParser;
 
 validScalarNum = @(x) isnumeric(x) && isscalar(x);

@@ -253,20 +253,7 @@ clear fid line1 lineCount line
 
 
 
-%clear linecount line times count;
 
-if(channelCheck)
-    if(isempty(markers))
-        fchMask=channelCheckGUI(data,nir_filename);
-    else
-        fchMask=channelCheckGUI(data,nir_filename,markers);
-    end
-else
-   if(~isempty(fmask))
-       fNIR.fchMask=(fmask==1); 
-    end
-
-end
 
 
 data(data(:,1)==0,:)=[];
@@ -347,6 +334,17 @@ switch(numRawChannels)
     otherwise
         warning('Unidentified Probe\n');
         fNIR.info.probename='Unknown .nir file';
+end
+
+
+%clear linecount line times count;
+
+if(channelCheck)
+    fNIR=probeCheckGUI(fNIR);
+else
+   if(~isempty(fmask))
+       fNIR.fchMask=(fmask==1); 
+   end
 end
 
 end
