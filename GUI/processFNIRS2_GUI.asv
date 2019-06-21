@@ -950,7 +950,7 @@ else
 
                                 if(pf2_base.isnestedfield(outData,'ROI.HbO')&&~isempty(x_ind)) % won't run on full fNIR struct fxs
                                     validChannels_roi=validChannels_roi&funcOutput_roi{fmask_out_ind};
-                                    validChannels_roi=sum(~isnan(outData.(bmrk)))>0; % check for invalid ROI
+                                    
                                     outData.ROI.(bmrk)(:,~validChannels_roi)=nan;
                                 end
                             end

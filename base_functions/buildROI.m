@@ -164,13 +164,19 @@ function out=mergeAndRun(func_handle,x_roi,removeNanChannels,varg)
 
     if(removeNanChannels)
         nnz_x=sum(~isnan(x_roi),2)==0;
-        
+        rm_ch=sum(nnz_x);
         x_roi=x_roi(~nnz_x,:);
-        fprintf('Removed %i channels from ROI\n',sum(nnz_x));
+        
+        if(rm_ch>0)
+            fprintf('Removed %i channels from ROI\n',rm_ch);
+        end
+        
     end
+
     
     if(size(x_roi,1)==0) % if all rows removed
-        x_roi=nan(size(1,len_x_roi));
+        out=nan(1,len_x_roi);
+        return;
     end
 
     if(size(x_roi,1)==1)

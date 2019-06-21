@@ -45,8 +45,10 @@ function fMask=pf2_TakizawaRejection(fNIR,strictCriteria)
      numch=size(fNIR.HbO,2);
      
 	 fMask=false(1,numch);
+     
+     timeLength=max(fNIR.time)-min(fNIR.time);
 	 
-     if(length(fNIR.time)<10)
+     if(timeLength<10)
         takizawa.reject=zeros(1,numch);
         fNIR.takizawa=takizawa;
         warning('Data not long enough for Takizawa criteria (t<10s)');
@@ -275,7 +277,7 @@ function fMask=pf2_TakizawaRejection(fNIR,strictCriteria)
         
         % Apply Rule 4
         
-        tk.rule4.criteria.maxBlocks=r4windowSize/2; %arbitrary 
+        tk.rule4.criteria.maxBlocks=r4windowSize/(2*timeLength/90); %arbitrary but time length of VFT was 90seconds 
         
         tk.rule4.mask=tk.rule4.HbOT_change>tk.rule4.criteria.maxBlocks;
         tk.rule4.mask_strict=tk.rule4.HbO_change>tk.rule4.criteria.maxBlocks|tk.rule4.HbT_change>tk.rule4.criteria.maxBlocks;
