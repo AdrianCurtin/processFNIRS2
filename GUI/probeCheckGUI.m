@@ -340,6 +340,7 @@ end
         xlabel('Time (s)');
         ylabel('Light Intensity');
         title(sprintf('Channel %i of %i',ch,pf2ChannelCheck.numChannels));
+        set(handles.text_curChannel,'String',sprintf('Ch %i of %i',ch,pf2ChannelCheck.numChannels));
     end
     
         xlim([pf2ChannelCheck.viewTimeStart,pf2ChannelCheck.viewTimeEnd]);
