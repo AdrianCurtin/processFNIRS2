@@ -124,6 +124,7 @@ addParameter(p,'ShowGUI',true,@islogical); %adds bool to show gui even when outp
 addParameter(p,'DirtyBaseline',false,@islogical); % turn to use the entire mean as the baseline period
 addParameter(p,'FixedDPF',PF2.curDPF_fixed,validScalarPosNum); %set default uniwavelength DPF
 addParameter(p,'DPFmode',PF2.dpf_mode,validDPFmode); %set role of DPF in mBLL calculations
+addParameter(p,'RejectLevel',PF2.RejectLevel,@(x) isnumeric(x)&&isscalar(x)&&x<1&&x>=0); %set the level at which a channel is rejected (fChMask)
 
 
 addParameter(p,'ImportOxyMethods','NA',@ischar);
@@ -461,7 +462,7 @@ if(~isfield(PF2.data,'fchMask')||(isfield(PF2.data,'fchMask')&&isempty(PF2.data.
 end
 
 numChannels=length(setF.device.Probe{1}.ChannelList);
-PF2.data.rawMask=ismember(setF.device.Probe{1}.ChannelNumbers,setF.device.Probe{1}.ChannelList(reshape(PF2.data.fchMask|outputData.ProcessRejected,[1,numChannels])));
+PF2.data.rawMask=ismember(setF.device.Probe{1}.ChannelNumbers,setF.device.Probe{1}.ChannelList(reshape(PF2.data.fchMask>PF2.RejectLevel|outputData.ProcessRejected,[1,numChannels])));
 
 
 if(~isempty(data))
@@ -776,9 +777,9 @@ bioM_list={'HbO','HbR','HbDiff','HbTotal','CBSI'};
 
 validChannels=false(size(data.channels));
 numChannels=length(data.channels(data.channels>0));
-validChannels(data.channels>0)=data.channels(data.channels>0)&(reshape(PF2.data.fchMask|outputData.ProcessRejected,[1,numChannels]));
+validChannels(data.channels>0)=data.channels(data.channels>0)&(reshape(PF2.data.fchMask>PF2.RejectLevel|outputData.ProcessRejected,[1,numChannels]));
 
-curfMask=PF2.data.fchMask|outputData.ProcessRejected;
+curfMask=PF2.data.fchMask>PF2.RejectLevel|outputData.ProcessRejected;
 
 if(pf2_base.isnestedfield(data,'ROI.HbO')&&~isempty(data.ROI))
     validChannels_roi=true(1,size(data.ROI.('HbO'),2));
@@ -1534,7 +1535,7 @@ newVal=get(handles.checkbox_rejectCh,'Value')==0;
 
 if(length(PF2.curProbes)==1)
     PF2.data.fchMask(curCh==listCh(curSelectedOptode))=newVal;
-    PF2.data.rawMask=ismember(setF.device.Probe{1}.ChannelNumbers,setF.device.Probe{1}.ChannelList(PF2.data.fchMask|outputData.ProcessRejected));
+    PF2.data.rawMask=ismember(setF.device.Probe{1}.ChannelNumbers,setF.device.Probe{1}.ChannelList(PF2.data.fchMask>PF2.RejectLevel|outputData.ProcessRejected));
 end
 
 
@@ -2627,7 +2628,7 @@ for probeNum=1:numProbes
     end
     
     if(isfield(PF2,'data')&&isfield(PF2.data,'fchMask'))
-        PF2.GUIPF2.optodeTable.ManualRej(probeOptIdx)=~PF2.data.fchMask; 
+        PF2.GUIPF2.optodeTable.ManualRej(probeOptIdx)=~PF2.data.fchMask>PF2.RejectLevel; 
     else
         PF2.GUIPF2.optodeTable.ManualRej(probeOptIdx)=false;
     end

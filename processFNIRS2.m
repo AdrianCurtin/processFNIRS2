@@ -77,6 +77,7 @@ validRawMethod = @(x) ischar(validatestring(x,PF2.myRawMethods.cfg.Sections));
 validOxyMethod = @(x) ischar(validatestring(x,PF2.myOxyMethods.cfg.Sections));
 validDPFmode = @(x) ischar(validatestring(x,{'None','Fixed','Calc'})); % None uses no DPF factor (units mm*mMol), fixed uses one DPF for all wavelenghts,Calc attempts tocalculate wavelength*age dependent changes
 
+
 addOptional(p,'data',[],validDataInput);
 addOptional(p,'Raw_Method',defaultRawMethod,validRawMethod); %Attempt to load specified RawMethod
 addOptional(p,'Oxy_Method',defaultOxyMethod,validOxyMethod); %Attempt to load specified OxyMethod
@@ -97,6 +98,7 @@ addParameter(p,'ShowGUI',false,@islogical); % turn true to launch GUI
 addParameter(p,'DirtyBaseline',false,@islogical); % turn to use the entire mean as the baseline period
 addParameter(p,'FixedDPF',PF2.curDPF_fixed,validScalarPosNum); %set default uniwavelength DPF
 addParameter(p,'DPFmode',PF2.dpf_mode,validDPFmode); %set role of DPF in mBLL calculations
+addParameter(p,'RejectLevel',PF2.RejectLevel,@(x) isnumeric(x)&&isscalar(x)&&x<1&&x>=0); %set the level at which a channel is rejected (fChMask)
 
 
 addParameter(p,'ImportOxyMethods','NA',@ischar);  %Path for Oxy methods cfg file to import
@@ -394,9 +396,6 @@ if(isstruct(data)) %treat as fNIR struct
         fData.Aux=[];
     end
     
-    if(isfield(data,'takizawa'))
-        fData.takizawa=data.takizawa;
-    end
 end
 
 if(isempty(fData.info.Age))
@@ -441,7 +440,8 @@ if(~isempty(data))
         fData.fchMask=true(1,length(setF.device.Probe{1}.ChannelList));
     end
     numChannels=length(setF.device.Probe{1}.ChannelList);
-    rawMask=ismember(setF.device.Probe{1}.ChannelNumbers,setF.device.Probe{1}.ChannelList(reshape(fData.fchMask|outputData.ProcessRejected,1,numChannels)));
+    
+    rawMask=ismember(setF.device.Probe{1}.ChannelNumbers,setF.device.Probe{1}.ChannelList(reshape(fData.fchMask>PF2.RejectLevel|outputData.ProcessRejected,1,numChannels)));
 
    %varargout=processFNIRdata(); 
    
@@ -469,7 +469,7 @@ if(~isempty(data))
         end
     end
     if(outputData.ProcessOxy)
-        fData.stage{4}.fchMask=fData.fchMask;
+        fData.stage{4}.fchMask=fData.fchMask>PF2.RejectLevel;
         fData.stage{4}.Aux=fData.Aux;
         fData.stage{4}.markers=fData.markers;
         fData.stage{4}.time=fData.time;
@@ -526,7 +526,7 @@ if(nargout>0)
         end
        
        if(exist('outfNIR')&&isfield(fData,'fchMask'))
-           outfNIR.fchMask=fData.fchMask;
+           outfNIR.fchMask=fData.fchMask; % autorejected channels are masked virtually , not by changing the channel mask
        end
        
        if(isfield(fData,'Aux')&&~isempty(fData.Aux))

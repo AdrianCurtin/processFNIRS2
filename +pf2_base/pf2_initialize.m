@@ -41,6 +41,7 @@ if(~isfield(PF2,'myRawMethods')||~isfield(PF2,'baseline'))
    fprintf('Initializing default age for DPF calculation to %.0f\n',PF2.curDPF_age);
    PF2.baseline=[];
    PF2.baseline.startTime=0; %or minimum time
+   PF2.RejectLevel=0; % Reject channels when mask ==0
    
    PF2.baseline.useAbsoluteTime=false; %enable to force baseline from absolute time instead of relative time (non-GUI only)
    PF2.baseline.windowStartTime=0; % time from start of viewing window (GUI only)
