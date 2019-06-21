@@ -1,7 +1,13 @@
 function [fNIR] = ImportHitachiMES(file,pathname,channelCheck)
-if(nargin<3)
-    channelCheck=false;
+
+forceChannelCheck=false;
+
+if(nargin<3) % channel check is on by default with no file
+    channelCheck=true;
+else
+    forceChannelCheck=true; % but if you manually specifiy it is honored
 end
+    
 
 curdir=cd;
 
@@ -39,8 +45,11 @@ lineF=fgetl(fid);
 lineNum=1;
 
 header=[];
+
+delimiter='\t';
+
 while(~feof(fid)&&(ischar(lineF))&&~strcmp(lineF,'Data'))
-    [lineSplit,idx]=strsplit(lineF,'\t');
+    [lineSplit,idx]=strsplit(lineF,delimiter);
     if(length(lineSplit)>1)
        varField=renameValid(strtrim(lineSplit{1}));
        header.(varField)=strtrim(lineF(length(lineSplit{1})+2:end));
@@ -48,6 +57,26 @@ while(~feof(fid)&&(ischar(lineF))&&~strcmp(lineF,'Data'))
     lineF=fgetl(fid);
     lineNum=lineNum+1;
 end
+
+if(isempty(header))
+    delimiter=',';
+    frewind(fid);
+    lineF=fgetl(fid);
+    while(~feof(fid)&&(ischar(lineF))&&~strcmp(lineF,'Data'))
+        [lineSplit,idx]=strsplit(lineF,delimiter);
+        if(length(lineSplit)>1)
+           varField=renameValid(strtrim(lineSplit{1}));
+           header.(varField)=strtrim(lineF(length(lineSplit{1})+2:end));
+        end
+        lineF=fgetl(fid);
+        lineNum=lineNum+1;
+    end
+end
+
+if(isempty(header))
+    error('Unkown delimiter or file type');
+end
+
 
 lineF=fgetl(fid);
 lineNum=lineNum+1;
@@ -57,18 +86,18 @@ lineF=fgetl(fid);
 startLineNum=lineNum;
 fclose(fid);
 
-numCols=find(strcmp(strsplit(header.HeaderInfo,'\t'),'Time'));
+numCols=find(strcmp(strsplit(header.HeaderInfo,delimiter),'Time'));
 if(~isempty(numCols))
     numCols=numCols-1;
 else
-    numCols=length(strsplit(header.HeaderInfo,'\t'));
+    numCols=length(strsplit(header.HeaderInfo,delimiter));
 end
 
-markCol=find(strcmp(strsplit(header.HeaderInfo,'\t'),'Mark'));
+markCol=find(strcmp(strsplit(header.HeaderInfo,delimiter),'Mark'));
 
 
 fprintf('Importing %s...\n',filename);
-hMES = importdata(filename,'\t',startLineNum);
+hMES = importdata(filename,delimiter,startLineNum);
 hMES.textdata=hMES.textdata(:,1:numCols);
 hMES=str2double(hMES.textdata);
 
@@ -76,7 +105,7 @@ hMES(isnan(hMES(:,1)),:)=[]; %remove nan columns
 
 
 chWavelengths=[0;0];
-wvHeaders=strsplit(header.HeaderInfo);
+wvHeaders=strsplit(header.HeaderInfo,delimiter);
 for j=2:length(wvHeaders)
     temp=sscanf(wvHeaders{j},'CH%f(%f)');
     if(~isempty(temp)&&length(temp)==2)
@@ -96,7 +125,7 @@ if(isfield(header,'Sampling_Period_s'))
 end
 if(isfield(header,'Wave_nm'))
     header.Wave_nm(header.Wave_nm=='''')=[];
-   fNIR.info.curWv=str2double(strsplit(header.Wave_nm,'\t')); 
+   fNIR.info.curWv=str2double(strsplit(header.Wave_nm,delimiter)); 
    numWv=length(fNIR.info.curWv);
 else
    error('Missing number of wavelengths'); 
@@ -109,25 +138,73 @@ fNIR.markers=[fNIR.time(mrkIdx),hMES(mrkIdx,markCol),mrkIdx];
 fNIR.info.MESheader=header;
 fNIR.info.chWavelengths=chWavelengths;
 
-if(channelCheck)
-    warning('Not updated yet');
-   fNIR.fchMask=hitChannelCheckGUI(fNIR,filename);
-else
-   fNIR.fchMask=ones(1,numCh/numWv); 
+
+if(~isempty(header)&&isfield(header,'Name'))
+    fNIR.info.SubjectID=header.Name;
 end
+if(~isempty(header)&&isfield(header,'Comment'))
+    fNIR.info.Comment=header.Comment;
+end
+    
+if(~isempty(header)&&isfield(header,'ID'))
+    fNIR.info.Session=header.ID;
+end
+    
+if(~isempty(header)&&isfield(header,'Sex'))
+    fNIR.info.Sex=header.Sex;
+end
+
+if(~isempty(header)&&isfield(header,'Age'))
+    fNIR.info.Age=str2double(header.Age(1:end-1));
+end
+
+
+
 
 fprintf('Importing Complete\n');
 cd(curdir);
 
-numRawChannels=numCh*2;
+numRawChannels=numCh;
 
 switch(numRawChannels)
     case 44
         fNIR.info.probename='Hitachi_ETG4000_3x5';
+    case 104
+        fNIR.info.probename='Hitachi_ETG4000_3x11';
     otherwise
         warning('Unidentified Probe\n');
         fNIR.info.probename='Unkown *MES.CSV file';
 end
+
+
+
+if(~channelCheck)
+    ch_mask_file=sprintf('%s_CH.mat',fileroot);
+
+try
+    fmask=load(ch_mask_file,'fmask');
+    fmask=fmask.fmask;
+    fprintf('%i Channels marked bad\n',sum(fmask<1));
+catch
+    fprintf('No channel rejection present\n');
+    fmask=[];
+end
+else
+   fmask=[]; 
+end
+
+
+if(channelCheck)
+    fNIR.fchMask=probeCheckGUI(fNIR,filename,forceChannelCheck);
+else
+   if(~isempty(fmask))
+       fNIR.fchMask=fmask;
+   else
+       fNIR.fchMask=ones(1,numCh/numWv); 
+   end
+       
+end
+
 
 end
 

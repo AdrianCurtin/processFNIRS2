@@ -1797,16 +1797,26 @@ if(~isempty(dataTipSelectionHandleTag))
 else
     cla(timelineAxesHandle);
 end
-h=plot(timelineAxesHandle,PF2.data.time,0*PF2.data.time,'--k');
-set(h,'Tag','FullLine');
-hold(timelineAxesHandle,'on');
-h=plot(timelineAxesHandle,PF2.data.time(timeInd),0*PF2.data.time(timeInd),'r','linewidth',2);
+h=plot(timelineAxesHandle,PF2.data.time,0*PF2.data.time+0.1,'color','White','linewidth',4);
 set(h,'Tag','ViewLine');
-h=pf2_base.external.vline(timelineAxesHandle,PF2.view.startTime,{'r','linewidth',2});
+hold(timelineAxesHandle,'on');
+h=plot(timelineAxesHandle,PF2.data.time,0*PF2.data.time-0.1,'color','White','linewidth',4);
+set(h,'Tag','ViewLine');
+h=plot(timelineAxesHandle,PF2.data.time,0*PF2.data.time,'color','White','linewidth',4);
+set(h,'Tag','ViewLine');
+h=plot(timelineAxesHandle,PF2.data.time,0*PF2.data.time,'color','White','linewidth',4);
+set(h,'Tag','ViewLine');
+h=plot(timelineAxesHandle,PF2.data.time,0*PF2.data.time,'--k');
+set(h,'Tag','ViewLine');
+
+h=plot(timelineAxesHandle,PF2.data.time(timeInd),0*PF2.data.time(timeInd),'r','linewidth',4);
+set(h,'Tag','ViewLine');
+h=pf2_base.external.vline(timelineAxesHandle,PF2.view.startTime,{'r','linewidth',4});
 set(h,'Tag','StartVLine');
-h=pf2_base.external.vline(timelineAxesHandle,PF2.view.endTime,{'r','linewidth',2});
+h=pf2_base.external.vline(timelineAxesHandle,PF2.view.endTime,{'r','linewidth',4});
 set(h,'Tag','EndVLine');
 xlim(timelineAxesHandle,[min(PF2.data.time),max(PF2.data.time)]);
+ylim(timelineAxesHandle,[-1,1]);
 set(timelineAxesHandle,'xtick',[],'ytick',[])
 set(timelineAxesHandle,'Tag','Timeline');
 
@@ -2668,7 +2678,7 @@ numList=0;
 for i=1:length(listWv)
    if(listWv(i)>0)
         numList=numList+1;
-        strWv{numList}=sprintf('%i',listWv(i)); 
+        strWv{numList}=sprintf('%.1f',listWv(i)); 
    elseif(listWv(i)==0)
        numList=numList+1;
        strWv{numList}='Dark'; %sprintf('%i',listWv(i)); 
@@ -3213,11 +3223,15 @@ if(~isempty(data))
         end
 
         numOptodes=length(curTopoInfo);
+        
+        for optIdx=1:numOptodes
+            h{optIdx}= axes('Position',[0 0 .001 .001],'Box','on');
+            h{optIdx}.OuterPosition=curTopoInfo{optIdx};
+        end
 
         for optIdx=1:numOptodes
-
-            h=subplot(1,numOptodes,optIdx);
-            h.OuterPosition=curTopoInfo{optIdx};
+            axes(h{optIdx});
+            
 
             plotIdx=(ismember(data.channels,optIdx));
             %plotIdx2=(ismember(PF2.curConcSet,PF2.curConc));
@@ -3284,6 +3298,9 @@ if(~isempty(data))
                yl=ylim;
 
                plot(data.time(timeInd),data.time(timeInd)*0,'--k','linewidth',1);
+            else
+               
+               th=text(0.5,0.5,'X','FontSize',40,'color',[1,0,0]); axis off
             end
 
             xl=[PF2.view.startTime,PF2.view.endTime]; plotMarkers(xl);
@@ -3406,12 +3423,16 @@ if(~isempty(data))
             annotstr=sprintf('Probe %i: Processed Raw',prb);
             th=annotation(PF2.rawTopo{prb},'textbox',[0,1,0,0],'String',annotstr,'FitBoxToText','on');
         end
-        numoptodes=length(curTopoInfo);
+        numOptodes=length(curTopoInfo);
         
-        for optIdx=1:numoptodes
+        
+        for optIdx=1:numOptodes
+            h{optIdx}= axes('Position',[0 0 .001 .001],'Box','on');
+            h{optIdx}.OuterPosition=curTopoInfo{optIdx};
+        end
 
-            h=subplot(1,numoptodes,optIdx);
-            h.OuterPosition=curTopoInfo{optIdx};
+        for optIdx=1:numOptodes
+            axes(h{optIdx});
             
             plotIdx=(ismember(PF2.curChSet,optIdx));
 
@@ -3856,7 +3877,7 @@ function txt = myupdatefcn(pointDataTip, event_obj)
      if(strcmp(cursorTimelineMode,'start'))
          if(pos(1)~= PF2.view.startTime)
             dataTipSelectionHandleTag=selectedObjectTag;
-            if(pos(1)>PF2.view.endTime)
+            if(pos(1)>PF2.view.endTime||contains(dataTipSelectionHandleTag,'End'))
                 cursorTimelineMode='end';
             else
                 PF2.view.startTime=pos(1);
@@ -3872,7 +3893,7 @@ function txt = myupdatefcn(pointDataTip, event_obj)
      elseif(strcmp(cursorTimelineMode,'end'))
          if(pos(1)~= PF2.view.endTime)
             dataTipSelectionHandleTag=selectedObjectTag;
-            if(pos(1)<PF2.view.startTime)
+            if(pos(1)<PF2.view.startTime||contains(dataTipSelectionHandleTag,'Start'))
                 cursorTimelineMode='start';
             else
                 PF2.view.endTime=pos(1);

@@ -19,7 +19,7 @@ markers=[];
 baseline=[];
 fchMask=[];
 
-forceChannelCheck=false;
+forceChannelCheck=false; % if channelcheck is enabled manually, then honor, otherwise load only first time
 
 if nargin < 1 % No Arguments - Open fNIRS and mrk file
 	[nir_filename, pathname] = uigetfile({'*.nir';'*.*'},'Open fNIRS nir_filename');
@@ -77,20 +77,6 @@ log_filename=sprintf('%s.log',fileroot);
 
 log_info=importCOBIlog(log_filename);
 
-if(~channelCheck)
-ch_mask_file=sprintf('%s_CH.mat',fileroot);
-
-try
-    fmask=load(ch_mask_file,'fmask');
-    fmask=fmask.fmask;
-    fprintf('%i Channels marked bad\n',sum(fmask<1));
-catch
-    fprintf('No channel rejection present\n');
-    fmask=[];
-end
-else
-   fmask=[]; 
-end
 
 
 
@@ -349,11 +335,27 @@ end
 
 %clear linecount line times count;
 
+
+if(~channelCheck)
+    ch_mask_file=sprintf('%s_CH.mat',fileroot);
+
+    try
+        fmask=load(ch_mask_file,'fmask');
+        fmask=fmask.fmask;
+        fprintf('%i Channels marked bad\n',sum(fmask<1));
+    catch
+        fprintf('No channel rejection present\n');
+        fmask=[];
+    end
+else
+   fmask=[]; 
+end
+
 if(channelCheck)
-    fNIR=probeCheckGUI(fNIR,nir_filename,forceChannelCheck);
+    fNIR.fchMask=probeCheckGUI(fNIR,nir_filename,forceChannelCheck);
 else
    if(~isempty(fmask))
-       fNIR.fchMask=(fmask==1); 
+       fNIR.fchMask=fmask; 
    end
 end
 
