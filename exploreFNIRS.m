@@ -1816,7 +1816,7 @@ for chIdx=1:numOpt
                    end
                    
                    switch ExFNIRS.settings.ChannelMode
-                       case 'FNIRS'
+                       case 'fNIR'
                            data2plot=curFNIRS{i};
                        case 'ROI'
                            if(~pf2_base.isnestedfield(curGrand,'ROI.HbO.data'))
@@ -1913,13 +1913,20 @@ for chIdx=1:numOpt
                     errColor=errColor+(1-errColor)*0.55;
                 end
                 
-                gaFeat=curGrand.(bioM);
+                switch ExFNIRS.settings.ChannelMode
+                    case 'fNIR'
+                        data2plot=curGrand.(bioM);
+                    case 'ROI'
+                        data2plot=curGrand.ROI.(bioM);
+                    case 'Aux'
+                end
+                
                 if(strcmp(errorFeature,'MaxMin'))
-                  upperError=gaFeat.Max(:,ch);
-                  lowerError=gaFeat.Min(:,ch);
+                  upperError=data2plot.Max(:,ch);
+                  lowerError=data2plot.Min(:,ch);
                 else
-                  upperError=gaFeat.(plotFeature)(:,ch)+gaFeat.(errorFeature)(:,ch)*errMulitply;
-                  lowerError=gaFeat.(plotFeature)(:,ch)-gaFeat.(errorFeature)(:,ch)*errMulitply;
+                  upperError=data2plot.(plotFeature)(:,ch)+data2plot.(errorFeature)(:,ch)*errMulitply;
+                  lowerError=data2plot.(plotFeature)(:,ch)-data2plot.(errorFeature)(:,ch)*errMulitply;
                 end
                 
                 
@@ -1967,7 +1974,7 @@ for chIdx=1:numOpt
             end
             
             switch ExFNIRS.settings.ChannelMode
-                case 'FNIR'
+                case 'fNIR'
                     chNamePart=sprintf('Opt. %i',ch);
                     chNamePartLong=sprintf('Optode %i',ch);
                 case 'ROI'
@@ -3573,7 +3580,7 @@ for chIdx=1:numOpt
         
         
         switch ExFNIRS.settings.ChannelMode
-            case 'FNIR'
+            case 'fNIR'
                 title(sprintf('Optode %i',ch));
             case 'ROI'
                 title(sprintf('ROI: %s',selectedOptStr{ch}));

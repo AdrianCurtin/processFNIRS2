@@ -161,7 +161,7 @@ if(~isfield(pf2ChannelCheck.nirsData,'markers')||isempty(pf2ChannelCheck.nirsDat
 else
     pf2ChannelCheck.markers=pf2ChannelCheck.nirsData.markers;
     uMrk=sort(unique(pf2ChannelCheck.markers(:,2)));
-    pf2ChannelCheck.pf2ChannelCheck.curMarkerset=uMrk;
+    pf2ChannelCheck.curMarkerset=uMrk;
     mrkStr=cell(length(uMrk),1);
     for i=1:length(uMrk)
        mrkStr{i}=sprintf('%i (#%i)',uMrk(i),sum(pf2ChannelCheck.markers(:,2)==uMrk(i)));
@@ -171,14 +171,14 @@ else
     set(handles.marker_listbox,'String',mrkStr);
     if(pf2ChannelCheck.showMarkers)
         set(handles.marker_listbox,'Value',1:length(uMrk));
-        pf2ChannelCheck.curMarkers=pf2ChannelCheck.pf2ChannelCheck.curMarkerset;
+        pf2ChannelCheck.curMarkers=pf2ChannelCheck.curMarkerset;
     else
         set(handles.marker_listbox,'Value',[]);
         pf2ChannelCheck.curMarkers=[];
     end
 end
 
-    
+pf2ChannelCheck.handle.text_curChannel=handles.text_curChannel;
     
 set(handles.currentfiletext,'String',name);
     
@@ -215,7 +215,8 @@ function setUpAxes(handles,probInfo)
     
       
 global pf2ChannelCheck
-    pf2ChannelCheck.chCurAxesHandle=handles.chAxes;
+ 
+pf2ChannelCheck.chCurAxesHandle=handles.chAxes;
 
 uiP=handles.uipanel_arranged;
   
@@ -226,12 +227,12 @@ end
 
 
 for c=1:length(probInfo.OptLayout2D)
-     pf2ChannelCheck.pf2ChannelCheck.chCurAxesHandle{c} = axes(uiP);
+     pf2ChannelCheck.chAxesHandles{c} = axes(uiP);
      plot([1:20],[1:20]);
-     pf2ChannelCheck.pf2ChannelCheck.chCurAxesHandle{c}.OuterPosition=probInfo.OptLayout2D{c};
-     set(pf2ChannelCheck.pf2ChannelCheck.chCurAxesHandle{c},'Tag',sprintf('ChAxes%i',c));
+     pf2ChannelCheck.chAxesHandles{c}.OuterPosition=probInfo.OptLayout2D{c};
+     set(pf2ChannelCheck.chAxesHandles{c},'Tag',sprintf('ChAxes%i',c));
      
-     pf2ChannelCheck.pf2ChannelCheck.chCurAxesHandle{c}.ButtonDownFcn = @myupdatefcn;
+     pf2ChannelCheck.chAxesHandles{c}.ButtonDownFcn = @myupdatefcn;
 end
 
 function myupdatefcn(hObject, eventdata, handles)
@@ -340,7 +341,7 @@ end
         xlabel('Time (s)');
         ylabel('Light Intensity');
         title(sprintf('Channel %i of %i',ch,pf2ChannelCheck.numChannels));
-        set(handles.text_curChannel,'String',sprintf('Ch %i of %i',ch,pf2ChannelCheck.numChannels));
+        set(pf2ChannelCheck.handle.text_curChannel,'String',sprintf('Ch %i of %i',ch,pf2ChannelCheck.numChannels));
     end
     
         xlim([pf2ChannelCheck.viewTimeStart,pf2ChannelCheck.viewTimeEnd]);
@@ -397,7 +398,7 @@ axes(handles.chAxes);
 plotChannel(pf2ChannelCheck.curChannel,pf2ChannelCheck.showMarkers,true);
 
 for i=1:pf2ChannelCheck.numChannels
-    axes(pf2ChannelCheck.pf2ChannelCheck.chCurAxesHandle{i});
+    axes(pf2ChannelCheck.chAxesHandles{i});
     plotChannel(i,false);
 end
 % --- Executes on button press in rejectButton.
@@ -409,7 +410,7 @@ function rejectButton_Callback(hObject, eventdata, handles)
 global pf2ChannelCheck
 
 pf2ChannelCheck.fmask(pf2ChannelCheck.curChannel)=0;
-axes(pf2ChannelCheck.pf2ChannelCheck.chCurAxesHandle{pf2ChannelCheck.curChannel});
+axes(pf2ChannelCheck.chCurAxesHandle{pf2ChannelCheck.curChannel});
 plotChannel(pf2ChannelCheck.curChannel,false);
 axes(handles.chAxes);
 plotChannel(pf2ChannelCheck.curChannel,pf2ChannelCheck.showMarkers,true);
@@ -423,7 +424,7 @@ function noisyButton_Callback(hObject, eventdata, handles)
   
 global pf2ChannelCheck
 pf2ChannelCheck.fmask(pf2ChannelCheck.curChannel)=0.5;
-axes(pf2ChannelCheck.pf2ChannelCheck.chCurAxesHandle{pf2ChannelCheck.curChannel});
+axes(pf2ChannelCheck.chCurAxesHandle{pf2ChannelCheck.curChannel});
 plotChannel(pf2ChannelCheck.curChannel,false);
 axes(handles.chAxes);
 plotChannel(pf2ChannelCheck.curChannel,pf2ChannelCheck.showMarkers,true);
@@ -440,7 +441,7 @@ function cleanButton_Callback(hObject, eventdata, handles)
   
 global pf2ChannelCheck
 pf2ChannelCheck.fmask(pf2ChannelCheck.curChannel)=1;
-axes(pf2ChannelCheck.pf2ChannelCheck.chCurAxesHandle{pf2ChannelCheck.curChannel});
+axes(pf2ChannelCheck.chCurAxesHandle{pf2ChannelCheck.curChannel});
 plotChannel(pf2ChannelCheck.curChannel,false);
 axes(handles.chAxes);
 plotChannel(pf2ChannelCheck.curChannel,pf2ChannelCheck.showMarkers,true);
@@ -462,15 +463,18 @@ delete(hObject);
 end
 
 function []=exitAndReturn(hObject, eventdata, handles,skipSave)
+    
 if(nargin<4)
     skipSave=false;
 end  
 global pf2ChannelCheck
 
-
+if(isfield(pf2ChannelCheck,'saved')&&~pf2ChannelCheck.saved)
+   skipSave=true; 
+end
 
 %If not already loaded write output
-if(~isfield(pf2ChannelCheck,'fmask')&&sum(pf2ChannelCheck.fmask<0)==0)
+if(isfield(pf2ChannelCheck,'fmask')&&~isempty(pf2ChannelCheck.fmask))
    % doc fileparts:
     [pathstr, name, ext] = fileparts(pf2ChannelCheck.filepath);
     pathstr=sprintf('%s/',pathstr);
@@ -480,6 +484,8 @@ if(~isfield(pf2ChannelCheck,'fmask')&&sum(pf2ChannelCheck.fmask<0)==0)
     end
     %filestr=[pathstr,'/',name,'_CH.mat'];
     if(~skipSave)
+        pf2ChannelCheck.saved=true;
+        
         fmask=pf2ChannelCheck.fmask;
         save(filestr,'fmask');
         fprintf('Channel mask saved to %s\n',filestr);
@@ -508,11 +514,11 @@ if(pf2ChannelCheck.showMarkers)
     
     pf2ChannelCheck.curMarkersInd=get(handles.marker_listbox,'Value');
 
-    if(~isfield(pf2ChannelCheck,'pf2ChannelCheck.curMarkerset')||isempty(pf2ChannelCheck.pf2ChannelCheck.curMarkerset))
+    if(~isfield(pf2ChannelCheck,'pf2ChannelCheck.curMarkerset')||isempty(pf2ChannelCheck.curMarkerset))
         return;
     end
 
-    pf2ChannelCheck.curMarkers=pf2ChannelCheck.pf2ChannelCheck.curMarkerset(pf2ChannelCheck.curMarkersInd);
+    pf2ChannelCheck.curMarkers=pf2ChannelCheck.curMarkerset(pf2ChannelCheck.curMarkersInd);
 
     axes(handles.chAxes);
     plotChannel(pf2ChannelCheck.curChannel,pf2ChannelCheck.showMarkers,true);
@@ -544,7 +550,7 @@ else
     end
 end
 
-axes(pf2ChannelCheck.pf2ChannelCheck.chCurAxesHandle{ch});
+axes(pf2ChannelCheck.chAxesHandles{ch});
 plotChannel(ch,false);
 
 axes(pf2ChannelCheck.chCurAxesHandle);
@@ -564,7 +570,7 @@ function savebutton_Callback(hObject, eventdata, handles)
 % handles    structure with handles and user data (see GUIDATA)
   
 global pf2ChannelCheck
-if(~isempty(pf2ChannelCheck.filepath))
+if(isfield(pf2ChannelCheck,'filepath')&&~isempty(pf2ChannelCheck.filepath))
     [pathstr, name, ext] = fileparts(pf2ChannelCheck.filepath);
     pathstr=sprintf('%s/',pathstr);
     filestr=sprintf('%s_CH.mat',name);
@@ -700,12 +706,12 @@ function marker_listbox_Callback(hObject, eventdata, handles)
   
 global pf2ChannelCheck
 pf2ChannelCheck.curMarkersInd=get(handles.marker_listbox,'Value');
-pf2ChannelCheck.curMarkers=pf2ChannelCheck.pf2ChannelCheck.curMarkerset(pf2ChannelCheck.curMarkersInd);
+pf2ChannelCheck.curMarkers=pf2ChannelCheck.curMarkerset(pf2ChannelCheck.curMarkersInd);
 
 axes(handles.chAxes);
 plotChannel(pf2ChannelCheck.curChannel,pf2ChannelCheck.showMarkers,true);
 
-axes(pf2ChannelCheck.pf2ChannelCheck.chCurAxesHandle{pf2ChannelCheck.curChannel});
+axes(pf2ChannelCheck.chCurAxesHandle{pf2ChannelCheck.curChannel});
 plotChannel(pf2ChannelCheck.curChannel,false,false);
 
 % --- Executes during object creation, after setting all properties.
@@ -737,9 +743,9 @@ function pushbutton_mrk_all_Callback(hObject, eventdata, handles)
 % handles    structure with handles and user data (see GUIDATA)
 
 global pf2ChannelCheck
-if(isfield(pf2ChannelCheck,'pf2ChannelCheck.curMarkerset')&&~isempty(pf2ChannelCheck.pf2ChannelCheck.curMarkerset))
+if(isfield(pf2ChannelCheck,'pf2ChannelCheck.curMarkerset')&&~isempty(pf2ChannelCheck.curMarkerset))
 
-set(handles.marker_listbox,'Value',1:length(pf2ChannelCheck.pf2ChannelCheck.curMarkerset));
+set(handles.marker_listbox,'Value',1:length(pf2ChannelCheck.curMarkerset));
 
 end
 
