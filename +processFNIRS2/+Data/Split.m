@@ -2,24 +2,19 @@ function [outfNIR] = Split(varargin)
 %processFNIRS2.Data.Split Splice fNIRS segment according to start/end times and optionally rebaseline data
 %   processFNIRS2.Data.Split(fNIR,startTime,endTime,segmentLength,relative,blLength,blStartTime,blfNIR)
 %   Detailed explanation goes here
-
 % If only start time is given, returns segment from startTime to end
-
 % If an end time or segmentLength is defined returns segment from startTime
 % to endTime or (startTime+segmentLength)
-
 % If relative is set to true, startTime and endTime are both relative arguments
 % from the start of the segment (ie t=0 is min(time))
-
+%
 % If blLength or blStartTime are defined then the segment is baselined
 % according to the given data. Please use both arguments. 
 %   Default baseline length will be used if not provided
 %   blStartTime will be set to startTime if not provided
 %       please note this time is also affected by the relative flag
-
 %bl, length of baseline in seconds, if zero then data is not baselined
 %blStart, start time of basline in seconds (absolute time or relative)
-
 % Usage examples
 % processFNIRS2.Data.Split(fnirData,561) : Returns segment of data from t=561s to end
 %       Equivalent to processFNIRS2.Data.Split('fNIR',fnirData,'startTime',561);

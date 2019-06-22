@@ -34,6 +34,7 @@ function hhh=vline(varargin)
 validX= @(x) isempty(x)||isnumeric(x);
 validAxesHandle= @(x) isa(x,'matlab.graphics.axis.Axes')&&isvalid(x);
 validStrCell = @(x) ischar(x) || (iscell(x));
+validHeight= @(x) isnumeric(x)&&~isempty(x)&&~any(x>1)&&~any(x<0);
 
 if(isa(varargin{1},'matlab.graphics.axis.Axes')) %If first argument is axes then move to front
    ax=varargin{1};
@@ -47,6 +48,7 @@ p=inputParser;
 addRequired(p,'x',validX);
 addOptional(p,'lineVarargin','r:',validStrCell);
 addOptional(p,'lineLabels',cell(0),validStrCell);
+addOptional(p,'lineLabelHeights',0.1,validHeight);
 addParameter(p,'ax',ax,validAxesHandle,'PartialMatchPriority',1);
 addParameter(p,'lineTags',cell(0),validStrCell,'PartialMatchPriority',2);
 addParameter(p,'handleVisibility',true,@islogical,'PartialMatchPriority',3);
@@ -57,6 +59,7 @@ x=p.Results.x;
 lineVarargin=p.Results.lineVarargin;
 lineLabels=p.Results.lineLabels;
 lineTags=p.Results.lineTags;
+lineLabelHeights=p.Results.lineLabelHeights;
 ax=p.Results.ax;
 handleVisibility=p.Results.handleVisibility;
 
@@ -91,9 +94,15 @@ for lineNum=1:numLines
     if(~isempty(lineLabels))
         if(length(lineLabels)==1)
             label=lineLabels{1};
+            if(isnumeric(label))
+                label=num2str(label);
+            end
             
         elseif(length(lineLabels)>=lineNum)
             label=lineLabels{lineNum};
+            if(isnumeric(label))
+                label=num2str(label);
+            end
         else
             label=[];
         end
@@ -116,6 +125,14 @@ for lineNum=1:numLines
         end
     end
     
+    if(length(lineLabelHeights)==1)
+        yLabelHeight=lineLabelHeights;
+    elseif(length(lineLabelHeights)>=lineNum)
+        yLabelHeight=lineLabelHeights(lineNum);
+    else
+        yLabelHeight=0.1;
+    end
+    
     
     g=ishold(ax);
     hold(ax,'on');
@@ -123,13 +140,18 @@ for lineNum=1:numLines
     y=get(ax,'ylim');
     h=plot(ax,[xVal xVal],y,linetype{:});
     if ~isempty(label)
+        if(isnumeric(label))
+            label=num2str(label);
+        end
+        
         xx=get(ax,'xlim');
         xrange=xx(2)-xx(1);
+        yrange=y(2)-y(1);
         xunit=(xVal-xx(1))/xrange;
         if xunit<0.8
-            text(ax,xVal+0.01*xrange,y(1)+0.1*(y(2)-y(1)),label,'color',get(h,'color'))
+            text(ax,xVal+0.01*xrange,y(1)+yLabelHeight*yrange,label,'color',get(h,'color'))
         else
-            text(ax,xVal-.05*xrange,y(1)+0.1*(y(2)-y(1)),label,'color',get(h,'color'))
+            text(ax,xVal-.05*xrange,y(1)+yLabelHeight*yrange,label,'color',get(h,'color'))
         end
     end     
 

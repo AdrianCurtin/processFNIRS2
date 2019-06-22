@@ -1629,7 +1629,7 @@ end
 if(numUgroups==1)
     num2Plot=numBioM;
     plotGroupByBioM=true;
-    cIndex=[204/256,37/256,41/256;57/256,106/256,177/256;0.2,0.2,0.2;107/256,76/256,154/256;0,0.7,0.7];
+    cIndex=table2cell(pf2_base.getBioColors());
     cIndex=cIndex(selBioM,:);
 else
     num2Plot=numUgroups;
@@ -3245,8 +3245,8 @@ numUgroups=length(unique(cellstr(gbyStrs)));
 if(numUgroups==1)
     num2Plot=numBioM;
     plotGroupByBioM=true;
-    cIndex=[204/256,37/256,41/256;57/256,106/256,177/256;0.2,0.2,0.2;107/256,76/256,154/256;0,0.7,0.7];
-    cIndex=cIndex(selBioM,:);
+    cIndex=table2cell(pf2_base.getBioColors());
+    cIndex=cIndex{selBioM};
 else
     num2Plot=numGroups;
     plotGroupByBioM=false;
@@ -4860,8 +4860,8 @@ numUgroups=length(unique(cellstr(gbyStrs)));
 if(numUgroups==1)
     num2Plot=numBioM;
     plotGroupByBioM=true;
-    cIndex=[204/256,37/256,41/256;57/256,106/256,177/256;0.2,0.2,0.2;107/256,76/256,154/256;0,0.7,0.7];
-    cIndex=cIndex(selBioM,:);
+    cIndex=table2cell(pf2_base.getBioColors());
+    cIndex=cIndex{selBioM,:};
 else
     num2Plot=numGroups;
     plotGroupByBioM=false;

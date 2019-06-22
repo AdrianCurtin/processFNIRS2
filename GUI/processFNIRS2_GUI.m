@@ -2112,8 +2112,9 @@ if(~isempty(data))
 
     cla(stageAxesHandles{3})
     
-    bioM={'HbO','HbR','HbDiff','HbTotal','CBSI'};
-    bioMclr={[1,0,0],[0,0,1],[0.6,0,0.6],[0,0,0],[0,0.7,0.7]};
+    colorsTable=pf2_base.colorsTable();
+    bioM=colorsTable.Properties.VariableNames;
+    bioMclr=table2cell(colorsTable);
     numBioM=length(bioM);
     
     for b=1:numBioM
