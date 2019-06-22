@@ -23,6 +23,6 @@ function roi_out=pf2_build_pca_ROI(fNIR,component_number)
 %		if used as varargin, the inputs can be modified according to the functions needs
 
 
-roi_out=buildROI_pf2(fNIR,@nanmean);
+roi_out=pf2_base.ezBuildROI(fNIR,@nanmean);
 
 end

@@ -51,7 +51,7 @@ if(isnumeric(x))
 			end
 		end
     end
-elseif(isstruct(x)&&strcmpi(fieldToUse,'raw')&&isfield(x,'raw')&&~isempty(x.raw))
+elseif(isstruct(x)&&strcmpi(fieldToUse,'OD')&&isfield(x,'raw')&&~isempty(x.raw))
     if(isfield(x,'probe'))
         devinfo=x.probe;
     else
@@ -137,15 +137,19 @@ elseif(isstruct(x)&&strcmpi(fieldToUse,'oxy')&&isfield(x,'HbO')&&~isempty(x.HbO)
 
     if(isnumeric(ch_index))
         for field_ind=1:length(validFields)
-            x_roi=x.(validFields{field_ind})(:,ch_index);
-            roi_out.ROI.(validFields{field_ind})=mergeAndRun(roi_func_handle,x_roi',removeNanChannels,varargin);
+			if(isfield(x,(validFields{field_ind}))&&~isempty(x.(validFields{field_ind})))
+				x_roi=x.(validFields{field_ind})(:,ch_index);
+				roi_out.ROI.(validFields{field_ind})=mergeAndRun(roi_func_handle,x_roi',removeNanChannels,varargin);
+			end
         end
         roi_out.ROI.info=table({ch_index},{'oxy'},'RowNames',roi_names,'VariableNames',{'Optodes','Type'});
     elseif(iscell(ch_index))
         for roi_ind=1:length(ch_index)
             for field_ind=1:length(validFields)
-                x_roi=x.(validFields{field_ind})(:,ch_index{roi_ind});
-                roi_out.ROI.(validFields{field_ind})(:,roi_ind)=mergeAndRun(roi_func_handle,x_roi',removeNanChannels,varargin);
+				if(isfield(x,(validFields{field_ind}))&&~isempty(x.(validFields{field_ind})))
+					x_roi=x.(validFields{field_ind})(:,ch_index{roi_ind});
+					roi_out.ROI.(validFields{field_ind})(:,roi_ind)=mergeAndRun(roi_func_handle,x_roi',removeNanChannels,varargin);
+				end
             end
             if(roi_ind==1)
                 roi_out.ROI.info=table(ch_index(roi_ind),{'oxy'},'RowNames',roi_names(roi_ind),'VariableNames',{'Optodes','Type'});

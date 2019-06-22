@@ -27,7 +27,7 @@ function roi_out=pf2_build_pca_ROI(fNIR,component_number)
 		component_number=1;
 	end
 
-	roi_out=buildROI_pf2(fNIR,@getPCAcomponent,component_number);
+	roi_out=pf2_base.fnirs.ezBuildROI(fNIR,@getPCAcomponent,component_number);
 
 end
 

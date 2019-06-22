@@ -48,3 +48,40 @@ else
 end
 
 end
+
+
+%%_Subsubfunctions_________________________________________________________
+
+%__________________________________________________________________________
+function [CVx] = calcLocalCV(x,N)
+% Function to calculate coefficient of variation for use in SMAR technique
+% x:	input signal
+% N:	window length for SMAR
+
+if nargin<1
+    error('Not enough Input arguments');
+end
+
+if(N<1)
+    error('Invalid Window Length');
+end
+
+l=size(x);
+wid=l(2);%width
+len=l(1);%length
+
+xi=zeros(len-N,wid);
+xj=zeros(len-N,wid);
+
+CVx=zeros(len-N,wid);
+
+for n=1:length(x)-N
+    xi(n,:)=sum(x(n:n+N,:))./(N+1);
+
+    for j=0:N
+        xj(n,:)=xj(n,:)+(x(n+j,:)-xi(n,:)).^2;
+    end
+    xj(n)=xj(n)/N;
+    
+    CVx(n,:)=sqrt(xj(n,:))./xi(n,:);
+end

@@ -1,5 +1,5 @@
-function roi_out=buildROI_pf2(fNIR,funcString,varargin)
-% pf2_buildROI is a warpper function for the pf2_base.fNIR.buildROI function
+function roi_out=ezBuildROI(fNIR,funcString,varargin)
+% ezBuildROI is a warpper function for the pf2_base.fNIR.buildROI function
 %   this function takes an fNIR struct and extracts already assigned values from 
 %	the .ROI field
 
@@ -62,9 +62,9 @@ if(isstruct(fNIR)&&isfield(fNIR,'HbO')&&~isempty(fNIR.HbO))
     removeNanChannels=true;
     
     if(~isempty(varargin))
-        roi_out=buildROI(fNIR,ch_index,roi_names,'oxy',removeNanChannels,roi_func_handle,varargin{:});
+        roi_out=pf2_base.fnirs.buildROI(fNIR,ch_index,roi_names,'oxy',removeNanChannels,roi_func_handle,varargin{:});
     else
-        roi_out=buildROI(fNIR,ch_index,roi_names,'oxy',removeNanChannels,roi_func_handle);
+        roi_out=pf2_base.fnirs.buildROI(fNIR,ch_index,roi_names,'oxy',removeNanChannels,roi_func_handle);
     end
 else
 	% no HbO/HbR information is present to calculate ROIs from
