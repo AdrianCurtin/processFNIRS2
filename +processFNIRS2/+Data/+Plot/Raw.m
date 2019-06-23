@@ -164,6 +164,10 @@ if(~isfield(fNIR,'markers')||isempty(fNIR.markers))
    showMarkers=false; 
 end
 
+if(ischar(showMarkers)&&strcmpi(showMarkers,'all'))
+    showMarkers=true;
+end
+
 if(islogical(showMarkers))
     if(~showMarkers)
         showMarkers=[];

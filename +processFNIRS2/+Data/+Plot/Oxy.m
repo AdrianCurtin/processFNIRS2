@@ -1,14 +1,29 @@
 function [ figHandle ] = Oxy(fNIR,channels,showMarkers,bioMlist,baseline,ylimit,plotArranged,lineProps,rejectedLineProps)
 %processFNIRS2.Data.Plot.Oxy
 %   plots an individual channels or autoarranged plot of the channelss based on the device
-
 % specify an individual optode to plot that or leave blank or 'all' to plot
 % all channels arranged
-
+%
 % showMarkers argument can be an array of markers, strings of marker
 % labels, or just true/false to plot all
+%
+% bioMlist is the list of biomarkers that Plot.Oxy will use, defaults to
+% just HbO/HbR
+%
+% baseline will accept a time (ex 10s) for a baseline at the beginning of the plot
+%   can be negative indexed from the end or accepts an FNIRS struct to
+%   baseline from
+% 
+% ylimit will force the ylimit of each plot to a specific value
+%
+% plotArranged will force the plot to be arranged in probe format even if
+%   optodes are not present
+%
+% lineprops will be passed along to all polots
+%
+% rejectedLineProps will just be passed on to rejected Optodes
+%   (fchMask<rejectLevel)
 
-%todo baseline ylabel tag  
 
 global PF2
 if(~isfield(PF2,'RejectLevel'))
@@ -148,6 +163,10 @@ end
 
 if(~isfield(fNIR,'markers')||isempty(fNIR.markers))
    showMarkers=false; 
+end
+
+if(ischar(showMarkers)&&strcmpi(showMarkers,'all'))
+    showMarkers=true;
 end
 
 if(islogical(showMarkers))

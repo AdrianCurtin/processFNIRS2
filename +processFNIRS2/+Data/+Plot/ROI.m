@@ -1,15 +1,27 @@
 function [ figHandle ] = ROI(fNIR,rois2plot,showMarkers,bioMlist,baseline,ylimit,lineProps,rejectedLineProps)
 %processFNIRS2.Data.Plot.ROI
-%   plots an individual channels or autoarranged plot of the channelss based on the device
-
-% specify an individual optode to plot that or leave blank or 'all' to plot
-% all channels arranged
-
+%   plots an individual or ROIs (provided they have been built and
+%   calculated
+% specify an individual ROI index to plot that or leave blank or 'all' to plot
+%       Can use ROI names to plot ex'ROI1'
+%
 % showMarkers argument can be an array of markers, strings of marker
 % labels, or just true/false to plot all
-
-%todo check getFNIRS time change
-
+%
+% bioMlist is the list of biomarkers that Plot.Oxy will use, defaults to
+% just HbO/HbR
+%
+% baseline will accept a time (ex 10s) for a baseline at the beginning of the plot
+%   can be negative indexed from the end or accepts an FNIRS struct to
+%   baseline from
+% 
+% ylimit will force the ylimit of each plot to a specific value
+%
+%
+% lineprops will be passed along to all polots
+%
+% rejectedLineProps will just be passed on to rejected Optodes
+%   (fchMask<rejectLevel)
 
 global PF2
 if(~isfield(PF2,'RejectLevel'))
@@ -63,13 +75,25 @@ if(~iscell(bioMlist))
 end
 
 
+ROInames=fNIR.ROI.info.Properties.RowNames;
+
+
 if(nargin<2||isempty(rois2plot)||(ischar(rois2plot)&&strcmpi(rois2plot,'all')))
     rois2plot=[];
 end
 
-if(any(logical(rois2plot))&&~any(isnumeric(rois2plot))&&~any(ischar(roi2plot)))
+if(iscell(rois2plot)||any(ischar(rois2plot)))
+    if(~iscell(rois2plot))
+        rois2plot={rois2plot};
+    end
+    rois2plot=find(ismember(ROInames,rois2plot));
+end
+
+if(any(logical(rois2plot))&&~any(isnumeric(rois2plot))&&~any(ischar(rois2plot)))
    rois2plot=find(rois2plot); 
 end
+
+
 
 
 
@@ -157,6 +181,10 @@ end
 
 if(~isfield(fNIR,'markers')||isempty(fNIR.markers))
    showMarkers=false; 
+end
+
+if(ischar(showMarkers)&&strcmpi(showMarkers,'all'))
+    showMarkers=true;
 end
 
 if(islogical(showMarkers))
@@ -276,8 +304,6 @@ if(length(ylimit)==1)
 elseif(length(ylimit)>2||isempty(ylimit))
    ylimit=[oxyMinValue,oxyMaxValue];
 end
-
-ROInames=fNIR.ROI.info.Properties.RowNames;
 
 h=cell(0);
 for(roiIdx=1:length(rois2plot))
