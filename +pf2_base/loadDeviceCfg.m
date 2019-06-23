@@ -166,7 +166,7 @@ chAxesHandles=cell(numCh,1);
 
 ChxList=(ChxList-min(ChxList))./(max(ChxList)-min(ChxList));
 
-ChyList=(ChyList-min(ChyList))./(max(ChyList)-min(ChyList));
+ChyList=1-(ChyList-min(ChyList))./(max(ChyList)-min(ChyList));
 
 % if(plotFigs)
 %     figure(999);
