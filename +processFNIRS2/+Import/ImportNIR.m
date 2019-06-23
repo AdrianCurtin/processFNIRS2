@@ -347,7 +347,7 @@ else
 end
 
 if(channelCheck)
-    fNIR.fchMask=probeCheckGUI(fNIR,nir_filename,forceChannelCheck);
+    fNIR=probeCheckGUI(fNIR,nir_filename,forceChannelCheck);
 else
    if(~isempty(fmask))
        fNIR.fchMask=fmask; 

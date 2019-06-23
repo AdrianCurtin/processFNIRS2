@@ -100,9 +100,15 @@ else
        error('Empty dataset'); 
     end
     
+    if(isfield(pf2ChannelCheck.nirsData,'fchMask'))
+        pf2ChannelCheck.fmask=pf2ChannelCheck.nirsData.fchMask;
+    end
+    
     
     if(length(varargin)>1) % pf2ChannelCheck.filepath
         pf2ChannelCheck.filepath=varargin{2};
+    else
+        pf2ChannelCheck.filepath=[];
     end
     
     if(length(varargin)>2) % pf2ChannelCheck.filepath
@@ -111,7 +117,7 @@ else
 end
 
 
-if(~isempty(pf2ChannelCheck.filepath))
+if(isfield(pf2ChannelCheck,'filepath')&&~isempty(pf2ChannelCheck.filepath))
     [pathstr, name, ext] = fileparts(pf2ChannelCheck.filepath);
     if(length(pathstr)>0)
         filestr=[pathstr,'/',name,'_CH.mat'];
@@ -188,8 +194,12 @@ set(handles.currentfiletext,'String',name);
 %Count num Channels
 pf2ChannelCheck.numChannels=pf2ChannelCheck.nirsData.info.probe.Probe{pf2ChannelCheck.probeNum}.NumOptodes;
 
-if(isempty(pf2ChannelCheck.fmask))
-    pf2ChannelCheck.fmask=ones(1,pf2ChannelCheck.numChannels);
+if(isfield(pf2ChannelCheck,'fmask')&&isempty(pf2ChannelCheck.fmask))
+    if(isfield(pf2ChannelCheck.nirsdata,'fchMask'))
+        pf2ChannelCheck.fmask=pf2ChannelCheck.nirsdata.fchMask;
+    else
+         pf2ChannelCheck.fmask=ones(1,pf2ChannelCheck.numChannels);
+    end
 end
 
 if(pf2ChannelCheck.numChannels>0)
@@ -358,7 +368,8 @@ function varargout = probeCheckGUI_OutputFcn(hObject, eventdata, handles)
 % Get default command line output from handles structure
 
 global pf2ChannelCheck
-varargout = {pf2ChannelCheck.fmask};
+pf2ChannelCheck.nirsData.fchMask=pf2ChannelCheck.fmask;
+varargout = {pf2ChannelCheck.nirsData};
 pf2ChannelCheck=[];
 clear pf2ChannelCheck;
 
@@ -458,9 +469,10 @@ function figure1_CloseRequestFcn(hObject, eventdata, handles)
 if isequal(get(hObject, 'waitstatus'), 'waiting')
 % The GUI is still in UIWAIT, us UIRESUME
 uiresume(hObject);
-else
-delete(hObject);
 end
+
+delete(hObject);
+
 
 function []=exitAndReturn(hObject, eventdata, handles,skipSave)
     
@@ -474,7 +486,7 @@ if(isfield(pf2ChannelCheck,'saved')&&~pf2ChannelCheck.saved)
 end
 
 %If not already loaded write output
-if(isfield(pf2ChannelCheck,'fmask')&&~isempty(pf2ChannelCheck.fmask))
+if(isfield(pf2ChannelCheck,'fmask')&&~isempty(pf2ChannelCheck.fmask)&&~isempty(pf2ChannelCheck.filepath))
    % doc fileparts:
     [pathstr, name, ext] = fileparts(pf2ChannelCheck.filepath);
     pathstr=sprintf('%s/',pathstr);
@@ -490,13 +502,19 @@ if(isfield(pf2ChannelCheck,'fmask')&&~isempty(pf2ChannelCheck.fmask))
         save(filestr,'fmask');
         fprintf('Channel mask saved to %s\n',filestr);
     end
+    
+end
+
+if(isnestedfield(hObject,'Parent.Parent'))
+    uiresume(hObject.Parent.Parent);
 end
 
 if(isfield(handles,'figure1'))
    delete(handles.figure1); 
 end
 
-close()
+
+close();
 
 % --- Executes on button press in markerCheck.
 function markerCheck_Callback(hObject, eventdata, handles)
