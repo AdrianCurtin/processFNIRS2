@@ -114,12 +114,12 @@ for(optIdx=1:length(data2plot))
     
 
    
-    
-    imagesc(data2plot(optIdx));
-     caxis('manual')
-    caxis([minVal,maxVal]);
-    axis off
-    
+    if(~isnan(data2plot(optIdx)))
+        imagesc(data2plot(optIdx));
+         caxis('manual')
+        caxis([minVal,maxVal]);
+        axis off
+    end
     title(sprintf('Opt %i',optNum));
     
 end
