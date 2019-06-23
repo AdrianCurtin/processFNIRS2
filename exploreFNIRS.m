@@ -3800,8 +3800,24 @@ if(showTopo)
                     subplot(numBioM,numCoeff,c+(b-1)*numCoeff)
                     curT=fNIR_t{b,c};
                     curP=fNIR_p{b,c};
-
-                    interpolateNIR(abs(curT),'Mode','tstat','fontSize',12,'transparent',true,'pValueMask',curP,'TitleText',coefNames{c})%,7,11,2,1,false,'[Hb-Oxy] Natural High Vs. Low',12,'hot',true)
+                    
+                    switch(ExFNIRS.settings.ChannelMode)
+                        case 'fNIR'
+                            interpolateNIR(abs(curT),'Mode','tstat','fontSize',12,'transparent',true,'pValueMask',curP,'TitleText',coefNames{c})%,7,11,2,1,false,'[Hb-Oxy] Natural High Vs. Low',12,'hot',true)
+                        case 'ROI'
+                            roiInfo=ExFNIRS.currentROI;
+                            interpolateNIR(mapROIvaluesToCh(roiInfo,abs(curT)),'Mode','tstat','fontSize',12,'transparent',true,'pValueMask',mapROIvaluesToCh(roiInfo,curP),'TitleText',coefNames{c})%,7,11,2,1,false,'[Hb-Oxy] Natural High Vs. Low',12,'hot',true)
+%                             maxVal=nanmax([nanmax(abs(curT(:))),1]);
+%                             minVal=nanmin([maxVal+0.1;abs(curT(curP<0.05))]);
+%                             if(maxVal<=minVal)
+%                                 minVal=maxVal;
+%                                 maxVal=maxVal+0.05;
+%                             end
+%                             
+%                             numROI=size(ExFNIRS.currentROI,1);
+%                             vals=abs(curT(1:numROI));
+%                             processFNIRS2.Data.Plot.InterpolateROIvalues(roiInfo,vals,minVal,maxVal,1,coefNames{c},'tstat');%,7,11,2,1,false,'[Hb-Oxy] Natural High Vs. Low',12,'hot',true)
+                    end
                     if(c==1) % first column
                         ylabel(selectedBioM(b));
                     end
@@ -6135,35 +6151,45 @@ switch (ExFNIRS.settings.ChannelMode)
         roiNames={};
         for i=1:length(ExFNIRS.data)
             if(pf2_base.isnestedfield(ExFNIRS.data{i},'ROI.info'))
-                for roinum=1:size(ExFNIRS.data{i}.ROI.info,1)
-                    if(length(ExFNIRS.data{i}.ROI.info.Properties.RowNames)<roinum)
-                        roiNames=[roiNames,{sprintf('ROI%i',roinum)}];
-                    elseif(isempty(ExFNIRS.data{i}.ROI.info.Properties.RowNames{roinum}))
-                        roiNames=[roiNames,{sprintf('ROI%i',roinum)}];
-                    else
-                        roiNames=[roiNames,ExFNIRS.data{i}.ROI.info.Properties.RowNames(roinum)];
+                curRowNames=ExFNIRS.data{i}.ROI.info.Properties.RowNames;
+                if(any(~ismember(curRowNames,roiNames)))
+                    for roinum=1:size(ExFNIRS.data{i}.ROI.info,1)
+                        if(~ismember(curRowNames{roinum},roiNames))
+                            if(isempty(ExFNIRS.data{i}.ROI.info.Properties.RowNames{roinum}))
+                                newRoiName=sprintf('ROI%i',roinum+length(rowNames));
+                                roiNames=[roiNames,{newRoiName}];
+                                ExFNIRS.data{i}.ROI.info.Properties.RowNames{roinum}=newRoiName;
+                            else
+                                roiNames=[roiNames,ExFNIRS.data{i}.ROI.info.Properties.RowNames(roinum)];
+                            end
+                            ExFNIRS.data{i}.ROI.info.DeviceCfg(:)={ExFNIRS.data{i}.info.probename};
+                            uROI=[uROI;ExFNIRS.data{i}.ROI.info(roinum,:)];
+                        end
                     end
                 end
-                uROI=[uROI,ExFNIRS.data{i}.ROI.info{:,1}'];
+                
+                
+                
             end
         end
         %uROI=unique(uROI{:},'rows');
         
         [uROInames,b,c]=unique(roiNames);
         uROInames=roiNames(b);
-        uROI=uROI(b);
+        uROI=uROI(b,:);
         
-        uROItable=table(uROI(:),'VariableNames',{'Optodes'},'RowNames',uROInames);
+        
         
         if(initROI) % standaradize all ROIs on first load
             fprintf(2,'************\nStandardizing all ROI fields..\n********\n');
             for i=1:length(ExFNIRS.data)
                 if(pf2_base.isnestedfield(ExFNIRS.data{i},'raw')&&~isempty(ExFNIRS.data{i}))
-                   ExFNIRS.data{i}.ROI.info=uROItable;
+                   ExFNIRS.data{i}.ROI.info=uROI;
                 end
             end
         end
         
+        ExFNIRS.currentROI=uROI;
         
         
         set(handles.text_optode_label,'String','ROI');
@@ -6175,7 +6201,7 @@ switch (ExFNIRS.settings.ChannelMode)
         set(handles.listbox_optode,'String',uROInames);
         set(handles.listbox_optode,'Value',1);
         set(handles.listbox_biomarker,'String',{'HbO','HbR','HbDiff','HbTotal','CBSI'});
-        set(handles.pushbutton_lme_plot_topo,'Enable','off');
+        set(handles.pushbutton_lme_plot_topo,'Enable','on');
     case 'Aux'
         set(handles.text_optode_label,'String','Aux');
         set(handles.text_biomarker_label,'String','Aux Signal');

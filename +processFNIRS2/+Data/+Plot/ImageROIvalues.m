@@ -72,11 +72,6 @@ imgSize=1000;
 imgData=nan(imgSize,imgSize);
 
 
-
-if(length(data2plot)>numROI)
-   error('There are only %i ROIs defined but %i datapoints',numROI,length(data2plot)); 
-end
-
 allCh=[];
 
 for roiIdx=1:numROI
