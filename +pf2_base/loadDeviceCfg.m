@@ -1,7 +1,15 @@
-function probeInfo=loadDeviceCfg(deviceCfgFilename,buildProbeLayout)
+function probeInfo=loadDeviceCfg(deviceCfgFilename,buildProbeLayout,includeSSchannels)
+% Builds a probeInfo struct from the device.cfg file
+% use BuildProbeLayout to build a 2D representation for plotting
+%   use includeSSchannels disable remove short separation channels from 2D
+%   plot layouts and figures
 
 if(nargin<2)
    buildProbeLayout=false; 
+end
+
+if(nargin<3)
+    includeSSchannels=true;
 end
 
 pF2_folder=pf2_base.pf2_defaultRootPath();
@@ -115,11 +123,20 @@ for j=1:length(probeInfo.cfg.Sections)
            else % Calculate 2D SD
                p.SD=sqrt((p.DetPosX-p.SrcPosX).^2+(p.DetPosY-p.SrcPosY).^2);
            end
+           
+           p.IsShortSeparation=p.SD<2;
+           p.NumShortSeparation=sum(p.IsShortSeparation);
+        else
+            error('Unable to determine source detector separation, please validate detector and source positions');
         end
         
         if(buildProbeLayout) % auto generate plot layour
             if(isfield(p,'OptPosX')&&isfield(p,'OptPosY'))
-                p.OptLayout2D=setUp2DAxes(p.OptPosX,p.OptPosY);
+                if(includeSSchannels)
+                    p.OptLayout2D=setUp2DAxes(p.OptPosX,p.OptPosY);
+                else
+                    p.OptLayout2D=setUp2DAxes(p.OptPosX(~p.IsShortSeparation),p.OptPosY(~p.IsShortSeparation));
+                end
             else
                 warning('buildProbeLayout option selected, but not enough information to generate Optode locations');
                 p.OptLayout2D=setUpFalse2D(p.NumOptodes);  % generate false channels if not requested
@@ -192,7 +209,6 @@ end
 startStepSize=50;
 stepSize=10;
 
-tic
 
 maskSize=1200;
 
@@ -248,7 +264,7 @@ for hSize=lastPsize:stepSize:maskSize
     lastHsize=hSize-stepSize;
 end
 
-toc
+
 
 for c=1:numCh
     
