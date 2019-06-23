@@ -264,11 +264,6 @@ else
 end
 
 
-if(size(baseline,2)==size(data,2))
-    data=[baseline;data];
-else
-    warning('Mismatched baseline and data size');
-end
 
 
 

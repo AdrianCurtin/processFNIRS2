@@ -238,12 +238,6 @@ else
 end
 
 
- t=fNIR.time;
-    tmin=nanmin(t);
-    tmax=nanmax(t);
-    tmean=nanmean(t)-tmin;
-
-
 
 oxyMaxValue=0;
 oxyMinValue=0;
@@ -321,6 +315,11 @@ for(optIdx=1:length(channels))
         set(lh,'Tag',sprintf('Opt%i:%s',optNum,bioM));
     end
     
+    if(~isempty(baseline)||isempty(showMarkers))
+        maxH=plot([tmean],ylimit(2),'color',[1,1,1],'HandleVisibility','off');
+        minH=plot([tmean],ylimit(1),'color',[1,1,1],'HandleVisibility','off'); 
+    end
+    
     if(~isempty(baseline))
         if(~isnan(baseline(1))&&baseline(1)>0)
             bh=pf2_base.external.vline(tmin+baseline(1),'--r','Baseline Start',0.95);
@@ -334,8 +333,7 @@ for(optIdx=1:length(channels))
         
     
     if(~isempty(showMarkers))
-        maxH=plot([tmean],ylimit(2),'color',[1,1,1],'HandleVisibility','off');
-        minH=plot([tmean],ylimit(1),'color',[1,1,1],'HandleVisibility','off');
+
         for i=1:length(showMarkers)
             mrkName=sprintf('Mrk%i',showMarkers(i));
             if(numMarkers(i)<tooManyMarkers||plotTonsOfMarkers)

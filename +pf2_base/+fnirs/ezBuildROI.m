@@ -34,7 +34,12 @@ if(~isfield(fNIR,'ROI'))
     fNIR.ROI=[]; % return a blank thing if there wasn't a field
 end
 
-
+if(iscell(fNIR.ROI)||isnumeric(fNIR.ROI))
+    temp=fNIR.ROI;
+    fNIR.ROI=[];
+    fNIR.ROI.info=temp;
+end
+    
 if(pf2_base.isnestedfield(fNIR,'ROI.info'))
 	% Unpack ROI information into channel and roi names
 	if(istable(fNIR.ROI.info))

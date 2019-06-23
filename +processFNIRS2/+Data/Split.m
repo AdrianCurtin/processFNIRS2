@@ -114,21 +114,25 @@ if(isempty(fNIR.time))
     return;
 end
 
-if(isnan(startTime))
-    startTime=fNIR.time(1);
-end
+
 
 if(relative) % Convert to absolute units here
-    if(startTime<0)
+    if(isnan(startTime))
+        startTime=min(fNIR.time);
+    elseif(startTime<0)
         error('Relative time cannot have a negative startTime');
+    else
+        startTime=min(fNIR.time)+startTime;  %Start time is X seconds from beginning
     end
-    startTime=fNIR.time(1)+startTime;  %Start time is X seconds from beginning
     if(~isnan(endTime))  
-        endTime=fNIR.time(1)+endTime;  %End time is X seconds from beginning
+        endTime=min(fNIR.time)+endTime;  %End time is X seconds from beginning
     else
         endTime=max(fNIR.time); %go to end if not defined by default
     end
 else
+    if(isnan(startTime))
+        startTime=min(fNIR.time(1));
+    end
     if(startTime<min(fNIR.time))
         warning('Start time precedes fNIR time');
     end
