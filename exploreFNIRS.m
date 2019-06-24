@@ -2368,6 +2368,21 @@ for c=1:size(myTable,2)
     end
 end
 
+function writeLogFile(logFileName,path)
+
+fullPath=sprintf('%s/%s',path,logFileName);
+fileID = fopen(fullPath,'w');
+versInfo=exploreFNIRS.versInfo();
+fprintf(fileID,'%s\n',versInfo);
+fprintf(fileID,'Exported %s\n',datestr(datetime(now)));
+
+rawMethodDescrip=processFNIRS2.Methods.Raw.DescribeMethod();
+fprintf(fileID,'%s\n',rawMethodDescrip);
+oxyMethodDescrip=processFNIRS2.Methods.Oxy.DescribeMethod();
+fprintf(fileID,'%s\n',oxyMethodDescrip);
+
+
+fclose(fileID);
 
 function exportWideTable(times)
 
@@ -2390,6 +2405,7 @@ else
     exportMAT=false;
 end
 
+logFileName=file(1:end-3)+'_wide.log';
 
 exportTable=mergeGbyTablesWide(ExFNIRS.gby,bioMList,[],times,true,true);
 
@@ -2432,6 +2448,8 @@ else
     save(sprintf('%s/%s',pathname,file),'exportTable','grandAvgData','grandAvgBarData');
 end
 
+writeLogFile(logFileName,pathname);
+
 fprintf('Data exported to %s\n',sprintf('%s/%s',pathname,file));
 
 function exportLongTable(times)
@@ -2454,6 +2472,8 @@ if(strcmp(lower(file(end-3:end)),'mat'))
 else
     exportMAT=false;
 end
+
+logFileName=file(1:end-3)+'_long.log';
 
 
 exportTable=mergeGbyTablesLong(ExFNIRS.gby,bioMList,[],times,true,true);
@@ -2498,6 +2518,8 @@ if(~exportMAT)
 else
     save(sprintf('%s/%s',pathname,file),'exportTable','grandAvgData','grandAvgBarData');
 end
+
+writeLogFile(logFileName,pathname);
 
 fprintf('Data exported to %s\n',sprintf('%s%s',pathname,file));
 
@@ -3257,6 +3279,7 @@ end
 if(showBarChart)
     multiPlot=false;
     ExFNIRS.figHandles.main=figure(1000);
+    clf(ExFNIRS.figHandles.main);
     cla(ExFNIRS.figHandles.main);
     addDebugAnnotation(ExFNIRS.figHandles.main);
     dcm_obj = datacursormode(ExFNIRS.figHandles.main);
@@ -3799,6 +3822,7 @@ if(showTopo)
     else
         
         topoH=figure(2000);
+        clf(topoH);
         addDebugAnnotation(topoH);
         
         chNames=ExFNIRS.curChartModelsCoefficents_tstat.Properties.RowNames;
@@ -3879,6 +3903,7 @@ if(showTopo)
         
         if(doublePlotWithFDR&&FDRfound)
             topoHfdr=figure(2001);
+            clf(topoHfdr);
             addDebugAnnotation(topoHfdr);
 
 
@@ -4527,6 +4552,7 @@ if(numGroups==0)
 end
 
 ExFNIRS.figHandles.main=figure(1100);
+clf(ExFNIRS.figHandles.main)
 cla(ExFNIRS.figHandles.main);
 dcm_obj = datacursormode(ExFNIRS.figHandles.main);
 set(dcm_obj,'UpdateFcn',@myDataTipUpdateFcn);

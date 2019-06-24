@@ -117,12 +117,13 @@ maxfTime=max(fNIR.time);
 if(~isstruct(blfNIR)&&~isempty(blLength)&&blLength>0)
     blfNIR=getFNIRS(fNIR,min(fNIR.time),min(fNIR.time)+blLength); 
 elseif(isstruct(blfNIR))
-    blLength=max(blfNIR.time)-min(blfNIR.time); %Baseline length in time
-    if(blLength==0&&length(blfNIR.time)>0&&~isnan(blfNIR.time))
+    if(~isempty(blfNIR.time)&&~any(isnan(blfNIR.time)))
+        blLength=max(blfNIR.time)-min(blfNIR.time)+1/blfNIR.fs; %Baseline length in time
+    elseif(blLength==0&&length(blfNIR.time)>0&&~isnan(blfNIR.time))
         blLength=1/blfNIR.fs;
     else
        warning('Entire Baseline is invalid');
-       blLength=1*blfNIR.time;
+       blLength=nan;
     end
 elseif(blLength==0)
     blLength=[];
@@ -359,6 +360,12 @@ for i=0:numSegs-1
         HbDiff(i,nanCheckValid)=nanmean(fHbDiff(ind_init:ind_2,nanCheck),1)-blHbDiff(nanCheck);
         HbTotal(i,nanCheckValid)=nanmean(fHbTotal(ind_init:ind_2,nanCheck),1)-blHbTotal(nanCheck);
         CBSI(i,nanCheckValid)=nanmean(fCBSI(ind_init:ind_2,nanCheck),1)-blCBSI(nanCheck);
+    elseif(isnan(blLength))
+        HbR(i,nanCheckValid)=nan;
+        HbO(i,nanCheckValid)=nan;
+        HbDiff(i,nanCheckValid)=nan;
+        HbTotal(i,nanCheckValid)=nan;
+        CBSI(i,nanCheckValid)=nan;
     else
         HbR(i,nanCheckValid)=nanmean(fHbR(ind_init:ind_2,nanCheck),1);
         HbO(i,nanCheckValid)=nanmean(fHbO(ind_init:ind_2,nanCheck),1);
@@ -374,6 +381,12 @@ for i=0:numSegs-1
             HbDiff_roi(i,nanCheckValid_roi)=nanmean(fHbDiff_roi(ind_init:ind_2,nanCheck_roi),1)-blHbDiff_roi(nanCheck_roi);
             HbTotal_roi(i,nanCheckValid_roi)=nanmean(fHbTotal_roi(ind_init:ind_2,nanCheck_roi),1)-blHbTotal_roi(nanCheck_roi);
             CBSI_roi(i,nanCheckValid_roi)=nanmean(fCBSI_roi(ind_init:ind_2,nanCheck_roi),1)-blCBSI_roi(nanCheck_roi);
+        elseif(isnan(blLength))
+            HbR_roi(i,nanCheckValid_roi)=nan;
+            HbO_roi(i,nanCheckValid_roi)=nan;
+            HbDiff_roi(i,nanCheckValid_roi)=nan;
+            HbTotal_roi(i,nanCheckValid_roi)=nan;
+            CBSI_roi(i,nanCheckValid_roi)=nan;
         else
             HbR_roi(i,nanCheckValid_roi)=nanmean(fHbR_roi(ind_init:ind_2,nanCheck_roi),1);
             HbO_roi(i,nanCheckValid_roi)=nanmean(fHbO_roi(ind_init:ind_2,nanCheck_roi),1);

@@ -1,4 +1,8 @@
-function [rawMethodsList,isCurrent]=Raw()
+function [rawMethodsList,isCurrent]=Raw(onlyCurrentMethod)
+
+if(nargin<1)
+    onlyCurrentMethod=false;
+end
 
 global PF2
 
@@ -31,7 +35,11 @@ if(pf2_base.isnestedfield(PF2,'myRawMethods.cfg.Sections')&&length(PF2.myRawMeth
         fprintf('%s',methodListStr);
         return;
     else
-        rawMethodsList=rawMethodsCellStr;
+        if(onlyCurrentMethod)
+            rawMethodsList=rawMethodsCellStr{isCurrent};
+        else
+            rawMethodsList=rawMethodsCellStr;
+        end
     end
 
 else

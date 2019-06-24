@@ -209,11 +209,11 @@ cfgOxyImportPath=p.Results.ImportOxyMethods;
 hObject=1;
 handles=1;
 if(~strcmp(cfgRawImportPath,'NA'))
-    processFNIRS2_configureMethods('importMethodsCallback',hObject,[],handles,cfgRawImportPath,true);
+    processFNIRS2.Methods.Raw.ImportMethods(cfgRawImportPath);
 end
 
 if(~strcmp(cfgOxyImportPath,'NA'))
-    processFNIRS2_configureMethods('importMethodsCallback',hObject,[],handles,cfgOxyImportPath,false);
+    processFNIRS2.Methods.Oxy.ImportMethods(cfgOxyImportPath);
 end
 
 if(isempty(data)||(isstruct(data)&&isfield(data,'info')&&~isfield(data,'raw')&&~isfield(data,'HbO')))

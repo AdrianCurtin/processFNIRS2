@@ -1,4 +1,9 @@
-function [OxyMethodsList,isCurrent]=Oxy()
+function [OxyMethodsList,isCurrent]=Oxy(onlyCurrentMethod)
+
+if(nargin<1)
+    onlyCurrentMethod=false;
+end
+
 
 global PF2
 
@@ -35,7 +40,11 @@ if(pf2_base.isnestedfield(PF2,'myOxyMethods.cfg.Sections')&&~isempty(PF2.myOxyMe
         fprintf('%s',methodListStr);
         return;
     else
-        OxyMethodsList=oxyMethodsCellStr;
+        if(onlyCurrentMethod)
+            OxyMethodsList=oxyMethodsCellStr{isCurrent};
+        else
+            OxyMethodsList=oxyMethodsCellStr;
+        end
     end
 else
    methodListStr=sprintf('No Oxy Processing Methods Loaded\nPlease import or configure methods first\n'); 
