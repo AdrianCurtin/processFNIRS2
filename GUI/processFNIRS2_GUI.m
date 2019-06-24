@@ -1002,7 +1002,7 @@ if(pf2_base.isnestedfield(outData,'ROI.info')&&~isempty(outData.ROI.info)&&~isfi
     fprintf(2,'No ROI information was built\nDefaulting to nanmean of valid channels');
     outData=pf2_build_nanmean_ROI(outData);
     if(~isempty(outData.ROI))
-        validChannels_roi=true(1,size(outData.ROI.(bmrk),2));
+        validChannels_roi=true(1,size(outData.ROI.('HbO'),2));
     else
         clear outData.ROI; 
     end

@@ -2370,11 +2370,28 @@ end
 
 function writeLogFile(logFileName,path)
 
+global ExFNIRS
+
+settings=ExFNIRS.settings;
+
 fullPath=sprintf('%s/%s',path,logFileName);
 fileID = fopen(fullPath,'w');
 versInfo=exploreFNIRS.versInfo();
 fprintf(fileID,'%s\n',versInfo);
-fprintf(fileID,'Exported %s\n',datestr(datetime(now)));
+fprintf(fileID,'Exported %s\n',datestr(datetime('now')));
+
+fprintf(fileID,'Group By: %s\n',ExFNIRS.statusGroupByStr);
+fprintf(fileID,'Cur Method: %s\n',ExFNIRS.curMethodName);
+fprintf(fileID,'Averaging Method: %s\n',settings.within_sub_avg_mode_label);
+fprintf(fileID,'GrandAvg Resample Size: %.2f\n',settings.grandavg_resample_size);
+fprintf(fileID,'Resample Size: %.2f\n',settings.barchart_resample_size);
+fprintf(fileID,'Baseline Start: %.2f\n',settings.baseline_start);
+fprintf(fileID,'Baseline End: %.2f\n',settings.baseline_end);
+fprintf(fileID,'Block Start: %.2f\n',settings.block_start);
+fprintf(fileID,'Block End: %.2f\n',settings.block_end);
+fprintf(fileID,'Feature: %s\n',settings.plot_bar_feature);
+
+fprintf(fileID,'\n');
 
 rawMethodDescrip=processFNIRS2.Methods.Raw.DescribeMethod();
 fprintf(fileID,'%s\n',rawMethodDescrip);
@@ -2405,7 +2422,7 @@ else
     exportMAT=false;
 end
 
-logFileName=file(1:end-3)+'_wide.log';
+logFileName=sprintf('%s_wide.log',file(1:end-4));
 
 exportTable=mergeGbyTablesWide(ExFNIRS.gby,bioMList,[],times,true,true);
 
@@ -2473,7 +2490,7 @@ else
     exportMAT=false;
 end
 
-logFileName=file(1:end-3)+'_long.log';
+logFileName=sprintf('%_long.log',file(1:end-4));
 
 
 exportTable=mergeGbyTablesLong(ExFNIRS.gby,bioMList,[],times,true,true);
