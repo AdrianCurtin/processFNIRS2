@@ -178,9 +178,10 @@ switch(Mode)
             twosided=false;
         else
             twoSided=true;
-            fNIRarr=abs(fNIRarr);
-            lowerThreshold=nanmin(fNIRarr(channelMask));
-            upperThreshold=nanmax(fNIRarr(channelMask));
+            cmap=@parula;
+            upperThreshold=max(abs([upperThreshold,lowerThreshold]));
+            lowerThreshold=-1*min(abs([upperThreshold,lowerThreshold]));
+            
         end
 		cMapLabel='T-Statistic';
         nanReplaceVal=0;

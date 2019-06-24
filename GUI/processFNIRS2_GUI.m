@@ -2112,7 +2112,8 @@ if(~isempty(data))
 
     cla(stageAxesHandles{3})
     
-    colorsTable=pf2_base.colorsTable();
+    colorsTable=pf2_base.getBioColors();
+
     bioM=colorsTable.Properties.VariableNames;
     bioMclr=table2cell(colorsTable);
     numBioM=length(bioM);
