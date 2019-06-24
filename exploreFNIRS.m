@@ -1890,6 +1890,7 @@ for chIdx=1:numOpt
                       gStrs{b}=selectedBioM{b};
                       curFigH.legendHandles{curSy,curSx}.h{b}=h;
                   else
+                      if(~isempty(data2plot.(bioM)))
                       h=plot(curFigH.subH{curSy,curSx},curFNIRS{i}.time,data2plot.(bioM)(:,ch),'color',cIndex(curUgroupIdx,:));
                       set(h,'Tag',getFormattedTrialString(curFNIRS{i}));
                       if(ExFNIRS.settings.plot_grandaverage||~isempty(curFigH.legendHandles{curSy,curSx}.h{curUgroupIdx}))
@@ -1899,6 +1900,7 @@ for chIdx=1:numOpt
                       end
                       gStrs{curUgroupIdx}=gbyStrs{g}; 
                       curFigH.legendHandles{curSy,curSx}.h{curUgroupIdx}=h;
+                      end
                   end
                   
                   
