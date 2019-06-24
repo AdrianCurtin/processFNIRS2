@@ -613,6 +613,19 @@ global ExFNIRS
 
 if(ExFNIRS.settings.updateOnChange)
     updateSelectedTable(handles);
+else
+    flagForUpdate(true,handles);
+end
+
+function flagForUpdate(UpdateNeeded,handles)
+
+global ExFNIRS
+if(UpdateNeeded)
+    ExFNIRS.UpdateNeeded=true;
+    set(handles.pushbutton_process_selection,'BackgroundColor','Red');
+else
+    ExFNIRS.UpdateNeeded=false;
+    set(handles.pushbutton_process_selection,'BackgroundColor','Green');
 end
 
 % --- Executes during object creation, after setting all properties.
@@ -637,9 +650,10 @@ function listbox_group_Callback(hObject, eventdata, handles)
 % Hints: contents = cellstr(get(hObject,'String')) returns listbox_group contents as cell array
 %        contents{get(hObject,'Value')} returns selected item from listbox_group
 global ExFNIRS
-
 if(ExFNIRS.settings.updateOnChange)
     updateSelectedTable(handles);
+else
+    flagForUpdate(true,handles);
 end
 % --- Executes during object creation, after setting all properties.
 function listbox_group_CreateFcn(hObject, eventdata, handles)
@@ -666,6 +680,8 @@ global ExFNIRS
 
 if(ExFNIRS.settings.updateOnChange)
     updateSelectedTable(handles);
+else
+    flagForUpdate(true,handles);
 end
 
 % --- Executes during object creation, after setting all properties.
@@ -693,6 +709,8 @@ global ExFNIRS
 
 if(ExFNIRS.settings.updateOnChange)
     updateSelectedTable(handles);
+else
+    flagForUpdate(true,handles);
 end
 
 % --- Executes during object creation, after setting all properties.
@@ -720,6 +738,8 @@ global ExFNIRS
 
 if(ExFNIRS.settings.updateOnChange)
     updateSelectedTable(handles);
+else
+    flagForUpdate(true,handles);
 end
 
 % --- Executes during object creation, after setting all properties.
@@ -759,6 +779,8 @@ end
 
 if(ExFNIRS.settings.updateOnChange)
     updateSelectedTable(handles);
+else
+    flagForUpdate(true,handles);
 end
 
 % --- Executes on button press in pushbutton_group_select_none.
@@ -787,6 +809,8 @@ global ExFNIRS
 
 if(ExFNIRS.settings.updateOnChange)
     updateSelectedTable(handles);
+else
+    flagForUpdate(true,handles);
 end
 
 
@@ -812,6 +836,8 @@ global ExFNIRS
 
 if(ExFNIRS.settings.updateOnChange)
     updateSelectedTable(handles);
+else
+    flagForUpdate(true,handles);
 end
 
 % --- Executes on button press in pushbutton_trial_select_none.
@@ -836,6 +862,8 @@ global ExFNIRS
 
 if(ExFNIRS.settings.updateOnChange)
     updateSelectedTable(handles);
+else
+    flagForUpdate(true,handles);
 end
 
 
@@ -863,6 +891,8 @@ global ExFNIRS
 
 if(ExFNIRS.settings.updateOnChange)
     updateSelectedTable(handles);
+else
+    flagForUpdate(true,handles);
 end
 
 % --- Executes on button press in pushbutton_subjectID_select_none.
@@ -889,6 +919,8 @@ set(handles.edit_baseline_start,'String',sprintf('%.2f',ExFNIRS.settings.baselin
 
 if(ExFNIRS.settings.updateOnChange)
     updateSelectedTable(handles);
+else
+    flagForUpdate(true,handles);
 end
 
 
@@ -919,6 +951,8 @@ set(handles.edit_baseline_end,'String',sprintf('%.2f',ExFNIRS.settings.baseline_
 
 if(ExFNIRS.settings.updateOnChange)
     updateSelectedTable(handles);
+else
+    flagForUpdate(true,handles);
 end
 
 % --- Executes during object creation, after setting all properties.
@@ -1055,7 +1089,10 @@ set(handles.edit_barchart_resample_size,'String',sprintf('%.2f',ExFNIRS.settings
 
 if(ExFNIRS.settings.updateOnChange)
     updateSelectedTable(handles);
+else
+    flagForUpdate(true,handles);
 end
+
 
 
 % --- Executes during object creation, after setting all properties.
@@ -1135,6 +1172,7 @@ function listbox_biomarker_CreateFcn(hObject, eventdata, handles)
 if ispc && isequal(get(hObject,'BackgroundColor'), get(0,'defaultUicontrolBackgroundColor'))
     set(hObject,'BackgroundColor','white');
 end
+
 
 function updateSelectedTable(handles)
 
@@ -1391,6 +1429,8 @@ set(handles.text_status,'String',sprintf('%i Segments in\n%i Group(s)',numSeg,ma
 
 close(hF);
 
+flagForUpdate(false,handles);
+
 function updateInfoGroupByVars(handles)
 global ExFNIRS
 
@@ -1501,6 +1541,16 @@ function pushbutton_biomarker_select_none_Callback(hObject, eventdata, handles)
 
 set(handles.listbox_biomarker,'Value',[]);
 
+function flagForProcessUpdate(ProcessingNeeded)
+
+global ExFNIRS
+if(ProcessingNeeded)
+   ExFNIRS.ProcessingNeeded=true;
+   
+else
+   ExFNIRS.ProcessingNeeded=false; 
+end
+
 % --- Executes on selection change in listbox_raw_methods.
 function listbox_raw_methods_Callback(hObject, eventdata, handles)
 % hObject    handle to listbox_raw_methods (see GCBO)
@@ -1554,6 +1604,10 @@ function pushbutton_plot_temporal_Callback(hObject, eventdata, handles)
 % handles    structure with handles and user data (see GUIDATA)
 
 global ExFNIRS
+
+if(ExFNIRS.UpdateNeeded)
+    updateSelectedTable(handles);
+end
 
 if(~isfield(ExFNIRS,'gby'))
     warning('No groups match selection criteria');
@@ -2096,7 +2150,7 @@ for i=1:size(sH,1)
         addDebugAnnotation(sH{i,b}.h);
         switch(figType)
             case 'bioM'
-                suptitle(sH{i,b}.h,selectedBioM{i});
+                pf2_base.external.suptitle(sH{i,b}.h,selectedBioM{i});
             otherwise
                 
         end
@@ -2191,6 +2245,8 @@ ExFNIRS.settings.plotby.SubjectID=get(handles.checkbox_subjectID_plotby,'Value')
 
 if(ExFNIRS.settings.updateOnChange)
     updateSelectedTable(handles);
+else
+    flagForUpdate(true,handles);
 end
 
 % --- Executes on button press in checkbox_group_plotby.
@@ -2204,6 +2260,8 @@ global ExFNIRS
 ExFNIRS.settings.plotby.Group=get(handles.checkbox_group_plotby,'Value');
 if(ExFNIRS.settings.updateOnChange)
     updateSelectedTable(handles);
+else
+    flagForUpdate(true,handles);
 end
 
 
@@ -2218,6 +2276,8 @@ global ExFNIRS
 ExFNIRS.settings.plotby.Session=get(handles.checkbox_session_plotby,'Value');
 if(ExFNIRS.settings.updateOnChange)
     updateSelectedTable(handles);
+else
+    flagForUpdate(true,handles);
 end
 
 
@@ -2232,6 +2292,8 @@ global ExFNIRS
 ExFNIRS.settings.plotby.Trial=get(handles.checkbox_trial_plotby,'Value');
 if(ExFNIRS.settings.updateOnChange)
     updateSelectedTable(handles);
+else
+    flagForUpdate(true,handles);
 end
 
 
@@ -2246,6 +2308,8 @@ global ExFNIRS
 ExFNIRS.settings.plotby.Condition=get(handles.checkbox_condition_plotby,'Value');
 if(ExFNIRS.settings.updateOnChange)
     updateSelectedTable(handles);
+else
+    flagForUpdate(true,handles);
 end
 
 
@@ -2255,6 +2319,10 @@ function pushbutton_export_csv_Callback(hObject, eventdata, handles)
 % eventdata  reserved - to be defined in a future version of MATLAB
 % handles    structure with handles and user data (see GUIDATA)
 global ExFNIRS
+
+if(ExFNIRS.UpdateNeeded)
+    updateSelectedTable(handles);
+end
 
 if(isempty(ExFNIRS.selectedTable)||isempty(ExFNIRS.gby))
     return;
@@ -3009,6 +3077,8 @@ function listbox_block_Callback(hObject, eventdata, handles)
 global ExFNIRS
 if(ExFNIRS.settings.updateOnChange)
     updateSelectedTable(handles);
+else
+    flagForUpdate(true,handles);
 end
 
 
@@ -3039,6 +3109,8 @@ end
 global ExFNIRS
 if(ExFNIRS.settings.updateOnChange)
     updateSelectedTable(handles);
+else
+    flagForUpdate(true,handles);
 end
 
 % --- Executes on button press in pushbutton_block_select_none.
@@ -3060,6 +3132,8 @@ global ExFNIRS
 ExFNIRS.settings.plotby.Block=get(handles.checkbox_block_plotby,'Value');
 if(ExFNIRS.settings.updateOnChange)
     updateSelectedTable(handles);
+else
+    flagForUpdate(true,handles);
 end
 
 % --- Executes on button press in pushbutton_refresh_methods.
@@ -3127,7 +3201,11 @@ strsOxy=get(handles.listbox_oxy_methods,'String');
 ExFNIRS.processedData=cell(length(strsOxy)*length(strsRaw),3);
 ExFNIRS.numProcessed=0;
 
-processCurrentFunction(handles);
+if(ExFNIRS.settings.updateOnChange)
+    updateSelectedTable(handles);
+else
+   flagForUpdate(true,handles); 
+end
 
 % --- Executes during object creation, after setting all properties.
 function edit_grandavg_resample_size_CreateFcn(hObject, eventdata, handles)
@@ -3169,6 +3247,10 @@ plot_barchart(handles, true,false);
 function plot_barchart(handles, showBarChart,showTopo)
 
 global ExFNIRS
+
+if(ExFNIRS.UpdateNeeded)
+    updateSelectedTable(handles);
+end
 
 if(~isfield(ExFNIRS,'gby'))
     warning('No groups match selection criteria');
@@ -3583,7 +3665,7 @@ for chIdx=1:numOpt
             case 'fNIR'
                 title(sprintf('Optode %i',ch));
             case 'ROI'
-                title(sprintf('ROI: %s',selectedOptStr{ch}));
+                title(sprintf('ROI: %s',optStrs{ch}));
             case 'Aux'
                 
         end
@@ -3690,7 +3772,7 @@ for sH=1:length(subplotHandles)
         
         
         
-        lmeString=sprintf('%s%i_%s~%s+(1|SubjectID)',varNameStart,subplotGby{sH}.curCh,subplotGby{sH}.curBioM{1},curLMEGbyString);
+        lmeString=sprintf('%s%i_%s~-1+%s+(1|SubjectID)',varNameStart,subplotGby{sH}.curCh,subplotGby{sH}.curBioM{1},curLMEGbyString);
 
         try
             curChartLME{sH}=fitlme(mergedTables{sH},lmeString);
@@ -3748,6 +3830,9 @@ for sH=1:length(subplotHandles)
     end
 end
 
+doublePlotWithFDR=true;
+FDRfound=false;
+
 if(showTopo)
     if(~ExFNIRS.settings.LME_enable)
         warning('LME must be enabled');
@@ -3801,12 +3886,19 @@ if(showTopo)
                     curT=fNIR_t{b,c};
                     curP=fNIR_p{b,c};
                     
+                    curQ=performFDR(curP);
+                    
+                    if(any(curQ<0.05))
+                        FDRfound=true;
+                        %FDR RESULTS FOUND
+                    end
+                    
                     switch(ExFNIRS.settings.ChannelMode)
                         case 'fNIR'
-                            interpolateNIR(abs(curT),'Mode','tstat','fontSize',12,'transparent',true,'pValueMask',curP,'TitleText',coefNames{c})%,7,11,2,1,false,'[Hb-Oxy] Natural High Vs. Low',12,'hot',true)
+                            interpolateNIR(curT,'Mode','tstat','fontSize',12,'transparent',true,'pValueMask',curP,'TitleText',coefNames{c})%,7,11,2,1,false,'[Hb-Oxy] Natural High Vs. Low',12,'hot',true)
                         case 'ROI'
                             roiInfo=ExFNIRS.currentROI;
-                            interpolateNIR(mapROIvaluesToCh(roiInfo,abs(curT)),'Mode','tstat','fontSize',12,'transparent',true,'pValueMask',mapROIvaluesToCh(roiInfo,curP),'TitleText',coefNames{c})%,7,11,2,1,false,'[Hb-Oxy] Natural High Vs. Low',12,'hot',true)
+                            interpolateNIR(mapROIvaluesToCh(roiInfo,curT),'Mode','tstat','fontSize',12,'transparent',true,'pValueMask',mapROIvaluesToCh(roiInfo,curP),'TitleText',coefNames{c})%,7,11,2,1,false,'[Hb-Oxy] Natural High Vs. Low',12,'hot',true)
 %                             maxVal=nanmax([nanmax(abs(curT(:))),1]);
 %                             minVal=nanmin([maxVal+0.1;abs(curT(curP<0.05))]);
 %                             if(maxVal<=minVal)
@@ -3825,8 +3917,68 @@ if(showTopo)
             end
         end
         
+        if(doublePlotWithFDR&&FDRfound)
+            topoHfdr=figure(2001);
+            addDebugAnnotation(topoHfdr);
+
+
+                for b=1:numBioM
+                    for c=1:numCoeff
+                        subplot(numBioM,numCoeff,c+(b-1)*numCoeff)
+                        curT=fNIR_t{b,c};
+                        curP=fNIR_p{b,c};
+                        curQ=performFDR(curP);
+
+                        switch(ExFNIRS.settings.ChannelMode)
+                            case 'fNIR'
+                                interpolateNIR(curT,'Mode','tstat','fontSize',12,'transparent',true,'pValueMask',curQ,'TitleText',coefNames{c})%,7,11,2,1,false,'[Hb-Oxy] Natural High Vs. Low',12,'hot',true)
+                            case 'ROI'
+                                roiInfo=ExFNIRS.currentROI;
+                                interpolateNIR(mapROIvaluesToCh(roiInfo,curT),'Mode','tstat','fontSize',12,'transparent',true,'pValueMask',mapROIvaluesToCh(roiInfo,curQ),'TitleText',coefNames{c})%,7,11,2,1,false,'[Hb-Oxy] Natural High Vs. Low',12,'hot',true)
+    %                             maxVal=nanmax([nanmax(abs(curT(:))),1]);
+    %                             minVal=nanmin([maxVal+0.1;abs(curT(curP<0.05))]);
+    %                             if(maxVal<=minVal)
+    %                                 minVal=maxVal;
+    %                                 maxVal=maxVal+0.05;
+    %                             end
+    %                             
+    %                             numROI=size(ExFNIRS.currentROI,1);
+    %                             vals=abs(curT(1:numROI));
+    %                             processFNIRS2.Data.Plot.InterpolateROIvalues(roiInfo,vals,minVal,maxVal,1,coefNames{c},'tstat');%,7,11,2,1,false,'[Hb-Oxy] Natural High Vs. Low',12,'hot',true)
+                        end
+                        if(c==1) % first column
+                            ylabel(selectedBioM(b));
+                        end
+                    end
+                end
+            suptitle('FDR Edition');
+        end
+        
     end
 end
+
+function [qvalues,passed]=performFDR(pvalues,pThreshold)
+% Performs FDR correction per #CITATION HERE
+if(nargin<2)
+    pThreshold=0.05;
+end
+
+qvalues=pvalues;
+
+[pSorted,pIdx]=sort(pvalues);       
+numP=length(pSorted);
+
+for i=0:numP-1
+    qThreshold=0.05/(numP-i);
+    qvalues(pIdx==i)=pvalues(pIdx==i)*(numP-i);
+end
+
+passed=qvalues<pThreshold;
+        
+        
+
+    
+
 % --- Executes on selection change in popupmenu_bar_feature.
 function popupmenu_bar_feature_Callback(hObject, eventdata, handles)
 % hObject    handle to popupmenu_bar_feature (see GCBO)
@@ -3960,7 +4112,7 @@ function checkbox_auto_update_Callback(hObject, eventdata, handles)
 global ExFNIRS
 ExFNIRS.settings.updateOnChange=get(handles.checkbox_auto_update,'Value');
 
-if(ExFNIRS.settings.updateOnChange)
+if(ExFNIRS.settings.updateOnChange&&ExFNIRS.UpdateNeeded)
     updateSelectedTable(handles);
 end
 
@@ -3974,6 +4126,14 @@ function listbox_subgroup_Callback(hObject, eventdata, handles)
 % Hints: contents = cellstr(get(hObject,'String')) returns listbox_subgroup contents as cell array
 %        contents{get(hObject,'Value')} returns selected item from listbox_subgroup
 
+
+global ExFNIRS
+
+if(ExFNIRS.settings.updateOnChange)
+    updateSelectedTable(handles);
+else
+    flagForUpdate(true,handles);
+end
 
 % --- Executes during object creation, after setting all properties.
 function listbox_subgroup_CreateFcn(hObject, eventdata, handles)
@@ -4008,6 +4168,8 @@ end
 
 if(ExFNIRS.settings.updateOnChange)
     updateSelectedTable(handles);
+else
+    flagForUpdate(true,handles);
 end
 % --- Executes on button press in checkbox_use_subgroup.
 function checkbox_use_subgroup_Callback(hObject, eventdata, handles)
@@ -4031,6 +4193,8 @@ end
 
 if(ExFNIRS.settings.updateOnChange)
     updateSelectedTable(handles);
+else
+    flagForUpdate(true,handles);
 end
 
 
@@ -4343,6 +4507,8 @@ ExFNIRS.settings.within_sub_avg_mode=get(handles.popupmenu_within_sub_avg,'Value
 
 if(ExFNIRS.settings.updateOnChange)
     updateSelectedTable(handles);
+else
+    flagForUpdate(true,handles);
 end
 
 % --- Executes during object creation, after setting all properties.
@@ -4366,6 +4532,10 @@ function pushbutton_infoData_barchart_Callback(hObject, eventdata, handles)
 
 
 global ExFNIRS
+
+if(ExFNIRS.UpdateNeeded)
+   UpdateSelectedTable(handles); 
+end
 
 if(~isfield(ExFNIRS,'gby'))
     warning('No groups match selection criteria');
@@ -4606,7 +4776,7 @@ if(ExFNIRS.settings.LME_enable)
         curLMEGbyString(1)=[];
     end
 
-    lmeString=sprintf('%s~%s+(1|SubjectID)',ExFNIRS.settings.curInfoStr,curLMEGbyString);
+    lmeString=sprintf('%s~-1+%s+(1|SubjectID)',ExFNIRS.settings.curInfoStr,curLMEGbyString);
 
     try
         curInfoChartLME=fitlme(mergedTables,lmeString);
@@ -4805,6 +4975,11 @@ function pushbutton_plot_scatter_Callback(hObject, eventdata, handles)
 
 
 global ExFNIRS
+
+
+if(ExFNIRS.UpdateNeeded)
+   UpdateSelectedTable(handles); 
+end
 
 if(~isfield(ExFNIRS,'gby'))
     warning('No groups match selection criteria');
@@ -5617,11 +5792,11 @@ for i=1:size(sH,1)
         addDebugAnnotation(sH{i,b}.h);
         switch(figType)
             case 'bioM'
-                suptitle(sH{i,b}.h,selectedBioM{i});
+                pf2_base.external.suptitle(sH{i,b}.h,selectedBioM{i});
             case 'channels'
-                suptitle(sH{i,b}.h,selectedOpt{i});
+                pf2_base.external.suptitle(sH{i,b}.h,selectedOpt{i});
             case 'bio,channels'
-                suptitle(sH{i,b}.h,sprintf('Optode %i [%s]',selectedOpt(i),selectedBioM{b}));
+                pf2_base.external.suptitle(sH{i,b}.h,sprintf('Optode %i [%s]',selectedOpt(i),selectedBioM{b}));
             otherwise
 
         end
@@ -5894,6 +6069,8 @@ global ExFNIRS
 
 if(ExFNIRS.settings.updateOnChange)
     updateSelectedTable(handles);
+else
+    flagForUpdate(true,handles);
 end
 
 
@@ -5921,6 +6098,8 @@ global ExFNIRS
 ExFNIRS.settings.plotby.InfoGroupBy=get(handles.checkbox_info_groupby_plotby,'Value');
 if(ExFNIRS.settings.updateOnChange)
     updateSelectedTable(handles);
+else
+    flagForUpdate(true,handles);
 end
 
 
@@ -6054,6 +6233,8 @@ ExFNIRS.settings.within_sub_avg_mode=get(handles.popupmenu_within_sub_avg,'Value
 
 if(ExFNIRS.settings.updateOnChange)
     updateSelectedTable(handles);
+else
+    flagForUpdate(true,handles);
 end
 
 

@@ -197,6 +197,25 @@ if(blLength>0)
     blHbTotal=nanmean(blfNIR.HbTotal(:,validCh),1);
     blCBSI=nanmean(blfNIR.CBSI(:,validCh),1);
     
+    if(isempty(blHbR))
+        blHbR=nan;
+    end
+    
+    if(isempty(blHbO))
+        blHbO=nan;
+    end
+    
+    if(isempty(blHbDiff))
+        blHbDiff=nan;
+    end
+    
+    if(isempty(blHbTotal))
+        blHbTotal=nan;
+    end
+    if(isempty(blCBSI))
+        blCBSI=nan;
+    end
+    
     if(pf2_base.isnestedfield(blfNIR,'ROI.HbO'))
         blNanCheck_roi=sum(isnan(blfNIR.ROI.HbR),1)/length(blfNIR.time)<nanRejectionLevel; %calculate percentage of invalid values in baseline
 
@@ -206,11 +225,11 @@ if(blLength>0)
         end
         validCh_roi=find(blNanCheck_roi==1);
 
-        blHbR_roi=nanmean(fNIR.ROI.HbR(:,validCh_roi),1);
-        blHbO_roi=nanmean(fNIR.ROI.HbO(:,validCh_roi),1);
-        blHbDiff_roi=nanmean(fNIR.ROI.HbDiff(:,validCh_roi),1);
-        blHbTotal_roi=nanmean(fNIR.ROI.HbTotal(:,validCh_roi),1);
-        blCBSI_roi=nanmean(fNIR.ROI.CBSI(:,validCh_roi),1);
+        blHbR_roi=nanmean(blfNIR.ROI.HbR(:,validCh_roi),1);
+        blHbO_roi=nanmean(blfNIR.ROI.HbO(:,validCh_roi),1);
+        blHbDiff_roi=nanmean(blfNIR.ROI.HbDiff(:,validCh_roi),1);
+        blHbTotal_roi=nanmean(blfNIR.ROI.HbTotal(:,validCh_roi),1);
+        blCBSI_roi=nanmean(blfNIR.ROI.CBSI(:,validCh_roi),1);
         
         if(pf2_base.isnestedfield(fNIR,'ROI.HbO')&&size(blfNIR.ROI.HbO,2)==size(fNIR.ROI.HbO,2))
             

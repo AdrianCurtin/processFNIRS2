@@ -281,7 +281,9 @@ elseif(length(ylimit)>2||isempty(ylimit))
    ylimit=[oxyMinValue,oxyMaxValue];
 end
 
-
+if(ylimit(1)==ylimit(2))
+    ylimit=[0,1]; %% No valid data here
+end
 
 h=cell(0);
 for(optIdx=1:length(channels))

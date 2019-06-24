@@ -288,16 +288,36 @@ else
     
     if(hasROIfield)
         outfNIR.ROI=fNIR.ROI;
-        if(pf2_base.isnestedfield(fNIR.ROI,'raw'))
-            outfNIR.ROI.raw=fNIR.ROI.raw(indexStart:indexEnd,:);
-        end
-        
+
         if(pf2_base.isnestedfield(fNIR.ROI,'HbO'))
             outfNIR.ROI.HbO=fNIR.ROI.HbO(indexStart:indexEnd,:);
             outfNIR.ROI.HbR=fNIR.ROI.HbR(indexStart:indexEnd,:);
             outfNIR.ROI.HbDiff=fNIR.ROI.HbDiff(indexStart:indexEnd,:);
             outfNIR.ROI.CBSI=fNIR.ROI.CBSI(indexStart:indexEnd,:);
             outfNIR.ROI.HbTotal=fNIR.ROI.HbTotal(indexStart:indexEnd,:);
+            
+            if(~isempty(blfNIR))
+                if(isfield(blfNIR,'ROI'))
+                    outfNIR.ROI.HbR=outfNIR.ROI.HbR-nanmean(blfNIR.ROI.HbR,1);
+                    outfNIR.ROI.HbO=outfNIR.ROI.HbO-nanmean(blfNIR.ROI.HbO,1);
+                    outfNIR.ROI.HbDiff=outfNIR.ROI.HbDiff-nanmean(blfNIR.ROI.HbDiff,1);
+                    outfNIR.ROI.HbTotal=outfNIR.ROI.HbTotal-nanmean(blfNIR.ROI.HbTotal,1);
+                    outfNIR.ROI.CBSI=outfNIR.ROI.CBSI-nanmean(blfNIR.ROI.CBSI,1);
+                else
+                    error('Baseline has no Build ROI data');
+                end
+         
+             elseif(exist('blIndexStart'))
+                    if (~isempty(blIndexStart)&&~isempty(blIndexEnd))&&(blIndexStart<=blIndexEnd)
+                    %for i=1:length(outfNIR.HbR(1,:))
+                       outfNIR.ROI.HbO=outfNIR.ROI.HbO-nanmean(fNIR.ROI.HbO(blIndexStart:blIndexEnd,:),1);
+                       outfNIR.ROI.HbR=outfNIR.ROI.HbR-nanmean(fNIR.ROI.HbR(blIndexStart:blIndexEnd,:),1);
+                       outfNIR.ROI.CBSI=outfNIR.ROI.CBSI-nanmean(fNIR.ROI.CBSI(blIndexStart:blIndexEnd,:),1);
+                       outfNIR.ROI.HbDiff=outfNIR.ROI.HbDiff-nanmean(fNIR.ROI.HbDiff(blIndexStart:blIndexEnd,:),1);
+                    end
+                    %end
+            end
+             
         end
     end
     

@@ -51,6 +51,7 @@ addParameter(p,'TitleText','',@ischar);
 addParameter(p,'fontSize',30,validScalarPosNum);
 addParameter(p,'colorScheme','autumn',@ischar);
 addParameter(p,'ChannelLabels',false,@islogical);
+addParameter(p,'UseFDR',false,@islogical);
 
 parse(p,varargin{:});
 
@@ -69,6 +70,7 @@ logScale=p.Results.logScale;
 pValueMask=p.Results.pValueMask;
 channelMask=p.Results.channelMask;
 pThreshold=p.Results.pThreshold;
+useFDR=p.Results.UseFDR;
 
 debugPlot=false;
 
@@ -84,8 +86,45 @@ end
     
 
 if(~isempty(pValueMask))
-    pValueMask(isnan(pValueMask))=1;
+    if(any(isnan(pValueMask)))
+       warning('Only pass nan if you don''t want FDR correction to be applied for rejected channels'); 
+    end
+    
+    for i=1:length(pValueMask)
+        if(isnan(pValueMask(i)))
+            pValueMask(i)=i;
+        end
+    end
+    
+    %%Perform FDR here
+    if(useFDR)
+        [pUniq,~,pUidx]=unique(pValueMask(:));
+        [fUniq,~,fUidx]=unique(fNIRarr(:));
+        
+        if(length(pUniq)==length(fUniq)&&length(pUniq)<length(pValueMask)) %checking for ROI mode
+            %FDR should only be used with the full setup
+            sortedP=pUniq;
+            sortedIdx=pUidx;
+        else
+            [sortedP,sortedIdx]=sort(pValueMask);
+        end
+        
+        numP=length(sortedP);
+        
+        if(any(sortedP)==9999)
+            numP=numP-1;
+        end
+        for i=1:numP
+            q=pThreshold/(numP+1-i);
+            pValueMask(sortedIdx==i)=pValueMask(sortedIdx==i)*(numP+1-i);
+        end
+        
+        
+    end
+    
     channelMask(pValueMask>pThreshold|pValueMask<0)=false;
+        
+   
 end
 
 if(isempty(lowerThreshold))
@@ -105,6 +144,9 @@ end
 
 cMapLabel='';
 nanReplaceVal=nan;
+
+twoSided=false;
+twoSidedOffset=1000;
 
 switch(Mode)
     case 'value'
@@ -127,16 +169,50 @@ switch(Mode)
     case 'tstat'
         %channelMask(abs(fNIRarr)<lowerThreshold)=false;
         %channelMask(abs(fNIRarr)>upperThreshold)=false;
+        if(upperThreshold<0||lowerThreshold>0)
+            if(upperThreshold<0)
+               temp=upperThreshold;
+               upperThreshold=lowerThreshold;
+               lowerThreshold=temp;
+            end
+            twosided=false;
+        else
+            twoSided=true;
+            fNIRarr=abs(fNIRarr);
+            lowerThreshold=nanmin(fNIRarr(channelMask));
+            upperThreshold=nanmax(fNIRarr(channelMask));
+        end
 		cMapLabel='T-Statistic';
         nanReplaceVal=0;
+        
 	case 'fstat'
 		cMapLabel='F-Statistic';
         nanReplaceVal=0;
+        if(upperThreshold<0||lowerThreshold>0)
+            if(upperTreshold<0)
+               temp=upperThreshold;
+               upperThreshold=lowerThreshold;
+               lowerThreshold=temp;
+            end
+            twosided=false;
+        else
+            twoSided=true;
+        end
     case 'corr'
         channelMask(abs(fNIRarr)<lowerThreshold)=false;
         channelMask(abs(fNIRarr)>upperThreshold)=false;
 		cMapLabel='rho';
         nanReplaceVal=0;
+        if(upperThreshold<0||lowerThreshold>0)
+            if(upperThreshold<0)
+               temp=upperThreshold;
+               upperThreshold=lowerThreshold;
+               lowerThreshold=temp;
+            end
+            twosided=false;
+        else
+            twoSided=true;
+        end
     case 'pvalue'
         channelMask(abs(fNIRarr)<lowerThreshold)=false;
         channelMask(abs(fNIRarr)>upperThreshold)=false;
@@ -255,14 +331,14 @@ else
     invertAxis=false;
 end
 
-minE=minVal-(maxVal-minVal);
+minE=minVal-abs(maxVal-minVal)*0.5;
+
 if(logScale)
     minE=minVal/2;
 end
 
-
-
 fNIRarr(fNIRarr<minE)=minE;
+
 
 
 
@@ -273,6 +349,10 @@ if(exist(colorScheme)==2)
 else
    warning('Invalid cmap function %s\ndefaulting to Hot',colorScheme');
    cmapFunc=@hot;
+end
+
+if(twoSided)
+  % cmapFunc=@parula; 
 end
 
 cmp=cmapFunc(nCol);
@@ -294,12 +374,19 @@ if(debugPlot)
     caxis([minVal,maxVal]);
 end
 
+
+
 if(strcmp(interpolationType,'broadened')) %pad sides
    newArr=ones(size(fNIRarr,1),size(fNIRarr,2)+2)*minE;
+   alphaArr=zeros(size(fNIRarr,1),size(fNIRarr,2)+2);
    for i=1:size(fNIRarr,1)
       newArr(i,:)=[minE,fNIRarr(i,:),minE];
+      alphaArr(i,:)=[0,channelMask(i,:),0];
    end
    fNIRarr=[ones(1,size(newArr,2))*minE;newArr;ones(1,size(newArr,2))*minE];
+   alphaArr=[zeros(1,size(newArr,2));alphaArr;zeros(1,size(newArr,2))];
+else
+    alphaArr=channelMask;
 end
 
 if(~invertAxis)
@@ -317,6 +404,7 @@ if(debugPlot)
 end
 
 rWidth=100+1;
+
 
 if(~strcmp(interpolationType,'broadened')) 
     [intArrX,intArrY]= meshgrid(1:(size(fNIRarr,2))*rWidth,1:size(fNIRarr,1)*rWidth);
@@ -346,8 +434,15 @@ flexArrX=(flexArrX-midpoint)/rWidth;
 flexArrX=flexArrX.*cos(constAngle*flexArrX);
 flexArrX=flexArrX*rWidth+midpoint;
 
+
 intArr=interp2(midArrX,midArrY,fNIRarr,intArrX,intArrY,'spline',minE);%,method,extrapval)
 
+intAlphaArrLinear=interp2(midArrX,midArrY,alphaArr,intArrX,intArrY,'linear',0);%,method,extrapval)
+intAlphaArr=interp2(midArrX,midArrY,alphaArr,intArrX,intArrY,'spline',0);%,method,extrapval)
+% 
+% intArr(intAlphaArrLinear<0.1)=minE;
+% 
+% intAlphaArr(intAlphaArrLinear==0)=0;
 
 if(debugPlot)
     imagesc(intArr);
@@ -358,26 +453,31 @@ end
 midArrX=flexArrX;
 rW2=ceil(size(intArr,2)-max(flexArrX));
  
-if(~emptyplot)
-    intArr=interp2(midArrX,midArrY,fNIRarr,intArrX,intArrY,'spline',minE);%,method,extrapval)
-end
 
 if(strcmp(interpolationType,"Interpolated")) %%Should remove everything not inbetween optodes 
    intArr([1:(rWidth+1)/2,(size(intArr,1)-(rWidth-1)/2):size(intArr,1)],:)=[]; 
    intArr(:,[1:rW2,(size(intArr,2)-rW2):size(intArr,2)])=[]; 
+   intAlphaArr([1:(rWidth+1)/2,(size(intAlphaArr,1)-(rWidth-1)/2):size(intAlphaArr,1)],:)=[]; 
+   intAlphaArr(:,[1:rW2,(size(intAlphaArr,2)-rW2):size(intAlphaArr,2)])=[]; 
+   
    midArrX=midArrX-min(midArrX)+1;
    midArrY=midArrY-min(midArrY)+1;
 else
    intArr(:,[1:rW2,(size(intArr,2)-rW2):size(intArr,2)])=[]; 
+   intAlphaArr(:,[1:rW2,(size(intAlphaArr,2)-rW2):size(intAlphaArr,2)])=[]; 
    midArrX=midArrX-min(midArrX)+1;
 end
 
 
+nullCol=ind2rgb(0,cmp);
 
 scaleArr=intArr;
 %First crop by max/min
+
 scaleArr(scaleArr>maxVal)=maxVal;
 scaleArr(scaleArr<minVal)=minVal;
+
+
 %Then rescale from 0:1
 scaleArr=(scaleArr-minVal)/(maxVal-minVal);
 
@@ -467,7 +567,7 @@ if(strcmp(interpolationType,'broadened'))
     end
 end
 
-nullCol=ind2rgb(0,cmp);
+
 nullArr=(rsRGBarr(:,:,1)==nullCol(:,:,1)&rsRGBarr(:,:,2)==nullCol(:,:,2)&rsRGBarr(:,:,3)==nullCol(:,:,3));
 for i=1:3
      b=rsRGBarr(:,:,i);
@@ -477,6 +577,7 @@ end
  
 nullCol=ind2rgb(0,cmp)*0;
 
+% Masking happens here based on null colors
 maskRect=zeros(bYlen,bXlen);
 maskRect(brainRectY(1):brainRectY(2),brainRectX(1):brainRectX(2))=(rsRGBarr(:,:,1)~=nullCol(:,:,1)|rsRGBarr(:,:,2)~=nullCol(:,:,2)|rsRGBarr(:,:,3)~=nullCol(:,:,3));
 maskRect=maskRect==1;
@@ -526,16 +627,15 @@ axis image;
 
 h=gca;
 
-if(invertAxis)
-    cmp=cmp(size(cmp,1):-1:1,:);
-    colormap(cmp)
-end
-
+% if(invertAxis)
+%     cmp=cmp(size(cmp,1):-1:1,:);
+% %    colormap(cmp)
+% end
+% 
 
 if(~emptyplot)
     c=colorbar();
     colormap(cmp);
-
 
 
     if(invertAxis)
@@ -562,6 +662,12 @@ if(~emptyplot)
         ticks_wanted=log10(minVal):((log10(maxVal)-log10(minVal)))/(l-1):log10(maxVal);
         set(c,'YTick',(ticks_wanted));
         set(c,'YTickLabel',sprintf('%0.5f\n', 10.^ticks_wanted));
+    end
+    
+    if(invertAxis)
+        ticks_wanted=(minVal):(maxVal-minVal)/5:(maxVal);
+        set(c,'YTick',(ticks_wanted));
+        set(c,'YTickLabel',sprintf('%0.2f\n', ticks_wanted(end:-1:1)));
     end
 
 
