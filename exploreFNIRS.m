@@ -1448,11 +1448,9 @@ else
     set(handles.popupmenu_info_group,'Value',1);
 end
 
-
-
 function processCurrentFunction(handles)
+
 global ExFNIRS
-global ProgressHandles
 
 strsRaw=get(handles.listbox_raw_methods,'String');
 selectedStrs=get(handles.listbox_raw_methods,'Value');
@@ -1462,61 +1460,21 @@ strsOxy=get(handles.listbox_oxy_methods,'String');
 selectedStrs=get(handles.listbox_oxy_methods,'Value');
 cur_oxy_method=strsOxy(selectedStrs,:);
 
-
 if(~isfield(ExFNIRS,'processedData'))
     ExFNIRS.processedData=cell(length(strsOxy)*length(strsRaw),3);
     ExFNIRS.numProcessed=0;
 end
 
-if(iscell(cur_raw_method))
-   cur_raw_method=cur_raw_method{1}; 
-end
-if(iscell(cur_oxy_method))
-   cur_oxy_method=cur_oxy_method{1}; 
-end
+exploreFNIRS.processMethods(cur_raw_method,cur_oxy_method);
 
-ProcRawMethods=ExFNIRS.processedData(:,1);
-ProcOxyMethods=ExFNIRS.processedData(:,2);
+[strsOxy,iOxy]=processFNIRS2.Methods.Oxy();
+[strsRaw,iRaw]=processFNIRS2.Methods.Raw();
 
-curRawMatchIdx=strcmp(cur_raw_method,ProcRawMethods);
-curOxyMatchIdx=strcmp(cur_oxy_method,ProcOxyMethods);
+set(handles.listbox_oxy_methods,'String',strsOxy);
+set(handles.listbox_oxy_methods,'Value',find(iOxy));
+set(handles.listbox_raw_methods,'String',strsRaw);
+set(handles.listbox_raw_methods,'Value',find(iRaw));
 
-if(~any(curRawMatchIdx&curOxyMatchIdx))
-    ExFNIRS.processedData{ExFNIRS.numProcessed+1,1}=cur_raw_method;
-    ExFNIRS.processedData{ExFNIRS.numProcessed+1,2}=cur_oxy_method;
-    data=ExFNIRS.data;
-    
-    processFNIRS2('blLength',0);
-    processFNIRS2('Raw_Method',cur_raw_method,'Oxy_Method',cur_oxy_method); 
-    numData=length(data);
-    cur_raw_method_label=cur_raw_method;
-    cur_oxy_method_label=cur_oxy_method;
-    cur_raw_method_label('_')='-';
-    cur_oxy_method_label('_')='-';
-    ProgressHandles.h.hF=waitbar(0,sprintf('ExploreFNIRS\nProcessing Method %s x %s %i of %i',cur_raw_method_label,cur_oxy_method_label,1,numData));
-    hF=ProgressHandles.h.hF;
-    
-    for i=1:numData
-       waitbar(i/numData,hF,sprintf('ExploreFNIRS\nProcessing Method %s x %s %i of %i',cur_raw_method_label,cur_oxy_method_label,i,numData));
-       
-       if(~isempty(data{i})&&length(data{i}.time)>1)
-           data{i}=processFNIRS2(data{i});
-           data{i}=applyfMask(data{i});
-           data{i}=processFNIRS2.Data.Resample(data{i},ExFNIRS.settings.grandavg_resample_size,'centerOnT0',true,'timeOutMode','end','averageAux',false);
-       end
-    end
-    
-    close(hF);
-    
-    ExFNIRS.processedData{ExFNIRS.numProcessed+1,3}=data;
-    ExFNIRS.numProcessed=ExFNIRS.numProcessed+1;
-    ExFNIRS.curProcessedData= data;
-else
-   ExFNIRS.curProcessedData= ExFNIRS.processedData{curRawMatchIdx&curOxyMatchIdx,3};
-end
-
-ExFNIRS.curMethodName=sprintf('%s : %s',cur_raw_method,cur_oxy_method);
-ExFNIRS.curMethodName(ExFNIRS.curMethodName=='_')='-';
 
 updateSelectedTable(handles);
 
@@ -5053,7 +5011,7 @@ numUgroups=length(unique(cellstr(gbyStrs)));
 if(numUgroups==1)
     num2Plot=numBioM;
     plotGroupByBioM=true;
-    cIndex=table2cell(pf2_base.getBioColors());
+    cIndex=table2cell(pf2_base.getBioColors())';
     cIndex=cIndex{selBioM,:};
 else
     num2Plot=numGroups;

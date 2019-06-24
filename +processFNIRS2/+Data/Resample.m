@@ -113,10 +113,17 @@ end
 minfTime=min(fNIR.time);
 maxfTime=max(fNIR.time);
 
+
 if(~isstruct(blfNIR)&&~isempty(blLength)&&blLength>0)
     blfNIR=getFNIRS(fNIR,min(fNIR.time),min(fNIR.time)+blLength); 
 elseif(isstruct(blfNIR))
     blLength=max(blfNIR.time)-min(blfNIR.time); %Baseline length in time
+    if(blLength==0&&length(blfNIR.time)>0&&~isnan(blfNIR.time))
+        blLength=1/blfNIR.fs;
+    else
+       warning('Entire Baseline is invalid');
+       blLength=1*blfNIR.time;
+    end
 elseif(blLength==0)
     blLength=[];
 end
@@ -137,7 +144,7 @@ else
     numCh=size(fNIR.HbR,2); 
 end
 
-if(centerOnT0)
+if(centerOnT0) % foces time blocks to start from t=0
     times=(0:segLength:(maxfTime+segLength))';
     if(min(fNIR.time)<0)
         newMinTime=(minfTime-segLength);

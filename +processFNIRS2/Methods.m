@@ -1,15 +1,37 @@
-function outStr=Methods()
+function [RawMethodsList,OxyMethodsList,IsCurrent]=Methods(onlyCurrent)
 
+if(nargin<1)
+    
+    onlyCurrent=false;
+end
 
-methodListStr=sprintf('Currently Loaded Methods:');
-
-methodListStr=sprintf('%s\n%s',methodListStr,processFNIRS2.Methods.Raw);
-
-methodListStr=sprintf('%s\n%s',methodListStr,processFNIRS2.Methods.Oxy);
 
 if(nargout==0)
-   fprintf(methodListStr); 
+
+    processFNIRS2.Methods.Raw();
+
+    processFNIRS2.Methods.Oxy();
+
+
+
+
+
+
    return;
-else
-   outStr=methodListStr; 
+elseif(nargout>1)
+    
+    [RawMethods,isCur]=processFNIRS2.Methods.Raw();
+
+    [OxyMethods,isCurB]=processFNIRS2.Methods.Oxy();
+
+   RawMethodsList=RawMethods;
+   OxyMethodsList=OxyMethods;
+   IsCurrent{1}=isCur;
+   IsCurrent{2}=isCurB;
+   
+   if(onlyCurrent)
+       RawMethodsList=RawMethodsList(isCur);
+       OxyMethodsList=OxyMethodsList(isCur);
+   end
 end
+

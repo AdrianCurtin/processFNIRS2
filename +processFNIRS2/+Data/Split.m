@@ -332,6 +332,10 @@ if(isfield(fNIR,'info'))
     outfNIR.info=fNIR.info;
 end
 
+if(isfield(fNIR,'fs'))
+    outfNIR.fs=fNIR.fs;
+end
+
 
 if(isfield(fNIR,'fchMask'))
     outfNIR.fchMask=fNIR.fchMask;

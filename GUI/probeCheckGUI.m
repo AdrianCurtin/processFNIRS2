@@ -328,6 +328,12 @@ end
         hold on;
     end
     
+    if(~withTitle&&ch==pf2ChannelCheck.curChannel)
+        th=text(mean(xl)/2+15,mean(yl),'O','FontSize',60,'color',[ 0.2,0.2,0.2]);  %Current Channel
+        set(th,'ButtonDownFcn',temp.ButtonDownFcn);
+        set(th,'Tag',temp.Tag);
+        hold on;
+    end
     
     
     if(plotMarkers&&~isempty(pf2ChannelCheck.markers))
