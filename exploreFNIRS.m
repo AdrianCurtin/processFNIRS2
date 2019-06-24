@@ -139,6 +139,8 @@ if(~isfield(ExFNIRS,'defaultRootPath'))
     cd(curdir);
 end
 
+set(handles.text_versInfo,'Text',exploreFNIRS.versInfo);
+
 warning('OFF','MATLAB:table:RowsAddedExistingVars')
 p=inputParser;
 
