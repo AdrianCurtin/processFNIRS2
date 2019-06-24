@@ -2490,7 +2490,7 @@ else
     exportMAT=false;
 end
 
-logFileName=sprintf('%_long.log',file(1:end-4));
+logFileName=sprintf('%s_long.log',file(1:end-4));
 
 
 exportTable=mergeGbyTablesLong(ExFNIRS.gby,bioMList,[],times,true,true);
