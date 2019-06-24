@@ -14,6 +14,6 @@ if(isnan((explained(componentNumber))))
 end
 
 fprintf('Variance in component %i explains %.1f%% variability\n',componentNumber,(explained(componentNumber)));
-outSig=coef(:,componentNumber)*sum(abs(score(:,componentNumber)));
+outSig=coef(:,componentNumber)*mean(abs(score(:,componentNumber)));
 
 end

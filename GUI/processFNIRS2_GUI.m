@@ -875,7 +875,7 @@ else
                   passedArgVals{time_ind}=PF2.data.time(validRows);
                elseif strcmp(args{a},'fchMask')==1
                   fmask_ind=a;
-                  passedArgVals{fmask_ind}=PF2.data.rawMask;
+                  passedArgVals{fmask_ind}=curfMask;
                elseif strcmp(args{a},'fChannelNumbers')==1
                   fchInfo_ind=a;
                   passedArgVals{fchInfo_ind}=data.channels(validChannels);
@@ -994,6 +994,17 @@ else
                 warning('Unable to identify NIRS input argument\n');
             end
         end
+    end
+end
+
+
+if(pf2_base.isnestedfield(outData,'ROI.info')&&~isempty(outData.ROI.info)&&~isfield(outData.ROI,'HbO'))
+    fprintf(2,'No ROI information was built\nDefaulting to nanmean of valid channels');
+    outData=pf2_build_nanmean_ROI(outData);
+    if(~isempty(outData.ROI))
+        validChannels_roi=true(1,size(outData.ROI.(bmrk),2));
+    else
+        clear outData.ROI; 
     end
 end
 
@@ -2569,12 +2580,18 @@ numProbes=length(setF.device.Probe);
 
 if(pf2_base.isnestedfield(PF2,'data.ROI.info'))
    for probeNum=1:numProbes
+       if(iscell(PF2.data.ROI))
+           temp=PF2.data.ROI;
+           PF2.data.ROI=[];
+           PF2.data.ROI.info=temp;
+       end
+       
        if(iscell(PF2.data.ROI.info)) % If its a cell, make it a better format
            rownames=cell(1,length(PF2.data.ROI.info));
            for r=1:length(PF2.data.ROI.info)
                rownames{r}=sprintf('ROI%i',r);
            end
-           PF2.data.ROI.info=table(PF2.data.ROI.info,'VariableNames',{'Optodes'},'RowNames',rownames);
+           PF2.data.ROI.info=table(PF2.data.ROI.info(:),'VariableNames',{'Optodes'},'RowNames',rownames);
        end
        
        if(istable(PF2.data.ROI.info))

@@ -7,7 +7,8 @@ function thresholdedData= pf2_thresholdValues(data,max,min)
        thresholdedData(validMax)=data(validMax);
     else
         validMin=data>min;
-        thresholdedData(validMin.*validMax==1)=data(validMin.*validMax==1);
+        thresholdedData(validMax)=data(validMax);
+        thresholdedData(~validMin)=nan;
     end
     
 end
