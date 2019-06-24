@@ -329,9 +329,14 @@ end
     end
     
     if(~withTitle&&ch==pf2ChannelCheck.curChannel)
-        th=text(mean(xl)/2+15,mean(yl),'O','FontSize',60,'color',[ 0.2,0.2,0.2]);  %Current Channel
-        set(th,'ButtonDownFcn',temp.ButtonDownFcn);
-        set(th,'Tag',temp.Tag);
+        if(isfield(pf2ChannelCheck,'curChannelMarker'))
+            delete(pf2ChannelCheck.curChannelMarker);
+        end
+        
+        
+        pf2ChannelCheck.curChannelMarker=text(mean(xl)/2+15,mean(yl),'O','FontSize',60,'color',[ 0.2,0.2,0.2]);  %Current Channel
+        set(pf2ChannelCheck.curChannelMarker,'ButtonDownFcn',temp.ButtonDownFcn);
+        set(pf2ChannelCheck.curChannelMarker,'Tag',temp.Tag);
         hold on;
     end
     

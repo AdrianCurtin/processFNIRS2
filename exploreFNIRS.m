@@ -139,7 +139,7 @@ if(~isfield(ExFNIRS,'defaultRootPath'))
     cd(curdir);
 end
 
-set(handles.text_versInfo,'Text',exploreFNIRS.versInfo);
+set(handles.text_versInfo,'String',exploreFNIRS.versInfo());
 
 warning('OFF','MATLAB:table:RowsAddedExistingVars')
 p=inputParser;
@@ -625,6 +625,7 @@ global ExFNIRS
 if(UpdateNeeded)
     ExFNIRS.UpdateNeeded=true;
     set(handles.pushbutton_process_selection,'BackgroundColor','Red');
+    updateSelectedTable(handles,false);
 else
     ExFNIRS.UpdateNeeded=false;
     set(handles.pushbutton_process_selection,'BackgroundColor','Green');
@@ -790,7 +791,7 @@ function pushbutton_group_select_none_Callback(hObject, eventdata, handles)
 % hObject    handle to pushbutton_group_select_none (see GCBO)
 % eventdata  reserved - to be defined in a future version of MATLAB
 % handles    structure with handles and user data (see GUIDATA)
-
+global ExFNIRS
 if(ExFNIRS.settings.use_group)
     set(handles.listbox_group,'Value',[]);
 else
@@ -1176,7 +1177,14 @@ if ispc && isequal(get(hObject,'BackgroundColor'), get(0,'defaultUicontrolBackgr
 end
 
 
-function updateSelectedTable(handles)
+
+function updateSelectedTable(handles,processDataNow)
+
+if(nargin<2)
+    processDataNow=true;
+else
+    processDataNow=false;
+end
 
 global ExFNIRS
 
@@ -1315,6 +1323,11 @@ if(ExFNIRS.settings.plotby.InfoGroupBy)
 end
 
 if(~any(sellFullIdx))
+    statusTextStr='No data matching selection';
+    ExFNIRS.statusGroupByStr='Ungrouped';
+    set(handles.text_status_text,'String',statusTextStr);
+    set(handles.text_status,'String','0 Segments in\n0 Group(s)');
+    set(handles.popupmenu_info_group,'String',{''});
     return
 end
 
@@ -1380,9 +1393,23 @@ if(isempty(ExFNIRS.groupByVars))
     ExFNIRS.statusGroupByStr='Ungrouped';
 end
 
+
 set(handles.text_status_text,'String',statusTextStr);
 
 updateInfoGroupByVars(handles);
+
+set(handles.text_status,'String',sprintf('%i Observations in\n%i Group(s)',size(ExFNIRS.selectedTable,1),max(gbyIdx)));
+
+
+
+if(processDataNow)
+    processSelectedTable(handles,gbyIdx);
+end
+
+
+function processSelectedTable(handles,gbyIdx)
+global ExFNIRS
+closeProgressHandles();
 
 
 closeProgressHandles();
@@ -1428,10 +1455,10 @@ for i=1:max(gbyIdx)
 end
 
 set(handles.text_status,'String',sprintf('%i Segments in\n%i Group(s)',numSeg,max(gbyIdx)));
-
 close(hF);
 
 flagForUpdate(false,handles);
+
 
 function updateInfoGroupByVars(handles)
 global ExFNIRS
@@ -1643,8 +1670,11 @@ end
 if(numUgroups==1)
     num2Plot=numBioM;
     plotGroupByBioM=true;
-    cIndex=table2cell(pf2_base.getBioColors());
-    cIndex=cIndex(selBioM,:);
+    bioColorTable=table2cell(pf2_base.getBioColors());
+    cIndex=[];
+    for i=1:length(bioColorTable)
+        cIndex(i,:)=bioColorTable{i};
+    end
 else
     num2Plot=numUgroups;
     plotGroupByBioM=false;
@@ -1889,11 +1919,11 @@ for chIdx=1:numOpt
                       hGrand=plot(curFigH.subH{curSy,curSx},curGrand.time,data2plot.(plotFeature)(:,ch),'LineWidth',3,'color',cIndex(curUgroupIdx,:));
                   end
                   
-                  if(numUgroups>1||numBioM==1)
+                  if(numUgroups>1||numBioM==1)&&~isempty(gbyStrs{g})
                        gStrs{curUgroupIdx}=gbyStrs{g}; 
                        set(hGrand,'Tag',sprintf('%s: %s',plotFeature,gStrs{curUgroupIdx}));
                        curFigH.legendHandles{curSy,curSx}.hG{curUgroupIdx}=hGrand;
-                  elseif(numBioM>1&&~multiPlot)
+                  elseif(~multiPlot)
                        gStrs{b}=selectedBioM{b};
                        set(hGrand,'Tag',sprintf('%s: %s',plotFeature,gStrs{b}));
                        curFigH.legendHandles{curSy,curSx}.hG{b}=hGrand;
@@ -1922,7 +1952,7 @@ for chIdx=1:numOpt
                 end
                      
                 if(plotGroupByBioM)
-                    errColor=cIndex(b,:);
+                    errColor=cIndex{b,:};
                     errColor=errColor+(1-errColor)*0.55;
                 else
                     errColor=cIndex(curUgroupIdx,:);
@@ -3330,7 +3360,7 @@ if(numUgroups==1)
     num2Plot=numBioM;
     plotGroupByBioM=true;
     cIndex=table2cell(pf2_base.getBioColors());
-    cIndex=cIndex{selBioM};
+    cIndex=cIndex(selBioM);
 else
     num2Plot=numGroups;
     plotGroupByBioM=false;
@@ -6065,9 +6095,9 @@ function pushbutton_info_groupby_select_all_Callback(hObject, eventdata, handles
 % eventdata  reserved - to be defined in a future version of MATLAB
 % handles    structure with handles and user data (see GUIDATA)
 
-strs=get(handles.listbox_session,'String');
+strs=get(handles.listbox_info_groupby,'String');
 if(iscell(strs)||ismatrix(strs))
-    set(handles.listbox_session,'Value',[1:size(strs,1)]);
+    set(handles.listbox_info_groupby,'Value',[1:size(strs,1)]);
 end
 
 global ExFNIRS
@@ -6085,10 +6115,19 @@ function pushbutton_info_groupby_select_none_Callback(hObject, eventdata, handle
 % eventdata  reserved - to be defined in a future version of MATLAB
 % handles    structure with handles and user data (see GUIDATA)
 
-strs=get(handles.listbox_session,'String');
+global ExFNIRS
+
+strs=get(handles.listbox_info_groupby,'String');
 if(iscell(strs)||ismatrix(strs))
-    set(handles.listbox_session,'Value',[]);
+    set(handles.listbox_info_groupby,'Value',[]);
 end
+
+if(ExFNIRS.settings.updateOnChange)
+    updateSelectedTable(handles);
+else
+    flagForUpdate(true,handles);
+end
+
 
 
 
