@@ -516,7 +516,7 @@ if(isfield(pf2ChannelCheck,'fmask')&&~isempty(pf2ChannelCheck.fmask)&&~isempty(p
     
 end
 
-if(isnestedfield(hObject,'Parent.Parent'))
+if(pf2_base.isnestedfield(hObject,'Parent.Parent'))
     uiresume(hObject.Parent.Parent);
 end
 

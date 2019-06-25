@@ -1391,7 +1391,7 @@ end
 function []=removeFunction(idx)
 global PF2
 
-if(~isempty(idx)&&~isempty(PF2.currentMethod.F)&&idx<length(PF2.currentMethod.F))
+if(~isempty(idx)&&~isempty(PF2.currentMethod.F)&&idx<=length(PF2.currentMethod.F))
     PF2.currentMethod.F(idx)=[];
 end
 saveCurrentMethod();

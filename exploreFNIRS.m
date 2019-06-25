@@ -1952,7 +1952,7 @@ for chIdx=1:numOpt
                 end
                      
                 if(plotGroupByBioM)
-                    errColor=cIndex{b,:};
+                    errColor=cIndex(b,:);
                     errColor=errColor+(1-errColor)*0.55;
                 else
                     errColor=cIndex(curUgroupIdx,:);
@@ -3804,7 +3804,7 @@ for sH=1:length(subplotHandles)
         
         
         
-        lmeString=sprintf('%s%i_%s~-1+%s+(1|SubjectID)',varNameStart,subplotGby{sH}.curCh,subplotGby{sH}.curBioM{1},curLMEGbyString);
+        lmeString=sprintf('%s%i_%s~%s+(1|SubjectID)',varNameStart,subplotGby{sH}.curCh,subplotGby{sH}.curBioM{1},curLMEGbyString);
 
         try
             curChartLME{sH}=fitlme(mergedTables{sH},lmeString);
