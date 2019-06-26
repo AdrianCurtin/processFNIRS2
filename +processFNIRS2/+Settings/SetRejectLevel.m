@@ -8,7 +8,12 @@ function SetRejectLevel(rejectionLevel)
 
 if(nargin<1)
     global PF2
-    fprintf('Current Rejection Level is %.2\n',PF2.RejectLevel);
+    
+    if(~isfield(PF2,'RejectLevel'))
+       pf2_base.pf2_initialize(); 
+    end
+    
+    fprintf('Current Rejection Level is %.2f\n',PF2.RejectLevel);
     return;
 end
 
@@ -17,3 +22,5 @@ if(~isnumeric(rejectionLevel)||rejectionLevel<0||rejectionLevel>=1)
 end
 
 processFNIRS2('RejectLevel',rejectionLevel);
+
+fprintf('Rejection Level set to %.2f\n',rejectionLevel);

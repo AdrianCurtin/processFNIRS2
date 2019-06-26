@@ -162,6 +162,15 @@ if(~isfield(ExFNIRS,'settings')||~isfield(ExFNIRS.settings,'baseline_start'))
     ExFNIRS.settings.LME_use_intercept=get(handles.checkbox_LME_use_intercept,'Value');
 end
 
+
+if(ExFNIRS.settings.processRaw)
+    set(handles.listbox_raw_methods,'Enable','on');
+else
+    set(handles.listbox_raw_methods,'Enable','off');
+    set(handles.listbox_raw_methods,'Value',1);
+end
+
+
 addOptional(p,'data',[],@iscell); % Your data, as a cell of FNIRS structs (ideally with populated info fields and the task of interest starting at t=0)
 addOptional(p,'timeShiftTo0',ExFNIRS.settings.timeShiftTo0,@islogical); %Specifies whether to automatically shift the start of the FNIRS period to 0, 
 		%best practice though is to turn this off and do it yourself before hand so that task starts at 0s and the baseline is before/after/during. See setT0fnirs()
@@ -273,32 +282,32 @@ for i=1:length(ExFNIRS.data)
    else
        ExFNIRS.data{i}.info.missingFNIRS=0;
        
-       if(~isfield(ExFNIRS.data{i}.info,'Group')||isempty(ExFNIRS.data{i}.Group))
+       if(~isfield(ExFNIRS.data{i}.info,'Group')||isempty(ExFNIRS.data{i}.info.Group))
            ExFNIRS.data{i}.info.Group='Missing';
        end
        
-       if(~isfield(ExFNIRS.data{i}.info,'SubjectID')||isempty(ExFNIRS.data{i}.SubjectID))
+       if(~isfield(ExFNIRS.data{i}.info,'SubjectID')||isempty(ExFNIRS.data{i}.info.SubjectID))
            ExFNIRS.data{i}.info.SubjectID=sprintf('Missing%i',subIdAuto);
            subIdAuto=subIdAutp+1;
        end
        
-       if(~isfield(ExFNIRS.data{i}.info,'Subgroup')||isempty(ExFNIRS.data{i}.Subgroup))
+       if(~isfield(ExFNIRS.data{i}.info,'Subgroup')||isempty(ExFNIRS.data{i}.info.Subgroup))
            ExFNIRS.data{i}.info.Subgroup='Missing';
        end
        
-       if(~isfield(ExFNIRS.data{i}.info,'Session')||isempty(ExFNIRS.data{i}.Session))
+       if(~isfield(ExFNIRS.data{i}.info,'Session')||isempty(ExFNIRS.data{i}.info.Session))
            ExFNIRS.data{i}.info.Session='Missing';
        end
        
-       if(~isfield(ExFNIRS.data{i}.info,'Trial')||isempty(ExFNIRS.data{i}.Trial))
+       if(~isfield(ExFNIRS.data{i}.info,'Trial')||isempty(ExFNIRS.data{i}.info.Trial))
            ExFNIRS.data{i}.info.Trial='Missing';
        end
        
-       if(~isfield(ExFNIRS.data{i}.info,'Block')||isempty(ExFNIRS.data{i}.Block))
+       if(~isfield(ExFNIRS.data{i}.info,'Block')||isempty(ExFNIRS.data{i}.info.Block))
            ExFNIRS.data{i}.info.Block='Missing';
        end
        
-       if(~isfield(ExFNIRS.data{i}.info,'Condition')||isempty(ExFNIRS.data{i}.Condition))
+       if(~isfield(ExFNIRS.data{i}.info,'Condition')||isempty(ExFNIRS.data{i}.info.Condition))
            ExFNIRS.data{i}.info.Condition='Missing';
        end
    end
@@ -6570,4 +6579,4 @@ else
     set(handles.listbox_raw_methods,'Value',1);
 end
 
-
+processCurrentFunction(handles);

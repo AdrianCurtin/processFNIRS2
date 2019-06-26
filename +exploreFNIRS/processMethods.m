@@ -28,9 +28,7 @@ if(iscell(oxyMethodStr))
    oxyMethodStr=oxyMethodStr{1}; 
 end
 
-if(~processOxyOnly)
-    ProcRawMethods=ExFNIRS.processedData(:,1);
-end
+ProcRawMethods=ExFNIRS.processedData(:,1);
 ProcOxyMethods=ExFNIRS.processedData(:,2);
 
 curRawMatchIdx=strcmp(rawMethodStr,ProcRawMethods);
