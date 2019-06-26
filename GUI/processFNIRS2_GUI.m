@@ -528,6 +528,8 @@ global PF2
 global outputData
 global setF
 
+clearAutoRejectedChannels();
+
 if(outputData.ProcessRaw)
     if(PF2.view.processWindowOnly)
         croppedData=PF2.data.stage{1};
@@ -564,6 +566,7 @@ if(outputData.ProcessOxy)
 else
     PF2.data.stage{5}=PF2.data.stage{4};
 end
+
 
 
 function [outDataOD,outDataRaw]=processStageRaw2OD(data)
@@ -1739,6 +1742,9 @@ updatePlots(handles)
 
 function updatePlots(handles)
 
+
+UpdateOptodeList(handles);
+
 global PF2
 global setF
 
@@ -2616,9 +2622,48 @@ if(pf2_base.isnestedfield(PF2,'data.ROI.info'))
        end
    end
 end
+
+function clearAutoRejectedChannels()
+
+global PF2
+global setF
+
+if(isfield(PF2,'PF2GUI2'))
+numProbes=length(setF.device.Probe);
+for probeNum=1:numProbes
+    probeOptIdx=(PF2.GUIPF2.optodeTable.ProbeNum==probeNum&~PF2.GUIPF2.optodeTable.IsROI);
     
+    if(pf2_base.isnestedfield(PF2,'data.fchMask'))
+        PF2.GUIPF2.optodeTable.AutoRej(probeOptIdx)=~(PF2.data.fchMask>PF2.RejectLevel);
+    else
+        PF2.GUIPF2.optodeTable.AutoRej(probeOptIdx)=false;
+    end
     
 
+    probeRow=find(probeOptIdx);
+    numOpt=length(probeRow);
+    
+    if(numProbes>1)
+       opt_start_string=sprintf('P%i-',probeNum); 
+    else
+       opt_start_string='';
+    end
+    
+    for opt=1:numOpt
+        idx=probeRow(opt);
+        if(PF2.GUIPF2.optodeTable.ManualRej(idx))
+            PF2.GUIPF2.optodeTable.Label{idx}=sprintf('%s%i(R)',opt_start_string,PF2.GUIPF2.optodeTable.Optode(idx));
+        elseif(PF2.GUIPF2.optodeTable.AutoRej(idx))
+            PF2.GUIPF2.optodeTable.Label{idx}=sprintf('%s%i(AR)',opt_start_string,PF2.GUIPF2.optodeTable.Optode(idx));
+        else
+            PF2.GUIPF2.optodeTable.Label{idx}=sprintf('%s%i',opt_start_string,PF2.GUIPF2.optodeTable.Optode(idx)); 
+        end
+    end
+end
+    
+    
+updateOptodeTablesROI();
+end
 
 
 function UpdateOptodeList(handles)

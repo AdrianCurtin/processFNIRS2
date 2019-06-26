@@ -250,7 +250,7 @@ for i=length(ExFNIRS.data):-1:1
     end
     
     if( ExFNIRS.settings.timeShiftTo0)
-        ExFNIRS.data{i}=setT0fnirs(ExFNIRS.data{i},min(ExFNIRS.data{i}.time));
+        ExFNIRS.data{i}=processFNIRS2.Data.SetT0(ExFNIRS.data{i},min(ExFNIRS.data{i}.time));
     end
     
     if(isfield(ExFNIRS.data{i},'info'))
@@ -321,7 +321,10 @@ segInfoVars={'SubjectID','Group','Subgroup','Session','Trial','Block','Condition
 
 
 for v =1:length(segInfoVars)
-   if(isnumeric(ExFNIRS.dataTable.(segInfoVars{v})(1)))
+   if(~ismember(segInfoVars{v},ExFNIRS.dataTable.Properties.VariableNames))
+        ExFNIRS.dataTable.(segInfoVars{v})=strings(size(ExFNIRS.dataTable,1),1);
+        ExFNIRS.dataTable.(segInfoVars{v})(:,1)='Missing';
+   elseif(isnumeric(ExFNIRS.dataTable.(segInfoVars{v})(1)))
        nIdx=isnan(ExFNIRS.dataTable.(segInfoVars{v}));
        if(any(nIdx))
           warning('Missing value to deal with'); 
@@ -441,7 +444,7 @@ global ProgressHandles
 if(isempty(FNIRS_array))
     return;
 else
-    closeProgressHandles();
+    pf2_base.closeProgressHandles();
     
     numF=length(FNIRS_array);
     ProgressHandles.h.hF=waitbar(0,sprintf('ExploreFNIRS\nBuilding Table: Row %i of %i',1,numF));
@@ -469,8 +472,11 @@ else
                
               if(ismember(curFieldName,outTable.Properties.VariableNames)&&~isempty(curField))
                   outTable.(curFieldName)(i,1)=curField;
-              else
-                  if(ischar(curField))
+              elseif(~isempty(curField))
+                  if(ischar(curField)) % adds columns
+                      outTable.(curFieldName)=strings(size(outTable,1),1);
+                      outTable.(curFieldName)(i,1)=curField;
+                  elseif(isstring(curField))
                       outTable.(curFieldName)=strings(size(outTable,1),1);
                       outTable.(curFieldName)(i,1)=curField;
                   elseif(isnumeric(curField))
@@ -1188,7 +1194,7 @@ end
 
 global ExFNIRS
 
-closeProgressHandles();
+pf2_base.closeProgressHandles();
 
 ExFNIRS.selectedTable=table();
 ExFNIRS.selectedFNIR=cell(0);
@@ -1409,10 +1415,9 @@ end
 
 function processSelectedTable(handles,gbyIdx)
 global ExFNIRS
-closeProgressHandles();
+pf2_base.closeProgressHandles();
 
 
-closeProgressHandles();
 global ProgressHandles
 ProgressHandles.h.hF=waitbar(0,sprintf('ExploreFNIRS\nProcessing Group %i of %i',1,max(gbyIdx)));
 hF=ProgressHandles.h.hF;
@@ -1865,22 +1870,29 @@ for chIdx=1:numOpt
                        case 'ROI'
                            if(~pf2_base.isnestedfield(curGrand,'ROI.HbO.data'))
                               error('ROI data must be calculated using a build ROI step');
-                          end
+                           end
+                          if(~isempty(curFNIRS{i})&&isfield(curFNIRS{i},'ROI'))
                            data2plot=curFNIRS{i}.ROI;
+                          else
+                             data2plot=[]; 
+                          end
+                          
                        case 'Aux'
                            
                    end
                    
                   if(plotGroupByBioM)
-                      h=plot(curFigH.subH{curSy,curSx},curFNIRS{i}.time,data2plot.(bioM)(:,ch),'color',cIndex(b,:));
-                      set(h,'Tag',getFormattedTrialString(curFNIRS{i}));
-                      if(ExFNIRS.settings.plot_grandaverage||~isempty(curFigH.legendHandles{curSy,curSx}.h{b}))
-                        set(h.Annotation.LegendInformation,'IconDisplayStyle','off'); 
+                      if(~isempty(data2plot))
+                          h=plot(curFigH.subH{curSy,curSx},curFNIRS{i}.time,data2plot.(bioM)(:,ch),'color',cIndex(b,:));
+                          set(h,'Tag',getFormattedTrialString(curFNIRS{i}));
+                          if(ExFNIRS.settings.plot_grandaverage||~isempty(curFigH.legendHandles{curSy,curSx}.h{b}))
+                            set(h.Annotation.LegendInformation,'IconDisplayStyle','off'); 
+                          end
+                          gStrs{b}=selectedBioM{b};
+                          curFigH.legendHandles{curSy,curSx}.h{b}=h;
                       end
-                      gStrs{b}=selectedBioM{b};
-                      curFigH.legendHandles{curSy,curSx}.h{b}=h;
                   else
-                      if(~isempty(data2plot.(bioM)))
+                      if(~isempty(data2plot.(bioM))&&isfield(data2plot,bioM))
                       h=plot(curFigH.subH{curSy,curSx},curFNIRS{i}.time,data2plot.(bioM)(:,ch),'color',cIndex(curUgroupIdx,:));
                       set(h,'Tag',getFormattedTrialString(curFNIRS{i}));
                       if(ExFNIRS.settings.plot_grandaverage||~isempty(curFigH.legendHandles{curSy,curSx}.h{curUgroupIdx}))
@@ -2071,13 +2083,11 @@ for chIdx=1:numOpt
                 otherwise 
             end
             ylabel(curFigH.subH{curSy,curSx},ylbl);
-
-
-        end
-        
+            
         if(ExFNIRS.settings.ylim_fixed)
+            xlim(curFigH.subH{curSy,curSx},[ExFNIRS.settings.plot_start-ExFNIRS.settings.block_start,ExFNIRS.settings.plot_end-ExFNIRS.settings.block_start]);
             ylim(curFigH.subH{curSy,curSx},'auto');
-            cylim=ylim;
+            cylim=ylim(curFigH.subH{curSy,curSx});
             ExFNIRS.settings.ylim_fixed_min=min(ExFNIRS.settings.ylim_fixed_min,cylim(1));
             ExFNIRS.settings.ylim_fixed_max=max(ExFNIRS.settings.ylim_fixed_max,cylim(2));
         elseif(ExFNIRS.settings.ylim_manual&&~plotCount)
@@ -2091,6 +2101,11 @@ for chIdx=1:numOpt
             ExFNIRS.settings.ylim_fixed_min=0;
             ylim(curFigH.subH{curSy,curSx},[0,curYlim(2)]);
         end
+
+
+        end
+        
+
     end
 end
 
@@ -2107,7 +2122,7 @@ for i=1:size(sH,1)
                 xlim(sH{i,b}.subH{y,x},[ExFNIRS.settings.plot_start-ExFNIRS.settings.block_start,ExFNIRS.settings.plot_end-ExFNIRS.settings.block_start]);
                 
                 if(ExFNIRS.settings.ylim_fixed)
-                ylim(sH{i,b}.subH{y,x},[ExFNIRS.settings.ylim_fixed_min,ExFNIRS.settings.ylim_fixed_max]);
+                    ylim(sH{i,b}.subH{y,x},[ExFNIRS.settings.ylim_fixed_min,ExFNIRS.settings.ylim_fixed_max]);
                 end
 
                 if(ExFNIRS.settings.plot_legend_mode==3||(ExFNIRS.settings.plot_legend_mode==2&&(x==numSubX&&y==numSubY)))
@@ -2654,8 +2669,8 @@ for g=1:length(gbyTables)
         numROI=size(curBarGA.ROI.HbO.data,2);
         ROIs=1:numROI;
     elseif(exportFNIR&&pf2_base.isnestedfield(curBarGA,'ROI.HbO'))
-       numROI=length(channels); 
-       ROIs=channels;
+       numROI=size(curBarGA.ROI.HbO.data,2);
+       ROIs=1:numROI;
     else
        numROI=0; 
     end
@@ -3354,13 +3369,16 @@ for g=1:numGroups
    end
 end
 
-numUgroups=length(unique(cellstr(gbyStrs)));
+[numUgroups]=length(unique(cellstr(gbyStrs)));
 
 if(numUgroups==1)
     num2Plot=numBioM;
     plotGroupByBioM=true;
-    cIndex=table2cell(pf2_base.getBioColors());
-    cIndex=cIndex(selBioM);
+    cCell=table2cell(pf2_base.getBioColors());
+    for i=1:length(cCell)
+        cIndex(i,:)=cCell{i};
+    end
+    cIndex=cIndex(selBioM,:);
 else
     num2Plot=numGroups;
     plotGroupByBioM=false;
@@ -3651,7 +3669,7 @@ for chIdx=1:numOpt
         end
         
         if(ExFNIRS.settings.ylim_fixed)
-            ylim([min(ylimLower-0.1*yrange,0),max(ylimUpper+0.1*yrange,0)]);
+            ylim([min(ylimLower-0.05*yrange,0),max(ylimUpper+0.05*yrange,0)]);
             cylim=ylim;
             ExFNIRS.settings.ylim_fixed_min=min(cylim(1),ExFNIRS.settings.ylim_fixed_min);
             ExFNIRS.settings.ylim_fixed_max=max(cylim(2),ExFNIRS.settings.ylim_fixed_max);
@@ -3802,14 +3820,26 @@ for sH=1:length(subplotHandles)
             
         end
         
-        
-        
-        lmeString=sprintf('%s%i_%s~%s+(1|SubjectID)',varNameStart,subplotGby{sH}.curCh,subplotGby{sH}.curBioM{1},curLMEGbyString);
+        ExFNIRS.settings.LME_use_intercept=true;
+        if(ExFNIRS.settings.LME_use_intercept)
+            lmeString=sprintf('%s%i_%s~%s+(1|SubjectID)',varNameStart,subplotGby{sH}.curCh,subplotGby{sH}.curBioM{1},curLMEGbyString);
+        else
+            lmeString=sprintf('%s%i_%s~-1+%s+(1|SubjectID)',varNameStart,subplotGby{sH}.curCh,subplotGby{sH}.curBioM{1},curLMEGbyString);
+            
+        end
 
         try
             curChartLME{sH}=fitlme(mergedTables{sH},lmeString);
+            
+            switch (ExFNIRS.settings.ChannelMode)
+                case 'fNIR'
+                         chName=sprintf('Opt%i',subplotGby{sH}.curCh);
+                case 'ROI'     
+                         chName=sprintf('ROI%i_%s',subplotGby{sH}.curCh,optStrs{subplotGby{sH}.curCh});
+                case 'Aux'
+            end
 
-            chName=sprintf('Opt%i',subplotGby{sH}.curCh);
+           
             fprintf('Chart %i LME model: %s',sH,chName);
             if(~plotGroupByBioM)
                 fprintf(' [%s]',subplotGby{sH}.curBioM{1});
@@ -3880,8 +3910,15 @@ if(showTopo)
         
          for z=1:length(chNames)
             temp=strsplit(chNames{z},'_');
-            chArr(z)=sscanf(temp{1},'Opt%i');
-            bioMarr(z)=temp(2);
+             switch (ExFNIRS.settings.ChannelMode)
+                case 'fNIR'
+                         chArr(z)=sscanf(temp{1},'Opt%i');
+                case 'ROI'     
+                         chArr(z)=sscanf(temp{1},'ROI%i');
+                case 'Aux'
+            end
+            
+            bioMarr(z)=temp(end);
          end
          bioMLabel=cell(0,0);
         
@@ -4568,7 +4605,7 @@ function pushbutton_infoData_barchart_Callback(hObject, eventdata, handles)
 global ExFNIRS
 
 if(ExFNIRS.UpdateNeeded)
-   UpdateSelectedTable(handles); 
+   updateSelectedTable(handles); 
 end
 
 if(~isfield(ExFNIRS,'gby'))
@@ -4613,6 +4650,7 @@ num2Plot=numGroups;
 gbyStrs=cell(numGroups,1);
 curInfoGby=cell(0);
 subplotGby=[];
+gbyIdx=nan(numGroups,1);
 
 for g=1:numGroups
     gbyStrs{g}='';
@@ -4629,7 +4667,8 @@ for g=1:numGroups
    end
 end
 
-numUgroups=length(unique(cellstr(gbyStrs)));
+[uGbyStrs,~,uGroupIdx]=unique(cellstr(gbyStrs));
+numUgroups=length(uGbyStrs);
 
 
 if(ExFNIRS.settings.use_gui_color)
@@ -4675,9 +4714,8 @@ for g=1:numGroups
     subplotGby.gby(g)=ExFNIRS.gby(g);
     
     if(useCurInfoGroup)
-      cBarSec=uCurIdx(g); 
-      barGroup(uCurIdx(g))=barGroup(uCurIdx(g))+1;
-      curBarGroup=barGroup(uCurIdx(g));
+        cBarSec=uCurIdx(g); % which section to put the bar in 
+        curBarGroup=uGroupIdx(g);
     else
        cBarSec=1;
        curBarGroup=g;
@@ -4695,19 +4733,21 @@ for g=1:numGroups
     
     %switch modes here
     if(strcmp(plotFeature,'Count'))
-        curHAvg=length(hierarchicalAverage(curData,curTable(:,dataH),@nanmean));
+        curHAvg=length(pf2_base.hierarchicalAverage(curData,curTable(:,dataH),@nanmean));
     elseif(strcmp(plotFeature,'Mean'))
-        curHAvg=nanmean(hierarchicalAverage(curData,curTable(:,dataH),@nanmean));
+        curHAvg=nanmean(pf2_base.hierarchicalAverage(curData,curTable(:,dataH),@nanmean));
     elseif(strcmp(plotFeature,'Median'))
-        curHAvg=nanmedian(hierarchicalAverage(curData,curTable(:,dataH),@nanmedian));
+        curHAvg=nanmedian(pf2_base.hierarchicalAverage(curData,curTable(:,dataH),@nanmedian));
     else
         error('Unknown parameter');
         %curHAvg=nanmedian(hierarchicalAverage(curData,curTable(:,dataH),@nanmedian));
     end
     
+    
+
     if(ExFNIRS.settings.plot_bar_ga)
           barChartData(cBarSec,curBarGroup,1)=curHAvg;
-          gAStrs{curBarGroup}=sprintf('%s',gbyStrs{g}); 
+          gAStrs{curBarGroup}=sprintf('%s',uGbyStrs{curBarGroup}); 
     end
 
     if(ExFNIRS.settings.plot_bar_err)
@@ -4721,14 +4761,14 @@ for g=1:numGroups
               curHerr=nanmax(hierarchicalAverage(curData,curTable(:,dataH),@nanmax));
                   
               barChartData(cBarSec,curBarGroup,2)=curHerr;
-              curHerr=nanmin(hierarchicalAverage(curData,curTable(:,dataH),@nanmin));
+              curHerr=nanmin(pf2_base.hierarchicalAverage(curData,curTable(:,dataH),@nanmin));
               barChartData(cBarSec,curBarGroup,3)=curHerr;
           elseif(strcmp(errorFeature,'SD'))
-              curHerr=nanstd(hierarchicalAverage(curData,curTable(:,dataH),@nanmean));
+              curHerr=nanstd(pf2_base.hierarchicalAverage(curData,curTable(:,dataH),@nanmean));
               barChartData(cBarSec,curBarGroup,2)=curHerr*errMulitply;
           elseif(strcmp(errorFeature,'SEM'))
-              curHerr=nanstd(hierarchicalAverage(curData,curTable(:,dataH),@nanmean));
-              curN=length(hierarchicalAverage(curData,curTable(:,dataH),@nanmean));
+              curHerr=nanstd(pf2_base.hierarchicalAverage(curData,curTable(:,dataH),@nanmean));
+              curN=length(pf2_base.hierarchicalAverage(curData,curTable(:,dataH),@nanmean));
               curHerr=curHerr/sqrt(curN);
               barChartData(cBarSec,curBarGroup,2)=curHerr*errMulitply;
           end
@@ -4783,6 +4823,11 @@ end
 if(ExFNIRS.settings.plot_legend_mode==3||(ExFNIRS.settings.plot_legend_mode==2))
     legend(gAStrs(:));
     legend boxoff;
+end
+
+fprintf('Info Table Values\n');
+for i=1:length(gAStrs(:))
+    fprintf('%s\tMean %.2f\tError: %.2f\n',gAStrs{i},barChartData(1,i,1),barChartData(1,i,2));
 end
         
 hold off;
@@ -6053,6 +6098,12 @@ else
     set(handles.listbox_info_groupby,'String','');
 end
 
+if(ExFNIRS.settings.updateOnChange)
+    updateSelectedTable(handles);
+else
+    flagForUpdate(true,handles);
+end
+
 % --- Executes during object creation, after setting all properties.
 function popupmenu_groupby_info_field_CreateFcn(hObject, eventdata, handles)
 % hObject    handle to popupmenu_groupby_info_field (see GCBO)
@@ -6074,6 +6125,15 @@ function listbox_info_groupby_Callback(hObject, eventdata, handles)
 
 % Hints: contents = cellstr(get(hObject,'String')) returns listbox_info_groupby contents as cell array
 %        contents{get(hObject,'Value')} returns selected item from listbox_info_groupby
+
+global ExFNIRS
+
+
+if(ExFNIRS.settings.updateOnChange)
+    updateSelectedTable(handles);
+else
+    flagForUpdate(true,handles);
+end
 
 
 % --- Executes during object creation, after setting all properties.
@@ -6397,36 +6457,41 @@ switch (ExFNIRS.settings.ChannelMode)
                 
             end
         end
-        %uROI=unique(uROI{:},'rows');
-        
-        [uROInames,b,c]=unique(roiNames);
-        uROInames=roiNames(b);
-        uROI=uROI(b,:);
-        
-        
-        
-        if(initROI) % standaradize all ROIs on first load
-            fprintf(2,'************\nStandardizing all ROI fields..\n********\n');
-            for i=1:length(ExFNIRS.data)
-                if(pf2_base.isnestedfield(ExFNIRS.data{i},'raw')&&~isempty(ExFNIRS.data{i}))
-                   ExFNIRS.data{i}.ROI.info=uROI;
+        if(isempty(uROI))
+            warning('No ROIs present in data');
+            set(handles.popupmenu_ChannelMode,'Value',1);
+        else
+            %uROI=unique(uROI{:},'rows');
+
+            [uROInames,b,c]=unique(roiNames);
+            uROInames=roiNames(b);
+            uROI=uROI(b,:);
+
+
+
+            if(initROI) % standaradize all ROIs on first load
+                fprintf(2,'************\nStandardizing all ROI fields..\n********\n');
+                for i=1:length(ExFNIRS.data)
+                    if(pf2_base.isnestedfield(ExFNIRS.data{i},'raw')&&~isempty(ExFNIRS.data{i}))
+                       ExFNIRS.data{i}.ROI.info=uROI;
+                    end
                 end
             end
+
+            ExFNIRS.currentROI=uROI;
+
+
+            set(handles.text_optode_label,'String','ROI');
+            set(handles.text_biomarker_label,'String','BioMarker');
+            set(handles.listbox_biomarker,'Enable','on');
+            set(handles.pushbutton_biomarker_select_all,'Enable','on');
+            set(handles.pushbutton_biomarker_select_none,'Enable','on');
+
+            set(handles.listbox_optode,'String',uROInames);
+            set(handles.listbox_optode,'Value',1);
+            set(handles.listbox_biomarker,'String',{'HbO','HbR','HbDiff','HbTotal','CBSI'});
+            set(handles.pushbutton_lme_plot_topo,'Enable','on');
         end
-        
-        ExFNIRS.currentROI=uROI;
-        
-        
-        set(handles.text_optode_label,'String','ROI');
-        set(handles.text_biomarker_label,'String','BioMarker');
-        set(handles.listbox_biomarker,'Enable','on');
-        set(handles.pushbutton_biomarker_select_all,'Enable','on');
-        set(handles.pushbutton_biomarker_select_none,'Enable','on');
-        
-        set(handles.listbox_optode,'String',uROInames);
-        set(handles.listbox_optode,'Value',1);
-        set(handles.listbox_biomarker,'String',{'HbO','HbR','HbDiff','HbTotal','CBSI'});
-        set(handles.pushbutton_lme_plot_topo,'Enable','on');
     case 'Aux'
         set(handles.text_optode_label,'String','Aux');
         set(handles.text_biomarker_label,'String','Aux Signal');

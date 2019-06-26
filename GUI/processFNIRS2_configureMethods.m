@@ -1345,6 +1345,7 @@ end
 function myMethods=unpackMethods(myMethods)
 %Converts mymethods function from .S to fields in F
 for i=1:length(myMethods.cfg.Sections)
+    flagBad=false;
     x=myMethods.cfg.(myMethods.cfg.Sections{i});
     x_fields=fields(x);
     x.name=myMethods.cfg.Sections{i};
@@ -1362,7 +1363,9 @@ for i=1:length(myMethods.cfg.Sections)
         Fidx=x.F{idx};
         if(ischar(Fidx)&&contains(Fidx,'struct(''f'))
             warning('Improperly formatted function found. Some settings may be lost');
-            x.F(idx)=[];
+            
+            flagBad=true;
+            break;
         elseif(length(Fidx)>1) %This is a struct array for some reason?
            %Change it back!
            F_noarray.f=Fidx(1).f;
@@ -1370,24 +1373,28 @@ for i=1:length(myMethods.cfg.Sections)
            F_noarray.argvals=cell(0);
            F_noarray.default_argvals=cell(0);
            F_noarray.output=cell(0);
-           for j=1:length(Fidx)
+           for j=1:size(Fidx,2)
                 F_noarray.args{j}=Fidx(j).args;
                 F_noarray.argvals{j}=Fidx(j).argvals;
                 F_noarray.default_argvals{j}=Fidx(j).default_argvals;
                 if(isfield(Fidx(j),'output'))
-                    F_noarray.output{j}=Fidx(j).output;
+                    F_noarray.output{1}=Fidx(1).output;
                 else
-                    F_noarray.output{j}='x';
+                    F_noarray.output{1}='x';
                     %warning('please make sure your functions have an output feature');
                 end
            end
            x.F{idx}=F_noarray;
         end
     end
-
-    myMethods.cfg.remove(x.name);
-    myMethods.cfg.add(x.name,x);
+    if(~flagBad)
+        myMethods.cfg.remove(x.name);
+        myMethods.cfg.add(x.name,x);
+    else
+       flagBad=false; 
+    end
 end
+
 function []=removeFunction(idx)
 global PF2
 
