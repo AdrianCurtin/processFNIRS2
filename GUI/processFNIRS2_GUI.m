@@ -853,6 +853,9 @@ else
                roi_out_ind=[];
                fmask_out_ind=[];
                outputList=Fidx.output;
+               if(iscell(outputList{1}))
+                  outputList=outputList{1}; 
+               end
                for output_idx=1:length(outputList) % find first argument in output list
                    if strcmp(outputList{output_idx},'x')==1 &&isempty(x_out_ind)
                         x_out_ind=output_idx;

@@ -244,7 +244,8 @@ end
 
 myOutFunction.Name=get(handles.edit_function_name,'String');
 myOutFunction.Description=get(handles.edit_function_description,'String');
-myOutFunction.Output={get(handles.popupmenu_output_types,'String')};
+outputtypes=get(handles.popupmenu_output_types,'String');
+myOutFunction.Output={outputtypes{get(handles.popupmenu_output_types,'Value')}};
 
 myOutFunction.validStages=[];
 if(get(handles.checkbox_valid_raw,'Value'))
