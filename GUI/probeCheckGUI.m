@@ -100,7 +100,7 @@ else
        error('Empty dataset'); 
     end
     
-    if(isfield(pf2ChannelCheck.nirsData,'fchMask')&&~isempty(pf2ChannelCheck.nirsData.fchMask))
+    if(isfield(pf2ChannelCheck.nirsData,'fchMask'))
         pf2ChannelCheck.fmask=pf2ChannelCheck.nirsData.fchMask;
     end
     
