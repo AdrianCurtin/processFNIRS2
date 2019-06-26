@@ -2,6 +2,12 @@ function processMethods(rawMethodStr,oxyMethodStr)
 global ExFNIRS
 global ProgressHandles
 
+if(isempty(rawMethodStr))
+   processOxyOnly=true; 
+else
+   processOxyOnly=false; 
+end
+
 strsOxy=processFNIRS2.Methods.Oxy();
 strsRaw=processFNIRS2.Methods.Raw();
 
@@ -11,14 +17,20 @@ if(~isfield(ExFNIRS,'processedData')||(size(ExFNIRS.processedData,1)~=length(str
 end
 
 
-if(iscell(rawMethodStr))
+if(~processOxyOnly&&iscell(rawMethodStr))
    rawMethodStr=rawMethodStr{1}; 
+elseif(processOxyOnly)
+    rawMethodStr='None';
 end
+
+
 if(iscell(oxyMethodStr))
    oxyMethodStr=oxyMethodStr{1}; 
 end
 
-ProcRawMethods=ExFNIRS.processedData(:,1);
+if(~processOxyOnly)
+    ProcRawMethods=ExFNIRS.processedData(:,1);
+end
 ProcOxyMethods=ExFNIRS.processedData(:,2);
 
 curRawMatchIdx=strcmp(rawMethodStr,ProcRawMethods);
@@ -43,7 +55,16 @@ if(~any(curRawMatchIdx&curOxyMatchIdx))
        waitbar(i/numData,hF,sprintf('ExploreFNIRS\nProcessing Method %s x %s %i of %i',rawMethodStr_label,oxyMethodStr_label,i,numData));
        
        if(~isempty(data{i})&&length(data{i}.time)>1)
-           data{i}=processFNIRS2(data{i});
+           if(processOxyOnly)
+               if(isfield(data{i},'HbO'))
+                   data{i}=processFNIRS2.Process.ProcessOxy(data{i});
+               else
+                   warning('Data file for item %i has no Oxy Data, attempting to process with ''None''\n',data{i});
+                   data{i}=processFNIRS2(data{i});
+               end
+           else
+               data{i}=processFNIRS2(data{i});
+           end
            data{i}=processFNIRS2.Data.ApplyChannelMask(data{i});
            data{i}=processFNIRS2.Data.Resample(data{i},ExFNIRS.settings.grandavg_resample_size,'centerOnT0',true,'timeOutMode','end','averageAux',false);
        end
@@ -58,5 +79,9 @@ else
    ExFNIRS.curProcessedData= ExFNIRS.processedData{curRawMatchIdx&curOxyMatchIdx,3};
 end
 
-ExFNIRS.curMethodName=sprintf('%s : %s',rawMethodStr,oxyMethodStr);
+if(processOxyOnly)
+    ExFNIRS.curMethodName=sprintf('Skipped : %s',oxyMethodStr);
+else
+    ExFNIRS.curMethodName=sprintf('%s : %s',rawMethodStr,oxyMethodStr);
+end
 ExFNIRS.curMethodName(ExFNIRS.curMethodName=='_')='-';

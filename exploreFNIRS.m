@@ -91,7 +91,7 @@ function varargout = exploreFNIRS(varargin) % exploreFNIRS(data,timeShiftTo0,blS
 
 % Edit the above text to modify the response to help exploreFNIRS
 
-% Last Modified by GUIDE v2.5 19-Jun-2019 15:00:47
+% Last Modified by GUIDE v2.5 26-Jun-2019 14:20:12
 
 % Begin initialization code - DO NOT EDIT
 gui_Singleton = 1;
@@ -158,6 +158,8 @@ if(~isfield(ExFNIRS,'settings')||~isfield(ExFNIRS.settings,'baseline_start'))
     ExFNIRS.settings.timeShiftTo0=true;
     ExFNIRS.settings.ChannelMode='fNIR';  % valid is fNIR, ROI, and Aux
     ExFNIRS.settings.ChannelModes={1,'fNIR';2,'ROI';3,'Aux'};
+    ExFNIRS.settings.processRaw=get(handles.checkbox_process_raw,'Value');
+    ExFNIRS.settings.LME_use_intercept=get(handles.checkbox_LME_use_intercept,'Value');
 end
 
 addOptional(p,'data',[],@iscell); % Your data, as a cell of FNIRS structs (ideally with populated info fields and the task of interest starting at t=0)
@@ -180,6 +182,8 @@ if(~isempty(p.Results.data)||~isfield(ExFNIRS,'data'))
         ExFNIRS.data=ExFNIRS.data';
     end
 end
+
+
 
 ExFNIRS.settings.baseline_start=p.Results.blStart;
 ExFNIRS.settings.baseline_end=p.Results.blEnd;
@@ -213,7 +217,7 @@ set(handles.edit_plot_start,'String',sprintf('%.2f',ExFNIRS.settings.plot_start)
 set(handles.edit_plot_end,'String',sprintf('%.2f',ExFNIRS.settings.plot_end));
 set(handles.edit_barchart_resample_size,'String',sprintf('%.2f',ExFNIRS.settings.barchart_resample_size));
 
-
+set(handles.checkbox_process_raw,'Value',ExFNIRS.settings.processRaw);
 strs=get(handles.popupmenu_info_group,'String');
 val=get(handles.popupmenu_info_group,'Value');
 if(~iscell(strs))
@@ -260,6 +264,8 @@ end
 
 estimatedFS=nanmedian(fsArray(:));
 
+subIdAuto=1;
+
 for i=1:length(ExFNIRS.data)
    if(~isfield(ExFNIRS.data{i},'raw')&&~isfield(ExFNIRS.data{i},'HbO')||(length(ExFNIRS.data{i}.time)==1&&(isnan(ExFNIRS.data{i}.time)))||sum(sum(~isnan(ExFNIRS.data{i}.raw(:,2:end)),1),2)==0) %info only
        ExFNIRS.data{i}.time=nan;
@@ -267,31 +273,32 @@ for i=1:length(ExFNIRS.data)
    else
        ExFNIRS.data{i}.info.missingFNIRS=0;
        
-       if(~isfield(ExFNIRS.data{i}.info,'Group'))
+       if(~isfield(ExFNIRS.data{i}.info,'Group')||isempty(ExFNIRS.data{i}.Group))
            ExFNIRS.data{i}.info.Group='Missing';
        end
        
-       if(~isfield(ExFNIRS.data{i}.info,'SubjectID'))
-           ExFNIRS.data{i}.info.SubjectID='Missing';
+       if(~isfield(ExFNIRS.data{i}.info,'SubjectID')||isempty(ExFNIRS.data{i}.SubjectID))
+           ExFNIRS.data{i}.info.SubjectID=sprintf('Missing%i',subIdAuto);
+           subIdAuto=subIdAutp+1;
        end
        
-       if(~isfield(ExFNIRS.data{i}.info,'Subgroup'))
+       if(~isfield(ExFNIRS.data{i}.info,'Subgroup')||isempty(ExFNIRS.data{i}.Subgroup))
            ExFNIRS.data{i}.info.Subgroup='Missing';
        end
        
-       if(~isfield(ExFNIRS.data{i}.info,'Session'))
+       if(~isfield(ExFNIRS.data{i}.info,'Session')||isempty(ExFNIRS.data{i}.Session))
            ExFNIRS.data{i}.info.Session='Missing';
        end
        
-       if(~isfield(ExFNIRS.data{i}.info,'Trial'))
+       if(~isfield(ExFNIRS.data{i}.info,'Trial')||isempty(ExFNIRS.data{i}.Trial))
            ExFNIRS.data{i}.info.Trial='Missing';
        end
        
-       if(~isfield(ExFNIRS.data{i}.info,'Block'))
+       if(~isfield(ExFNIRS.data{i}.info,'Block')||isempty(ExFNIRS.data{i}.Block))
            ExFNIRS.data{i}.info.Block='Missing';
        end
        
-       if(~isfield(ExFNIRS.data{i}.info,'Condition'))
+       if(~isfield(ExFNIRS.data{i}.info,'Condition')||isempty(ExFNIRS.data{i}.Condition))
            ExFNIRS.data{i}.info.Condition='Missing';
        end
    end
@@ -1441,8 +1448,12 @@ for i=1:max(gbyIdx)
         ExFNIRS.gby(i).gbyFNIRS{i2}=processFNIRS2.Data.Split(ExFNIRS.gby(i).gbyFNIRS{i2},'blfNIR',blSeg);
         %ExFNIRS.gby(i).gbyFNIRS{i2}=processFNIRS2.Data.Resample(ExFNIRS.gby(i).gbyFNIRS{i2},ExFNIRS.settings.grandavg_resample_size,'centerOnT0',true,'timeOutMode','end');
     end
-    waitbar(0,eHf,sprintf('ExploreFNIRS\nAverging waveforms...'));
-   
+    try
+        waitbar(0,eHf,sprintf('ExploreFNIRS\nAverging waveforms...'));
+    catch
+        
+    end
+    
     if(ExFNIRS.settings.within_sub_avg_mode==1)
        hArg=[]; 
        ExFNIRS.settings.within_sub_avg_mode_label='None';
@@ -1454,9 +1465,16 @@ for i=1:max(gbyIdx)
         ExFNIRS.settings.within_sub_avg_mode_label='Hierarchy';
     end
     ExFNIRS.gby(i).gbyGrand=grandAvgFNIRS(ExFNIRS.gby(i).gbyFNIRS,false,[],false,hArg,true,false);
+    try
     waitbar(0,eHf,sprintf('ExploreFNIRS\nBuilding Chart Data...'));
+    catch
+        
+    end
     ExFNIRS.gby(i).gbyGrandBar=grandAvgFNIRS(ExFNIRS.gby(i).gbyFNIRS_blk,false, ExFNIRS.settings.barchart_resample_size,true,hArg,true,true);
+    try
     close(eHf);
+    catch
+    end
 end
 
 set(handles.text_status,'String',sprintf('%i Segments in\n%i Group(s)',numSeg,max(gbyIdx)));
@@ -1499,7 +1517,11 @@ if(~isfield(ExFNIRS,'processedData'))
     ExFNIRS.numProcessed=0;
 end
 
-exploreFNIRS.processMethods(cur_raw_method,cur_oxy_method);
+if(ExFNIRS.settings.processRaw)
+    exploreFNIRS.processMethods(cur_raw_method,cur_oxy_method);
+else
+    exploreFNIRS.processMethods([],cur_oxy_method);
+end
 
 [strsOxy,iOxy]=processFNIRS2.Methods.Oxy();
 [strsRaw,iRaw]=processFNIRS2.Methods.Raw();
@@ -3820,7 +3842,7 @@ for sH=1:length(subplotHandles)
             
         end
         
-        ExFNIRS.settings.LME_use_intercept=true;
+        
         if(ExFNIRS.settings.LME_use_intercept)
             lmeString=sprintf('%s%i_%s~%s+(1|SubjectID)',varNameStart,subplotGby{sH}.curCh,subplotGby{sH}.curBioM{1},curLMEGbyString);
         else
@@ -6515,3 +6537,37 @@ function popupmenu_ChannelMode_CreateFcn(hObject, eventdata, handles)
 if ispc && isequal(get(hObject,'BackgroundColor'), get(0,'defaultUicontrolBackgroundColor'))
     set(hObject,'BackgroundColor','white');
 end
+
+
+% --- Executes on button press in checkbox_LME_use_intercept.
+function checkbox_LME_use_intercept_Callback(hObject, eventdata, handles)
+% hObject    handle to checkbox_LME_use_intercept (see GCBO)
+% eventdata  reserved - to be defined in a future version of MATLAB
+% handles    structure with handles and user data (see GUIDATA)
+
+% Hint: get(hObject,'Value') returns toggle state of checkbox_LME_use_intercept
+
+global ExFNIRS
+
+ExFNIRS.settings.LME_use_intercept=get(handles.checkbox_LME_use_intercept,'Value');
+
+% --- Executes on button press in checkbox_process_raw.
+function checkbox_process_raw_Callback(hObject, eventdata, handles)
+% hObject    handle to checkbox_process_raw (see GCBO)
+% eventdata  reserved - to be defined in a future version of MATLAB
+% handles    structure with handles and user data (see GUIDATA)
+
+% Hint: get(hObject,'Value') returns toggle state of checkbox_process_raw
+
+global ExFNIRS
+
+ExFNIRS.settings.processRaw=get(handles.checkbox_process_raw,'Value');
+
+if(ExFNIRS.settings.processRaw)
+    set(handles.listbox_raw_methods,'Enable','on');
+else
+    set(handles.listbox_raw_methods,'Enable','off');
+    set(handles.listbox_raw_methods,'Value',1);
+end
+
+
