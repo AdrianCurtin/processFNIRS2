@@ -100,7 +100,7 @@ else
        error('Empty dataset'); 
     end
     
-    if(isfield(pf2ChannelCheck.nirsData,'fchMask'))
+    if(isfield(pf2ChannelCheck.nirsData,'fchMask')&&~isempty(pf2ChannelCheck.nirsData.fchMask))
         pf2ChannelCheck.fmask=pf2ChannelCheck.nirsData.fchMask;
     end
     
@@ -195,8 +195,8 @@ set(handles.currentfiletext,'String',name);
 pf2ChannelCheck.numChannels=pf2ChannelCheck.nirsData.info.probe.Probe{pf2ChannelCheck.probeNum}.NumOptodes;
 
 if(isfield(pf2ChannelCheck,'fmask')&&isempty(pf2ChannelCheck.fmask))
-    if(isfield(pf2ChannelCheck.nirsdata,'fchMask'))
-        pf2ChannelCheck.fmask=pf2ChannelCheck.nirsdata.fchMask;
+    if(isfield(pf2ChannelCheck.nirsData,'fchMask')&&~isempty(pf2ChannelCheck.nirsData.fchMask))
+        pf2ChannelCheck.fmask=pf2ChannelCheck.nirsData.fchMask;
     else
          pf2ChannelCheck.fmask=ones(1,pf2ChannelCheck.numChannels);
     end
@@ -432,7 +432,7 @@ function rejectButton_Callback(hObject, eventdata, handles)
 global pf2ChannelCheck
 
 pf2ChannelCheck.fmask(pf2ChannelCheck.curChannel)=0;
-axes(pf2ChannelCheck.chCurAxesHandle{pf2ChannelCheck.curChannel});
+axes(pf2ChannelCheck.chCurAxesHandle(pf2ChannelCheck.curChannel));
 plotChannel(pf2ChannelCheck.curChannel,false);
 axes(handles.chAxes);
 plotChannel(pf2ChannelCheck.curChannel,pf2ChannelCheck.showMarkers,true);
