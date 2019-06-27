@@ -208,7 +208,7 @@ if(isfield(pf2ChannelCheck,'fmask')&&isempty(pf2ChannelCheck.fmask))
 end
 
 pf2ChannelCheck.maxVal=nanmax(nanmax(pf2ChannelCheck.nirsData.raw(:,...
-    pf2ChannelCheck.nirsData.probeinfo.Probe{pf2ChannelCheck.probeNum}.Wavelength>0));
+    pf2ChannelCheck.nirsData.probeinfo.Probe{pf2ChannelCheck.probeNum}.Wavelength>0)));
 
 if(pf2ChannelCheck.numChannels>0)
     pf2ChannelCheck.curChannel=1;

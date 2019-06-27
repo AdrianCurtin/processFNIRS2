@@ -139,7 +139,7 @@ for i=1:size(files,1)
         device.Info.DefaultSamplingRate=7.8125;
         device.Info.MaxSamplingRate=7.8125;
         device.Info.NumberProbes=length(probeNums);
-        device.Info.RawMax=0.5;
+        device.Info.RawMax=1;
         device.Info.RawMin=0;
         device.Info.NumberChannels=0;
         
