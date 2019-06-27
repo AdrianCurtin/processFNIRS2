@@ -217,84 +217,11 @@ if(ismatrix(data)&&~isstruct(data))
    data.raw=x;
 end
 
+
+[validBioFields,altSpellings]=pf2_base.pf2_getFNIRSbiomFields();
+[validFields]=pf2_base.pf2_getFNIRSfields();
+   
 if(isstruct(data)) %treat as fNIR struct
-    if(isfield(data,'raw'))
-        PF2.data.stage{1}=data.raw;
-    end
-    
-    if(isfield(data,'MES'))
-        PF2.data.stage{1}=data.raw;
-    end
-    
-    if(isfield(data,'oxy'))
-        tempOxyStage.HbDiff=data.oxy;
-    end
-    
-    if(isfield(data,'hbo'))
-        tempOxyStage.HbO=data.hbo;
-    end
-    
-    if(isfield(data,'hbr'))
-        tempOxyStage.HbR=data.hbr;
-    end
-    
-    if(isfield(data,'total'))
-        tempOxyStage.HbTotal=data.total;
-    end
-    
-    if(isfield(data,'Total'))
-        tempOxyStage.HbTotal=data.Total;
-    end
-    
-    if(isfield(data,'cbsi'))
-        tempOxyStage.CBSI=data.cbsi;
-    end
-    
-    if(isfield(data,'HbO'))
-        tempOxyStage.HbO=data.HbO;
-    end
-    
-    if(isfield(data,'HbR'))
-        tempOxyStage.HbR=data.HbR;
-    end
-    
-    if(isfield(data,'HbTotal'))
-        tempOxyStage.HbTotal=data.HbTotal;
-    end
-    
-    if(isfield(data,'CBSI'))
-        tempOxyStage.CBSI=data.CBSI;
-    end
-    
-    if(isfield(data,'diffhb'))
-        tempOxyStage.HbDiff=data.diffhb;
-    end
-    
-    if(isfield(data,'HbDiff'))
-        tempOxyStage.HbDiff=data.HbDiff;
-    end
-    
-    if(isfield(data,'Oxy'))
-        tempOxyStage.HbO=data.Oxy;
-    end
-    
-    if(isfield(data,'Deoxy'))
-        tempOxyStage.HbR=data.Deoxy;
-    end
-    
-    if(isfield(data,'channels'))
-        tempOxyStage.channels=data.channels;
-    end
-    
-    if(isfield(data,'units'))
-        tempOxyStage.units=data.units;
-    end
-    
-    if(isfield(data,'DPF_factor'))
-        tempOxyStage.DPF_factor=data.DPF_factor;
-    end
-    
-    
     if(isfield(data,'mrk'))
         if(isnumeric(data.mrk))
             data.markers=data.mrk;
@@ -312,84 +239,63 @@ if(isstruct(data)) %treat as fNIR struct
         end
     end
     
-    if(isfield(data,'fchMask'))
-        PF2.data.fchMask=data.fchMask;
+    
+    dataFields=fields(data);  % copy bio marker fields
+    for i=1:length(dataFields)
+        curField=dataFields{i};
+       for j=1:length(validBioFields)
+           memberIdx=ismember(altSpellings{j},curField);
+           if(any(memberIdx))
+                if(strcmpi(validBioFields{j},'raw'))
+                    PF2.data.stage{1}=data.(curField);
+                else
+                    tempOxyStage.(validBioFields{j})=data.(curField);
+                end
+                break;
+           end
+       end
     end
     
-    if(isfield(data,'time'))
-        PF2.data.time=data.time;
+    for i=1:length(dataFields)  % copy other fields
+       curField=dataFields{i};
+       memberIdx=ismember(validFields,curField);
+       if(any(memberIdx))
+            if(strcmpi(validFields{memberIdx},'channels')||...
+                    strcmpi(validFields{memberIdx},'units')||...
+                    strcmpi(validFields{memberIdx},'DPF_factor'))
+                tempOxyStage.(validFields{memberIdx})=data.(curField);
+            else
+                PF2.data.(validFields{memberIdx})=data.(curField);
+            end
+       end
+    end
+
+    
+    if(~isfield(PF2.data,'markers'))
+       PF2.data.markers=[]; 
     end
     
-    if(isfield(data,'markers'))
-        if(isnumeric(data.markers))
-            PF2.data.markers=data.markers;
-        elseif(isfield(data.markers,'data'))
-            PF2.data.markers=data.markers.data;
-            if(~isfield(data,'info'))
-                data.info=[];
-            end
-            if(isfield(data.markers,'info'))
-               data.info.mrkinfo=data.markers.info;
-            end
-            if(isfield(data.markers,'headers'))
-                data.info.mrkheaders=data.markers.headers;
-            end
-        end
-    end
-    
-    if(isfield(data,'info'))
-        PF2.data.info=data.info;
-    else
+    if(~isfield(PF2.data,'info'))
         PF2.data.info=[]; 
     end
     
-    if(~isfield(PF2.data.info,'SubjectID'))
-        PF2.data.info.SubjectID='';
-    end
-    if(~isfield(PF2.data.info,'Group'))
-        PF2.data.info.Group='';
-    end
-    if(~isfield(PF2.data.info,'Subgroup'))
-        PF2.data.info.Subgroup='';
-    end
-    if(~isfield(PF2.data.info,'Session'))
-        PF2.data.info.Session='';
-    end
-    if(~isfield(PF2.data.info,'Trial'))
-        PF2.data.info.Trial='';
-    end
-    if(~isfield(PF2.data.info,'Block'))
-        PF2.data.info.Block='';
-    end
-    if(~isfield(PF2.data.info,'probename'))
-        PF2.data.info.probename='';
-    end
-    if(~isfield(PF2.data.info,'Condition'))
-        PF2.data.info.Condition='';
-    end
-    if(~isfield(PF2.data.info,'Age'))
-        PF2.data.info.Age=[];
-    end
-    if(~isfield(PF2.data.info,'Sex'))
-        PF2.data.info.Sex='';
+    if(~isfield(PF2.data,'Aux'))
+        PF2.data.Aux=[];
     end
     
-    if(isfield(data,'Aux'))
-        PF2.data.Aux=data.Aux;
-    end
+    [defaultInfoFields,defaultValues]=pf2_base.pf2_getDefaultInfoFields();
     
-    if(isfield(data,'channels'))
-        PF2.data.channels=data.channels;
+    for i=1:length(defaultInfoFields)
+        if(~isfield(PF2.data.info,defaultInfoFields{i}))
+            PF2.data.info.(defaultInfoFields{i})=defaultValues{i};
+        end
     end
     
     if(pf2_base.isnestedfield(data,'ROI.info'))
         PF2.data.ROI=data.ROI;
     end
-    
-    if(isfield(data,'takizawa'))
-        PF2.data.takizawa=data.takizawa;
-    end
 end
+
 
 if(isempty(PF2.data.info.Age))
    warning('fData.info.Age is empty\nDPF calculations will be performed using an age of %i years old\nPlease assign subject age for accurate chromophore calculations',PF2.curDPF_age);
@@ -1493,6 +1399,8 @@ global outputData
 
 varargout={};
 
+[validFields]=pf2_base.pf2_getFNIRSfields();
+
 if(nargout>0)
    if(isfield(PF2,'data')&&isfield(PF2.data,'stage')&&(size(PF2.data.stage,2)==5))
        if(outputData.ProcessOxy&&~isempty(PF2.data.stage{5}))
@@ -1516,10 +1424,7 @@ if(nargout>0)
           end
        end
        
-       if(isfield(PF2.data,'time'))
-           outfNIR.time=PF2.data.time;
-       end
-       
+  
        if(isfield(PF2.data,'markers'))
            
            if(PF2.OutputLegacyMarkers)
@@ -1530,34 +1435,21 @@ if(nargout>0)
            end
        end
        
-       if(isfield(PF2.data,'info'))
-           outfNIR.info=PF2.data.info;
-       end
-       
-       if(exist('outfNIR')&&isfield(PF2.data,'fchMask'))
-           outfNIR.fchMask=PF2.data.fchMask;
-       end
-       
-        if(exist('outfNIR')&&isfield(PF2.data,'channels'))
-            outfNIR.channels=PF2.data.channels;
-        end
+     
         
-       
-       if(isfield(PF2.data,'takizawa'))
-           outfNIR.takizawa=PF2.data.takizawa;
-       end
-       
-       if(isfield(PF2.data,'Aux'))
-           outfNIR.Aux=PF2.data.Aux;
-       end
-       
         if(exist('outfNIR'))
-            varargout={outfNIR};
-        else
-            varargout={[]};
+           fdataFields=fields(PF2.data);
+           for i=1:length(fdataFields)
+               memberIdx=ismember(validFields,fdataFields{i});
+               if(any(memberIdx))
+                    outfNIR.(validFields{memberIdx})=PF2.data.(fdataFields{i});
+               end
+           end
+           
+           varargout={outfNIR};
+       else
+          varargout={[]}; 
         end
-   else
-       varargout={[]};
    end
    
 end
