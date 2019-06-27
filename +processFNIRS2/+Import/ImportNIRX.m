@@ -13,7 +13,7 @@ includeSSchannels=true;
 buildProbeLayout=true;
 
 if nargin < 1
-   [folderDIR,pathname] = uigetfile({'*.hdr;*config.json';'*.*'},'Open NIRX Config file');
+   [folderDIR,pathname] = uigetfile({'*.hdr;*.nirs';'*.*'},'Open NIRX Config file');
   %error('Function requires at least one input argument');
 elseif ~ischar(folderDIR)
   error('Input must be a string representing a filename');
@@ -208,9 +208,11 @@ for i=1:size(files,1)
             if(buildProbeLayout) % auto generate plot layour
                 if(isfield(device.Probe{p},'OptPosX')&&isfield(device.Probe{p},'OptPosY'))
                     if(includeSSchannels)
-                        device.Probe{p}.OptLayout2D=setUp2DAxes(device.Probe{p}.OptPosX,device.Probe{p}.OptPosY);
+                        device.Probe{p}.OptLayout2D=pf2_base.fitProbe2D(device.Probe{p}.OptPosX,device.Probe{p}.OptPosY,device.Probe{p}.OptPosZ);
                     else
-                        device.Probe{p}.OptLayout2D=setUp2DAxes(device.Probe{p}.OptPosX(~device.Probe{p}.IsShortSeparation),device.Probe{p}.OptPosY(~device.Probe{p}.IsShortSeparation));
+                        device.Probe{p}.OptLayout2D=pf2_base.fitProbe2D(device.Probe{p}.OptPosX(~device.Probe{p}.IsShortSeparation)...
+                            ,device.Probe{p}.OptPosY(~device.Probe{p}.IsShortSeparation),...
+                            device.Probe{p}.OptPosZ(~device.Probe{p}.IsShortSeparation));
                     end
                 else
                     warning('buildProbeLayout option selected, but not enough information to generate Optode locations');
@@ -455,144 +457,6 @@ for i=1:numCh
     
     opt_2d_coords{i}=[x1,y1,x2,y2];
 end
-end
-
-function opt_2d_coords=setUp2DAxes(ChxList,ChyList)
-
-plotFigs=false;
-fprintf('Autoplacing Channels\n');
-    
-global chAxesHandles
-
-numCh=length(ChxList);
-
-chAxesHandles=cell(numCh,1);
-
-ChxList=(ChxList-min(ChxList))./(max(ChxList)-min(ChxList));
-
-ChyList=1-(ChyList-min(ChyList))./(max(ChyList)-min(ChyList));
-
-% if(plotFigs)
-%     figure(999);
-%     handles.uipanel_arranged=uipanel('Title','Panel', 'Position',[.1 .1 .8 .8]);
-%     uiP=handles.uipanel_arranged;
-% end
-
-
-uCh=unique([ChxList,ChyList],'rows');
-
-if(size(uCh,1)<length(ChxList))
-    error('Duplicate Channel Locations Present');
-end
-
-
-
-uCh=unique([ChxList(:),ChyList(:)],'rows');
-
-if(size(uCh,1)<length(ChxList))
-    error('Duplicate Channel Locations Present');
-end
-
-startStepSize=10;
-stepSize=10;
-
-
-maskSize=1200;
-
-lastPsize=startStepSize;
-
-for pSize=startStepSize:stepSize:maskSize
-    bitMask=zeros(maskSize,maskSize);
-    for c=1:numCh
-        [x1,y1,x2,y2]=cord2mask(ChxList(c),ChyList(c),pSize,pSize);
-        bitMask(x1:x2,y1:y2)=bitMask(x1:x2,y1:y2)+1;
-    end
-    if(plotFigs)
-        figure(2);
-        imagesc(bitMask);
-        java.lang.Thread.sleep(100) ;
-    end
-    
-    if(sum(sum(bitMask>1))>0)
-        break;
-    end
-    lastPsize=pSize-stepSize;
-end
-
-lastWsize=lastPsize;
-
-for wSize=lastPsize:stepSize:maskSize
-    bitMask=zeros(maskSize,maskSize);
-    for c=1:numCh
-        [x1,y1,x2,y2]=cord2mask(ChxList(c),ChyList(c),wSize,lastPsize);
-        bitMask(x1:x2,y1:y2)=bitMask(x1:x2,y1:y2)+1;
-    end
-    if(plotFigs)
-        figure(2);
-        imagesc(bitMask);
-        java.lang.Thread.sleep(100) ;
-    end
-    if(sum(sum(bitMask>1))>0)
-        break;
-    end
-    lastWsize=wSize-stepSize;
-end
-
-lastHsize=lastPsize;
-
-for hSize=lastPsize:stepSize:maskSize
-    bitMask=zeros(maskSize,maskSize);
-    for c=1:numCh
-        [x1,y1,x2,y2]=cord2mask(ChxList(c),ChyList(c),lastWsize,hSize);
-        bitMask(x1:x2,y1:y2)=bitMask(x1:x2,y1:y2)+1;
-    end
-    if(plotFigs)
-        figure(2)
-        imagesc(bitMask);
-        java.lang.Thread.sleep(100) ;
-    end
-    if(sum(sum(bitMask>1))>0)
-        break;
-    end
-    lastHsize=hSize-stepSize;
-end
-
-
-
-for c=1:numCh
-    
-     [x1,y1,x2,y2]=cord2mask(ChxList(c),ChyList(c),lastWsize,lastHsize,true);
-     opt_2d_coords{c}=[x1,y1,x2-x1,y2-y1];
-end
-
-end
-
-
-function [x1,y1,x2,y2]=cord2mask(x,y,wPixelSize,hPixelSize,returnRelative)
-    
-if(nargin<5)
-    returnRelative=false;
-end
-
-    
-bitMaskRes=1200;
-adjBitMaskResW=bitMaskRes-wPixelSize;
-adjBitMaskResH=bitMaskRes-hPixelSize;
-
-x1=round(x*adjBitMaskResW)+1;
-y1=round(y*adjBitMaskResH)+1;
-x2=round(x*adjBitMaskResW+wPixelSize)-1;
-y2=round(y*adjBitMaskResH+hPixelSize)-1;
-
-
-if(returnRelative)
-    x1=x1/bitMaskRes;
-    y1=y1/bitMaskRes;
-    x2=x2/bitMaskRes;
-    y2=y2/bitMaskRes;
-end
-
-
 end
 
 

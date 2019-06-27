@@ -131,12 +131,19 @@ for j=1:length(probeInfo.cfg.Sections)
         end
         
         if(buildProbeLayout) % auto generate plot layour
-            if(isfield(p,'OptPosX')&&isfield(p,'OptPosY'))
+            if(isfield(p,'OptPosX')&&isfield(p,'OptPosY')&&~isfield('OptPosZ'))
                 if(includeSSchannels)
-                    p.OptLayout2D=setUp2DAxes(p.OptPosX,p.OptPosY);
+                    p.OptLayout2D=pf2_base.fitProbe2D(p.OptPosX,p.OptPosY);
                 else
-                    p.OptLayout2D=setUp2DAxes(p.OptPosX(~p.IsShortSeparation),p.OptPosY(~p.IsShortSeparation));
+                    p.OptLayout2D=pf2_base.fitProbe2D(p.OptPosX(~p.IsShortSeparation),p.OptPosY(~p.IsShortSeparation));
                 end
+            elseif(isfield(p,'OptPosX')&&isfield(p,'OptPosY')&&~isfield('OptPosZ'))
+                if(includeSSchannels)
+                    p.OptLayout2D=pf2_base.fitProbe2D(p.OptPosX,p.OptPosY,p.OptPosZ);
+                else
+                    p.OptLayout2D=pf2_base.fitProbe2D(p.OptPosX(~p.IsShortSeparation),p.OptPosY(~p.IsShortSeparation),p.OptPosZ(~p.IsShortSeparation));
+                end
+                
             else
                 warning('buildProbeLayout option selected, but not enough information to generate Optode locations');
                 p.OptLayout2D=setUpFalse2D(p.NumOptodes);  % generate false channels if not requested
@@ -169,136 +176,3 @@ for i=1:numCh
     opt_2d_coords{i}=[x1,y1,x2,y2];
 end
 end
-
-function opt_2d_coords=setUp2DAxes(ChxList,ChyList)
-
-plotFigs=false;
-fprintf('Autoplacing Channels\n');
-    
-global chAxesHandles
-
-numCh=length(ChxList);
-
-chAxesHandles=cell(numCh,1);
-
-ChxList=(ChxList-min(ChxList))./(max(ChxList)-min(ChxList));
-
-ChyList=1-(ChyList-min(ChyList))./(max(ChyList)-min(ChyList));
-
-% if(plotFigs)
-%     figure(999);
-%     handles.uipanel_arranged=uipanel('Title','Panel', 'Position',[.1 .1 .8 .8]);
-%     uiP=handles.uipanel_arranged;
-% end
-
-
-uCh=unique([ChxList,ChyList],'rows');
-
-if(size(uCh,1)<length(ChxList))
-    error('Duplicate Channel Locations Present');
-end
-
-
-
-uCh=unique([ChxList(:),ChyList(:)],'rows');
-
-if(size(uCh,1)<length(ChxList))
-    error('Duplicate Channel Locations Present');
-end
-
-startStepSize=50;
-stepSize=10;
-
-
-maskSize=1200;
-
-for pSize=startStepSize:stepSize:maskSize
-    bitMask=zeros(maskSize,maskSize);
-    for c=1:numCh
-        [x1,y1,x2,y2]=cord2mask(ChxList(c),ChyList(c),pSize,pSize);
-        bitMask(x1:x2,y1:y2)=bitMask(x1:x2,y1:y2)+1;
-    end
-    if(plotFigs)
-        figure(2);
-        imagesc(bitMask);
-        java.lang.Thread.sleep(100) ;
-    end
-    
-    if(sum(sum(bitMask>1))>0)
-        break;
-    end
-    lastPsize=pSize-stepSize;
-end
-
-for wSize=lastPsize:stepSize:maskSize
-    bitMask=zeros(maskSize,maskSize);
-    for c=1:numCh
-        [x1,y1,x2,y2]=cord2mask(ChxList(c),ChyList(c),wSize,lastPsize);
-        bitMask(x1:x2,y1:y2)=bitMask(x1:x2,y1:y2)+1;
-    end
-    if(plotFigs)
-        figure(2);
-        imagesc(bitMask);
-        java.lang.Thread.sleep(100) ;
-    end
-    if(sum(sum(bitMask>1))>0)
-        break;
-    end
-    lastWsize=wSize-stepSize;
-end
-
-for hSize=lastPsize:stepSize:maskSize
-    bitMask=zeros(maskSize,maskSize);
-    for c=1:numCh
-        [x1,y1,x2,y2]=cord2mask(ChxList(c),ChyList(c),lastWsize,hSize);
-        bitMask(x1:x2,y1:y2)=bitMask(x1:x2,y1:y2)+1;
-    end
-    if(plotFigs)
-        figure(2)
-        imagesc(bitMask);
-        java.lang.Thread.sleep(100) ;
-    end
-    if(sum(sum(bitMask>1))>0)
-        break;
-    end
-    lastHsize=hSize-stepSize;
-end
-
-
-
-for c=1:numCh
-    
-     [x1,y1,x2,y2]=cord2mask(ChxList(c),ChyList(c),lastWsize,lastHsize,true);
-     opt_2d_coords{c}=[x1,y1,x2-x1,y2-y1];
-end
-
-end
-
-
-function [x1,y1,x2,y2]=cord2mask(x,y,wPixelSize,hPixelSize,returnRelative)
-    
-if(nargin<5)
-    returnRelative=false;
-end
-
-    
-bitMaskRes=1200;
-adjBitMaskResW=bitMaskRes-wPixelSize;
-adjBitMaskResH=bitMaskRes-hPixelSize;
-
-x1=round(x*adjBitMaskResW)+1;
-y1=round(y*adjBitMaskResH)+1;
-x2=round(x*adjBitMaskResW+wPixelSize)-1;
-y2=round(y*adjBitMaskResH+hPixelSize)-1;
-
-
-if(returnRelative)
-    x1=x1/bitMaskRes;
-    y1=y1/bitMaskRes;
-    x2=x2/bitMaskRes;
-    y2=y2/bitMaskRes;
-end
-
-
-end
-
