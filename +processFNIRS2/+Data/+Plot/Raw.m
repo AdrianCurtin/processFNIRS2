@@ -193,7 +193,7 @@ end
 
 
 tooManyMarkers=100;
-tooManyLabels=10;
+tooManyLabels=30;
 if(~isempty(showMarkers))
     plotTonsOfMarkers=[];
     numMarkers=zeros(1,length(showMarkers));
@@ -303,7 +303,7 @@ for(optIdx=1:length(channels))
                 if(numMarkers(i)<tooManyLabels)
                 	pf2_base.external.vline(curMarkers(showMarkersIdx==i),'k',mrkName,yLabelHeight(i));
                 else
-                    pf2_base.external.vline(curMarkers(showMarkersIdx==i),'lineTags',mrkName);
+                    pf2_base.external.vline(curMarkers(showMarkersIdx==i));
                     fprintf('Marker %i has too many instances to plot labels',showMarkers(i));
                 end
                 
