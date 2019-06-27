@@ -53,6 +53,10 @@ end
 
 
 
+if(isfield(fNIR,'probeinfo'))
+    probeInfo=fNIR.probeinfo;
+else
+    
 if(pf2_base.isnestedfield(fNIR,'info.probename')&&isfield(fNIR.info,'probename')&&~contains(fNIR.info.probename,'Unknown')) 
     %try to load the probename cfg file
     cfgFilePath=sprintf('%s.cfg',fNIR.info.probename);
@@ -75,6 +79,7 @@ elseif(~isempty(cfgFilePath)) % If we're not looking at the GUI, doesn't matter
     probeInfo=pf2_base.loadDeviceCfg(cfgFilePath,plotArranged);
 end
 
+end
 if(pf2_base.isnestedfield(probeInfo,'Probe'))
     deviceInfo=probeInfo.Info;
     if(~isfield(deviceInfo,'numberProbes')||deviceInfo.numberProbes==1)
@@ -84,6 +89,7 @@ if(pf2_base.isnestedfield(probeInfo,'Probe'))
 else
    error('Unable to identify probe'); 
 end
+
 
 
 if(isempty(channels))
@@ -192,8 +198,19 @@ if(isfield(fNIR,'markers')&&~isempty(showMarkers))
 end
 
 
-tooManyMarkers=100;
-tooManyLabels=10;
+
+if(length(ylimit)==1)
+    ylimit=[0,maxRawValue];
+elseif(length(ylimit)>2||isempty(ylimit))
+   ylimit=[RawMin,maxRawValue];
+end
+
+
+numch2plot=length(channels);
+tooManyLabels=200/numch2plot;
+
+tooManyMarkers=1500/numch2plot;
+
 if(~isempty(showMarkers))
     plotTonsOfMarkers=[];
     numMarkers=zeros(1,length(showMarkers));
@@ -223,15 +240,6 @@ if(~isempty(showMarkers))
        plotTonsOfMarkers=false; 
     end
 end
-
-
-if(length(ylimit)==1)
-    ylimit=[0,maxRawValue];
-elseif(length(ylimit)>2||isempty(ylimit))
-   ylimit=[RawMin,maxRawValue];
-end
-
-
 
 h=cell(0);
 for(optIdx=1:length(channels))
@@ -291,7 +299,7 @@ for(optIdx=1:length(channels))
             set(lh,'Tag',sprintf('Opt%i:%inm',optNum,curWv(i)));
         end
     end
-    
+    ylim(ylimit);
     if(~isempty(showMarkers))
         maxH=plot([tmean],ylimit(2),'color',[1,1,1],'HandleVisibility','off');
         minH=plot([tmean],ylimit(1),'color',[1,1,1],'HandleVisibility','off');
@@ -303,7 +311,7 @@ for(optIdx=1:length(channels))
                 if(numMarkers(i)<tooManyLabels)
                 	pf2_base.external.vline(curMarkers(showMarkersIdx==i),'k',mrkName,yLabelHeight(i));
                 else
-                    pf2_base.external.vline(curMarkers(showMarkersIdx==i),'lineTags',mrkName);
+                    pf2_base.external.vline(curMarkers(showMarkersIdx==i),{},{},{},'lineTags',mrkName);
                     fprintf('Marker %i has too many instances to plot labels',showMarkers(i));
                 end
                 
@@ -316,7 +324,7 @@ for(optIdx=1:length(channels))
 
     xlim([tmin,tmax]);
     
-    ylim(ylimit);
+    
     
     
     

@@ -86,27 +86,31 @@ if(length(channels)>1&&any(logical(channels))&&any(~isnumeric(channels)))
 end
 
 
-
-if(pf2_base.isnestedfield(fNIR,'info.probename')&&isfield(fNIR.info,'probename')&&~contains(fNIR.info.probename,'Unknown')) 
-    %try to load the probename cfg file
-    cfgFilePath=sprintf('%s.cfg',fNIR.info.probename);
+if(isfield(fNIR,'probeinfo'))
+    probeInfo=fNIR.probeinfo;
 else
-    cfgFilePath='';
-end
 
-
-if(isempty(cfgFilePath)||~contains(cfgFilePath,'.cfg'))
-    
-    warning('Missing or invalid configuration file path\n')
-    
-    disp('No device specified. Please load device configuration');
-    probeInfo=pf2_base.loadDeviceCfg([],true);
-    if(~isempty(probeInfo))
-        error('No valid devices selected');
+    if(pf2_base.isnestedfield(fNIR,'info.probename')&&isfield(fNIR.info,'probename')&&~contains(fNIR.info.probename,'Unknown')) 
+        %try to load the probename cfg file
+        cfgFilePath=sprintf('%s.cfg',fNIR.info.probename);
+    else
+        cfgFilePath='';
     end
-    
-elseif(~isempty(cfgFilePath)) % If we're not looking at the GUI, doesn't matter
-    probeInfo=pf2_base.loadDeviceCfg(cfgFilePath,plotArranged);
+
+
+    if(isempty(cfgFilePath)||~contains(cfgFilePath,'.cfg'))
+
+        warning('Missing or invalid configuration file path\n')
+
+        disp('No device specified. Please load device configuration');
+        probeInfo=pf2_base.loadDeviceCfg([],true);
+        if(~isempty(probeInfo))
+            error('No valid devices selected');
+        end
+
+    elseif(~isempty(cfgFilePath)) % If we're not looking at the GUI, doesn't matter
+        probeInfo=pf2_base.loadDeviceCfg(cfgFilePath,plotArranged);
+    end
 end
 
 if(pf2_base.isnestedfield(probeInfo,'Probe'))
@@ -193,37 +197,7 @@ if(isfield(fNIR,'markers')&&~isempty(showMarkers))
 end
 
 
-tooManyMarkers=100;
-tooManyLabels=10;
-if(~isempty(showMarkers))
-    plotTonsOfMarkers=[];
-    numMarkers=zeros(1,length(showMarkers));
-    for i=1:length(showMarkers)
-        numMarkers(i)=sum(showMarkersIdx==i);
-        if(numMarkers(i)>tooManyMarkers&&isempty(plotTonsOfMarkers))
-            fprintf(2,'Warning: Over %i markers for marker %i\n',tooManyMarkers,i);
-            user_entry = input(sprintf('Enable TonsOfMarkers Mode?\n(Can be VERY slow)\ny/n: '), 's');
-            user_entry=lower(user_entry);
-            switch user_entry
-                case '1'
-                    plotTonsOfMarkers=true;
-                case '0'
-                    plotTonsOfMarkers=false;
-                case 'y'
-                    plotTonsOfMarkers=true;
-                case 'n'
-                    plotTonsOfMarkers=false;
-                case 'yes'
-                    plotTonsOfMarkers=true;
-                case 'no'
-                    plotTonsOfMarkers=false;
-            end
-        end
-    end
-    if(isempty(plotTonsOfMarkers))
-       plotTonsOfMarkers=false; 
-    end
-end
+
 
 
 if(islogical(baseline)&&baseline&&any(~isnumeric(baseline))) 
@@ -286,6 +260,42 @@ if(ylimit(1)==ylimit(2))
 end
 
 h=cell(0);
+
+numch2plot=length(channels);
+tooManyLabels=200/numch2plot;
+
+tooManyMarkers=1500/numch2plot;
+
+if(~isempty(showMarkers))
+    plotTonsOfMarkers=[];
+    numMarkers=zeros(1,length(showMarkers));
+    for i=1:length(showMarkers)
+        numMarkers(i)=sum(showMarkersIdx==i);
+        if(numMarkers(i)>tooManyMarkers&&isempty(plotTonsOfMarkers))
+            fprintf(2,'Warning: Over %i markers for marker %i\n',tooManyMarkers,i);
+            user_entry = input(sprintf('Enable TonsOfMarkers Mode?\n(Can be VERY slow)\ny/n: '), 's');
+            user_entry=lower(user_entry);
+            switch user_entry
+                case '1'
+                    plotTonsOfMarkers=true;
+                case '0'
+                    plotTonsOfMarkers=false;
+                case 'y'
+                    plotTonsOfMarkers=true;
+                case 'n'
+                    plotTonsOfMarkers=false;
+                case 'yes'
+                    plotTonsOfMarkers=true;
+                case 'no'
+                    plotTonsOfMarkers=false;
+            end
+        end
+    end
+    if(isempty(plotTonsOfMarkers))
+       plotTonsOfMarkers=false; 
+    end
+end
+
 for(optIdx=1:length(channels))
     optNum=channels(optIdx);
     if(plotArranged)
@@ -352,7 +362,7 @@ for(optIdx=1:length(channels))
         end
     end
         
-    
+    ylim(ylimit);
     if(~isempty(showMarkers))
 
         for i=1:length(showMarkers)
@@ -362,7 +372,7 @@ for(optIdx=1:length(channels))
                 if(numMarkers(i)<tooManyLabels)
                 	pf2_base.external.vline(curMarkers(showMarkersIdx==i),'k',mrkName,yLabelHeight(i));
                 else
-                    pf2_base.external.vline(curMarkers(showMarkersIdx==i),'lineTags',mrkName);
+                    pf2_base.external.vline(curMarkers(showMarkersIdx==i),{},{},{},'lineTags',mrkName);
                     fprintf('Marker %i has too many instances to plot labels',showMarkers(i));
                 end
                 
@@ -375,7 +385,7 @@ for(optIdx=1:length(channels))
 
     xlim([tmin,tmax]);
     
-    ylim(ylimit);
+    
     
     xlabel(sprintf('Opt %i',optNum));
     
