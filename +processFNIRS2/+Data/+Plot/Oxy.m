@@ -78,7 +78,7 @@ if(nargin<2||isempty(channels)||(ischar(channels)&&strcmpi(channels,'all')))
     channels=[];
 end
 
-if(any(logical(channels))&&any(~isnumeric(channels)))
+if(length(channels)>1&&any(logical(channels))&&any(~isnumeric(channels)))
    if(any(~channels))
       plotArranged=true; 
    end

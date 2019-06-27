@@ -285,7 +285,7 @@ for i=1:numfSeg
     end
     
     
-    if(isfield(curFNIR,'Aux')&&averageAux)
+    if(isfield(curFNIR,'Aux')&&averageAux&&~isempty(curFNIR.Aux))
         curSegAuxFields=fields(curFNIR.Aux);
         if(~isempty(curSegAuxFields))
             for aux=1:numAuxFields

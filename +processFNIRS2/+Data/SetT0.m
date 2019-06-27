@@ -17,3 +17,12 @@ end
 if(isfield(outFNIR,'raw'))
    outFNIR.raw(:,1)= outFNIR.raw(:,1)-t0time;
 end
+
+
+if(pf2_base.isnestedfield(outFNIR,'Aux.t'))
+    outFNIR.Aux.t(:,1)= outFNIR.Aux.t(:,1)-t0time;
+end
+
+if(pf2_base.isnestedfield(outFNIR,'Aux.time'))
+    outFNIR.Aux.time(:,1)= outFNIR.Aux.time(:,1)-t0time;
+end

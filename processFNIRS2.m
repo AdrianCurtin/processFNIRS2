@@ -206,8 +206,6 @@ end
 cfgRawImportPath=p.Results.ImportRawMethods;
 cfgOxyImportPath=p.Results.ImportOxyMethods;
 
-hObject=1;
-handles=1;
 if(~strcmp(cfgRawImportPath,'NA'))
     processFNIRS2.Methods.Raw.ImportMethods(cfgRawImportPath);
 end
@@ -235,75 +233,11 @@ if(ismatrix(data)&&~isstruct(data))
    data=[];
    data.raw=x;
 end
+
+[validBioFields,altSpellings]=pf2_base.pf2_getFNIRSbiomFields();
+[validFields]=pf2_base.pf2_getFNIRSfields();
    
 if(isstruct(data)) %treat as fNIR struct
-    if(isfield(data,'raw'))
-        fData.stage{1}=data.raw;
-    end
-    if(isfield(data,'MES'))
-        fData.stage{1}=data.raw;
-    end
-    if(isfield(data,'oxy'))
-        tempOxyStage.HbDiff=data.oxy;
-    end
-    if(isfield(data,'hbo'))
-        tempOxyStage.HbO=data.hbo;
-    end
-    if(isfield(data,'hbr'))
-        tempOxyStage.HbR=data.hbr;
-    end
-    if(isfield(data,'total'))
-        tempOxyStage.HbTotal=data.total;
-    end
-    if(isfield(data,'Total'))
-        tempOxyStage.HbTotal=data.total;
-    end
-    if(isfield(data,'cbsi'))
-        tempOxyStage.CBSI=data.cbsi;
-    end
-    if(isfield(data,'HbO'))
-        tempOxyStage.HbO=data.HbO;
-    end
-    if(isfield(data,'HbR'))
-        tempOxyStage.HbR=data.HbR;
-    end
-    
-    if(isfield(data,'HbTotal'))
-        tempOxyStage.HbTotal=data.HbTotal;
-    end
-    
-    if(isfield(data,'CBSI'))
-        tempOxyStage.CBSI=data.CBSI;
-    end
-    
-    if(isfield(data,'diffhb'))
-        tempOxyStage.HbDiff=data.diffhb;
-    end
-    
-    if(isfield(data,'HbDiff'))
-        tempOxyStage.HbDiff=data.HbDiff;
-    end
-    
-    if(isfield(data,'Oxy'))
-        tempOxyStage.HbO=data.Oxy;
-    end
-    
-    if(isfield(data,'Deoxy'))
-        tempOxyStage.HbR=data.Deoxy;
-    end
-    
-    if(isfield(data,'channels'))
-        tempOxyStage.channels=data.channels;
-    end
-    
-    if(isfield(data,'units'))
-        tempOxyStage.units=data.units;
-    end
-    
-    if(isfield(data,'DPF_factor'))
-        tempOxyStage.DPF_factor=data.DPF_factor;
-    end
-    
     if(isfield(data,'mrk'))
         if(isnumeric(data.mrk))
             data.markers=data.mrk;
@@ -321,81 +255,61 @@ if(isstruct(data)) %treat as fNIR struct
         end
     end
     
-    if(isfield(data,'fchMask'))
-        fData.fchMask=data.fchMask;
+    
+    dataFields=fields(data);  % copy bio marker fields
+    for i=1:length(dataFields)
+        curField=dataFields{i};
+       for j=1:length(validBioFields)
+           memberIdx=ismember(altSpellings{j},curField);
+           if(any(memberIdx))
+                if(strcmpi(validBioFields{j},'raw'))
+                    fData.stage{1}=data.(curField);
+                else
+                    tempOxyStage.(validBioFields{j})=data.(curField);
+                end
+                break;
+           end
+       end
     end
     
-    if(isfield(data,'time'))
-        fData.time=data.time;
+    for i=1:length(dataFields)  % copy other fields
+       curField=dataFields{i};
+       memberIdx=ismember(validFields,curField);
+       if(any(memberIdx))
+            if(strcmpi(validFields{memberIdx},'channels')||...
+                    strcmpi(validFields{memberIdx},'units')||...
+                    strcmpi(validFields{memberIdx},'DPF_factor'))
+                tempOxyStage.(validFields{memberIdx})=data.(curField);
+            else
+                fData.(validFields{memberIdx})=data.(curField);
+            end
+       end
     end
+
     
-    if(isfield(data,'markers'))
-        if(isnumeric(data.markers))
-            fData.markers=data.markers;
-        elseif(isfield(data.markers,'data'))
-            fData.markers=data.markers.data;
-            if(~isfield(data,'info'))
-                data.info=[];
-            end
-            if(isfield(data.markers,'info'))
-               data.info.mrkinfo=data.markers.info;
-            end
-            if(isfield(data.markers,'headers'))
-                data.info.mrkheaders=data.markers.headers;
-            end
-        end
-    else
+    if(~isfield(fData,'markers'))
        fData.markers=[]; 
     end
     
-    if(isfield(data,'info'))
-        fData.info=data.info;
-    else
+    if(~isfield(fData,'info'))
         fData.info=[]; 
     end
     
-    if(~isfield(fData.info,'SubjectID'))
-        fData.info.SubjectID='';
+    if(~isfield(fData,'Aux'))
+        fData.Aux=[];
     end
-    if(~isfield(fData.info,'Group'))
-        fData.info.Group='';
-    end
-    if(~isfield(fData.info,'Subgroup'))
-        fData.info.Subgroup='';
-    end
-    if(~isfield(fData.info,'Session'))
-        fData.info.Session='';
-    end
-    if(~isfield(fData.info,'Trial'))
-        fData.info.Trial='';
-    end
-    if(~isfield(fData.info,'Block'))
-        fData.info.Block='';
-    end
-    if(~isfield(fData.info,'Condition'))
-        fData.info.Condition='';
-    end
-    if(~isfield(fData.info,'Age'))
-        fData.info.Age=[];
-    end
-    if(~isfield(fData.info,'Sex'))
-        fData.info.Sex='';
+    
+    [defaultInfoFields,defaultValues]=pf2_base.pf2_getDefaultInfoFields();
+    
+    for i=1:length(defaultInfoFields)
+        if(~isfield(fData.info,defaultInfoFields{i}))
+            fData.info.(defaultInfoFields{i})=defaultValues{i};
+        end
     end
     
     if(pf2_base.isnestedfield(data,'ROI.info'))
         fData.ROI=data.ROI;
     end
-    
-    if(isfield(data,'channels'))
-        fData.channels=data.channels;
-    end
-    
-    if(isfield(data,'Aux'))
-        fData.Aux=data.Aux;
-    else
-        fData.Aux=[];
-    end
-    
 end
 
 if(isempty(fData.info.Age))
@@ -409,9 +323,6 @@ end
 if(isstruct(tempOxyStage))
     fData.stage{4}=tempOxyStage; %Assign stage3 if exists
 end
-
-
-
 
 fData=updateCurrentDevice(fData);
 
@@ -440,18 +351,21 @@ if(~isempty(data))
         fData.fchMask=true(1,length(setF.device.Probe{1}.ChannelList));
     end
     numChannels=length(setF.device.Probe{1}.ChannelList);
+    channelNumbers=setF.device.Probe{1}.ChannelNumbers;
+    wavelengths=setF.device.Probe{1}.Wavelength;
     
-    rawMask=ismember(setF.device.Probe{1}.ChannelNumbers,setF.device.Probe{1}.ChannelList(reshape(fData.fchMask>PF2.RejectLevel|outputData.ProcessRejected,1,numChannels)));
+    rawMask=ismember(channelNumbers,setF.device.Probe{1}.ChannelList(reshape(fData.fchMask>PF2.RejectLevel|outputData.ProcessRejected,1,numChannels)));
 
    %varargout=processFNIRdata(); 
    
    
     fAux=fData.Aux;
     fMarkers=fData.markers;
-   
+    
+
    if(outputData.ProcessRaw)
         
-        [fData.stage{3},fData.stage{2}]=processStageRaw2OD(fData.stage{1},fData.fs,fData.time,rawMask,fMarkers,fAux); % Raw data processing
+        [fData.stage{3},fData.stage{2}]=pf2_base.fnirs.processStageRaw2OD(PF2.stageRawMethod,fData.stage{1},fData.fs,fData.time,rawMask,fMarkers,fAux,channelNumbers,wavelengths); % Raw data processing
         if(outputData.ProcessOxy)
             fData.stage{4}=processStageOD2Hb(fData.stage{3},fData.time,fData.info.Age,outputData.DirtyBaseline); % Beer-Lambert conversion
         end
@@ -521,25 +435,16 @@ if(nargout>0)
            outfNIR.info=fData.info;
        end
        
-       if(exist('outfNIR')&&isfield(fData,'channels'))
-            outfNIR.channels=fData.channels;
-        end
-       
-       if(exist('outfNIR')&&isfield(fData,'fchMask'))
-           outfNIR.fchMask=fData.fchMask; % autorejected channels are masked virtually , not by changing the channel mask
-       end
-       
-       if(isfield(fData,'Aux')&&~isempty(fData.Aux))
-           outfNIR.Aux=fData.Aux;
-       end
-       
-       if(isfield(fData,'takizawa'))
-           outfNIR.takizawa=fData.takizawa;
-       end
-       
-       
        if(exist('outfNIR'))
-        varargout={outfNIR};
+           fdataFields=fields(fData);
+           for i=1:length(fdataFields)
+               memberIdx=ismember(validFields,fdataFields{i});
+               if(any(memberIdx))
+                    outfNIR.(validFields{memberIdx})=fData.(fdataFields{i});
+               end
+           end
+           
+           varargout={outfNIR};
        else
           varargout={[]}; 
        end
@@ -553,115 +458,6 @@ clearVarsOnClose();
 
 end
 
-
-function [outDataOD,outDataRaw]=processStageRaw2OD(data,fs,time,rawMask,fMarkers,fAux)
- % Raw data processing
-
-global PF2
-
-outData=data;
-OD_converted=false;
-
-validChannels=(PF2.curWvSet>0)&rawMask;  %Dark Channel should be 0, time should be NA, other information should be negative values
-
-if(~isfield(PF2,'stageRawMethod'))
-    disp('No current Filters enabled');
-    %outData(:,validChannels)=medfilt1(data(:,validChannels),10);
-else
-    for i=1:length(PF2.stageRawMethod.F)
-        Fidx=PF2.stageRawMethod.F{i};
-        if(isfield(Fidx,'f'))
-            func=str2func(Fidx(1).f);
-            if(contains(Fidx(1).f,'Intensity2OD'))
-                outDataRaw=outData;
-                OD_converted=true;
-            end
-            x_ind=[];
-            fs_ind=[];
-            time_ind=[];
-            fmask_ind=[];
-            fchInfo_ind=[];
-            fmrk_ind=[];
-            fAux_ind=[];
-            fsd_ind=[];
-            
-            if(length(Fidx)>1) %This is a struct array for some reason?
-               %Change it back!
-               args=cell(0,0);
-               passedArgVals=cell(0,0);
-               for j=1:length(Fidx)
-                    args{j}=Fidx(j).args;
-                    passedArgVals{j}=Fidx(j).argvals;
-               end
-            else
-                args=Fidx.args;
-                passedArgVals=Fidx.argvals;
-                if(~iscell(args))
-                    args={args};
-                end
-                if(~iscell(passedArgVals))
-                    passedArgVals={passedArgVals};
-                end
-            end
-            
-            for a=1:length(args)
-               if strcmp(args{a},'x')==1
-                  x_ind=a;
-                  passedArgVals{x_ind}=data(:,validChannels);
-               elseif strcmp(args{a},'fs')==1
-                  fs_ind=a; 
-                  passedArgVals{fs_ind}=fs;
-               elseif strcmp(args{a},'fTime')==1
-                  time_ind=a; 
-                  passedArgVals{time_ind}=time;
-               elseif strcmp(args{a},'fchMask')==1
-                  fmask_ind=a;
-                  passedArgVals{fmask_ind}=rawMask;
-               elseif strcmp(args{a},'fChannelNumbers')==1
-                  fchInfo_ind=a;
-                  passedArgVals{fchInfo_ind}=PF2.curChSet(validChannels);
-               elseif strcmp(args{a},'fChannelSD')==1
-                  fsd_ind=a;
-                  passedArgVals{fsd_ind}=PF2.curSDSet(ismember(PF2.curChList,PF2.curChSet(validChannels)));
-               elseif strcmp(args{a},'fMarkers')==1
-                  fmrk_ind=a; 
-                  passedArgVals{fmrk_ind}=fMarkers;
-               elseif strcmp(args{a},'fAux')==1
-                  fAux_ind=a;
-                  passedArgVals{fAux_ind}=fAux;
-               end
-            end
-            
-            if(~isempty(x_ind))
-                outData=data;
-                
-                %for ch=1:size(data,2)
-                outData(:,validChannels)=func(passedArgVals{:});
-                %end
-                data=outData;
-            else
-                outData=data;
-                warning('Unable to identify NIRS input argument\n');
-            end
-        end
-    end
-end
-if(OD_converted==false)
-    outDataRaw=outData;
-    outDataOD=outData;
-    validChannels=((PF2.curWvSet>=0)&rawMask); %convert all and Dark channels
-    outDataOD(:,validChannels)=pf2_Intensity2OD(outData(:,validChannels));
-else
-    validDarkChannels=((PF2.curWvSet==0)&rawMask); %convert just dark channels
-    outDataOD=outData; 
-    outDataOD(:,validDarkChannels)=pf2_Intensity2OD(outData(:,validDarkChannels));
-end
-
-outDataRaw(:,((PF2.curWvSet>=0)&~rawMask))=nan;
-outDataOD(:,((PF2.curWvSet>=0)&~rawMask))=nan;
-
-
-end
 
 function outData=processStageOD2Hb(data,time,subjectAge,DirtyBaseline)
  % Beer-Lambert conversion
@@ -718,6 +514,12 @@ validChannels(data.channels>0)=data.channels(data.channels>0)&(reshape(data.fchM
 
 curfMask=data.fchMask|ProcessRejected;
 
+if(isfield(data,'ftimeChMask'))
+    curftimeMask=data.ftimeChMask|ProcessRejected;
+else
+    curftimeMask=ones(size(data.HbO));
+end
+
 if(pf2_base.isnestedfield(data,'ROI.HbO')&&~isempty(data.ROI))
     validChannels_roi=true(1,size(data.ROI.('HbO'),2));
 end
@@ -743,6 +545,7 @@ else
             fAux_ind=[];
             fsd_ind=[];
             fStruct_ind=[];
+            ftimeMask_ind=[];
             
             
             if(length(Fidx)>1||~iscell(Fidx.args)) %This is a struct array for some reason?
@@ -762,7 +565,11 @@ else
                x_out_ind=[];
                roi_out_ind=[];
                fmask_out_ind=[];
+               ftimeMask_out_ind=[];
+               fstruct_out_ind=[];
+               
                outputList=Fidx.output;
+               
                if(iscell(outputList{1}))
                   outputList=outputList{1}; 
                end
@@ -771,6 +578,10 @@ else
                         x_out_ind=output_idx;
                    elseif strcmpi(outputList{output_idx},'fchMask')==1 && isempty(fmask_out_ind)
                        fmask_out_ind=output_idx;
+                   elseif strcmpi(outputList{output_idx},'ftimeChMask')==1 && isempty(ftimeMask_out_ind)
+                       ftimeMask_out_ind=output_idx;
+                   elseif strcmpi(outputList{output_idx},'fNIRstruct')==1 && isempty(fstruct_out_ind)
+                       fstruct_out_ind=output_idx;
                    elseif strcmpi(outputList{output_idx},'ROI')==1 && isempty(roi_out_ind)
                        roi_out_ind=output_idx;
                    end
@@ -779,7 +590,10 @@ else
                 x_out_ind=1;
                 roi_out_ind=[];
                 fmask_out_ind=[];
+                ftimeMask_out_ind=[];
+                fstruct_out_ind=[];
             end
+            
             
             for a=1:length(args)
                if strcmp(args{a},'x')==1
@@ -792,7 +606,7 @@ else
                   passedArgVals{time_ind}=data.time;
                elseif strcmp(args{a},'fchMask')==1
                   fmask_ind=a;
-                  passedArgVals{fmask_ind}=data.fchMask;
+                  passedArgVals{fmask_ind}=curfMask;
                elseif strcmp(args{a},'fChannelNumbers')==1
                   fchInfo_ind=a;
                   passedArgVals{fchInfo_ind}=data.channels(validChannels);
@@ -805,6 +619,9 @@ else
                elseif strcmp(args{a},'fChannelSD')==1
                   fsd_ind=a;
                   passedArgVals{fsd_ind}=PF2.curSDSet(validChannels);
+               elseif strcmp(args{a},'ftimeChMask')==1
+                  ftimeMask_ind=a;
+                  passedArgVals{ftimeMask_ind}=curftimeMask; % always needs channel info when used in raw
                elseif strcmp(args{a},'fNIRstruct')==1  % Try not to use, can be inefficient
                    fStruct_ind=a;
                    passedArgVals{fStruct_ind}=data;
@@ -817,7 +634,7 @@ else
                 outData=data;
                 %TODO move channel mask that doesn't process data outside
                 %of loop 
-                if(~isempty(fStruct_ind))
+                if(~isempty(fStruct_ind)||~isempty(fstruct_out_ind))
                     runOnce=true;
                 else
                     runOnce=false;
@@ -850,12 +667,36 @@ else
                     end
                     
                     if(~isempty(fmask_out_ind)) % Or with current fmask
-                        curfMask=curfMask&funcOutput{fmask_out_ind};
+                        if(size(funcOutput{fmask_out_ind},2)<size(curfMask,2))
+                            curfMask(:,validChannels)=curfMask(:,validChannels)&funcOutput{fmask_out_ind};
+                        else
+                            curfMask=curfMask&funcOutput{fmask_out_ind};
+                        end
+                        
                         validChannels=validChannels&curfMask;
                         outData.(bioM_list{bioM})(:,~validChannels)=nan;
                         if(pf2_base.isnestedfield(data,'ROI.HbO'))
-                            validChannels_roi=validChannels_roi&funcOutput_roi{fmask_out_ind};
+                            if(size(funcOutput_roi{fmask_out_ind},2)<size(validChannels_roi,2))
+                                validChannels_roi(:,validChannels)=validChannels_roi(:,validChannels)&funcOutput{fmask_out_ind};
+                            else
+                                validChannels_roi=validChannels_roi&funcOutput_roi{fmask_out_ind};
+                            end
                             outData.ROI.(bioM_list{bioM})(:,~validChannels_roi)=nan;
+                        end
+                    end
+                    
+                    if(~isempty(ftimeMask_out_ind)) % Or with current ftimemask
+                        if(size(funcOutput{ftimeMask_out_ind},2)<size(validChannels,2))
+                            curftimeMask(:,validChannels)=curftimeMask(:,validChannels)&funcOutput{ftimeMask_out_ind};
+                        else
+                            curftimeMask=curftimeMask&funcOutput{ftimeMask_out_ind};
+                        end
+                        if(pf2_base.isnestedfield(data,'ROI.HbO'))
+                            if(size(funcOutput_roi{ftimeMask_out_ind},2)<size(validChannels_roi,2))
+                                curftimeMask_roi(:,validChannels_roi)=curftimeMask_roi(:,validChannels_roi)&funcOutput_roi{ftimeMask_out_ind};
+                            else
+                                curftimeMask_roi=curftimeMask_roi&funcOutput_roi{ftimeMask_out_ind};
+                            end
                         end
                     end
                     
@@ -863,7 +704,12 @@ else
                         outData=funcOutput{roi_out_ind};
                         if(isfield(outData,'ROI')&&~isempty(outData.ROI'))
                             validChannels_roi=true(1,size(outData.ROI.(bioM_list{bioM}),2));
+                            curftimeMask_roi=true(size(outData.ROI.(bioM_list{bioM})));
                         end
+                    end
+                    
+                    if(~isempty(fstruct_out_ind)) % Build ROIs
+                        outData=funcOutput{fstruct_out_ind};
                     end
                     
                     if(runOnce)
@@ -897,8 +743,11 @@ invalidChannels(data.channels>0)=data.channels(data.channels>0)&(reshape(~curfMa
 for bioM=1:length(bioM_list) % go through each biomarker and set invalid cahnnels to nan
     outData.(bioM_list{bioM})(:,invalidChannels)=nan;
     
+    outData.(bioM_list{bioM})(~curftimeMask)=nan;
+    
     if(pf2_base.isnestedfield(outData,'ROI.HbO'))
         outData.ROI.(bioM_list{bioM})(:,~validChannels_roi)=nan;
+        outData.ROI.(bioM_list{bioM})(~curftimeMask_roi)=nan;
     end
 end
 

@@ -324,42 +324,22 @@ else
 
 end
 
-if(isfield(fNIR,'takizawa'))
-    outfNIR.takizawa=fNIR.takizawa;
+validFields=pf2_base.pf2_getFNIRSfields();
+
+fdataFields=fields(fNIR);  % Copy known fields
+for i=1:length(fdataFields)
+   memberIdx=ismember(validFields,fdataFields{i});
+   if(any(memberIdx)&&~strcmp(fdataFields{i},'time'))
+        outfNIR.(validFields{memberIdx})=fNIR.(fdataFields{i});
+   end
 end
 
-if(isfield(fNIR,'info'))
-    outfNIR.info=fNIR.info;
-end
-
-if(isfield(fNIR,'fs'))
-    outfNIR.fs=fNIR.fs;
-end
-
-
-if(isfield(fNIR,'fchMask'))
-    outfNIR.fchMask=fNIR.fchMask;
-end
-
-if(isfield(fNIR,'channels'))
-    outfNIR.channels=fNIR.channels;
-end
-
-if(isfield(fNIR,'units'))
-    outfNIR.units=fNIR.units;
-end
-
-
-if(isfield(fNIR,'DPF_factor'))
-    outfNIR.DPF_factor=fNIR.DPF_factor;
-end
-
-if(isfield(fNIR,'Aux'))
-    if(~isempty(fNIR.Aux))
-        auxFields=fields(fNIR.Aux);
+if(isfield(outfNIR,'Aux'))
+    if(~isempty(outfNIR.Aux))
+        auxFields=fields(outfNIR.Aux);
         for f=1:length(auxFields)
             curFieldName=auxFields{f};
-            curField=fNIR.Aux.(curFieldName);
+            curField=outfNIR.Aux.(curFieldName);
             if(isstruct(curField)||iscell(curField)||istable(curField))
                 if(~isfield(curField,'t')||~isfield(curField,'time'))
                     outfNIR.Aux.(curFieldName)=curField;
@@ -384,14 +364,18 @@ if(isfield(fNIR,'Aux'))
     end
 end
 
-if(isfield(fNIR,'markers')&&~isempty(outfNIR.time))
-    if(isfield(fNIR.markers,'data')&&~isempty(fNIR.markers.data))
-        validIndicies=(fNIR.markers.data(:,1)<=max(outfNIR.time)&fNIR.markers.data(:,1)>=min(outfNIR.time))==1;
-        outfNIR.markers.data=fNIR.markers.data(validIndicies,:);
-    elseif(isnumeric(fNIR.markers)&&~isempty(fNIR.markers))
-        validIndicies=(fNIR.markers(:,1)<=max(outfNIR.time)&fNIR.markers(:,1)>=min(outfNIR.time))==1;
+if(isfield(outfNIR,'markers')&&~isempty(outfNIR.time))
+    if(isfield(outfNIR.markers,'data')&&~isempty(outfNIR.markers.data))
+        validIndicies=(outfNIR.markers.data(:,1)<=max(outfNIR.time)&outfNIR.markers.data(:,1)>=min(outfNIR.time))==1;
+        outfNIR.markers.data=outfNIR.markers.data(validIndicies,:);
+    elseif(isnumeric(outfNIR.markers)&&~isempty(outfNIR.markers))
+        validIndicies=(fNIR.markers(:,1)<=max(outfNIR.time)&outfNIR.markers(:,1)>=min(outfNIR.time))==1;
         outfNIR.markers=fNIR.markers(validIndicies,:);
     end
+end
+
+if(isfield(outfNIR,'ftimeChMask'))
+    outfNIR.ftimeChMask=outfNIR.ftimeChMask(indexStart:indexEnd,:);
 end
     
     

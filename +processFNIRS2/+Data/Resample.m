@@ -445,6 +445,15 @@ if(calcROI)
     outFNIR.ROI.CBSI=CBSI_roi(1:end-field_diff,:);
 end
 
+validFields=pf2_base.pf2_getFNIRSfields();
+fdataFields=fields(fNIR);  % Copy known fields
+for i=1:length(fdataFields)
+   memberIdx=ismember(validFields,fdataFields{i});
+   if(any(memberIdx)&&~strcmp(fdataFields{i},'time')...
+           &&~strcmp(fdataFields{i},'fs'))
+        outFNIR.(validFields{memberIdx})=fNIR.(fdataFields{i});
+   end
+end
 
 times=times(1:size(outFNIR.HbR,1),:);
 outFNIR.segmentTimes=[times,times+segLength/2,times+segLength];
@@ -455,31 +464,6 @@ elseif(strcmp(timeOutMode,'end'))
 else %Return midpoint
     outFNIR.time=outFNIR.segmentTimes(1:end,2); %returns effective "sample point" at midpoint of segmentTimes
 end
-
-
-
-if(isfield(fNIR,'fchMask'))
-   outFNIR.fchMask=fNIR.fchMask; 
-end
-
-if(isfield(fNIR,'markers'))
-    outFNIR.markers=fNIR.markers;
-end
-
-if(isfield(fNIR,'channels'))
-    outFNIR.channels=fNIR.channels;
-end
-
-if(isfield(fNIR,'units'))
-    outFNIR.units=fNIR.units;
-end
-
-if(isfield(fNIR,'info'))
-    outFNIR.info=fNIR.info;
-end
-
-
-
 
 outFNIR.fs=1/segLength; %new "effective sampling frequency
 

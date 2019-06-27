@@ -580,6 +580,10 @@ OD_converted=false;
 validChannels=((PF2.curWvSet>0)&PF2.data.rawMask);  %Dark Channel should be 0, time should be NA, other information should be negative values
 validDarkChannels=((PF2.curWvSet==0)&PF2.data.rawMask);
 
+curRawMask=PF2.data.rawMask;
+
+timeChMask=ones(size(data));
+
 firstValidRow=nan;
 for i=1:size(data,1)
    if(any(~isnan(data(i,validChannels))))
@@ -609,7 +613,7 @@ if(~isfield(PF2.GUIPF2,'stageRawMethod'))
 else
     for i=1:length(PF2.GUIPF2.stageRawMethod.F)
         Fidx=PF2.GUIPF2.stageRawMethod.F{i};
-        if(isfield(Fidx,'f'))
+            if(isfield(Fidx,'f'))
             func=str2func(Fidx(1).f);
             if(contains(Fidx(1).f,'Intensity2OD'))
                 outDataRaw=outData;
@@ -622,9 +626,9 @@ else
             fchInfo_ind=[];
             fmrk_ind=[];
             fAux_ind=[];
-            fAmb_ind=[];
             fsd_ind=[];
-            
+            ftimeMask_ind=[];
+
             if(length(Fidx)>1) %This is a struct array for some reason?
                %Change it back!
                args=cell(0,0);
@@ -643,6 +647,31 @@ else
                     passedArgVals={passedArgVals};
                 end
             end
+
+            if(isfield(Fidx,'output'))
+               x_out_ind=[];
+               fmask_out_ind=[];
+               ftimeMask_out_ind=[];
+
+               outputList=Fidx.output;
+
+               if(iscell(outputList{1}))
+                  outputList=outputList{1}; 
+               end
+               for output_idx=1:length(outputList)
+                   if strcmpi(outputList{output_idx},'x')==1 && isempty(x_out_ind)
+                        x_out_ind=output_idx;
+                   elseif strcmpi(outputList{output_idx},'fchMask')==1 && isempty(fmask_out_ind)
+                       fmask_out_ind=output_idx;
+                   elseif strcmpi(outputList{output_idx},'ftimeChMask')==1 && isempty(ftimeMask_out_ind)
+                       ftimeMask_out_ind=output_idx;
+                   end
+               end
+            else %legacy code missing output
+                x_out_ind=1;
+                fmask_out_ind=[];
+                ftimeMask_out_ind=[];
+            end
             
 
             
@@ -658,7 +687,10 @@ else
                   passedArgVals{time_ind}=PF2.data.time(validRows);
                elseif strcmp(args{a},'fchMask')==1
                   fmask_ind=a;
-                  passedArgVals{fmask_ind}=PF2.data.rawMask;
+                  passedArgVals{fmask_ind}=curRawMask(:,validChannels);
+               elseif strcmp(args{a},'ftimeChMask')==1
+                  ftimeMask_ind=a;
+                  passedArgVals{ftimeMask_ind}=timeChMask(:,validChannels); % always needs channel info when used in raw
                elseif strcmp(args{a},'fChannelNumbers')==1
                   fchInfo_ind=a;
                   passedArgVals{fchInfo_ind}=PF2.curChSet(validChannels);               
@@ -683,7 +715,7 @@ else
                 %for ch=1:size(data,2)
                     
                     try
-                        outData(validRows,validChannels)=func(passedArgVals{:});
+                        funcOutput{:}=func(passedArgVals{:});
                     catch ME
                         global outputData
                         if(outputData.ShowGUI)
@@ -696,6 +728,46 @@ else
                             rethrow(ME);
                         end
                     end
+                    
+                    try
+                        if(~isempty(x_out_ind)) 
+                            outData(validRows,validChannels)=funcOutput{x_out_ind};
+                        end
+                        
+                        if(~isempty(fmask_out_ind)) % Or with current fmask
+                            if(size(funcOutput{fmask_out_ind},2)<size(curRawMask,2))
+                                curRawMask(:,validChannels)=curRawMask(:,validChannels)&funcOutput{fmask_out_ind};
+                            else
+                                curRawMask=curRawMask&funcOutput{fmask_out_ind};
+                            end
+
+                            validChannels=validChannels&curRawMask;
+                            %outData(:,~rawMask)=nan;
+
+                        end
+
+                        if(~isempty(ftimeMask_out_ind)) % Or with current fmask
+                            if(size(funcOutput{ftimeMask_out_ind},2)<size(curRawMask,2))
+                                timeChMask(validRows,validChannels)=timeChMask(validRows,validChannels)&funcOutput{ftimeMask_out_ind};
+                            else
+                                timeChMask=timeChMask&funcOutput{ftimeMask_out_ind};
+                            end
+
+                        end
+                    catch ME
+                        global outputData
+                        if(outputData.ShowGUI)
+                            outData(:,validChannels)=nan;
+                            warning('Error occured in method %s when processing %s\n',PF2.GUIPF2.stageRawMethod.name,Fidx(1).f);
+                            waitfor(errordlg(sprintf('Error occured in method %s when processing %s\n%s\n',PF2.GUIPF2.stageRawMethod.name,Fidx(1).f,ME.message),'Raw Processing Error'));
+                        else
+                            fprintf('Error occured in method %s when processing %s\n',PF2.GUIPF2.stageRawMethod.name,Fidx(1).f);
+                            outData(:,validChannels)=nan;
+                            rethrow(ME);
+                        end
+                    end
+                    
+                    
                 %end
                 data=outData;
             else
@@ -705,19 +777,22 @@ else
         end
     end
 end
+
+outData(~timeChMask)=nan;
+
 if(OD_converted==false)
     outDataRaw=outData;
     outDataOD=outData;
-    validChannels=((PF2.curWvSet>=0)&PF2.data.rawMask); %convert all and Dark channels
+    validChannels=((PF2.curWvSet>=0)&curRawMask); %convert all and Dark channels
     outDataOD(:,validChannels)=pf2_Intensity2OD(outData(:,validChannels));
 else
-    validDarkChannels=((PF2.curWvSet==0)&PF2.data.rawMask); %convert just dark channels
+    validDarkChannels=((PF2.curWvSet==0)&curRawMask); %convert just dark channels
     outDataOD=outData; 
     outDataOD(:,validDarkChannels)=pf2_Intensity2OD(outData(:,validDarkChannels));
 end
 
-outDataRaw(:,((PF2.curWvSet>=0)&~PF2.data.rawMask))=nan;
-outDataOD(:,((PF2.curWvSet>=0)&~PF2.data.rawMask))=nan;
+outDataRaw(:,((PF2.curWvSet>=0)&~curRawMask))=nan;
+outDataOD(:,((PF2.curWvSet>=0)&~curRawMask))=nan;
 
 function outData=processStageOD2Hb(data,subAge)
  % Beer-Lambert conversion
@@ -787,6 +862,13 @@ curfMask=PF2.data.fchMask>PF2.RejectLevel|outputData.ProcessRejected;
 
 if(pf2_base.isnestedfield(data,'ROI.HbO')&&~isempty(data.ROI))
     validChannels_roi=true(1,size(data.ROI.('HbO'),2));
+    curftimeMask_roi=true(size(data.ROI.('HbO')));
+end
+
+if(isfield(data,'ftimeChMask'))
+    curftimeMask=data.ftimeChMask|ProcessRejected;
+else
+    curftimeMask=ones(size(data.HbO));
 end
 
 firstValidRow=nan;
@@ -852,23 +934,33 @@ else
                x_out_ind=[];
                roi_out_ind=[];
                fmask_out_ind=[];
+               ftimeMask_out_ind=[];
+               fstruct_out_ind=[];
+               
                outputList=Fidx.output;
+               
                if(iscell(outputList{1}))
                   outputList=outputList{1}; 
                end
-               for output_idx=1:length(outputList) % find first argument in output list
-                   if strcmp(outputList{output_idx},'x')==1 &&isempty(x_out_ind)
+               for output_idx=1:length(outputList)
+                   if strcmpi(outputList{output_idx},'x')==1 && isempty(x_out_ind)
                         x_out_ind=output_idx;
-                   elseif strcmp(outputList{output_idx},'fchMask')==1  &&isempty(fmask_out_ind)
+                   elseif strcmpi(outputList{output_idx},'fchMask')==1 && isempty(fmask_out_ind)
                        fmask_out_ind=output_idx;
-                   elseif strcmp(outputList{output_idx},'ROI')==1&&isempty(roi_out_ind)
+                   elseif strcmpi(outputList{output_idx},'ftimeChMask')==1 && isempty(ftimeMask_out_ind)
+                       ftimeMask_out_ind=output_idx;
+                   elseif strcmpi(outputList{output_idx},'fNIRstruct')==1 && isempty(fstruct_out_ind)
+                       fstruct_out_ind=output_idx;
+                   elseif strcmpi(outputList{output_idx},'ROI')==1 && isempty(roi_out_ind)
                        roi_out_ind=output_idx;
                    end
                end
-            else
-                x_out_ind=1; % assume that first index is the signal output
-                roi_out_ind=[]; % leave empty
+            else %legacy code missing output
+                x_out_ind=1;
+                roi_out_ind=[];
                 fmask_out_ind=[];
+                ftimeMask_out_ind=[];
+                fstruct_out_ind=[];
             end
             
             for a=1:length(args)
@@ -895,6 +987,9 @@ else
                elseif strcmp(args{a},'fAux')==1
                   fAux_ind=a;
                   passedArgVals{fAux_ind}=PF2.data.Aux;
+               elseif strcmp(args{a},'ftimeChMask')==1
+                  ftimeMask_ind=a;
+                  passedArgVals{ftimeMask_ind}=curftimeMask; % always needs channel info when used in raw
                elseif strcmp(args{a},'fNIRstruct')==1  % Try not to use, can be inefficient
                    fStruct_ind=a;
                    passedArgVals{fStruct_ind}=data;
@@ -905,7 +1000,7 @@ else
                 outData=data;
                 %for ch=1:size(data,2)
                 
-                if(~isempty(fStruct_ind))
+                if(~isempty(fStruct_ind)||~isempty(fstruct_out_ind))
                     runOnce=true;
                 else
                     runOnce=false;
@@ -951,14 +1046,38 @@ else
                             end
                             
                             if(~isempty(fmask_out_ind)) % Or with current fmask
+                                if(size(funcOutput{fmask_out_ind},2)<size(curfMask,2))
+                                    curfMask(:,validChannels)=curfMask(:,validChannels)&funcOutput{fmask_out_ind};
+                                else
+                                    curfMask=curfMask&funcOutput{fmask_out_ind};
+                                end
                                 curfMask=curfMask&funcOutput{fmask_out_ind};
-                                validChannels=outData.channels&(reshape(curfMask,[1,numChannels]));
+                                validChannels=validChannels&curfMask;
                                 outData.(bmrk)(:,~validChannels)=nan;
 
                                 if(pf2_base.isnestedfield(outData,'ROI.HbO')&&~isempty(x_ind)) % won't run on full fNIR struct fxs
-                                    validChannels_roi=validChannels_roi&funcOutput_roi{fmask_out_ind};
-                                    validChannels_roi=sum(~isnan(outData.(bmrk)))>0; % check for invalid ROI
+                                    if(size(funcOutput_roi{fmask_out_ind},2)<size(validChannels_roi,2))
+                                        validChannels_roi(:,validChannels)=validChannels_roi(:,validChannels)&funcOutput{fmask_out_ind};
+                                    else
+                                        validChannels_roi=validChannels_roi&funcOutput_roi{fmask_out_ind};
+                                    end
                                     outData.ROI.(bmrk)(:,~validChannels_roi)=nan;
+                                end
+                            end
+                            
+                            if(~isempty(ftimeMask_out_ind)) % Or with current ftimemask
+                                if(size(funcOutput{ftimeMask_out_ind},2)<size(validChannels,2)||size(funcOutput{fmask_out_ind},2)<length(validRows))
+                                    curftimeMask(validRows,validChannels)=curftimeMask(validRows,validChannels)&funcOutput{ftimeMask_out_ind};
+                                else
+                                    curftimeMask=curftimeMask&funcOutput{ftimeMask_out_ind};
+                                end
+                                if(pf2_base.isnestedfield(data,'ROI.HbO'))
+                                    if(size(funcOutput_roi{fmask_out_ind},2)<size(validChannels_roi,2)||size(funcOutput_roi{fmask_out_ind},2)<length(validRows))
+                                        curftimeMask_roi(validRows,validChannels)=curftimeMask_roi(validRows,validChannels)&funcOutput{ftimeMask_out_ind};
+                                    else
+                                        curftimeMask_roi=curftimeMask_roi&funcOutput{ftimeMask_out_ind};
+                                    end
+                                    
                                 end
                             end
                             
@@ -966,10 +1085,15 @@ else
                                 outData=funcOutput{roi_out_ind};
                                 if(~isempty(outData.ROI))
                                     validChannels_roi=true(1,size(outData.ROI.(bmrk),2));
+                                    curftimeMask_roi=true(size(data.ROI.('HbO')));
                                 else
                                     clear outData.ROI; 
                                 end
                                     
+                            end
+                            
+                            if(~isempty(fstruct_out_ind)) % Build ROIs
+                                outData=funcOutput{fstruct_out_ind};
                             end
                             
                             if(runOnce)
@@ -1023,9 +1147,10 @@ PF2.data.curChMask=curfMask;
 
 for bioM=1:length(bioM_list) % go through each biomarker and set invalid cahnnels to nan
     outData.(bioM_list{bioM})(:,invalidChannels)=nan;
-    
+    outData.(bioM_list{bioM})(~curftimeMask)=nan;
     if(isfield(outData,'ROI')&&isfield(outData.ROI,'HbO'))
         outData.ROI.(bioM_list{bioM})(:,~validChannels_roi)=nan;
+        outData.ROI.(bioM_list{bioM})(~curftimeMask_roi)=nan;
     end
 end
 
@@ -1751,7 +1876,7 @@ UpdateOptodeList(handles);
 global PF2
 global setF
 
-figure(handles.figure1);
+%figure(handles.figure1);
 
 PF2.curProbe=get(handles.listbox_probes,'Value');
 PF2.curCh_listIdx=get(handles.listbox_optodes,'Value');
@@ -1939,7 +2064,7 @@ if(~isempty(data))
 
     xl=[PF2.view.startTime,PF2.view.endTime]; plotMarkers(xl,stageAxesHandles{1});
     hold(stageAxesHandles{1},'off');
-    xlim(xl);
+    xlim(stageAxesHandles{1},xl);
     if(setF.device.Info.TimeIsSampleCount)
         xlabel(stageAxesHandles{1},'Time (samples)');
     else
@@ -2048,7 +2173,7 @@ if(~isempty(data)&&~isempty(plotSingleTable))
 
     xl=[PF2.view.startTime,PF2.view.endTime]; plotMarkers(xl,stageAxesHandles{2});
     hold(stageAxesHandles{2},'off');
-    xlim(xl);
+    xlim(stageAxesHandles{2},xl);
     if(setF.device.Info.TimeIsSampleCount)
         xlabel(stageAxesHandles{2},'Time (samples)');
     else
@@ -2163,7 +2288,7 @@ if(~isempty(data))
 
     xl=[PF2.view.startTime,PF2.view.endTime]; plotMarkers(xl,stageAxesHandles{3});
     hold(stageAxesHandles{3},'off');
-    xlim(xl);
+    xlim(stageAxesHandles{3},xl);
     if(setF.device.Info.TimeIsSampleCount)
         xlabel(stageAxesHandles{3},'Time (samples)');
     else
@@ -2247,7 +2372,7 @@ if(~isempty(data))
     end
 
     xl=[PF2.view.startTime,PF2.view.endTime]; plotMarkers(xl,stageAxesHandles{4});
-    xlim(xl);
+    xlim(stageAxesHandles{4},xl);
     hold(stageAxesHandles{4},'off');
 
     if(setF.device.Info.TimeIsSampleCount)

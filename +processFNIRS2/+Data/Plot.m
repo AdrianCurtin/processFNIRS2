@@ -13,7 +13,7 @@ if(isfield(fNIR,'HbO')&&~isempty(fNIR.HbO))
     if(nargout>0)
         varargout{1:nargout}=processFNIRS2.Data.Plot.Oxy(fNIR,varargin{:});
     else
-        processFNIRS2.Data.Plot.Oxy(fNIR,varargin);
+        processFNIRS2.Data.Plot.Oxy(fNIR,varargin{:});
     end
 elseif(isfield(fNIR,'raw')&&~isempty(fNIR.raw))
     if(nargout>0)

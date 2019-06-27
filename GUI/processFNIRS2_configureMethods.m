@@ -742,7 +742,7 @@ function listbox_inputSelect_Callback(hObject, eventdata, handles)
 %        contents{get(hObject,'Value')} returns selected item from listbox_inputSelect
 global PF2
 
-reservedArgs={'Name','Description','validStages','Arguments','x','fs','fTime','fchMask','fMarkers','fChannelNumbers','fMarkers','fChannelSD','fAmbient','fNIRstruct','argvals','default_argvals'};
+reservedArgs={'Name','Description','validStages','Arguments','x','fs','fTime','fchMask','ftimeChMask','fMarkers','fChannelNumbers','fMarkers','fChannelSD','fAmbient','fNIRstruct','argvals','default_argvals'};
 
 curFunction=get(handles.listbox_currentFunctions,'Value');
 curFunctionNames=get(handles.listbox_currentFunctions,'String');
@@ -789,6 +789,8 @@ if(~isempty(curFunctionNames)&&~isempty(curFunction))
                     set(handles.text_inputDescription,'String',sprintf('time points of fNIRS data')); 
                 elseif(strcmp(curArgument,'fchMask'))
                     set(handles.text_inputDescription,'String',sprintf('Channel Mask')); 
+                elseif(strcmp(curArgument,'ftimeChMask'))
+                    set(handles.text_inputDescription,'String',sprintf('Time x Channel Mask')); 
                 elseif(strcmp(curArgument,'fChannelNumbers'))
                     set(handles.text_inputDescription,'String',sprintf('Channel numbers corresponding to rows input')); 
                 elseif(strcmp(curArgument,'fMarkers'))
