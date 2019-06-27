@@ -156,8 +156,10 @@ for i=1:size(files,1)
             device.Probe{p}.DetPosX=probeInfo.SD.DetPos(:,1);
             device.Probe{p}.DetPosY=probeInfo.SD.DetPos(:,2);
             device.Probe{p}.DetPosZ=probeInfo.SD.DetPos(:,3);
-
             
+            
+            device.Probe{p}.SrcPos3D=probeInfo.SD.SrcPos;
+            device.Probe{p}.DetPos3D=probeInfo.SD.DetPos;
             
 
            
@@ -177,6 +179,8 @@ for i=1:size(files,1)
                 detPosX(opt)=device.Probe{p}.DetPosX(dIdx);
                 detPosY(opt)=device.Probe{p}.DetPosY(dIdx);
                 detPosZ(opt)=device.Probe{p}.DetPosZ(dIdx);
+                srcPos3D(opt,:)=device.Probe{p}.SrcPos3D(sIdx,:);
+                detPos3D(opt,:)=device.Probe{p}.DetPos3D(sIdx,:);
             end
             
             device.Probe{p}.SrcPosX=srcPosX';
@@ -190,7 +194,12 @@ for i=1:size(files,1)
             device.Probe{p}.OptPosY=mean([device.Probe{p}.SrcPosY(:,1),device.Probe{p}.DetPosY(:,1)],2);
             device.Probe{p}.OptPosZ=mean([device.Probe{p}.SrcPosZ(:,1),device.Probe{p}.DetPosZ(:,1)],2);
             device.Probe{p}.NumOptodes=length(device.Probe{p}.OptPosX);
-
+            
+            device.Probe{p}.DetPos3D=detPos3D;
+            device.Probe{p}.SrcPos3D=srcPos3D;
+            
+            device.Probe{p}.OptPos3D=(srcPos3D+detPos3D)/2;
+            
             device.Probe{p}.SD=sqrt((device.Probe{p}.SrcPosX-device.Probe{p}.DetPosX).^2+...
                 (device.Probe{p}.SrcPosY-device.Probe{p}.DetPosY).^2+(device.Probe{p}.SrcPosZ-device.Probe{p}.DetPosZ).^2)';
             device.Probe{p}.IsShortSeparation=device.Probe{p}.SD<2;
