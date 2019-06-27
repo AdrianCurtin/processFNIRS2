@@ -44,8 +44,8 @@ if(~any(curRawMatchIdx&curOxyMatchIdx))
     numData=length(data);
     rawMethodStr_label=rawMethodStr;
     oxyMethodStr_label=oxyMethodStr;
-    rawMethodStr_label('_')='-';
-    oxyMethodStr_label('_')='-';
+    rawMethodStr_label(rawMethodStr_label=='_')='-';
+    oxyMethodStr_label(rawMethodStr_label=='_')='-';
     ProgressHandles.h.hF=waitbar(0,sprintf('ExploreFNIRS\nProcessing Method %s x %s %i of %i',rawMethodStr_label,oxyMethodStr_label,1,numData));
     hF=ProgressHandles.h.hF;
     

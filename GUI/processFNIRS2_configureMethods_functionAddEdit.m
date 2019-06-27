@@ -82,7 +82,8 @@ set(handles.figure1,'Name',sprintf('%s Function',compareMode.type));
 outputType=cell(3,1);
 outputType{1}='x';
 outputType{2}='fchMask';
-outputType{3}='ROI';
+outputType{3}='ftimeChMask';
+outputType{4}='ROI';
 set(handles.popupmenu_output_types,'String',outputType);
 
 argumentTypes=cell(9,1);
@@ -92,12 +93,13 @@ argumentTypes{3}='Input';
 argumentTypes{4}='Fs';
 argumentTypes{5}='Time';
 argumentTypes{6}='ChannelMask';
-argumentTypes{7}='ChannelNumbers';
-argumentTypes{8}='SD Dist';
-argumentTypes{9}='Markers';
-argumentTypes{10}='Aux';
-argumentTypes{11}='AmbientChannels';
-argumentTypes{12}='Full fNIR struct';
+argumentTypes{7}='TimeChannelMask';
+argumentTypes{8}='ChannelNumbers';
+argumentTypes{9}='SD Dist';
+argumentTypes{10}='Markers';
+argumentTypes{11}='Aux';
+argumentTypes{12}='AmbientChannels';
+argumentTypes{13}='Full fNIR struct';
 
 
 set(handles.popupmenu_argument_types,'String',argumentTypes);
@@ -128,12 +130,13 @@ curFunction.ReservedArgumentNames{3}='x';
 curFunction.ReservedArgumentNames{4}='fs';
 curFunction.ReservedArgumentNames{5}='fTime';
 curFunction.ReservedArgumentNames{6}='fchMask';
-curFunction.ReservedArgumentNames{7}='fChannelNumbers';
-curFunction.ReservedArgumentNames{8}='fChannelSD';
-curFunction.ReservedArgumentNames{9}='fMarkers';
-curFunction.ReservedArgumentNames{10}='fAux';
-curFunction.ReservedArgumentNames{11}='fAmbient';
-curFunction.ReservedArgumentNames{12}='fNIRstruct';
+curFunction.ReservedArgumentNames{7}='ftimeChMask';
+curFunction.ReservedArgumentNames{8}='fChannelNumbers';
+curFunction.ReservedArgumentNames{9}='fChannelSD';
+curFunction.ReservedArgumentNames{10}='fMarkers';
+curFunction.ReservedArgumentNames{11}='fAux';
+curFunction.ReservedArgumentNames{12}='fAmbient';
+curFunction.ReservedArgumentNames{13}='fNIRstruct';
 
 if(~isempty(curFunction.Arguments))
     set(handles.listbox_function_arguments,'Value',1);
@@ -202,24 +205,27 @@ for i=1:length(curFunction.Arguments)
     elseif(strcmp(argStr{i},'fchMask'))
         curFunction.DefaultValues{i}='Channel Mask';
         curFunction.ArgumentTypes(i)=6;
+    elseif(strcmp(argStr{i},'ftimeChMask'))
+        curFunction.DefaultValues{i}='Time X Channel Mask';
+        curFunction.ArgumentTypes(i)=7;
     elseif(strcmp(argStr{i},'fChannelNumbers'))
         curFunction.DefaultValues{i}='ChannelNumbers';
-        curFunction.ArgumentTypes(i)=7;
+        curFunction.ArgumentTypes(i)=8;
     elseif(strcmp(argStr{i},'fChannelSD'))
         curFunction.DefaultValues{i}='SD Dist';
-        curFunction.ArgumentTypes(i)=8;    
+        curFunction.ArgumentTypes(i)=9;    
     elseif(strcmp(argStr{i},'fMarkers'))
         curFunction.DefaultValues{i}='Markers';
-        curFunction.ArgumentTypes(i)=9;
+        curFunction.ArgumentTypes(i)=10;
     elseif(strcmp(argStr{i},'fAux'))
         curFunction.DefaultValues{i}='Auxillary';
-        curFunction.ArgumentTypes(i)=10;        
+        curFunction.ArgumentTypes(i)=11;        
     elseif(strcmp(argStr{i},'fAmbient'))
         curFunction.DefaultValues{i}='AmbientChannels';
-        curFunction.ArgumentTypes(i)=11;    
+        curFunction.ArgumentTypes(i)=12;    
     elseif(strcmp(argStr{i},'fNIRstruct'))
         curFunction.DefaultValues{i}='Full fNIR struct';
-        curFunction.ArgumentTypes(i)=12;    
+        curFunction.ArgumentTypes(i)=13;    
     else
         curFunction.DefaultValues{i}='Unknown';
         curFunction.ArgumentTypes(i)=3; %assume its input?
@@ -229,7 +235,7 @@ set(handles.listbox_function_arguments,'String',argStr);
 
 function args=reservedArgs()
 
-args={'Name','Description','validStages','Arguments','x','fs','fTime','fchMask','fChannelNumbers','fMarkers','fAux','fAmbient','fChannelSD','fNIRstruct'};
+args={'Name','Description','validStages','Arguments','x','fs','fTime','fchMask','ftimeChMask','fChannelNumbers','fMarkers','fAux','fAmbient','fChannelSD','fNIRstruct'};
 
 function myOutFunction=saveExistingFields(handles)
 global curFunction

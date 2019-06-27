@@ -1654,7 +1654,7 @@ listbox_currentFunctions_Callback(hObject, eventdata, handles);
 
 function str=cleanForDialog(str)
 
-str('_')='-';
+str(str=='_')='-';
 
 
 % --- Executes on button press in pushbutton_avail_function_edit.
