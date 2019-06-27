@@ -131,13 +131,13 @@ for j=1:length(probeInfo.cfg.Sections)
         end
         
         if(buildProbeLayout) % auto generate plot layour
-            if(isfield(p,'OptPosX')&&isfield(p,'OptPosY')&&~isfield('OptPosZ'))
+            if(isfield(p,'OptPosX')&&isfield(p,'OptPosY')&&~isfield(p,'OptPosZ'))
                 if(includeSSchannels)
                     p.OptLayout2D=pf2_base.fitProbe2D(p.OptPosX,p.OptPosY);
                 else
                     p.OptLayout2D=pf2_base.fitProbe2D(p.OptPosX(~p.IsShortSeparation),p.OptPosY(~p.IsShortSeparation));
                 end
-            elseif(isfield(p,'OptPosX')&&isfield(p,'OptPosY')&&~isfield('OptPosZ'))
+            elseif(isfield(p,'OptPosX')&&isfield(p,'OptPosY')&&isfield(p,'OptPosZ'))
                 if(includeSSchannels)
                     p.OptLayout2D=pf2_base.fitProbe2D(p.OptPosX,p.OptPosY,p.OptPosZ);
                 else

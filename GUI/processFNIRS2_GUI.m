@@ -336,7 +336,7 @@ if(isempty(cfgFilePath)||~contains(cfgFilePath,'.cfg'))
     
 elseif(~isempty(cfgFilePath)) % If we're not looking at the GUI, doesn't matter
     
-    if(pf2_base.isnestedfield(setF.device.cfg)&&isfield(setF.device.cfg.Info,'CfgName')) % look to see if they match,...
+    if(pf2_base.isnestedfield(setF,'device.cfg')&&isfield(setF.device.cfg.Info,'CfgName')) % look to see if they match,...
             
         curProbeName=sprintf('%s.cfg',setF.device.cfg.Info.CfgName);
         
@@ -565,8 +565,10 @@ else
 
                outputList=Fidx.output;
 
-               if(iscell(outputList{1}))
+               if(iscell(outputList)&&iscell(outputList{1}))
                   outputList=outputList{1}; 
+               elseif(~iscell(outputList))
+                  outputList={outputList};   
                end
                for output_idx=1:length(outputList)
                    if strcmpi(outputList{output_idx},'x')==1 && isempty(x_out_ind)
@@ -904,7 +906,7 @@ else
                   passedArgVals{fAux_ind}=PF2.data.Aux;
                elseif strcmp(args{a},'ftimeChMask')==1
                   ftimeMask_ind=a;
-                  passedArgVals{ftimeMask_ind}=curftimeMask; % always needs channel info when used in raw
+                  passedArgVals{ftimeMask_ind}=curftimeMask(:,validChannels); % always needs channel info when used in raw
                elseif strcmp(args{a},'fNIRstruct')==1  % Try not to use, can be inefficient
                    fStruct_ind=a;
                    passedArgVals{fStruct_ind}=data;

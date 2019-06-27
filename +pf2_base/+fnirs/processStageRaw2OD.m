@@ -71,8 +71,10 @@ for i=1:length(method.F)
 
            outputList=Fidx.output;
 
-           if(iscell(outputList{1}))
+           if(iscell(outputList)&&iscell(outputList{1}))
               outputList=outputList{1}; 
+           elseif(~iscell(outputList))
+              outputList={outputList};   
            end
            for output_idx=1:length(outputList)
                if strcmpi(outputList{output_idx},'x')==1 && isempty(x_out_ind)
