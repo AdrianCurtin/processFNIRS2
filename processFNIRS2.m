@@ -115,39 +115,49 @@ PF2.OutputLegacyMarkers=p.Results.OutputLegacyMarkers;
 
 data=p.Results.data;
 
+skipCFG=false;
 if(~isempty(p.Results.UseDeviceCFG)) % if command argument given
     cfgFilePath=p.Results.UseDeviceCFG; % command argument to load cfg file
-elseif(pf2_base.isnestedfield(data,'info.probename')&&~contains(data.info.probename,'Unkown')) 
+elseif(pf2_base.isnestedfield(data,'info.probename')&&~contains(data.info.probename,'Unkown')&&~contains(data.info.probename,'generated')) 
     %try to load the probename cfg file
     cfgFilePath=sprintf('%s.cfg',data.info.probename);
+elseif(pf2_base.isnestedfield(data,'info.probename')&&~contains(data.info.probename,'Unkown')&&contains(data.info.probename,'generated')) 
+    cfgFilePath=sprintf('%s.cfg',data.info.probename);
+    skipCFG=true;
 else
     cfgFilePath='';
 end
 
 ShowGUI=p.Results.ShowGUI||isempty(varargin)||(nargout==0&&~isempty(data));
 
-if(isempty(cfgFilePath)||~contains(cfgFilePath,'.cfg'))&&(~ShowGUI&&~isempty(data)) %if nothing, invalid, or no data
-    
-    warning('Missing or invalid configuration file path\n')
-    
-    disp('No device specified. Please load device configuration');
-    pf2_base.loadDeviceCfg();
-    if(~isfield(setF,'device'))
-        error('No valid devices selected');
-    end
-    
-elseif(~isempty(cfgFilePath)) 
-    
-    if(pf2_base.isnestedfield(setF,'device.cfg.Info.CfgName')) % look to see if they match,...
-            
-        curProbeName=sprintf('%s.cfg',setF.device.cfg.Info.CfgName);
-        
-        if(~strcmp(curProbeName,cfgFilePath)) %if they do don't bother loading
+if(isfield(data,'probeinfo')&&~isempty(data.probeinfo))
+    setF.device=data.probeinfo;
+else
+
+    if(isempty(cfgFilePath)||~contains(cfgFilePath,'.cfg'))&&(~ShowGUI&&~isempty(data)) %if nothing, invalid, or no data
+
+        warning('Missing or invalid configuration file path\n')
+
+        disp('No device specified. Please load device configuration');
+        pf2_base.loadDeviceCfg();
+        if(~isfield(setF,'device'))
+            error('No valid devices selected');
+        end
+
+    elseif(~isempty(cfgFilePath)) 
+
+        if(pf2_base.isnestedfield(setF,'device.cfg.Info.CfgName')) % look to see if they match,...
+
+            curProbeName=sprintf('%s.cfg',setF.device.cfg.Info.CfgName);
+
+            if(~strcmp(curProbeName,cfgFilePath)&&~skipCFG) %if they do don't bother loading
+                pf2_base.loadDeviceCfg(cfgFilePath);
+            end
+        else
             pf2_base.loadDeviceCfg(cfgFilePath);
         end
-    else
-        pf2_base.loadDeviceCfg(cfgFilePath);
     end
+
 end
 
 
@@ -495,7 +505,7 @@ end
 
 [outData.HbO, outData.HbR, outData.HbTotal, outData.HbDiff,outData.CBSI,outData.channels,~,outData.units,outData.DPF_factor]=...
     pf2_base.fnirs.bvoxy(data,setF.device.Probe{1}.ChannelNumbers,setF.device.Probe{1}.Wavelength,setF.device.Probe{1}.SD,baselineSamples,subjectAge,[],true,'NoPathlength',NoPathlength,'DiffPathlengthFactor',fixedDPF);
-
+outData.time=time;
                                                           %BASELINE
                                                           %START/END
 %[fNIR.oxy,fNIR.bv_805,fNIR.bv,fNIR.hbo,fNIR.hbr] = bvoxy (1,min(se,60),ss,se,fNIR.fin.raw_730,fNIR.fin.raw_805,fNIR.fin.raw_850);

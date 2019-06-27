@@ -404,11 +404,15 @@ if(isstruct(tempOxyStage))
     PF2.data.stage{4}=tempOxyStage; %Assign stage3 if exists
 end
 
+skipCFG=false;
 if(~isempty(p.Results.UseDeviceCFG)) % if command argument given
     cfgFilePath=p.Results.UseDeviceCFG; % command argument to load cfg file
-elseif(isfield(data,'info')&&isfield(data.info,'probename')&&~contains(data.info.probename,'Unknown')) 
+elseif(isfield(data,'info')&&isfield(data.info,'probename')&&~contains(data.info.probename,'Unknown')&&~contains(data.info.probename,'generated')) 
     %try to load the probename cfg file
     cfgFilePath=sprintf('%s.cfg',data.info.probename);
+elseif(isfield(data,'info')&&isfield(data.info,'probename')&&~contains(data.info.probename,'Unknown')&&contains(data.info.probename,'generated')) 
+    cfgFilePath=sprintf('%s.cfg',data.info.probename);
+    skipCFG=true;
 else
     cfgFilePath='';
 end
@@ -426,13 +430,13 @@ if(isempty(cfgFilePath)||~contains(cfgFilePath,'.cfg'))
     
 elseif(~isempty(cfgFilePath)) % If we're not looking at the GUI, doesn't matter
     
-    if(pf2_base.isnestedfield(setF,'device.cfg.info.CfgName')) % look to see if they match,...
+    if(pf2_base.isnestedfield(setF.device.cfg)&&isfield(setF.device.cfg.Info,'CfgName')) % look to see if they match,...
             
-        curProbeName=sprintf('%s.cfg',setF.device.cfg.info.CfgName);
+        curProbeName=sprintf('%s.cfg',setF.device.cfg.Info.CfgName);
         
-        %if(~strcmp(curProbeName,cfgFilePath)) %if they do don't bother loading
+        if(~strcmp(curProbeName,cfgFilePath)&&~skipCFG) %if they do don't bother loading
             pf2_base.loadDeviceCfg(cfgFilePath,true); % Always load to build device layout
-        %end
+        end
     else
         pf2_base.loadDeviceCfg(cfgFilePath,true);
     end
@@ -836,8 +840,9 @@ if(isempty(subAge))
     subAge=PF2.GUIPF2.curDPF_age;
 end
     
-[outData.HbO, outData.HbR, outData.HbTotal, outData.HbDiff,outData.CBSI,outData.channels,outData.time,outData.units,outData.DPF_factor]=...
+[outData.HbO, outData.HbR, outData.HbTotal, outData.HbDiff,outData.CBSI,outData.channels,~,outData.units,outData.DPF_factor]=...
     pf2_base.fnirs.bvoxy(data,setF.device.Probe{1}.ChannelNumbers,setF.device.Probe{1}.Wavelength,setF.device.Probe{1}.SD,baselineSamples,subAge,[],true,'NoPathlength',NoPathlength,'DiffPathlengthFactor',fixedDPF);
+outData.time=PF2.data.time;
 
                                                           %BASELINE
                                                           %START/END
@@ -892,6 +897,10 @@ if(isnan(firstValidRow)||isnan(lastValidRow))
    validRows=1;
 else
    validRows=firstValidRow:lastValidRow; 
+end
+
+if(isfield(data,'ROI')&&isempty(data.ROI))
+    clear data.ROI
 end
 
 
@@ -1081,9 +1090,9 @@ else
                                 end
                             end
                             
-                            if(~isempty(roi_out_ind)) % Build ROIs
+                            if(~isempty(roi_out_ind)&&isfield(outData,'ROI')&&~isempty(outData.ROI)) % Build ROIs
                                 outData=funcOutput{roi_out_ind};
-                                if(~isempty(outData.ROI))
+                                if(pf2_base.isnestedfield(outData,'ROI.HbO')&&~isempty(outData.ROI))
                                     validChannels_roi=true(1,size(outData.ROI.(bmrk),2));
                                     curftimeMask_roi=true(size(data.ROI.('HbO')));
                                 else
@@ -1919,7 +1928,8 @@ if(endInd<startInd)
     startInd=x;
 end
 
-timeInd=startInd:endInd;
+inds=1:length(time);
+timeInd=inds>=startInd&inds<=endInd;
 
 
 
@@ -3391,7 +3401,8 @@ if(endInd<startInd)
     startInd=x;
 end
 
-timeInd=startInd:endInd;
+inds=1:length(time);
+timeInd=inds>=startInd&inds<=endInd;
 if(preProcessed)
     data=PF2.data.stage{4};
 else
@@ -3583,8 +3594,8 @@ if(endInd<startInd)
     endInd=startInd;
     startInd=x;
 end
-
-timeInd=startInd:endInd;
+inds=1:length(time);
+timeInd=inds>=startInd&inds<=endInd;
 
 if(preProcessed==true)
     data=PF2.data.stage{1};

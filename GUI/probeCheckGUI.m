@@ -152,11 +152,14 @@ else
     cfgFilePath='';
 end
 
-pf2ChannelCheck.nirsData.info.probe=pf2_base.loadDeviceCfg(cfgFilePath,true);
+if(~isfield(pf2ChannelCheck.nirsData,'probeinfo'))
+    pf2ChannelCheck.nirsData.probeinfo=pf2_base.loadDeviceCfg(cfgFilePath,true);
+end
+
     
 pf2ChannelCheck.probeNum=1;
 
-setUpAxes(handles,pf2ChannelCheck.nirsData.info.probe.Probe{pf2ChannelCheck.probeNum});
+setUpAxes(handles,pf2ChannelCheck.nirsData.probeinfo.Probe{pf2ChannelCheck.probeNum});
 
 
 if(~isfield(pf2ChannelCheck.nirsData,'markers')||isempty(pf2ChannelCheck.nirsData.markers))
@@ -192,7 +195,7 @@ set(handles.currentfiletext,'String',name);
 %pf2ChannelCheck.nirsData.raw(pf2ChannelCheck.nirsData.raw(:,1)==0,:)=[];
 
 %Count num Channels
-pf2ChannelCheck.numChannels=pf2ChannelCheck.nirsData.info.probe.Probe{pf2ChannelCheck.probeNum}.NumOptodes;
+pf2ChannelCheck.numChannels=pf2ChannelCheck.nirsData.probeinfo.Probe{pf2ChannelCheck.probeNum}.NumOptodes;
 
 if(isfield(pf2ChannelCheck,'fmask')&&isempty(pf2ChannelCheck.fmask))
     if(isfield(pf2ChannelCheck.nirsData,'fchMask')&&~isempty(pf2ChannelCheck.nirsData.fchMask))
@@ -274,8 +277,8 @@ if(nargin<1)
     ch=pf2ChannelCheck.curChannel;
 end
 
-curCh=find(pf2ChannelCheck.nirsData.info.probe.Probe{pf2ChannelCheck.probeNum}.ChannelNumbers==ch);
-curWv=pf2ChannelCheck.nirsData.info.probe.Probe{pf2ChannelCheck.probeNum}.Wavelength(curCh);
+curCh=find(pf2ChannelCheck.nirsData.probeinfo.Probe{pf2ChannelCheck.probeNum}.ChannelNumbers==ch);
+curWv=pf2ChannelCheck.nirsData.probeinfo.Probe{pf2ChannelCheck.probeNum}.Wavelength(curCh);
 
 if(~isfield(pf2ChannelCheck,'viewTimeStart'))
    pf2ChannelCheck.viewTimeStart=min(pf2ChannelCheck.nirsData.time);
@@ -301,17 +304,17 @@ end
    xlim([pf2ChannelCheck.viewTimeStart,pf2ChannelCheck.viewTimeEnd]);
    xl=xlim; 
 
-    if(isfield(pf2ChannelCheck.nirsData.info.probe.Info,'RawMax'))
+    if(isfield(pf2ChannelCheck.nirsData.probeinfo.Info,'RawMax'))
         
-        plot(xl,ones(size(xl))*pf2ChannelCheck.nirsData.info.probe.Info.RawMax,'--k');
+        plot(xl,ones(size(xl))*pf2ChannelCheck.nirsData.probeinfo.Info.RawMax,'--k');
         
         yl=ylim();
-        ylim([0,pf2ChannelCheck.nirsData.info.probe.Info.RawMax*1.1]);
+        ylim([0,pf2ChannelCheck.nirsData.probeinfo.Info.RawMax*1.1]);
     end
     
-    if(isfield(pf2ChannelCheck.nirsData.info.probe.Info,'RawMin'))
+    if(isfield(pf2ChannelCheck.nirsData.probeinfo.Info,'RawMin'))
         
-        plot(xl,ones(size(xl))*pf2ChannelCheck.nirsData.info.probe.Info.RawMin,'--k');
+        plot(xl,ones(size(xl))*pf2ChannelCheck.nirsData.probeinfo.Info.RawMin,'--k');
     end
     
     yl=ylim();

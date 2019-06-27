@@ -171,6 +171,14 @@ eHBR_700=eHbRArray(1,:,:);
 eHBO_830=eHbOArray(2,:,:);
 eHBR_830=eHbRArray(2,:,:);
 
+% eHBO_700=reshape(eHBO_700,[numCh,len]);
+% eHBR_700=reshape(eHBR_700,[numCh,len]);
+% eHBO_830=reshape(eHBO_830,[numCh,len]);
+% eHBR_830=reshape(eHBR_830,[numCh,len]);
+% 
+% od700=reshape(od700,[numCh,len]);
+% od830=reshape(od830,[numCh,len]);
+
 HbO=(eHBR_830.*(od700./L_700)-eHBR_700.*(od830./L_830))./(eHBO_700.*eHBR_830-eHBO_830.*eHBR_700);
 HbR=(eHBO_700.*(od830./L_830)-eHBO_830.*(od700./L_700))./(eHBO_700.*eHBR_830-eHBO_830.*eHBR_700);
 

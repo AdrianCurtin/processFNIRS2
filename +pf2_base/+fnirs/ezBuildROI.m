@@ -31,7 +31,8 @@ else
 end
 
 if(~isfield(fNIR,'ROI'))
-    fNIR.ROI=[]; % return a blank thing if there wasn't a field
+    roi_out=fNIR;
+    %fNIR.ROI=[]; % return a blank thing if there wasn't a field
 end
 
 if(iscell(fNIR.ROI)||isnumeric(fNIR.ROI))

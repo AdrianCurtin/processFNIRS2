@@ -7,7 +7,7 @@ function isvalidfield=isnestedfield(var,nestedFieldString)
 
 
 if(nargin<=1)
-    isvalidfield=True;
+    isvalidfield=true;
 else
 
     fieldParts=strsplit(nestedFieldString,'.');
