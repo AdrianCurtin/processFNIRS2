@@ -572,7 +572,11 @@ varargout = {pf2ChannelCheck.nirsData};
 
 autoscale=pf2ChannelCheck.autoscale;
 mark_noisy=pf2ChannelCheck.mark_noisy;
-twoFig= pf2ChannelCheck.multiFigure;
+if(isfield(pf2ChannelCheck,'multiFigure'))
+    twoFig= pf2ChannelCheck.multiFigure;
+else
+    twoFig=false;
+end
 
 pf2ChannelCheck=[];
 pf2ChannelCheckHandles=[];
