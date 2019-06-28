@@ -743,6 +743,7 @@ if(pf2_base.isnestedfield(outData,'ROI.info')&&~isempty(outData.ROI.info)&&~isfi
     outData=pf2_build_nanmean_ROI(outData);
     if(~isempty(outData.ROI)&&isfield(outData.ROI,'HbO'))
         validChannels_roi=true(1,size(outData.ROI.('HbO'),2));
+        curftimeMask_roi=true(size(outData.ROI.('HbO')));
     else
         clear outData.ROI; 
     end
