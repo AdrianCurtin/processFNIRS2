@@ -97,10 +97,15 @@ if(isempty(channels))
 end
 
 if(nargin<4||isempty(wavelengths)||(ischar(wavelengths)&&strcmpi(wavelengths,'all')))
-    wavelengths=unique(probeInfo.Wavelength);
+    [wavelengths,wvb]=unique(probeInfo.Wavelength);
+    wavelengths=probeInfo.Wavelength(wvb); %unsort here
 else
-    wavelengths=unique(wavelengths(ismember(wavelengths,probeInfo.Wavelength)));
+    wvs=wavelengths(ismember(wavelengths,probeInfo.Wavelength));
+    [wavelengths,wvb]=unique(wvs);
+    wavelengths=wvs(wvb); %unsort here
 end
+
+
 
 wavelengths=wavelengths(~isnan(wavelengths));
 
@@ -159,7 +164,7 @@ if(~isempty(channels))
     if(nargout>0)
         figHandle=figure(); 
     else
-        figure();
+        %figure();
     end
 else
     warning('Nothing to Plot');
@@ -279,7 +284,7 @@ for(optIdx=1:length(channels))
     
     for i=1:size(rawToPlot,2)
         if(isfield(fNIR,'fchMask')&&fNIR.fchMask(optNum)<=rejectLevel)
-            lh=plot(t,rawToPlot,rejectedLineProps{:},lineProps{:});
+            lh=plot(t,rawToPlot(:,i),rejectedLineProps{:},lineProps{:});
             switch(fNIR.fchMask(optNum))
                 case 0.5
                     th=text(tmin+tmean*0.6,mean(ylimit),'~','FontSize',20,'color',[ 0.9100,0.4100,0.1700]);
@@ -288,9 +293,9 @@ for(optIdx=1:length(channels))
             end
                 
         elseif(~isempty(lineProps))
-            lh=plot(t,rawToPlot,lineProps{:});
+            lh=plot(t,rawToPlot(:,i),lineProps{:});
         else
-            lh=plot(t,rawToPlot);
+            lh=plot(t,rawToPlot(:,i));
         end
         
         if(curWv(i)==0)
@@ -299,6 +304,7 @@ for(optIdx=1:length(channels))
             set(lh,'Tag',sprintf('Opt%i:%inm',optNum,curWv(i)));
         end
     end
+    
     ylim(ylimit);
     if(~isempty(showMarkers))
         maxH=plot([tmean],ylimit(2),'color',[1,1,1],'HandleVisibility','off');
@@ -319,6 +325,18 @@ for(optIdx=1:length(channels))
         end
     end
     
+    if(optIdx==length(channels))
+        legStr=cell(1,length(wavelengths));
+        for s=1:length(wavelengths)
+            if(wavelengths(s)==0)
+                legStr{s}='Ambient';
+            else
+                legStr{s}=sprintf('%.0fnm',wavelengths(s)); 
+            end
+        end
+        legend(legStr{:});
+    end
+    
     
     hold off;
 
@@ -332,17 +350,7 @@ for(optIdx=1:length(channels))
     xlabel(sprintf('Opt %i',optNum));
     ylabel('Intensity');
     
-    if(optIdx==length(channels))
-        legStr=cell(1,length(wavelengths));
-        for s=1:length(wavelengths)
-            if(wavelengths(s)==0)
-                legStr{s}='Ambient';
-            else
-                legStr{s}=sprintf('%.0fnm',wavelengths(s)); 
-            end
-        end
-        legend(legStr{:});
-    end
+
 end
 
 end

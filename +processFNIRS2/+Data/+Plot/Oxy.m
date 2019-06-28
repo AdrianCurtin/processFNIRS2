@@ -158,7 +158,7 @@ if(~isempty(channels))
     if(nargout>0)
         figHandle=figure(); 
     else
-        figure();
+        %figure();
     end
 else
     warning('Nothing to Plot');
