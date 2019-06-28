@@ -22,7 +22,7 @@ function varargout = processFNIRS2_configureMethods(varargin)
 
 % Edit the above text to modify the response to help processFNIRS2_configureMethods
 
-% Last Modified by GUIDE v2.5 12-Jan-2019 12:52:23
+% Last Modified by GUIDE v2.5 28-Jun-2019 13:05:30
 
 % Begin Initialization code - DO NOT EDIT
 gui_Singleton = 1;
@@ -1788,3 +1788,21 @@ else
 end
 edit_input_Callback(hObject, eventdata, handles);
 saveCurrentMethod();
+
+
+% --- Executes on button press in pushbutton_reloaddefaultfuncs.
+function pushbutton_reloaddefaultfuncs_Callback(hObject, eventdata, handles)
+% hObject    handle to pushbutton_reloaddefaultfuncs (see GCBO)
+% eventdata  reserved - to be defined in a future version of MATLAB
+% handles    structure with handles and user data (see GUIDATA)
+
+
+defaultFunctionsPath=sprintf('%s/prefs/%s',pf2_base.pf2_defaultRootPath,'pf2_functions_default.cfg');
+if(~importFunctions(defaultFunctionsPath))
+   warning('Unable to find functions at %s! Please load another file',defaultFunctionsPath);
+   importFunctions();
+end
+         
+updateCurrentFunctions(handles);
+refreshCurrentFunctions(handles);
+listbox_myMethods_Callback(hObject, eventdata, handles);
