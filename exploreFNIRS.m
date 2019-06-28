@@ -1948,28 +1948,32 @@ for chIdx=1:numOpt
                           data2plot=curGrand.(bioM);
                       case 'ROI'
                           if(~pf2_base.isnestedfield(curGrand,'ROI.HbO.data'))
-                              error('ROI data must be calculated using a build ROI step');
+                              warning('ROI data must be calculated using a build ROI step');
+                              data2plot=[];
+                          else
+                            data2plot=curGrand.ROI.(bioM);
                           end
-                          data2plot=curGrand.ROI.(bioM);
                       case 'Aux'
            
                   end
                   
                   
-                  if(plotGroupByBioM)
-                      hGrand=plot(curFigH.subH{curSy,curSx},curGrand.time,data2plot.(plotFeature)(:,ch),'LineWidth',3,'color',cIndex(b,:));
-                  else
-                      hGrand=plot(curFigH.subH{curSy,curSx},curGrand.time,data2plot.(plotFeature)(:,ch),'LineWidth',3,'color',cIndex(curUgroupIdx,:));
-                  end
-                  
-                  if(numUgroups>1||numBioM==1)&&~isempty(gbyStrs{g})
-                       gStrs{curUgroupIdx}=gbyStrs{g}; 
-                       set(hGrand,'Tag',sprintf('%s: %s',plotFeature,gStrs{curUgroupIdx}));
-                       curFigH.legendHandles{curSy,curSx}.hG{curUgroupIdx}=hGrand;
-                  elseif(~multiPlot)
-                       gStrs{b}=selectedBioM{b};
-                       set(hGrand,'Tag',sprintf('%s: %s',plotFeature,gStrs{b}));
-                       curFigH.legendHandles{curSy,curSx}.hG{b}=hGrand;
+                  if(~isempty(data2plot))
+                      if(plotGroupByBioM)
+                          hGrand=plot(curFigH.subH{curSy,curSx},curGrand.time,data2plot.(plotFeature)(:,ch),'LineWidth',3,'color',cIndex(b,:));
+                      else
+                          hGrand=plot(curFigH.subH{curSy,curSx},curGrand.time,data2plot.(plotFeature)(:,ch),'LineWidth',3,'color',cIndex(curUgroupIdx,:));
+                      end
+
+                      if(numUgroups>1||numBioM==1)&&~isempty(gbyStrs{g})
+                           gStrs{curUgroupIdx}=gbyStrs{g}; 
+                           set(hGrand,'Tag',sprintf('%s: %s',plotFeature,gStrs{curUgroupIdx}));
+                           curFigH.legendHandles{curSy,curSx}.hG{curUgroupIdx}=hGrand;
+                      elseif(~multiPlot)
+                           gStrs{b}=selectedBioM{b};
+                           set(hGrand,'Tag',sprintf('%s: %s',plotFeature,gStrs{b}));
+                           curFigH.legendHandles{curSy,curSx}.hG{b}=hGrand;
+                      end
                   end
                   
                   
@@ -2006,59 +2010,65 @@ for chIdx=1:numOpt
                     case 'fNIR'
                         data2plot=curGrand.(bioM);
                     case 'ROI'
+                        if(pf2_base.isnestedfield(curGrand,'ROI.HbO'))
                         data2plot=curGrand.ROI.(bioM);
+                        else
+                           data2plot=[]; 
+                        end
                     case 'Aux'
                 end
                 
-                if(strcmp(errorFeature,'MaxMin'))
-                  upperError=data2plot.Max(:,ch);
-                  lowerError=data2plot.Min(:,ch);
-                else
-                  upperError=data2plot.(plotFeature)(:,ch)+data2plot.(errorFeature)(:,ch)*errMulitply;
-                  lowerError=data2plot.(plotFeature)(:,ch)-data2plot.(errorFeature)(:,ch)*errMulitply;
-                end
-                
-                
-                if(plotShaded)
-                      errAlpha=0.15;
-                      yPatch=[lowerError',fliplr(upperError')];
-                      xPatch=[curGrand.time',fliplr(curGrand.time')];
-                      xPatch(isnan(yPatch))=[];
-                      yPatch(isnan(yPatch))=[];
-                      
-                      hPatch=patch(curFigH.subH{curSy,curSx},xPatch,yPatch,-1,'facecolor',errColor,'edgecolor','none','facealpha',errAlpha);
-                      if(~isempty(hPatch))
-                          set(hPatch,'HitTest','off');
-                          set(hPatch,'HandleVisibility','off');
+                if(~isempty(data2plot))
+                    if(strcmp(errorFeature,'MaxMin'))
+                      upperError=data2plot.Max(:,ch);
+                      lowerError=data2plot.Min(:,ch);
+                    else
+                      upperError=data2plot.(plotFeature)(:,ch)+data2plot.(errorFeature)(:,ch)*errMulitply;
+                      lowerError=data2plot.(plotFeature)(:,ch)-data2plot.(errorFeature)(:,ch)*errMulitply;
+                    end
 
-                          set(hPatch.Annotation.LegendInformation,'IconDisplayStyle','off'); 
-                      end
-                end
-                
-                if(plotGroupByBioM)
-                      hGrandErr1{b}=plot(curFigH.subH{curSy,curSx},curGrand.time,upperError,'lineStyle',errStyle,'LineWidth',lineWidth,'color',errColor);
-                      hGrandErr2{b}=plot(curFigH.subH{curSy,curSx},curGrand.time,lowerError,'lineStyle',errStyle,'LineWidth',lineWidth,'color',errColor);
-                      set(hGrandErr1{b}.Annotation.LegendInformation,'IconDisplayStyle','off'); 
-                      set(hGrandErr2{b}.Annotation.LegendInformation,'IconDisplayStyle','off');
-                      curFigH.legendHandles{curSy,curSx}.hE{b}=hGrandErr1{b};
-                else
-                      hGrandErr1{g}=plot(curFigH.subH{curSy,curSx},curGrand.time,upperError,'lineStyle',errStyle,'LineWidth',lineWidth,'color',errColor);
-                      hGrandErr2{g}=plot(curFigH.subH{curSy,curSx},curGrand.time,lowerError,'lineStyle',errStyle,'LineWidth',lineWidth,'color',errColor);
-                      set(hGrandErr1{g}.Annotation.LegendInformation,'IconDisplayStyle','off'); 
-                      set(hGrandErr2{g}.Annotation.LegendInformation,'IconDisplayStyle','off'); 
-                      curFigH.legendHandles{curSy,curSx}.hE{g}=hGrandErr1{g};
-                end
-                
-                
 
-                if(~plotGroupByBioM)
-                   gAerrStrs{g}=sprintf('%s: %s',errorFeature,gbyStrs{g}); 
-                   set(hGrandErr1{g},'Tag',gAerrStrs{g});
-                   set(hGrandErr2{g},'Tag',gAerrStrs{g});
-                else
-                   gAerrStrs{b}=sprintf('%s: %s',errorFeature,selectedBioM{b}); 
-                   set(hGrandErr1{b},'Tag',gAerrStrs{b});
-                   set(hGrandErr2{b},'Tag',gAerrStrs{b});
+                    if(plotShaded)
+                          errAlpha=0.15;
+                          yPatch=[lowerError',fliplr(upperError')];
+                          xPatch=[curGrand.time',fliplr(curGrand.time')];
+                          xPatch(isnan(yPatch))=[];
+                          yPatch(isnan(yPatch))=[];
+
+                          hPatch=patch(curFigH.subH{curSy,curSx},xPatch,yPatch,-1,'facecolor',errColor,'edgecolor','none','facealpha',errAlpha);
+                          if(~isempty(hPatch))
+                              set(hPatch,'HitTest','off');
+                              set(hPatch,'HandleVisibility','off');
+
+                              set(hPatch.Annotation.LegendInformation,'IconDisplayStyle','off'); 
+                          end
+                    end
+
+                    if(plotGroupByBioM)
+                          hGrandErr1{b}=plot(curFigH.subH{curSy,curSx},curGrand.time,upperError,'lineStyle',errStyle,'LineWidth',lineWidth,'color',errColor);
+                          hGrandErr2{b}=plot(curFigH.subH{curSy,curSx},curGrand.time,lowerError,'lineStyle',errStyle,'LineWidth',lineWidth,'color',errColor);
+                          set(hGrandErr1{b}.Annotation.LegendInformation,'IconDisplayStyle','off'); 
+                          set(hGrandErr2{b}.Annotation.LegendInformation,'IconDisplayStyle','off');
+                          curFigH.legendHandles{curSy,curSx}.hE{b}=hGrandErr1{b};
+                    else
+                          hGrandErr1{g}=plot(curFigH.subH{curSy,curSx},curGrand.time,upperError,'lineStyle',errStyle,'LineWidth',lineWidth,'color',errColor);
+                          hGrandErr2{g}=plot(curFigH.subH{curSy,curSx},curGrand.time,lowerError,'lineStyle',errStyle,'LineWidth',lineWidth,'color',errColor);
+                          set(hGrandErr1{g}.Annotation.LegendInformation,'IconDisplayStyle','off'); 
+                          set(hGrandErr2{g}.Annotation.LegendInformation,'IconDisplayStyle','off'); 
+                          curFigH.legendHandles{curSy,curSx}.hE{g}=hGrandErr1{g};
+                    end
+
+
+
+                    if(~plotGroupByBioM)
+                       gAerrStrs{g}=sprintf('%s: %s',errorFeature,gbyStrs{g}); 
+                       set(hGrandErr1{g},'Tag',gAerrStrs{g});
+                       set(hGrandErr2{g},'Tag',gAerrStrs{g});
+                    else
+                       gAerrStrs{b}=sprintf('%s: %s',errorFeature,selectedBioM{b}); 
+                       set(hGrandErr1{b},'Tag',gAerrStrs{b});
+                       set(hGrandErr2{b},'Tag',gAerrStrs{b});
+                    end
                 end
             end
             

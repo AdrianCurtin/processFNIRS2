@@ -13,7 +13,7 @@ if(nargin<3)
 end
 
 if(nargin<4)
-    tauLow=0.003;
+    tauLow=-1;
 end
 
 if(N<1)
@@ -23,11 +23,8 @@ end
 CVx=calcLocalCV(x,N);
 
 
-Xcorr=x;
+maskCV=(abs(CVx)<tauUp&~isnan(CVx)&abs(CVx)>tauLow);
 
-maskCV=~(abs(CVx)>tauUp|isnan(CVx)|abs(CVx)<tauLow);
-
-Xcorr(~maskCV)=nan;
     
     
 
