@@ -47,12 +47,13 @@ if(size(uCh,1)<length(ChxList))
     error('Duplicate Channel Locations Present');
 end
 
-startStepSize=50;
+startStepSize=10;
 stepSize=10;
 
 
 maskSize=1200;
 
+lastPsize=startStepSize;
 for pSize=startStepSize:stepSize:maskSize
     bitMask=zeros(maskSize,maskSize);
     for c=1:numCh
@@ -71,6 +72,7 @@ for pSize=startStepSize:stepSize:maskSize
     lastPsize=pSize-stepSize;
 end
 
+lastWsize=lastPsize;
 for wSize=lastPsize:stepSize:maskSize
     bitMask=zeros(maskSize,maskSize);
     for c=1:numCh
@@ -88,6 +90,7 @@ for wSize=lastPsize:stepSize:maskSize
     lastWsize=wSize-stepSize;
 end
 
+lastHsize=lastPsize;
 for hSize=lastPsize:stepSize:maskSize
     bitMask=zeros(maskSize,maskSize);
     for c=1:numCh

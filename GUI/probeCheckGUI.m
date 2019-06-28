@@ -31,7 +31,7 @@ function varargout = probeCheckGUI(varargin)
 %3/29/2019 - Modified marker display to stop after 500 pf2ChannelCheck.markers to speed up
 %loading/ display time
 
-% Last Modified by GUIDE v2.5 20-Jun-2019 14:46:00
+% Last Modified by GUIDE v2.5 28-Jun-2019 09:03:37
 
 % Begin initialization code - DO NOT EDIT
 gui_Singleton = 1;
@@ -67,8 +67,23 @@ handles.output = hObject;
 guidata(hObject, handles);
 
 global pf2ChannelCheck
-pf2ChannelCheck=[];
 
+if(isfield(pf2ChannelCheck,'autoscale'))
+    set(handles.checkbox_autoscale,'Value',pf2ChannelCheck.autoscale);
+end
+if(isfield(pf2ChannelCheck,'mark_noisy'))
+    set(handles.checkbox_automark_noisy,'Value',pf2ChannelCheck.mark_noisy);
+end
+
+if(isfield(pf2ChannelCheck,'multiFigure'))
+    set(handles.checkbox_multiFigureMode,'Value',pf2ChannelCheck.multiFigure);
+end
+
+
+pf2ChannelCheck.autoscale=get(handles.checkbox_autoscale,'Value');
+pf2ChannelCheck.mark_noisy=get(handles.checkbox_automark_noisy,'Value');
+
+pf2ChannelCheck.noisyThreshold=0.1;
 
 
 if(~isfield(pf2ChannelCheck,'showMarkers'))
@@ -88,7 +103,7 @@ end
 
 if (isempty(varargin))
     pf2ChannelCheck.nirsData=[];
-    pf2ChannelCheck.nirsData.raw=rand(1000,49)*500+1000;
+    pf2ChannelCheck.nirsData.raw=[];
     pf2ChannelCheck.nirsData.time=0.5:0.5:500;
     %error('No data');
     fprintf(2,'Using simulated Data\n');
@@ -158,10 +173,18 @@ if(~isfield(pf2ChannelCheck.nirsData,'probeinfo'))
     pf2ChannelCheck.nirsData.probeinfo=pf2_base.loadDeviceCfg(cfgFilePath,true);
 end
 
-    
+
 pf2ChannelCheck.probeNum=1;
 
+if(isempty(pf2ChannelCheck.nirsData.raw))
+   pf2ChannelCheck.nirsData.raw=rand(1000,length(pf2ChannelCheck.nirsData.probeinfo.Probe{pf2ChannelCheck.probeNum}.ChannelNumbers))*500+1000; 
+end
+
+    
+
 setUpAxes(handles,pf2ChannelCheck.nirsData.probeinfo.Probe{pf2ChannelCheck.probeNum});
+
+
 
 
 if(~isfield(pf2ChannelCheck.nirsData,'markers')||isempty(pf2ChannelCheck.nirsData.markers))
@@ -199,22 +222,89 @@ set(handles.currentfiletext,'String',name);
 %Count num Channels
 pf2ChannelCheck.numChannels=pf2ChannelCheck.nirsData.probeinfo.Probe{pf2ChannelCheck.probeNum}.NumOptodes;
 
+if(pf2ChannelCheck.numChannels>0)
+    pf2ChannelCheck.curChannel=1;
+else
+    pf2ChannelCheck.curChannel=0;
+end
+
+
+
+
 if(isfield(pf2ChannelCheck,'fmask')&&isempty(pf2ChannelCheck.fmask))
     if(isfield(pf2ChannelCheck.nirsData,'fchMask')&&~isempty(pf2ChannelCheck.nirsData.fchMask))
         pf2ChannelCheck.fmask=pf2ChannelCheck.nirsData.fchMask;
     else
          pf2ChannelCheck.fmask=ones(1,pf2ChannelCheck.numChannels);
     end
-end
-
-pf2ChannelCheck.maxVal=nanmax(nanmax(pf2ChannelCheck.nirsData.raw(:,...
-    pf2ChannelCheck.nirsData.probeinfo.Probe{pf2ChannelCheck.probeNum}.Wavelength>0)));
-
-if(pf2ChannelCheck.numChannels>0)
-    pf2ChannelCheck.curChannel=1;
 else
-    pf2ChannelCheck.curChannel=0;
+   pf2ChannelCheck.fmask=ones(1,pf2ChannelCheck.numChannels);
 end
+
+globalData=pf2ChannelCheck.nirsData.raw(:,...
+    pf2ChannelCheck.nirsData.probeinfo.Probe{pf2ChannelCheck.probeNum}.Wavelength>0);
+
+globalData850=pf2ChannelCheck.nirsData.raw(:,...
+    pf2ChannelCheck.nirsData.probeinfo.Probe{pf2ChannelCheck.probeNum}.Wavelength>805&pf2ChannelCheck.nirsData.probeinfo.Probe{pf2ChannelCheck.probeNum}.Wavelength<950);
+
+globalData730=pf2ChannelCheck.nirsData.raw(:,...
+    pf2ChannelCheck.nirsData.probeinfo.Probe{pf2ChannelCheck.probeNum}.Wavelength>600&pf2ChannelCheck.nirsData.probeinfo.Probe{pf2ChannelCheck.probeNum}.Wavelength<805);
+
+pf2ChannelCheck.globalstats.max=nanmax(nanmax(globalData));
+pf2ChannelCheck.globalstats.std=nanstd(globalData(:));
+pf2ChannelCheck.globalstats.mean=nanmean(globalData(:));
+pf2ChannelCheck.globalstats.cov=nanstd(globalData(:))/nanmean(globalData(:));
+pf2ChannelCheck.globalstatsWV1.cov=nanstd(globalData730(:))/nanmean(globalData730(:));
+pf2ChannelCheck.globalstatsWV2.cov=nanstd(globalData850(:))/nanmean(globalData850(:));
+pf2ChannelCheck.globalstatsWV1.std=nanstd(globalData730(:));
+pf2ChannelCheck.globalstatsWV1.mean=nanmean(globalData730(:));
+pf2ChannelCheck.globalstatsWV2.std=nanstd(globalData850(:));
+pf2ChannelCheck.globalstatsWV2.mean=nanmean(globalData850(:));
+
+
+
+pf2ChannelCheck.stats=[];
+pf2ChannelCheck.stats.cov=nan(1,pf2ChannelCheck.numChannels);
+pf2ChannelCheck.statsWV1.cov=nan(1,pf2ChannelCheck.numChannels);
+pf2ChannelCheck.statsWV2.cov=nan(1,pf2ChannelCheck.numChannels);
+pf2ChannelCheck.stats.mean=nan(1,pf2ChannelCheck.numChannels);
+pf2ChannelCheck.statsWV1.mean=nan(1,pf2ChannelCheck.numChannels);
+pf2ChannelCheck.statsWV2.mean=nan(1,pf2ChannelCheck.numChannels);
+pf2ChannelCheck.stats.std=nan(1,pf2ChannelCheck.numChannels);
+pf2ChannelCheck.statsWV1.std=nan(1,pf2ChannelCheck.numChannels);
+pf2ChannelCheck.statsWV2.std=nan(1,pf2ChannelCheck.numChannels);
+
+for i=1:pf2ChannelCheck.numChannels
+    chIdx=(pf2ChannelCheck.nirsData.probeinfo.Probe{pf2ChannelCheck.probeNum}.Wavelength>600&pf2ChannelCheck.nirsData.probeinfo.Probe{pf2ChannelCheck.probeNum}.ChannelNumbers==i);
+    chIdx830=chIdx&pf2ChannelCheck.nirsData.probeinfo.Probe{pf2ChannelCheck.probeNum}.Wavelength>805;
+    chIdx730=chIdx&pf2ChannelCheck.nirsData.probeinfo.Probe{pf2ChannelCheck.probeNum}.Wavelength<805;
+    
+    data=pf2ChannelCheck.nirsData.raw(:,chIdx);
+    data830=pf2ChannelCheck.nirsData.raw(:,chIdx830);
+    data730=pf2ChannelCheck.nirsData.raw(:,chIdx730);
+    
+    if(~isempty(data))
+
+        pf2ChannelCheck.stats.cov(i)=nanstd(data(:))./nanmean(data(:));
+        pf2ChannelCheck.stats.mean(i)=nanmean(data(:));
+        pf2ChannelCheck.stats.std(i)=nanmean(data(:));
+
+        pf2ChannelCheck.statsWV1.cov(i)=nanstd(data730(:))./nanmean(data730(:));
+        pf2ChannelCheck.statsWV1.mean(i)=nanmean(data730(:));
+        pf2ChannelCheck.statsWV1.std(i)=nanmean(data730(:));
+
+        pf2ChannelCheck.statsWV2.cov(i)=nanstd(data830(:))./nanmean(data830(:));
+        pf2ChannelCheck.statsWV2.mean(i)=nanmean(data830(:));
+        pf2ChannelCheck.statsWV2.std(i)=nanmean(data830(:));
+    end
+    
+end
+
+if(pf2ChannelCheck.multiFigure)
+    checkbox_multiFigureMode_Callback([], [], handles);
+end
+
+
 % This sets up the initial plot - only do when we are invisible
 % so window can get raised using probeCheckGUI.
 if strcmp(get(hObject,'Visible'),'off')
@@ -232,9 +322,9 @@ uiwait(handles.figure1);
 function setUpAxes(handles,probInfo)
     
       
-global pf2ChannelCheck
+global pf2ChannelCheckHandles
  
-pf2ChannelCheck.chCurAxesHandle=handles.chAxes;
+pf2ChannelCheckHandles.chCurAxesHandle=handles.chAxes;
 
 uiP=handles.uipanel_arranged;
   
@@ -245,13 +335,15 @@ end
 
 
 for c=1:length(probInfo.OptLayout2D)
-     pf2ChannelCheck.chAxesHandles{c} = axes(uiP);
+     pf2ChannelCheckHandles.chAxesHandles{c} = axes(uiP);
      plot([1:20],[1:20]);
-     pf2ChannelCheck.chAxesHandles{c}.OuterPosition=probInfo.OptLayout2D{c};
-     set(pf2ChannelCheck.chAxesHandles{c},'Tag',sprintf('ChAxes%i',c));
+     pf2ChannelCheckHandles.chAxesHandles{c}.OuterPosition=probInfo.OptLayout2D{c};
+     set(pf2ChannelCheckHandles.chAxesHandles{c},'Tag',sprintf('ChAxes%i',c));
      
-     pf2ChannelCheck.chAxesHandles{c}.ButtonDownFcn = @myupdatefcn;
+     pf2ChannelCheckHandles.chAxesHandles{c}.ButtonDownFcn = @myupdatefcn;
 end
+
+pf2ChannelCheckHandles.text_channelStats=handles.text_channelStats;
 
 function myupdatefcn(hObject, eventdata, handles)
     
@@ -270,6 +362,7 @@ function [handle]= plotChannel(ch,plotMarkers,withTitle)
 
       
 global pf2ChannelCheck
+global pf2ChannelCheckHandles
 if(nargin<3)
     withTitle=false;
 end
@@ -309,15 +402,15 @@ end
    xlim([pf2ChannelCheck.viewTimeStart,pf2ChannelCheck.viewTimeEnd]);
    xl=xlim; 
 
-    if(isfield(pf2ChannelCheck.nirsData.probeinfo.Info,'RawMax'))
+    if(isfield(pf2ChannelCheck.nirsData.probeinfo.Info,'RawMax')&&~pf2ChannelCheck.autoscale)
         
         plot(xl,ones(size(xl))*pf2ChannelCheck.nirsData.probeinfo.Info.RawMax,'--k');
         
         yl=ylim();
-        ylim([0,pf2ChannelCheck.maxVal*1.1]);%pf2ChannelCheck.nirsData.probeinfo.Info.RawMax*1.1]);
-    else
+        ylim([0,pf2ChannelCheck.globalstats.max*1.1]);%pf2ChannelCheck.nirsData.probeinfo.Info.RawMax*1.1]);
+    elseif(~pf2ChannelCheck.autoscale)
         yl=ylim();
-        ylim([0,pf2ChannelCheck.maxVal*1.1]);
+        ylim([0,pf2ChannelCheck.globalstats.max*1.1]);
         
     end
     
@@ -335,6 +428,13 @@ end
         hold on;
     elseif(pf2ChannelCheck.fmask(ch)==0.5)
         th=text(mean(xl)/2+15,mean(yl),'~','FontSize',50,'color',[ 0.9100,0.4100,0.1700]);
+        set(th,'ButtonDownFcn',temp.ButtonDownFcn);
+        set(th,'Tag',temp.Tag);
+        hold on;
+    end
+    
+    if(pf2ChannelCheck.mark_noisy&&(pf2ChannelCheck.statsWV1.cov(ch)>pf2ChannelCheck.noisyThreshold||pf2ChannelCheck.statsWV2.cov(ch)>pf2ChannelCheck.noisyThreshold))
+        th=text(min(xl)+mean(xl)/4,max(yl)-mean(yl)/4,'*','FontSize',20,'color',[ 0.2100,0.4100,0.2700]);
         set(th,'ButtonDownFcn',temp.ButtonDownFcn);
         set(th,'Tag',temp.Tag);
         hold on;
@@ -375,10 +475,85 @@ end
         ylabel('Light Intensity');
         title(sprintf('Channel %i of %i',ch,pf2ChannelCheck.numChannels));
         set(pf2ChannelCheck.handle.text_curChannel,'String',sprintf('Ch %i of %i',ch,pf2ChannelCheck.numChannels));
+        
+        
+        
+        set(pf2ChannelCheckHandles.text_channelStats,'String',getChannelStatStr(ch));
     end
     
         xlim([pf2ChannelCheck.viewTimeStart,pf2ChannelCheck.viewTimeEnd]);
     
+function statStr=getChannelStatStr(ch)
+
+global pf2ChannelCheck
+
+statStr='Stat Wv1 Wv2 All';
+
+testStr=sprintf('%.5f',pf2ChannelCheck.globalstats.cov);
+testStr=strsplit(testStr,'.');
+
+testStrMean=sprintf('%.5f',pf2ChannelCheck.globalstats.mean);
+testStrMean=strsplit(testStrMean,'.');
+testStrStd=sprintf('%.5f',pf2ChannelCheck.globalstats.std);
+testStrStd=strsplit(testStrStd,'.');
+
+maxSigDig=5;
+
+sigdigcov=max(0,maxSigDig-length(testStr{1}));
+sigdigmean=max(0,maxSigDig-length(testStrMean{1}));
+sigdigstd=max(0,maxSigDig-length(testStrStd{1}));
+
+switch(sigdigmean)
+    case 6
+        statStr=sprintf('%s\nm: %.6f %.6f %.6f',statStr,pf2ChannelCheck.statsWV1.mean(ch),pf2ChannelCheck.statsWV2.mean(ch),pf2ChannelCheck.stats.mean(ch));
+    case 5
+        statStr=sprintf('%s\nm: %.5f %.5f %.5f',statStr,pf2ChannelCheck.statsWV1.mean(ch),pf2ChannelCheck.statsWV2.mean(ch),pf2ChannelCheck.stats.mean(ch));
+    case 4
+        statStr=sprintf('%s\nm: %.4f %.4f %.4f',statStr,pf2ChannelCheck.statsWV1.mean(ch),pf2ChannelCheck.statsWV2.mean(ch),pf2ChannelCheck.stats.mean(ch));
+    case 3
+        statStr=sprintf('%s\nm: %.3f %.3f %.3f',statStr,pf2ChannelCheck.statsWV1.mean(ch),pf2ChannelCheck.statsWV2.mean(ch),pf2ChannelCheck.stats.mean(ch));
+    case 2
+        statStr=sprintf('%s\nm: %.2f %.2f %.2f',statStr,pf2ChannelCheck.statsWV1.mean(ch),pf2ChannelCheck.statsWV2.mean(ch),pf2ChannelCheck.stats.mean(ch));
+    case 1
+        statStr=sprintf('%s\nm: %.1f %.1f %.1f',statStr,pf2ChannelCheck.statsWV1.mean(ch),pf2ChannelCheck.statsWV2.mean(ch),pf2ChannelCheck.stats.mean(ch));
+    case 0
+        statStr=sprintf('%s\nm: %.0f %.0f %.0f',statStr,pf2ChannelCheck.statsWV1.mean(ch),pf2ChannelCheck.statsWV2.mean(ch),pf2ChannelCheck.stats.mean(ch));
+end
+
+switch(sigdigstd)
+    case 6
+        statStr=sprintf('%s\ns: %.6f %.6f %.6f',statStr,pf2ChannelCheck.statsWV1.std(ch),pf2ChannelCheck.statsWV2.std(ch),pf2ChannelCheck.stats.std(ch));
+    case 5
+        statStr=sprintf('%s\ns: %.5f %.5f %.5f',statStr,pf2ChannelCheck.statsWV1.std(ch),pf2ChannelCheck.statsWV2.std(ch),pf2ChannelCheck.stats.std(ch));
+    case 4
+        statStr=sprintf('%s\ns: %.4f %.4f %.4f',statStr,pf2ChannelCheck.statsWV1.std(ch),pf2ChannelCheck.statsWV2.std(ch),pf2ChannelCheck.stats.std(ch));
+    case 3
+        statStr=sprintf('%s\ns: %.3f %.3f %.3f',statStr,pf2ChannelCheck.statsWV1.std(ch),pf2ChannelCheck.statsWV2.std(ch),pf2ChannelCheck.stats.std(ch));
+    case 2
+        statStr=sprintf('%s\ns: %.2f %.2f %.2f',statStr,pf2ChannelCheck.statsWV1.std(ch),pf2ChannelCheck.statsWV2.std(ch),pf2ChannelCheck.stats.std(ch));
+    case 1
+        statStr=sprintf('%s\ns: %.1f %.1f %.1f',statStr,pf2ChannelCheck.statsWV1.std(ch),pf2ChannelCheck.statsWV2.std(ch),pf2ChannelCheck.stats.std(ch));
+    case 0
+        statStr=sprintf('%s\ns: %.0f %.0f %.0f',statStr,pf2ChannelCheck.statsWV1.std(ch),pf2ChannelCheck.statsWV2.std(ch),pf2ChannelCheck.stats.std(ch));
+end
+
+switch(sigdigcov)
+    case 6
+        statStr=sprintf('%s\nCv %.6f %.6f %.6f',statStr,pf2ChannelCheck.statsWV1.cov(ch),pf2ChannelCheck.statsWV2.cov(ch),pf2ChannelCheck.stats.cov(ch));
+    case 5
+        statStr=sprintf('%s\nCv %.5f %.5f %.5f',statStr,pf2ChannelCheck.statsWV1.cov(ch),pf2ChannelCheck.statsWV2.cov(ch),pf2ChannelCheck.stats.cov(ch));
+    case 4
+        statStr=sprintf('%s\nCv %.4f %.4f %.4f',statStr,pf2ChannelCheck.statsWV1.cov(ch),pf2ChannelCheck.statsWV2.cov(ch),pf2ChannelCheck.stats.cov(ch));
+    case 3
+        statStr=sprintf('%s\nCv %.3f %.3f %.3f',statStr,pf2ChannelCheck.statsWV1.cov(ch),pf2ChannelCheck.statsWV2.cov(ch),pf2ChannelCheck.stats.cov(ch));
+    case 2
+        statStr=sprintf('%s\nCv %.2f %.2f %.2f',statStr,pf2ChannelCheck.statsWV1.cov(ch),pf2ChannelCheck.statsWV2.cov(ch),pf2ChannelCheck.stats.cov(ch));
+    case 1
+        statStr=sprintf('%s\nCv %.1f %.1f %.1f',statStr,pf2ChannelCheck.statsWV1.cov(ch),pf2ChannelCheck.statsWV2.cov(ch),pf2ChannelCheck.stats.cov(ch));
+    case 0
+        statStr=sprintf('%s\nCv %.0f %.0f %.0f',statStr,pf2ChannelCheck.statsWV1.cov(ch),pf2ChannelCheck.statsWV2.cov(ch),pf2ChannelCheck.stats.cov(ch));
+end
+
 
 
 % --- Outputs from this function are returned to the command line.
@@ -391,10 +566,19 @@ function varargout = probeCheckGUI_OutputFcn(hObject, eventdata, handles)
 % Get default command line output from handles structure
 
 global pf2ChannelCheck
+global pf2ChannelCheckHandles
 pf2ChannelCheck.nirsData.fchMask=pf2ChannelCheck.fmask;
 varargout = {pf2ChannelCheck.nirsData};
+
+autoscale=pf2ChannelCheck.autoscale;
+mark_noisy=pf2ChannelCheck.mark_noisy;
+twoFig= pf2ChannelCheck.multiFigure;
+
 pf2ChannelCheck=[];
-clear pf2ChannelCheck;
+pf2ChannelCheckHandles=[];
+pf2ChannelCheck.autoscale=autoscale;
+pf2ChannelCheck.mark_noisy=mark_noisy;
+pf2ChannelCheck.multiFigure=twoFig;
 
 
 % --------------------------------------------------------------------
@@ -428,11 +612,12 @@ function figure1_CreateFcn(hObject, eventdata, handles)
 function updateChannels(handles)
   
 global pf2ChannelCheck
-axes(handles.chAxes);
+global pf2ChannelCheckHandles
+axes(pf2ChannelCheckHandles.chCurAxesHandle);
 plotChannel(pf2ChannelCheck.curChannel,pf2ChannelCheck.showMarkers,true);
 
 for i=1:pf2ChannelCheck.numChannels
-    axes(pf2ChannelCheck.chAxesHandles{i});
+    axes(pf2ChannelCheckHandles.chAxesHandles{i});
     plotChannel(i,false);
 end
 % --- Executes on button press in rejectButton.
@@ -442,11 +627,12 @@ function rejectButton_Callback(hObject, eventdata, handles)
 % handles    structure with handles and user data (see GUIDATA)
   
 global pf2ChannelCheck
+global pf2ChannelCheckHandles
 
 pf2ChannelCheck.fmask(pf2ChannelCheck.curChannel)=0;
-axes(pf2ChannelCheck.chCurAxesHandle(pf2ChannelCheck.curChannel));
+axes(pf2ChannelCheckHandles.chAxesHandles{pf2ChannelCheck.curChannel});
 plotChannel(pf2ChannelCheck.curChannel,false);
-axes(handles.chAxes);
+axes(pf2ChannelCheckHandles.chCurAxesHandle);
 plotChannel(pf2ChannelCheck.curChannel,pf2ChannelCheck.showMarkers,true);
 
 
@@ -457,10 +643,11 @@ function noisyButton_Callback(hObject, eventdata, handles)
 % handles    structure with handles and user data (see GUIDATA)
   
 global pf2ChannelCheck
+global pf2ChannelCheckHandles
 pf2ChannelCheck.fmask(pf2ChannelCheck.curChannel)=0.5;
-axes(pf2ChannelCheck.chCurAxesHandle{pf2ChannelCheck.curChannel});
+axes(pf2ChannelCheckHandles.chAxesHandles{pf2ChannelCheck.curChannel});
 plotChannel(pf2ChannelCheck.curChannel,false);
-axes(handles.chAxes);
+axes(pf2ChannelCheckHandles.chCurAxesHandle);
 plotChannel(pf2ChannelCheck.curChannel,pf2ChannelCheck.showMarkers,true);
 
 
@@ -474,10 +661,11 @@ function cleanButton_Callback(hObject, eventdata, handles)
 % handles    structure with handles and user data (see GUIDATA)
   
 global pf2ChannelCheck
+global pf2ChannelCheckHandles
 pf2ChannelCheck.fmask(pf2ChannelCheck.curChannel)=1;
-axes(pf2ChannelCheck.chCurAxesHandle{pf2ChannelCheck.curChannel});
+axes(pf2ChannelCheckHandles.chAxesHandles{pf2ChannelCheck.curChannel});
 plotChannel(pf2ChannelCheck.curChannel,false);
-axes(handles.chAxes);
+axes(pf2ChannelCheckHandles.chCurAxesHandle);
 plotChannel(pf2ChannelCheck.curChannel,pf2ChannelCheck.showMarkers,true);
 
 
@@ -561,7 +749,7 @@ if(pf2ChannelCheck.showMarkers)
 
     pf2ChannelCheck.curMarkers=pf2ChannelCheck.curMarkerset(pf2ChannelCheck.curMarkersInd);
 
-    axes(handles.chAxes);
+    axes(pf2ChannelCheckHandles.chCurAxesHandle);
     plotChannel(pf2ChannelCheck.curChannel,pf2ChannelCheck.showMarkers,true);
 else
     pf2ChannelCheck.curMarkers=[];
@@ -575,6 +763,7 @@ end
 function markUnmarkChannel(ch,eventdata)
   
 global pf2ChannelCheck
+global pf2ChannelCheckHandles
 pf2ChannelCheck.curChannel=ch;
 
 b = eventdata.Button;
@@ -591,10 +780,10 @@ else
     end
 end
 
-axes(pf2ChannelCheck.chAxesHandles{ch});
+axes(pf2ChannelCheckHandles.chAxesHandles{ch});
 plotChannel(ch,false);
 
-axes(pf2ChannelCheck.chCurAxesHandle);
+axes(pf2ChannelCheckHandles.chCurAxesHandle);
 plotChannel(ch,pf2ChannelCheck.showMarkers,true);
 
 
@@ -749,10 +938,10 @@ global pf2ChannelCheck
 pf2ChannelCheck.curMarkersInd=get(handles.marker_listbox,'Value');
 pf2ChannelCheck.curMarkers=pf2ChannelCheck.curMarkerset(pf2ChannelCheck.curMarkersInd);
 
-axes(handles.chAxes);
+axes(pf2ChannelCheckHandles.chCurAxesHandle);
 plotChannel(pf2ChannelCheck.curChannel,pf2ChannelCheck.showMarkers,true);
 
-axes(pf2ChannelCheck.chCurAxesHandle{pf2ChannelCheck.curChannel});
+axes(pf2ChannelCheck.chAxesHandle{pf2ChannelCheck.curChannel});
 plotChannel(pf2ChannelCheck.curChannel,false,false);
 
 % --- Executes during object creation, after setting all properties.
@@ -775,6 +964,38 @@ function checkbox_multiFigureMode_Callback(hObject, eventdata, handles)
 % handles    structure with handles and user data (see GUIDATA)
 
 % Hint: get(hObject,'Value') returns toggle state of checkbox_multiFigureMode
+
+global pf2ChannelCheck
+global pf2ChannelCheckHandles
+pf2ChannelCheck.multiFigure=get(handles.checkbox_multiFigureMode,'Value');
+
+if(pf2ChannelCheck.multiFigure)
+    set(handles.uipanel_curCh,'OuterPosition',[-0.001,0.001,0.918,0.001]);
+    set(handles.uipanel_arranged,'OuterPosition',[-0.001,0.001,0.918,0.913]);
+    newFig=figure(2020);
+    
+    pf2ChannelCheckHandles.chCurAxesHandle=axes(newFig);
+    set(pf2ChannelCheckHandles.chCurAxesHandle,'Tag',sprintf('ChAxes%i',pf2ChannelCheck.curChannel));
+    plotChannel(pf2ChannelCheck.curChannel,pf2ChannelCheck.showMarkers,true);
+    set(newFig,'ButtonDownFcn',@myupdatefcn);
+    set(pf2ChannelCheckHandles.chCurAxesHandle,'ButtonDownFcn',@myupdatefcn);
+else
+    
+    try
+        axes(pf2ChannelCheckHandles.chCurAxesHandle)
+        close(gcf());
+    catch
+        
+    end
+    
+    
+    pf2ChannelCheckHandles.chCurAxesHandle=handles.chAxes;
+    
+    set(handles.uipanel_curCh,'OuterPosition',[-0.001,0.471,0.918,0.447]);
+    set(handles.uipanel_arranged,'OuterPosition',[-0.001,0.001,0.918,0.466]);
+    axes(pf2ChannelCheckHandles.chCurAxesHandle);
+    plotChannel(pf2ChannelCheck.curChannel,pf2ChannelCheck.showMarkers,true);
+end
 
 
 % --- Executes on button press in pushbutton_mrk_all.
@@ -808,6 +1029,7 @@ function pushbutton_prev_Callback(hObject, eventdata, handles)
 % handles    structure with handles and user data (see GUIDATA)
   
 global pf2ChannelCheck
+global pf2ChannelCheckHandles
 if(pf2ChannelCheck.curChannel>1)
     pf2ChannelCheck.curChannel=pf2ChannelCheck.curChannel-1;
 
@@ -816,7 +1038,7 @@ else
     
 end
 
-axes(handles.chAxes);
+axes(pf2ChannelCheckHandles.chCurAxesHandle);
 plotChannel(pf2ChannelCheck.curChannel,pf2ChannelCheck.showMarkers,true);
 
 
@@ -828,6 +1050,7 @@ function pushbutton_next_Callback(hObject, eventdata, handles)
 
   
 global pf2ChannelCheck
+global pf2ChannelCheckHandles
 if(pf2ChannelCheck.curChannel<pf2ChannelCheck.numChannels)
     pf2ChannelCheck.curChannel=pf2ChannelCheck.curChannel+1;
 
@@ -836,5 +1059,31 @@ else
     
 end
 
-axes(handles.chAxes);
+axes(pf2ChannelCheckHandles.chCurAxesHandle);
 plotChannel(pf2ChannelCheck.curChannel,pf2ChannelCheck.showMarkers,true);
+
+
+% --- Executes on button press in checkbox_autoscale.
+function checkbox_autoscale_Callback(hObject, eventdata, handles)
+% hObject    handle to checkbox_autoscale (see GCBO)
+% eventdata  reserved - to be defined in a future version of MATLAB
+% handles    structure with handles and user data (see GUIDATA)
+
+% Hint: get(hObject,'Value') returns toggle state of checkbox_autoscale
+global pf2ChannelCheck
+pf2ChannelCheck.autoscale=get(handles.checkbox_autoscale,'Value');
+
+updateChannels(handles);
+
+% --- Executes on button press in checkbox_automark_noisy.
+function checkbox_automark_noisy_Callback(hObject, eventdata, handles)
+% hObject    handle to checkbox_automark_noisy (see GCBO)
+% eventdata  reserved - to be defined in a future version of MATLAB
+% handles    structure with handles and user data (see GUIDATA)
+
+% Hint: get(hObject,'Value') returns toggle state of checkbox_automark_noisy
+% Hint: get(hObject,'Value') returns toggle state of checkbox_autoscale
+global pf2ChannelCheck
+pf2ChannelCheck.mark_noisy=get(handles.checkbox_automark_noisy,'Value');
+
+updateChannels(handles);
