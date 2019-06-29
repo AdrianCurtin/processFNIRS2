@@ -664,8 +664,13 @@ else
 end
 
 function flagForUpdate(UpdateNeeded,handles)
+if(~isfield(ExFNIRS,'UpdateNeeded'))
+   ExFNIRS.UpdateNeeded=3; 
+end
+
 
 global ExFNIRS
+
 if(UpdateNeeded>0)
     if(ExFNIRS.UpdateNeeded<UpdateNeeded)
         ExFNIRS.UpdateNeeded=UpdateNeeded; %2 indicates fNIRS data needs to be reprocessed as well
