@@ -1404,6 +1404,14 @@ varargout={};
 [validFields]=pf2_base.pf2_getFNIRSfields();
 
 if(nargout>0)
+    fdataFields=fields(PF2.data);
+       for i=1:length(fdataFields)
+           memberIdx=ismember(validFields,fdataFields{i});
+           if(any(memberIdx))
+                outfNIR.(validFields{memberIdx})=PF2.data.(fdataFields{i});
+           end
+       end
+    
    if(isfield(PF2,'data')&&isfield(PF2.data,'stage')&&(size(PF2.data.stage,2)==5))
        if(outputData.ProcessOxy&&~isempty(PF2.data.stage{5}))
           outfNIR=PF2.data.stage{5};
@@ -1440,13 +1448,7 @@ if(nargout>0)
      
         
         if(exist('outfNIR'))
-           fdataFields=fields(PF2.data);
-           for i=1:length(fdataFields)
-               memberIdx=ismember(validFields,fdataFields{i});
-               if(any(memberIdx))
-                    outfNIR.(validFields{memberIdx})=PF2.data.(fdataFields{i});
-               end
-           end
+           
            
            varargout={outfNIR};
        else

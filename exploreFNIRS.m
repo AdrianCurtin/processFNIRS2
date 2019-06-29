@@ -91,7 +91,7 @@ function varargout = exploreFNIRS(varargin) % exploreFNIRS(data,timeShiftTo0,blS
 
 % Edit the above text to modify the response to help exploreFNIRS
 
-% Last Modified by GUIDE v2.5 26-Jun-2019 14:20:12
+% Last Modified by GUIDE v2.5 29-Jun-2019 12:19:36
 
 % Begin initialization code - DO NOT EDIT
 gui_Singleton = 1;
@@ -160,8 +160,23 @@ if(~isfield(ExFNIRS,'settings')||~isfield(ExFNIRS.settings,'baseline_start'))
     ExFNIRS.settings.ChannelModes={1,'fNIR';2,'ROI';3,'Aux'};
     ExFNIRS.settings.processRaw=get(handles.checkbox_process_raw,'Value');
     ExFNIRS.settings.LME_use_intercept=get(handles.checkbox_LME_use_intercept,'Value');
+    ExFNIRS.settings.LME_use_discreteTime=get(handles.checkbox_discreteTime,'Value');
+    ExFNIRS.settings.LME_randomFxStr='1|SubjectID';
+    ExFNIRS.settings.LME_use_customStr=get(handles.checkbox_lme_usecustom,'Value');
+    
+    ExFNIRS.settings.LME_customStr='';
 end
 
+
+segInfoVars={'Group','Subgroup','Session','Trial','Block','Condition'};
+randFxStr{1}='1|SubjectID';
+for i=2:2:length(segInfoVars)*2
+   randFxStr{i}=sprintf('%s|SubjectID',segInfoVars{(i)/2}); 
+   randFxStr{i+1}=sprintf('1+%s|SubjectID',segInfoVars{(i)/2}); 
+end
+
+set(handles.popupmenu_lmer_randomeffects,'String',randFxStr);
+ExFNIRS.settings.LME_randomFxStrs=randFxStr;
 
 if(ExFNIRS.settings.processRaw)
     set(handles.listbox_raw_methods,'Enable','on');
@@ -445,8 +460,13 @@ strsOxy=get(handles.listbox_oxy_methods,'String');
 
 ExFNIRS.processedData=cell(length(strsOxy)*length(strsRaw),3);
 ExFNIRS.numProcessed=0;
-processCurrentFunction(handles);
-updateSelectedTable(handles);
+
+if(ExFNIRS.settings.updateOnChange)
+    updateSelectedTable(handles);
+else
+    flagForUpdate(3,handles);
+end
+
 
 % UIWAIT makes exploreFNIRS wait for user response (see UIRESUME)
 % uiwait(handles.figure1);
@@ -646,8 +666,12 @@ end
 function flagForUpdate(UpdateNeeded,handles)
 
 global ExFNIRS
-if(UpdateNeeded)
-    ExFNIRS.UpdateNeeded=true;
+if(UpdateNeeded>0)
+    if(ExFNIRS.UpdateNeeded<UpdateNeeded)
+        ExFNIRS.UpdateNeeded=UpdateNeeded; %2 indicates fNIRS data needs to be reprocessed as well
+                                           % 3 indicates fNIRS must be
+                                           % reprocessed entirely
+    end
     set(handles.pushbutton_process_selection,'BackgroundColor','Red');
     updateSelectedTable(handles,false);
 else
@@ -947,7 +971,7 @@ set(handles.edit_baseline_start,'String',sprintf('%.2f',ExFNIRS.settings.baselin
 if(ExFNIRS.settings.updateOnChange)
     updateSelectedTable(handles);
 else
-    flagForUpdate(true,handles);
+    flagForUpdate(2,handles);
 end
 
 
@@ -979,7 +1003,7 @@ set(handles.edit_baseline_end,'String',sprintf('%.2f',ExFNIRS.settings.baseline_
 if(ExFNIRS.settings.updateOnChange)
     updateSelectedTable(handles);
 else
-    flagForUpdate(true,handles);
+    flagForUpdate(2,handles);
 end
 
 % --- Executes during object creation, after setting all properties.
@@ -1117,7 +1141,7 @@ set(handles.edit_barchart_resample_size,'String',sprintf('%.2f',ExFNIRS.settings
 if(ExFNIRS.settings.updateOnChange)
     updateSelectedTable(handles);
 else
-    flagForUpdate(true,handles);
+    flagForUpdate(2,handles);
 end
 
 
@@ -1427,11 +1451,53 @@ set(handles.text_status,'String',sprintf('%i Observations in\n%i Group(s)',size(
 
 
 if(processDataNow)
-    processSelectedTable(handles,gbyIdx);
+    processCurrentFunction(handles);
+    preprocessFNIRSData();
+    processSelectedTable(handles,sellFullIdx,gbyIdx);
 end
 
+function preprocessFNIRSData()
+global ExFNIRS
+if(ExFNIRS.UpdateNeeded==2||~isfield(ExFNIRS,'curPreprocessedFNIR'))
+    
+    pf2_base.closeProgressHandles();
 
-function processSelectedTable(handles,gbyIdx)
+     numSegs2Process=size(ExFNIRS.curProcessedData,1);
+
+    global ProgressHandles
+    ProgressHandles.h.hF=waitbar(0,sprintf('ExploreFNIRS\nResampling and baselining fNIRS %i of %i',1,numSegs2Process));
+    hF=ProgressHandles.h.hF;
+
+   
+    ExFNIRS.curPreprocessedFNIR=[];
+    ExFNIRS.curPreprocessedFNIR.fNIR=ExFNIRS.curProcessedData;
+    ExFNIRS.curPreprocessedFNIR.baseline=cell(size(ExFNIRS.curProcessedData));
+    ExFNIRS.curPreprocessedFNIR.gbyFNIRS=ExFNIRS.curProcessedData;
+    ExFNIRS.curPreprocessedFNIR.gbyFNIRS_blk=cell(size(ExFNIRS.curProcessedData));
+
+    for i=1:numSegs2Process
+       try
+            waitbar(i/numSegs2Process,hF,sprintf('ExploreFNIRS\nResampling and baselining fNIRS %i of %i',i,numSegs2Process));
+       catch
+
+       end
+        ExFNIRS.curPreprocessedFNIR.baseline{i}=processFNIRS2.Data.Split(ExFNIRS.curPreprocessedFNIR.fNIR{i},ExFNIRS.settings.baseline_start,ExFNIRS.settings.baseline_end); %baselineining is handled in processing section
+        ExFNIRS.curPreprocessedFNIR.gbyFNIRS{i}.time=ExFNIRS.curPreprocessedFNIR.gbyFNIRS{i}.time-ExFNIRS.settings.block_start; %change time so that 0 is start of block
+        ExFNIRS.curPreprocessedFNIR.gbyFNIRS_blk{i}=processFNIRS2.Data.Resample(ExFNIRS.curPreprocessedFNIR.gbyFNIRS{i}, ExFNIRS.settings.barchart_resample_size,'centerOnT0',true,'timeOutMode','start','blfNIR',ExFNIRS.curPreprocessedFNIR.baseline{i},'averageAux',true);
+        ExFNIRS.curPreprocessedFNIR.gbyFNIRS{i}=processFNIRS2.Data.Split(ExFNIRS.curPreprocessedFNIR.gbyFNIRS{i},'blfNIR',ExFNIRS.curPreprocessedFNIR.baseline{i});
+    end
+
+    try
+        close(hF);
+    catch
+    
+end
+else
+
+    ExFNIRS.UpdateNeeded=true; % mark that data was preprocesed
+end
+
+function processSelectedTable(handles,sellFullIdx,gbyIdx)
 global ExFNIRS
 pf2_base.closeProgressHandles();
 
@@ -1440,30 +1506,26 @@ global ProgressHandles
 ProgressHandles.h.hF=waitbar(0,sprintf('ExploreFNIRS\nProcessing Group %i of %i',1,max(gbyIdx)));
 hF=ProgressHandles.h.hF;
 
-numSeg=0;
+numSegs2Process=size(ExFNIRS.selectedTable,1);
+
+ExFNIRS.gbyFlat=[];
+ExFNIRS.gbyFlat.fNIR=ExFNIRS.curPreprocessedFNIR.fNIR{sellFullIdx,:};
+ExFNIRS.gbyFlat.baseline=ExFNIRS.curPreprocessedFNIR.baseline{sellFullIdx,:};
+ExFNIRS.gbyFlat.gbyFNIRS=ExFNIRS.curPreprocessedFNIR.gbyFNIRS{sellFullIdx,:};
+ExFNIRS.gbyFlat.gbyFNIRS_blk=ExFNIRS.curPreprocessedFNIR.gbyFNIRS_blk{sellFullIdx,:};
+ExFNIRS.gbyFlat.gbyIndex=gbyIdx;
+
+
 for i=1:max(gbyIdx)
-    waitbar(i/max(gbyIdx),hF,sprintf('ExploreFNIRS\nProcessing Group %i of %i',i,max(gbyIdx)));
-    ExFNIRS.gby(i).gbyTables=ExFNIRS.selectedTable(gbyIdx==i,:); 
-    ExFNIRS.gby(i).gbyFNIRS=ExFNIRS.selectedFNIR(gbyIdx==i,:);
-    ExFNIRS.gby(i).gbyFNIRS_blk=cell(size(ExFNIRS.gby(i).gbyFNIRS));
-    
-    ProgressHandles.h.exSeg=waitbar(0,sprintf('ExploreFNIRS\nProcessing segment %i of %i',1,length(ExFNIRS.gby(i).gbyFNIRS)));
-    eHf=ProgressHandles.h.exSeg;
-    for i2=1:length(ExFNIRS.gby(i).gbyFNIRS)
-        waitbar(i2/length(ExFNIRS.gby(i).gbyFNIRS),eHf,sprintf('ExploreFNIRS\nProcessing segment %i of %i',i2,length(ExFNIRS.gby(i).gbyFNIRS)));
-        numSeg=numSeg+1;
-      
-        blSeg=processFNIRS2.Data.Split(ExFNIRS.gby(i).gbyFNIRS{i2},ExFNIRS.settings.baseline_start,ExFNIRS.settings.baseline_end); %baselineining is handled in processing section
-        ExFNIRS.gby(i).gbyFNIRS{i2}.time=ExFNIRS.gby(i).gbyFNIRS{i2}.time-ExFNIRS.settings.block_start; %change time so that 0 is start of block
-        ExFNIRS.gby(i).gbyFNIRS_blk{i2}=processFNIRS2.Data.Resample(ExFNIRS.gby(i).gbyFNIRS{i2}, ExFNIRS.settings.barchart_resample_size,'centerOnT0',true,'timeOutMode','start','blfNIR',blSeg,'averageAux',true);
-        ExFNIRS.gby(i).gbyFNIRS{i2}=processFNIRS2.Data.Split(ExFNIRS.gby(i).gbyFNIRS{i2},'blfNIR',blSeg);
-        %ExFNIRS.gby(i).gbyFNIRS{i2}=processFNIRS2.Data.Resample(ExFNIRS.gby(i).gbyFNIRS{i2},ExFNIRS.settings.grandavg_resample_size,'centerOnT0',true,'timeOutMode','end');
-    end
     try
-        waitbar(0,eHf,sprintf('ExploreFNIRS\nAverging waveforms...'));
+        waitbar(i/max(gbyIdx),hF,sprintf('ExploreFNIRS\nProcessing Group %i of %i',i,max(gbyIdx)));
     catch
         
     end
+    ExFNIRS.gby(i).gbyTables=ExFNIRS.selectedTable(gbyIdx==i,:); 
+    ExFNIRS.gby(i).gbyFNIRS=ExFNIRS.curPreprocessedFNIR.gbyFNIRS(gbyIdx==i,:);
+    ExFNIRS.gby(i).gbyFNIRS_blk=ExFNIRS.curPreprocessedFNIR.gbyFNIRS_blk(gbyIdx==i,:);
+    
     
     if(ExFNIRS.settings.within_sub_avg_mode==1)
        hArg=[]; 
@@ -1475,21 +1537,22 @@ for i=1:max(gbyIdx)
         hArg=ExFNIRS.gby(i).gbyTables(:,ExFNIRS.dataHierarchy);
         ExFNIRS.settings.within_sub_avg_mode_label='Hierarchy';
     end
-    ExFNIRS.gby(i).gbyGrand=grandAvgFNIRS(ExFNIRS.gby(i).gbyFNIRS,false,[],false,hArg,true,false);
+    ExFNIRS.gby(i).gbyGrand=grandAvgFNIRS(ExFNIRS.gby(i).gbyFNIRS,false,[],false,hArg,false,false);
+    ExFNIRS.gby(i).gbyGrandBar=grandAvgFNIRS(ExFNIRS.gby(i).gbyFNIRS_blk,false, ExFNIRS.settings.barchart_resample_size,true,hArg,false,true);
+    ExFNIRS.gby(i).gbyGrandBarFlat=grandAvgFNIRS(ExFNIRS.gby(i).gbyFNIRS_blk,false, ExFNIRS.settings.barchart_resample_size,true,ExFNIRS.gby(i).gbyTables(:,'SubjectID'),false,true);
     try
-    waitbar(0,eHf,sprintf('ExploreFNIRS\nBuilding Chart Data...'));
-    catch
-        
-    end
-    ExFNIRS.gby(i).gbyGrandBar=grandAvgFNIRS(ExFNIRS.gby(i).gbyFNIRS_blk,false, ExFNIRS.settings.barchart_resample_size,true,hArg,true,true);
-    try
-    close(eHf);
+        close(eHf);
     catch
     end
 end
 
-set(handles.text_status,'String',sprintf('%i Segments in\n%i Group(s)',numSeg,max(gbyIdx)));
-close(hF);
+set(handles.text_status,'String',sprintf('%i Segments in\n%i Group(s)',numSegs2Process,max(gbyIdx)));
+try
+    close(hF);
+catch
+    
+end
+
 
 flagForUpdate(false,handles);
 
@@ -1514,6 +1577,8 @@ end
 function processCurrentFunction(handles)
 
 global ExFNIRS
+
+if(ExFNIRS.UpdateNeeded==3)
 
 strsRaw=get(handles.listbox_raw_methods,'String');
 selectedStrs=get(handles.listbox_raw_methods,'Value');
@@ -1542,10 +1607,9 @@ set(handles.listbox_oxy_methods,'Value',find(iOxy));
 set(handles.listbox_raw_methods,'String',strsRaw);
 set(handles.listbox_raw_methods,'Value',find(iRaw));
 
+ExFNIRS.UpdateNeeded=2;
 
-updateSelectedTable(handles);
-
-
+end
 
 % --- Executes on button press in pushbutton_biomarker_select_all.
 function pushbutton_biomarker_select_all_Callback(hObject, eventdata, handles)
@@ -1566,15 +1630,6 @@ function pushbutton_biomarker_select_none_Callback(hObject, eventdata, handles)
 
 set(handles.listbox_biomarker,'Value',[]);
 
-function flagForProcessUpdate(ProcessingNeeded)
-
-global ExFNIRS
-if(ProcessingNeeded)
-   ExFNIRS.ProcessingNeeded=true;
-   
-else
-   ExFNIRS.ProcessingNeeded=false; 
-end
 
 % --- Executes on selection change in listbox_raw_methods.
 function listbox_raw_methods_Callback(hObject, eventdata, handles)
@@ -1584,7 +1639,13 @@ function listbox_raw_methods_Callback(hObject, eventdata, handles)
 
 % Hints: contents = cellstr(get(hObject,'String')) returns listbox_raw_methods contents as cell array
 %        contents{get(hObject,'Value')} returns selected item from listbox_raw_methods
-processCurrentFunction(handles);
+global ExFNIRS
+
+if(ExFNIRS.settings.updateOnChange)
+    updateSelectedTable(handles);
+else
+    flagForUpdate(3,handles);
+end
 
 % --- Executes during object creation, after setting all properties.
 function listbox_raw_methods_CreateFcn(hObject, eventdata, handles)
@@ -1607,7 +1668,14 @@ function listbox_oxy_methods_Callback(hObject, eventdata, handles)
 
 % Hints: contents = cellstr(get(hObject,'String')) returns listbox_oxy_methods contents as cell array
 %        contents{get(hObject,'Value')} returns selected item from listbox_oxy_methods
-processCurrentFunction(handles);
+global ExFNIRS
+
+if(ExFNIRS.settings.updateOnChange)
+    updateSelectedTable(handles);
+else
+    flagForUpdate(3,handles);
+end
+
 
 % --- Executes during object creation, after setting all properties.
 function listbox_oxy_methods_CreateFcn(hObject, eventdata, handles)
@@ -2694,7 +2762,7 @@ for g=1:length(gbyTables)
        curGby=curGby{1}; 
     end
     
-    curBarGA=curGby.gbyGrandBar;
+    curBarGA=curGby.gbyGrandBarFlat;
     tempTable=curGby.gbyTables;
    
     
@@ -2855,7 +2923,7 @@ for g=1:length(gbyTables)
        curGby=curGby{1}; 
     end
     
-    curBarGA=curGby.gbyGrandBar;
+    curBarGA=curGby.gbyGrandBarFlat;
 
     if(exportROI&&(emptyChannelFlag)&&pf2_base.isnestedfield(curBarGA,'ROI.HbO.data'))
        numROI=size(curBarGA.ROI.HbO.data,2);
@@ -3240,7 +3308,14 @@ if(~isempty(curOxyMethods))
    set(handles.listbox_oxy_methods,'String',curOxyMethods); 
 end
 
-processCurrentFunction(handles);
+global ExFNIRS
+
+if(ExFNIRS.settings.updateOnChange)
+    updateSelectedTable(handles);
+else
+    flagForUpdate(3,handles);
+end
+
 
 % --- Executes on button press in pushbutton_import_raw.
 function pushbutton_import_raw_Callback(hObject, eventdata, handles)
@@ -3249,6 +3324,15 @@ function pushbutton_import_raw_Callback(hObject, eventdata, handles)
 % handles    structure with handles and user data (see GUIDATA)
 processFNIRS2('ImportOxyMethods','');
 
+global ExFNIRS
+
+if(ExFNIRS.settings.updateOnChange)
+    updateSelectedTable(handles);
+else
+    flagForUpdate(3,handles);
+end
+
+
 
 % --- Executes on button press in pushbutton_import_oxy.
 function pushbutton_import_oxy_Callback(hObject, eventdata, handles)
@@ -3256,6 +3340,14 @@ function pushbutton_import_oxy_Callback(hObject, eventdata, handles)
 % eventdata  reserved - to be defined in a future version of MATLAB
 % handles    structure with handles and user data (see GUIDATA)
 processFNIRS2('ImportRawMethods','');
+
+global ExFNIRS
+
+if(ExFNIRS.settings.updateOnChange)
+    updateSelectedTable(handles);
+else
+    flagForUpdate(3,handles);
+end
 
 
 % --- Executes on button press in pushbutton_clear_processed.
@@ -3270,6 +3362,12 @@ strsOxy=get(handles.listbox_oxy_methods,'String');
 
 ExFNIRS.processedData=cell(length(strsOxy)*length(strsRaw),3);
 ExFNIRS.numProcessed=0;
+
+if(ExFNIRS.settings.updateOnChange)
+    updateSelectedTable(handles);
+else
+    flagForUpdate(3,handles);
+end
 
 
 
@@ -3293,7 +3391,7 @@ ExFNIRS.numProcessed=0;
 if(ExFNIRS.settings.updateOnChange)
     updateSelectedTable(handles);
 else
-   flagForUpdate(true,handles); 
+   flagForUpdate(2,handles); 
 end
 
 % --- Executes during object creation, after setting all properties.
@@ -3864,15 +3962,26 @@ for sH=1:length(subplotHandles)
         end
         
         
-        if(ExFNIRS.settings.LME_use_intercept)
-            lmeString=sprintf('%s%i_%s~%s+(1|SubjectID)',varNameStart,subplotGby{sH}.curCh,subplotGby{sH}.curBioM{1},curLMEGbyString);
+        
+        if(ExFNIRS.settings.LME_use_customStr&&~isempty(ExFNIRS.settings.LME_customStr))
+            lmeString=sprintf('%s%i_%s~%s+(%s)',varNameStart,subplotGby{sH}.curCh,subplotGby{sH}.curBioM{1},ExFNIRS.settings.LME_customStr,ExFNIRS.settings.LME_randomFxStr);
+        elseif(ExFNIRS.settings.LME_use_intercept)
+            lmeString=sprintf('%s%i_%s~%s+(%s)',varNameStart,subplotGby{sH}.curCh,subplotGby{sH}.curBioM{1},curLMEGbyString,ExFNIRS.settings.LME_randomFxStr);
         else
-            lmeString=sprintf('%s%i_%s~-1+%s+(1|SubjectID)',varNameStart,subplotGby{sH}.curCh,subplotGby{sH}.curBioM{1},curLMEGbyString);
+            lmeString=sprintf('%s%i_%s~-1+%s+(%s)',varNameStart,subplotGby{sH}.curCh,subplotGby{sH}.curBioM{1},curLMEGbyString,ExFNIRS.settings.LME_randomFxStr);
             
         end
 
         try
+            if(~ExFNIRS.settings.LME_use_discreteTime&&numChartTimes>1)
+                mergedTables{sH}.Time=str2double(mergedTables{sH}.Time);
+            end
+            
+            
+            
             curChartLME{sH}=fitlme(mergedTables{sH},lmeString);
+%             curChartLME_emm{sH}= pf2_base.external.emmeans(curChartLME{sH}, {'orig'}, 'effects');
+%             h = emmip(curChartLME_emm{sH},'orig');
             
             switch (ExFNIRS.settings.ChannelMode)
                 case 'fNIR'
@@ -4546,7 +4655,13 @@ function listbox_hierarchy_Callback(hObject, eventdata, handles)
 
 % Hints: contents = cellstr(get(hObject,'String')) returns listbox_hierarchy contents as cell array
 %        contents{get(hObject,'Value')} returns selected item from listbox_hierarchy
+global ExFNIRS
 
+if(ExFNIRS.settings.updateOnChange)
+    updateSelectedTable(handles);
+else
+    flagForUpdate(true,handles);
+end
 
 % --- Executes during object creation, after setting all properties.
 function listbox_hierarchy_CreateFcn(hObject, eventdata, handles)
@@ -4585,6 +4700,13 @@ hierarchyStr=get(handles.listbox_hierarchy,'String');
 global ExFNIRS
 ExFNIRS.dataHierarchy(2:numHstr+1)=hierarchyStr;
 
+
+if(ExFNIRS.settings.updateOnChange)
+    updateSelectedTable(handles);
+else
+    flagForUpdate(true,handles);
+end
+
 % --- Executes on button press in pushbutton_move_hierarchy_down.
 function pushbutton_move_hierarchy_down_Callback(hObject, eventdata, handles)
 % hObject    handle to pushbutton_move_hierarchy_down (see GCBO)
@@ -4606,6 +4728,12 @@ end
 hierarchyStr=get(handles.listbox_hierarchy,'String');
 global ExFNIRS
 ExFNIRS.dataHierarchy(2:numHstr+1)=hierarchyStr;
+
+if(ExFNIRS.settings.updateOnChange)
+    updateSelectedTable(handles);
+else
+    flagForUpdate(true,handles);
+end
 
 
 % --- Executes on selection change in popupmenu_within_sub_avg.
@@ -4876,7 +5004,6 @@ end
 hold off;
    
 if(ExFNIRS.settings.LME_enable)
-    mergedTables=mergeGbyTablesLong(subplotGby.gby,[],[],[]);
     x=ExFNIRS.groupByVars;
     curLMEGbyString='';
 
@@ -4898,11 +5025,21 @@ if(ExFNIRS.settings.LME_enable)
     if(~isempty(curLMEGbyString))
         curLMEGbyString(1)=[];
     end
-
-    lmeString=sprintf('%s~-1+%s+(1|SubjectID)',ExFNIRS.settings.curInfoStr,curLMEGbyString);
+    
+    
+    if(ExFNIRS.settings.LME_use_customStr&&~isempty(ExFNIRS.settings.LME_customStr))
+        lmeString=sprintf('%s~%s+(%s)',ExFNIRS.settings.curInfoStr,ExFNIRS.settings.LME_customStr,ExFNIRS.settings.LME_randomFxStr);
+    elseif(ExFNIRS.settings.LME_use_intercept)
+        lmeString=sprintf('%s~%s+(%s)',ExFNIRS.settings.curInfoStr,curLMEGbyString,ExFNIRS.settings.LME_randomFxStr);
+    else
+       lmeString=sprintf('%s~-1+%s+(%s)',ExFNIRS.settings.curInfoStr,curLMEGbyString,ExFNIRS.settings.LME_randomFxStr);
+    end
+    
 
     try
-        curInfoChartLME=fitlme(mergedTables,lmeString);
+        curInfoChartLME=fitlme(ExFNIRS.selectedTable,lmeString);
+%         curInfoChartLME_emm= pf2_base.external.emmeans(curInfoChartLME, {'orig'}, 'effects');
+%         h = emmip(curInfoChartLME_emm,'orig');
 
         fprintf('Info Chart LME model: %s',ExFNIRS.settings.curInfoStr);
         if(useAllInteractions)
@@ -6137,6 +6274,19 @@ if(~isempty(ExFNIRS.settings.curInfoGroupBy))
     uVars(nanIndex)={'NaN'};
     set(handles.listbox_info_groupby,'String',uVars);
     set(handles.listbox_info_groupby,'Value',1:length(uVars));
+    
+    
+    
+    segInfoVars={'Group','Subgroup','Session','Trial','Block','Condition',ExFNIRS.settings.curInfoGroupBy};
+    randFxStr{1}='1|SubjectID';
+    for i=2:2:length(segInfoVars)*2
+       randFxStr{i}=sprintf('%s|SubjectID',segInfoVars{(i)/2}); 
+       randFxStr{i+1}=sprintf('1+%s|SubjectID',segInfoVars{(i)/2}); 
+    end
+
+    set(handles.popupmenu_lmer_randomeffects,'String',randFxStr);
+    ExFNIRS.settings.LME_randomFxStrs=randFxStr;
+
 else
     set(handles.listbox_info_groupby,'String','');
 end
@@ -6371,18 +6521,7 @@ function checkbox_LME_enable_Callback(hObject, eventdata, handles)
 
 global ExFNIRS
 ExFNIRS.settings.LME_enable=get(handles.checkbox_LME_enable,'Value');
-if(ExFNIRS.settings.LME_enable)
-    set(handles.popupmenu_within_sub_avg,'Value',2);
-else
-    set(handles.popupmenu_within_sub_avg,'Value',3);
-end
-ExFNIRS.settings.within_sub_avg_mode=get(handles.popupmenu_within_sub_avg,'Value');
 
-if(ExFNIRS.settings.updateOnChange)
-    updateSelectedTable(handles);
-else
-    flagForUpdate(true,handles);
-end
 
 
 % --- Executes on button press in checkbox_LME_all_interactions.
@@ -6414,6 +6553,18 @@ function pushbutton_lme_plot_topo_Callback(hObject, eventdata, handles)
 % hObject    handle to pushbutton_lme_plot_topo (see GCBO)
 % eventdata  reserved - to be defined in a future version of MATLAB
 % handles    structure with handles and user data (see GUIDATA)
+global ExFNIRS
+switch(ExFNIRS.settings.ChannelMode)
+    case 'fNIR'
+        strs=get(handles.listbox_optode,'String');
+        if(iscell(strs)||ismatrix(strs))
+            set(handles.listbox_optode,'Value',[1:size(strs,1)]);
+        end
+    case 'ROI'
+        
+    case 'Aux'
+        
+end
 
 plot_barchart(handles, false,true)
 
@@ -6591,4 +6742,98 @@ else
     set(handles.listbox_raw_methods,'Value',1);
 end
 
-processCurrentFunction(handles);
+if(ExFNIRS.settings.updateOnChange)
+    updateSelectedTable(handles);
+else
+    flagForUpdate(3,handles);
+end
+
+
+% --- Executes on button press in checkbox_discreteTime.
+function checkbox_discreteTime_Callback(hObject, eventdata, handles)
+% hObject    handle to checkbox_discreteTime (see GCBO)
+% eventdata  reserved - to be defined in a future version of MATLAB
+% handles    structure with handles and user data (see GUIDATA)
+
+% Hint: get(hObject,'Value') returns toggle state of checkbox_discreteTime
+global ExFNIRS
+ExFNIRS.settings.LME_use_discreteTime=get(handles.checkbox_discreteTime,'Value');
+
+
+% --- Executes on selection change in popupmenu_lmer_randomeffects.
+function popupmenu_lmer_randomeffects_Callback(hObject, eventdata, handles)
+% hObject    handle to popupmenu_lmer_randomeffects (see GCBO)
+% eventdata  reserved - to be defined in a future version of MATLAB
+% handles    structure with handles and user data (see GUIDATA)
+
+% Hints: contents = cellstr(get(hObject,'String')) returns popupmenu_lmer_randomeffects contents as cell array
+%        contents{get(hObject,'Value')} returns selected item from popupmenu_lmer_randomeffects
+global ExFNIRS
+
+ExFNIRS.settings.LME_randomFxStr=ExFNIRS.settings.LME_randomFxStrs{get(handles.popupmenu_lmer_randomeffects,'Value')};
+
+
+% --- Executes during object creation, after setting all properties.
+function popupmenu_lmer_randomeffects_CreateFcn(hObject, eventdata, handles)
+% hObject    handle to popupmenu_lmer_randomeffects (see GCBO)
+% eventdata  reserved - to be defined in a future version of MATLAB
+% handles    empty - handles not created until after all CreateFcns called
+
+% Hint: popupmenu controls usually have a white background on Windows.
+%       See ISPC and COMPUTER.
+if ispc && isequal(get(hObject,'BackgroundColor'), get(0,'defaultUicontrolBackgroundColor'))
+    set(hObject,'BackgroundColor','white');
+end
+
+% --- If Enable == 'on', executes on mouse press in 5 pixel border.
+% --- Otherwise, executes on mouse press in 5 pixel border or over popupmenu_lmer_randomeffects.
+function popupmenu_lmer_randomeffects_ButtonDownFcn(hObject, eventdata, handles)
+% hObject    handle to popupmenu_lmer_randomeffects (see GCBO)
+% eventdata  reserved - to be defined in a future version of MATLAB
+% handles    structure with handles and user data (see GUIDATA)
+
+
+
+% --- Executes on button press in checkbox_lme_usecustom.
+function checkbox_lme_usecustom_Callback(hObject, eventdata, handles)
+% hObject    handle to checkbox_lme_usecustom (see GCBO)
+% eventdata  reserved - to be defined in a future version of MATLAB
+% handles    structure with handles and user data (see GUIDATA)
+
+% Hint: get(hObject,'Value') returns toggle state of checkbox_lme_usecustom
+
+global ExFNIRS
+
+ExFNIRS.settings.LME_use_customStr=get(handles.checkbox_lme_usecustom,'Value');
+
+if(ExFNIRS.settings.LME_use_customStr&&isempty(ExFNIRS.settings.LME_customStr))
+    pushbutton_custom_lme_Callback([], [], handles);
+else
+    
+end
+
+
+% --- Executes on button press in pushbutton_custom_lme.
+function pushbutton_custom_lme_Callback(hObject, eventdata, handles)
+% hObject    handle to pushbutton_custom_lme (see GCBO)
+% eventdata  reserved - to be defined in a future version of MATLAB
+% handles    structure with handles and user data (see GUIDATA)
+
+global ExFNIRS
+
+prompt = {'Please enter custom LME string'};
+dlgtitle = 'Define custom LME model terms';
+dims = [1 100];
+answer = inputdlg(prompt,dlgtitle,dims,{ExFNIRS.settings.LME_customStr});
+
+if(~isempty(answer))
+    ExFNIRS.settings.LME_customStr=answer{1};
+    set(handles.checkbox_lme_usecustom,'Value',1);
+    ExFNIRS.settings.LME_use_customStr=true;
+else
+    ExFNIRS.settings.LME_use_customStr=false;
+    set(handles.checkbox_lme_usecustom,'Value',0);
+end
+
+set(handles.pushbutton_custom_lme,'TooltipString',answer{1});
+

@@ -67,8 +67,11 @@ if(~any(curRawMatchIdx&curOxyMatchIdx))
            data{i}=processFNIRS2.Data.Resample(data{i},ExFNIRS.settings.grandavg_resample_size,'centerOnT0',true,'timeOutMode','end','averageAux',false);
        end
     end
-    
+    try
     close(hF);
+    catch
+        
+    end
     
     ExFNIRS.processedData{ExFNIRS.numProcessed+1,3}=data;
     ExFNIRS.numProcessed=ExFNIRS.numProcessed+1;
