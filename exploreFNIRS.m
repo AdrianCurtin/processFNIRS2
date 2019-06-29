@@ -3902,6 +3902,10 @@ ExFNIRS.curChartModelsCoefficents=cell(0);
 ExFNIRS.curChartModelsCoefficents_pval=table();
 ExFNIRS.curChartModelsCoefficents_tstat=table();
 ExFNIRS.curChartModelsCoefficents_df=table();
+ExFNIRS.curChartModelsANOVACoefficents_pval=table();
+ExFNIRS.curChartModelsANOVACoefficents_Fstat=table();
+ExFNIRS.curChartModelsANOVACoefficents_df1=table();
+ExFNIRS.curChartModelsANOVACoefficents_df2=table();
 
 if(ExFNIRS.settings.LME_enable)
     fprintf('Generating Models...\nAccessed at ExFNIRS.curChartModels\n')
@@ -3990,7 +3994,7 @@ for sH=1:length(subplotHandles)
             
             
             curChartLME{sH}=fitlme(mergedTables{sH},lmeString);
-%             curChartLME_emm{sH}= pf2_base.external.emmeans(curChartLME{sH}, {'orig'}, 'effects');
+          %   curChartLME_emm{sH}= pf2_base.external.emmeans(curChartLME{sH}, {'orig'}, 'effects');
 %             h = emmip(curChartLME_emm{sH},'orig');
             
             switch (ExFNIRS.settings.ChannelMode)
@@ -4014,6 +4018,8 @@ for sH=1:length(subplotHandles)
             ExFNIRS.curChartModels{sH}=curChartLME{sH};
             ExFNIRS.curChartModelsAIC(sH)=curChartLME{sH}.ModelCriterion.AIC;
             ExFNIRS.curChartModelsCoefficents{sH}=curChartLME{sH}.Coefficients;
+            ExFNIRS.curChartModelsANOVA{sH}=curChartLME{sH}.anova;
+            
             
             varNames=curChartLME{sH}.Coefficients.Name;
             for v=1:length(varNames)
@@ -4027,19 +4033,27 @@ for sH=1:length(subplotHandles)
             if(~plotGroupByBioM)
                 curBioM=subplotGby{sH}.curBioM{1};
                 curRowName=sprintf('%s_%s',chName,curBioM);
-                ExFNIRS.curChartModelsCoefficents_pval{curRowName,varNames}=curChartLME{sH}.Coefficients.pValue';
-                ExFNIRS.curChartModelsCoefficents_tstat{curRowName,varNames}=curChartLME{sH}.Coefficients.tStat';
-                ExFNIRS.curChartModelsCoefficents_df{curRowName,varNames}=curChartLME{sH}.Coefficients.DF';
+                
+                
+                ExFNIRS.curChartModelsANOVACoefficents_pval{curRowName,varNames}=ExFNIRS.curChartModelsANOVA{sH}.pValue';
+                ExFNIRS.curChartModelsANOVACoefficents_Fstat{curRowName,varNames}=ExFNIRS.curChartModelsANOVA{sH}.FStat';
+                ExFNIRS.curChartModelsANOVACoefficents_df1{curRowName,varNames}=ExFNIRS.curChartModelsANOVA{sH}.DF1';
+                ExFNIRS.curChartModelsANOVACoefficents_df2{curRowName,varNames}=ExFNIRS.curChartModelsANOVA{sH}.DF2';
+                
+                ExFNIRS.curChartModelsCoefficents_pval{curRowName,varNames}=ExFNIRS.curChartModelsCoefficents{sH}.pValue';
+                ExFNIRS.curChartModelsCoefficents_tstat{curRowName,varNames}=ExFNIRS.curChartModelsCoefficents{sH}.tStat';
+                ExFNIRS.curChartModelsCoefficents_df{curRowName,varNames}=ExFNIRS.curChartModelsCoefficents{sH}.DF';
                 ExFNIRS.curChartModels_ch(sH)=subplotGby{sH}.curCh;
             else
                 curBioM=subplotGby{sH}.curBioM{1};
                 curRowName=sprintf('%s_%s',chName,curBioM);
-                ExFNIRS.curChartModelsCoefficents_pval{curRowName,varNames}=curChartLME{sH}.Coefficients.pValue';
-                ExFNIRS.curChartModelsCoefficents_tstat{curRowName,varNames}=curChartLME{sH}.Coefficients.tStat';
-                ExFNIRS.curChartModelsCoefficents_df{curRowName,varNames}=curChartLME{sH}.Coefficients.DF';
+                ExFNIRS.curChartModelsCoefficents_pval{curRowName,varNames}=ExFNIRS.curChartModelsCoefficents{sH}.pValue';
+                ExFNIRS.curChartModelsCoefficents_tstat{curRowName,varNames}=ExFNIRS.curChartModelsCoefficents{sH}.tStat';
+                ExFNIRS.curChartModelsCoefficents_df{curRowName,varNames}=ExFNIRS.curChartModelsCoefficents{sH}.DF';
                 ExFNIRS.curChartModels_ch(sH)=subplotGby{sH}.curCh;
             end
             disp(curChartLME{sH});
+            disp(curChartLME{sH}.anova);
         catch ME
             fprintf(2,'Could not generate model for figure %i\n',sH);
             fprintf(2,'\nLME: %s\n',lmeString);
@@ -4070,6 +4084,9 @@ if(showTopo)
         coefNames=ExFNIRS.curChartModelsCoefficents_tstat.Properties.VariableNames;
         numCoeff=size(ExFNIRS.curChartModelsCoefficents_tstat,2);
         
+        numANOVA=size(ExFNIRS.curChartModelsANOVACoefficents_Fstat,2);
+        anovaNames=ExFNIRS.curChartModelsCoefficents_tstat.Properties.VariableNames;
+        
          for z=1:length(chNames)
             temp=strsplit(chNames{z},'_');
              switch (ExFNIRS.settings.ChannelMode)
@@ -4084,13 +4101,27 @@ if(showTopo)
          end
          bioMLabel=cell(0,0);
         
+         LME_topo_mode='anova';
+         
         if(~plotGroupByBioM)
             for b=1:numBioM
-                for c=1:numCoeff
-                    fNIR_t{b,c}=nan(2,8);
-                    fNIR_p{b,c}=nan(2,8);
-                    fNIR_df{b,c}=nan(2,8);
-                end
+              switch(LME_topo_mode)
+                    case 'coef'
+
+                        for c=1:numCoeff
+                            fNIR_t{b,c}=nan(2,8);
+                            fNIR_p{b,c}=nan(2,8);
+                            fNIR_df{b,c}=nan(2,8);
+                        end
+                  case 'anova'
+                        for a=1:numANOVA
+                            fNIR_f{b,a}=nan(2,8);
+                            fNIR_p{b,a}=nan(2,8);
+                            fNIR_df{b,a}=nan(2,8);
+                            fNIR_df2{b,a}=nan(2,8);
+                        end
+
+              end
             end
 
 
@@ -4103,49 +4134,78 @@ if(showTopo)
 
                b_idx=strcmp(bioMarr{coefIdx},selectedBioM);
                bioMLabel(b)=selectedBioM(b_idx);
-                   
-               for c=1:numCoeff
+               switch(LME_topo_mode)
+                    case 'coef'
+   
+                       for c=1:numCoeff
 
-                   fNIR_t{b_idx,c}(curIdx(1),curIdx(2))=ExFNIRS.curChartModelsCoefficents_tstat{curChName,coefNames(c)};
-                   fNIR_p{b_idx,c}(curIdx(1),curIdx(2))=ExFNIRS.curChartModelsCoefficents_pval{curChName,coefNames(c)};
-                   fNIR_df{b_idx,c}(curIdx(1),curIdx(2))=ExFNIRS.curChartModelsCoefficents_df{curChName,coefNames(c)};
-                end
+                           fNIR_t{b_idx,c}(curIdx(1),curIdx(2))=ExFNIRS.curChartModelsCoefficents_tstat{curChName,coefNames(c)};
+                           fNIR_p{b_idx,c}(curIdx(1),curIdx(2))=ExFNIRS.curChartModelsCoefficents_pval{curChName,coefNames(c)};
+                           fNIR_df{b_idx,c}(curIdx(1),curIdx(2))=ExFNIRS.curChartModelsCoefficents_df{curChName,coefNames(c)};
+                       end
+                   case 'anova'
+                       for a=1:numANOVA
+
+                           fNIR_f{b_idx,a}(curIdx(1),curIdx(2))=ExFNIRS.curChartModelsANOVACoefficents_Fstat{curChName,anovaNames(a)};
+                           fNIR_p{b_idx,a}(curIdx(1),curIdx(2))=ExFNIRS.curChartModelsANOVACoefficents_pval{curChName,anovaNames(a)};
+                           fNIR_df{b_idx,a}(curIdx(1),curIdx(2))=ExFNIRS.curChartModelsANOVACoefficents_df1{curChName,anovaNames(a)};
+                           fNIR_df{b_idx,a}(curIdx(1),curIdx(2))=ExFNIRS.curChartModelsANOVACoefficents_df2{curChName,anovaNames(a)};
+                       end
+               end
             end
                    
             for b=1:numBioM
-                for c=1:numCoeff
-                    subplot(numBioM,numCoeff,c+(b-1)*numCoeff)
-                    curT=fNIR_t{b,c};
-                    curP=fNIR_p{b,c};
-                    
-                    curQ=performFDR(curP);
-                    
-                    if(any(curQ<0.05))
-                        FDRfound=true;
-                        %FDR RESULTS FOUND
-                    end
-                    
-                    switch(ExFNIRS.settings.ChannelMode)
-                        case 'fNIR'
-                            interpolateNIR(curT,'Mode','tstat','fontSize',12,'transparent',true,'pValueMask',curP,'TitleText',coefNames{c})%,7,11,2,1,false,'[Hb-Oxy] Natural High Vs. Low',12,'hot',true)
-                        case 'ROI'
-                            roiInfo=ExFNIRS.currentROI;
-                            interpolateNIR(mapROIvaluesToCh(roiInfo,curT),'Mode','tstat','fontSize',12,'transparent',true,'pValueMask',mapROIvaluesToCh(roiInfo,curP),'TitleText',coefNames{c})%,7,11,2,1,false,'[Hb-Oxy] Natural High Vs. Low',12,'hot',true)
-%                             maxVal=nanmax([nanmax(abs(curT(:))),1]);
-%                             minVal=nanmin([maxVal+0.1;abs(curT(curP<0.05))]);
-%                             if(maxVal<=minVal)
-%                                 minVal=maxVal;
-%                                 maxVal=maxVal+0.05;
-%                             end
-%                             
-%                             numROI=size(ExFNIRS.currentROI,1);
-%                             vals=abs(curT(1:numROI));
-%                             processFNIRS2.Data.Plot.InterpolateROIvalues(roiInfo,vals,minVal,maxVal,1,coefNames{c},'tstat');%,7,11,2,1,false,'[Hb-Oxy] Natural High Vs. Low',12,'hot',true)
-                    end
-                    if(c==1) % first column
-                        ylabel(selectedBioM(b));
-                    end
-                end
+               switch(LME_topo_mode)
+                    case 'coef'
+                        for c=1:numCoeff
+                            subplot(numBioM,numCoeff,c+(b-1)*numCoeff)
+                            curT=fNIR_t{b,c};
+                            curP=fNIR_p{b,c};
+
+                            curQ=performFDR(curP);
+
+                            if(any(curQ<0.05))
+                                FDRfound=true;
+                                %FDR RESULTS FOUND
+                            end
+
+                            switch(ExFNIRS.settings.ChannelMode)
+                                case 'fNIR'
+                                    interpolateNIR(curT,'Mode','tstat','fontSize',12,'transparent',true,'pValueMask',curP,'TitleText',coefNames{c})%,7,11,2,1,false,'[Hb-Oxy] Natural High Vs. Low',12,'hot',true)
+                                case 'ROI'
+                                    roiInfo=ExFNIRS.currentROI;
+                                    interpolateNIR(mapROIvaluesToCh(roiInfo,curT),'Mode','tstat','fontSize',12,'transparent',true,'pValueMask',mapROIvaluesToCh(roiInfo,curP),'TitleText',coefNames{c})%,7,11,2,1,false,'[Hb-Oxy] Natural High Vs. Low',12,'hot',true)
+                            end
+                            if(c==1) % first column
+                                ylabel(selectedBioM(b));
+                            end
+                        end
+                   case 'anova'
+                       for a=1:numANOVA
+                            subplot(numBioM,numANOVA,a+(b-1)*numANOVA)
+                            curF=fNIR_f{b,a};
+                            curP=fNIR_p{b,a};
+
+                            curQ=performFDR(curP);
+
+                            if(any(curQ<0.05))
+                                FDRfound=true;
+                                %FDR RESULTS FOUND
+                            end
+
+                            switch(ExFNIRS.settings.ChannelMode)
+                                case 'fNIR'
+                                    interpolateNIR(curF,'Mode','fstat','fontSize',12,'transparent',true,'pValueMask',curP,'TitleText',anovaNames{a})%,7,11,2,1,false,'[Hb-Oxy] Natural High Vs. Low',12,'hot',true)
+                                case 'ROI'
+                                    roiInfo=ExFNIRS.currentROI;
+                                    interpolateNIR(mapROIvaluesToCh(roiInfo,curF),'Mode','fstat','fontSize',12,'transparent',true,'pValueMask',mapROIvaluesToCh(roiInfo,curP),'TitleText',anovaNames{a})%,7,11,2,1,false,'[Hb-Oxy] Natural High Vs. Low',12,'hot',true)
+                            end
+                            if(a==1) % first column
+                                ylabel(selectedBioM(b));
+                            end
+                        end
+                       
+               end
             end
         end
         
@@ -4156,32 +4216,64 @@ if(showTopo)
 
 
                 for b=1:numBioM
-                    for c=1:numCoeff
-                        subplot(numBioM,numCoeff,c+(b-1)*numCoeff)
-                        curT=fNIR_t{b,c};
-                        curP=fNIR_p{b,c};
-                        curQ=performFDR(curP);
+                    switch(LME_topo_mode)
+                     case 'coef'
+                        for c=1:numCoeff
+                            subplot(numBioM,numCoeff,c+(b-1)*numCoeff)
+                            curT=fNIR_t{b,c};
+                            curP=fNIR_p{b,c};
+                            curQ=performFDR(curP);
 
-                        switch(ExFNIRS.settings.ChannelMode)
-                            case 'fNIR'
-                                interpolateNIR(curT,'Mode','tstat','fontSize',12,'transparent',true,'pValueMask',curQ,'TitleText',coefNames{c})%,7,11,2,1,false,'[Hb-Oxy] Natural High Vs. Low',12,'hot',true)
-                            case 'ROI'
-                                roiInfo=ExFNIRS.currentROI;
-                                interpolateNIR(mapROIvaluesToCh(roiInfo,curT),'Mode','tstat','fontSize',12,'transparent',true,'pValueMask',mapROIvaluesToCh(roiInfo,curQ),'TitleText',coefNames{c})%,7,11,2,1,false,'[Hb-Oxy] Natural High Vs. Low',12,'hot',true)
-    %                             maxVal=nanmax([nanmax(abs(curT(:))),1]);
-    %                             minVal=nanmin([maxVal+0.1;abs(curT(curP<0.05))]);
-    %                             if(maxVal<=minVal)
-    %                                 minVal=maxVal;
-    %                                 maxVal=maxVal+0.05;
-    %                             end
-    %                             
-    %                             numROI=size(ExFNIRS.currentROI,1);
-    %                             vals=abs(curT(1:numROI));
-    %                             processFNIRS2.Data.Plot.InterpolateROIvalues(roiInfo,vals,minVal,maxVal,1,coefNames{c},'tstat');%,7,11,2,1,false,'[Hb-Oxy] Natural High Vs. Low',12,'hot',true)
+                            switch(ExFNIRS.settings.ChannelMode)
+                                case 'fNIR'
+                                    interpolateNIR(curT,'Mode','tstat','fontSize',12,'transparent',true,'pValueMask',curQ,'TitleText',coefNames{c})%,7,11,2,1,false,'[Hb-Oxy] Natural High Vs. Low',12,'hot',true)
+                                case 'ROI'
+                                    roiInfo=ExFNIRS.currentROI;
+                                    interpolateNIR(mapROIvaluesToCh(roiInfo,curT),'Mode','tstat','fontSize',12,'transparent',true,'pValueMask',mapROIvaluesToCh(roiInfo,curQ),'TitleText',coefNames{c})%,7,11,2,1,false,'[Hb-Oxy] Natural High Vs. Low',12,'hot',true)
+        %                             maxVal=nanmax([nanmax(abs(curT(:))),1]);
+        %                             minVal=nanmin([maxVal+0.1;abs(curT(curP<0.05))]);
+        %                             if(maxVal<=minVal)
+        %                                 minVal=maxVal;
+        %                                 maxVal=maxVal+0.05;
+        %                             end
+        %                             
+        %                             numROI=size(ExFNIRS.currentROI,1);
+        %                             vals=abs(curT(1:numROI));
+        %                             processFNIRS2.Data.Plot.InterpolateROIvalues(roiInfo,vals,minVal,maxVal,1,coefNames{c},'tstat');%,7,11,2,1,false,'[Hb-Oxy] Natural High Vs. Low',12,'hot',true)
+                            end
+                            if(c==1) % first column
+                                ylabel(selectedBioM(b));
+                            end
                         end
-                        if(c==1) % first column
-                            ylabel(selectedBioM(b));
+                        case 'anova'
+                           for a=1:numANOVA
+                            subplot(numBioM,numANOVA,a+(b-1)*numANOVA)
+                            curT=fNIR_t{b,a};
+                            curP=fNIR_p{b,a};
+                            curQ=performFDR(curP);
+
+                            switch(ExFNIRS.settings.ChannelMode)
+                                case 'fNIR'
+                                    interpolateNIR(curT,'Mode','tstat','fontSize',12,'transparent',true,'pValueMask',curQ,'TitleText',numANOVA{a})%,7,11,2,1,false,'[Hb-Oxy] Natural High Vs. Low',12,'hot',true)
+                                case 'ROI'
+                                    roiInfo=ExFNIRS.currentROI;
+                                    interpolateNIR(mapROIvaluesToCh(roiInfo,curT),'Mode','tstat','fontSize',12,'transparent',true,'pValueMask',mapROIvaluesToCh(roiInfo,curQ),'TitleText',numANOVA{a})%,7,11,2,1,false,'[Hb-Oxy] Natural High Vs. Low',12,'hot',true)
+        %                             maxVal=nanmax([nanmax(abs(curT(:))),1]);
+        %                             minVal=nanmin([maxVal+0.1;abs(curT(curP<0.05))]);
+        %                             if(maxVal<=minVal)
+        %                                 minVal=maxVal;
+        %                                 maxVal=maxVal+0.05;
+        %                             end
+        %                             
+        %                             numROI=size(ExFNIRS.currentROI,1);
+        %                             vals=abs(curT(1:numROI));
+        %                             processFNIRS2.Data.Plot.InterpolateROIvalues(roiInfo,vals,minVal,maxVal,1,coefNames{c},'tstat');%,7,11,2,1,false,'[Hb-Oxy] Natural High Vs. Low',12,'hot',true)
+                            end
+                            if(a==1) % first column
+                                ylabel(selectedBioM(b));
+                            end
                         end
+                            
                     end
                 end
             suptitle('FDR Edition');
@@ -5059,6 +5151,7 @@ if(ExFNIRS.settings.LME_enable)
         end
         ExFNIRS.curInfoChartModel=curInfoChartLME;
         disp(curInfoChartLME);
+        disp(curInfoChartLME.anova);
     catch ME
         warning('Could not generate model for info figure %s',ExFNIRS.settings.curInfoStr);
         warning(ME.message);

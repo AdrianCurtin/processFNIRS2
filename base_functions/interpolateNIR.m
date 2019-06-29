@@ -190,7 +190,7 @@ switch(Mode)
 		cMapLabel='F-Statistic';
         nanReplaceVal=0;
         if(upperThreshold<0||lowerThreshold>0)
-            if(upperTreshold<0)
+            if(upperThreshold<0)
                temp=upperThreshold;
                upperThreshold=lowerThreshold;
                lowerThreshold=temp;
@@ -198,6 +198,10 @@ switch(Mode)
             twosided=false;
         else
             twoSided=true;
+            cmap=@parula;
+            upperThreshold=max(abs([upperThreshold,lowerThreshold]));
+            lowerThreshold=-1*min(abs([upperThreshold,lowerThreshold]));
+            
         end
     case 'corr'
         channelMask(abs(fNIRarr)<lowerThreshold)=false;
