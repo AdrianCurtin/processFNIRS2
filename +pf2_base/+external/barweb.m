@@ -121,7 +121,7 @@ else
 	if size(barvalues,2) == 1 && size(barvalues,1)~=size(groupnames,1)
 		barvalues = barvalues';
 		errors = errors';
-	end
+ 	end
 	if size(barvalues,1) == 1
 		barvalues = [barvalues; zeros(1,length(barvalues))];
 		errors = [errors; zeros(1,size(barvalues,2))];
@@ -146,8 +146,12 @@ else
 		legend boxoff;
 	else
 		handles.legend = [];
-	end
+    end
 	
+%     if(numgroups==1&&numbars==2)
+%         barvalues=[barvalues;barvalues];
+%     end
+    
 	% Plot errors
 	for i = 1:numbars 
         x = bsxfun(@plus, handles.bars(i).XData, [handles.bars(i).XOffset]'); 

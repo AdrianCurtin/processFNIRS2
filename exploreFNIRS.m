@@ -498,8 +498,10 @@ else
                   elseif(isnumeric(curField))
                       outTable.(curFieldName)=nan(size(outTable,1),1);
                       outTable.(curFieldName)(i,1)=curField;
+                  elseif(islogical(curField))
+                      outTable.(curFieldName)=nan(size(outTable,1),1);
+                      outTable.(curFieldName)(i,1)=curField;
                   end
-                  
                   
               end
            end
