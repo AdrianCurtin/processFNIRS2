@@ -406,6 +406,16 @@ if(~isempty(data))
 end
 
 if(nargout>0)
+    fdataFields=fields(fData);
+    for i=1:length(fdataFields)
+       memberIdx=ismember(validFields,fdataFields{i});
+       if(any(memberIdx))
+            outfNIR.(validFields{memberIdx})=fData.(fdataFields{i});
+       end
+
+    end
+    
+    
    if(isfield(fData,'stage')&&(size(fData.stage,2)==5))
        if(outputData.ProcessOxy&&~isempty(fData.stage{5}))
           outfNIR=fData.stage{5};
@@ -446,13 +456,6 @@ if(nargout>0)
        end
        
        if(exist('outfNIR'))
-           fdataFields=fields(fData);
-           for i=1:length(fdataFields)
-               memberIdx=ismember(validFields,fdataFields{i});
-               if(any(memberIdx))
-                    outfNIR.(validFields{memberIdx})=fData.(fdataFields{i});
-               end
-           end
            
            varargout={outfNIR};
        else
