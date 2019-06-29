@@ -117,9 +117,9 @@ maxfTime=max(fNIR.time);
 if(~isstruct(blfNIR)&&~isempty(blLength)&&blLength>0)
     blfNIR=getFNIRS(fNIR,min(fNIR.time),min(fNIR.time)+blLength); 
 elseif(isstruct(blfNIR))
-    if(~isempty(blfNIR.time)&&~any(isnan(blfNIR.time)))
+    if(~isempty(blfNIR.time)&&~any(isnan(blfNIR.time))&&isfield(blfNIR,'fs'))
         blLength=max(blfNIR.time)-min(blfNIR.time)+1/blfNIR.fs; %Baseline length in time
-    elseif(blLength==0&&length(blfNIR.time)>0&&~isnan(blfNIR.time))
+    elseif(~isempty(blLength)&&~isfield(blfNIR,'empty')&&blLength==0&&~isempty(blfNIR)&&~any(isnan(blfNIR.time))&&isfield(blfNIR,'fs'))
         blLength=1/blfNIR.fs;
     else
        warning('Entire Baseline is invalid');
