@@ -664,12 +664,13 @@ else
 end
 
 function flagForUpdate(UpdateNeeded,handles)
+
+global ExFNIRS
+
+
 if(~isfield(ExFNIRS,'UpdateNeeded'))
    ExFNIRS.UpdateNeeded=3; 
 end
-
-
-global ExFNIRS
 
 if(UpdateNeeded>0)
     if(ExFNIRS.UpdateNeeded<UpdateNeeded)
