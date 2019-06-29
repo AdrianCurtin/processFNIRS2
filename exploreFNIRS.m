@@ -3978,6 +3978,8 @@ for sH=1:length(subplotHandles)
             
             
             curChartLME{sH}=fitlme(mergedTables{sH},lmeString);
+%             curChartLME_emm{sH}= pf2_base.external.emmeans(curChartLME{sH}, {'orig'}, 'effects');
+%             h = emmip(curChartLME_emm{sH},'orig');
             
             switch (ExFNIRS.settings.ChannelMode)
                 case 'fNIR'
@@ -5034,6 +5036,8 @@ if(ExFNIRS.settings.LME_enable)
 
     try
         curInfoChartLME=fitlme(ExFNIRS.selectedTable,lmeString);
+%         curInfoChartLME_emm= pf2_base.external.emmeans(curInfoChartLME, {'orig'}, 'effects');
+%         h = emmip(curInfoChartLME_emm,'orig');
 
         fprintf('Info Chart LME model: %s',ExFNIRS.settings.curInfoStr);
         if(useAllInteractions)
