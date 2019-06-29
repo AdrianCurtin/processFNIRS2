@@ -1387,11 +1387,7 @@ end
 
 ExFNIRS.selectedTable=ExFNIRS.dataTable(sellFullIdx,:);
 
-if(isempty(ExFNIRS.curProcessedData))
-   error('No processed data yet!'); 
-end
 
-ExFNIRS.selectedFNIR=ExFNIRS.curProcessedData(sellFullIdx,:);
 
 subColIdx=find(strcmp('SubjectID',ExFNIRS.dataTable.Properties.VariableNames));
 groupColIdx=find(strcmp('Group',ExFNIRS.dataTable.Properties.VariableNames));
@@ -1458,6 +1454,14 @@ set(handles.text_status,'String',sprintf('%i Observations in\n%i Group(s)',size(
 
 if(processDataNow)
     processCurrentFunction(handles);
+    
+    if(~isfield(ExFNIRS,'curProcessedData')||isempty(ExFNIRS.curProcessedData))
+       error('No processed data yet!'); 
+    end
+
+    ExFNIRS.selectedFNIR=ExFNIRS.curProcessedData(sellFullIdx,:);
+    
+    
     preprocessFNIRSData();
     processSelectedTable(handles,sellFullIdx,gbyIdx);
 end
