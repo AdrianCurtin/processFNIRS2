@@ -91,7 +91,7 @@ function varargout = exploreFNIRS(varargin) % exploreFNIRS(data,timeShiftTo0,blS
 
 % Edit the above text to modify the response to help exploreFNIRS
 
-% Last Modified by GUIDE v2.5 29-Jun-2019 10:46:54
+% Last Modified by GUIDE v2.5 29-Jun-2019 12:19:36
 
 % Begin initialization code - DO NOT EDIT
 gui_Singleton = 1;
@@ -162,9 +162,9 @@ if(~isfield(ExFNIRS,'settings')||~isfield(ExFNIRS.settings,'baseline_start'))
     ExFNIRS.settings.LME_use_intercept=get(handles.checkbox_LME_use_intercept,'Value');
     ExFNIRS.settings.LME_use_discreteTime=get(handles.checkbox_discreteTime,'Value');
     ExFNIRS.settings.LME_randomFxStr='1|SubjectID';
+    ExFNIRS.settings.LME_use_customStr=get(handles.checkbox_lme_usecustom,'Value');
     
-    
-
+    ExFNIRS.settings.LME_customStr='';
 end
 
 
@@ -3960,10 +3960,13 @@ for sH=1:length(subplotHandles)
         end
         
         
-        if(ExFNIRS.settings.LME_use_intercept)
-            lmeString=sprintf('%s%i_%s~%s+(1|SubjectID)',varNameStart,subplotGby{sH}.curCh,subplotGby{sH}.curBioM{1},curLMEGbyString);
+        
+        if(ExFNIRS.settings.LME_use_customStr&&~isempty(ExFNIRS.settings.LME_customStr))
+            lmeString=sprintf('%s%i_%s~%s+(%s)',varNameStart,subplotGby{sH}.curCh,subplotGby{sH}.curBioM{1},ExFNIRS.settings.LME_customStr,ExFNIRS.settings.LME_randomFxStr);
+        elseif(ExFNIRS.settings.LME_use_intercept)
+            lmeString=sprintf('%s%i_%s~%s+(%s)',varNameStart,subplotGby{sH}.curCh,subplotGby{sH}.curBioM{1},curLMEGbyString,ExFNIRS.settings.LME_randomFxStr);
         else
-            lmeString=sprintf('%s%i_%s~-1+%s+(1|SubjectID)',varNameStart,subplotGby{sH}.curCh,subplotGby{sH}.curBioM{1},curLMEGbyString);
+            lmeString=sprintf('%s%i_%s~-1+%s+(%s)',varNameStart,subplotGby{sH}.curCh,subplotGby{sH}.curBioM{1},curLMEGbyString,ExFNIRS.settings.LME_randomFxStr);
             
         end
 
@@ -5018,8 +5021,16 @@ if(ExFNIRS.settings.LME_enable)
     if(~isempty(curLMEGbyString))
         curLMEGbyString(1)=[];
     end
-
-    lmeString=sprintf('%s~-1+%s+(1|SubjectID)',ExFNIRS.settings.curInfoStr,curLMEGbyString);
+    
+    
+    if(ExFNIRS.settings.LME_use_customStr&&~isempty(ExFNIRS.settings.LME_customStr))
+        lmeString=sprintf('%s~%s+(%s)',ExFNIRS.settings.curInfoStr,ExFNIRS.settings.LME_customStr,ExFNIRS.settings.LME_randomFxStr);
+    elseif(ExFNIRS.settings.LME_use_intercept)
+        lmeString=sprintf('%s~%s+(%s)',ExFNIRS.settings.curInfoStr,curLMEGbyString,ExFNIRS.settings.LME_randomFxStr);
+    else
+       lmeString=sprintf('%s~-1+%s+(%s)',ExFNIRS.settings.curInfoStr,curLMEGbyString,ExFNIRS.settings.LME_randomFxStr);
+    end
+    
 
     try
         curInfoChartLME=fitlme(ExFNIRS.selectedTable,lmeString);
@@ -6774,4 +6785,49 @@ function popupmenu_lmer_randomeffects_ButtonDownFcn(hObject, eventdata, handles)
 % hObject    handle to popupmenu_lmer_randomeffects (see GCBO)
 % eventdata  reserved - to be defined in a future version of MATLAB
 % handles    structure with handles and user data (see GUIDATA)
+
+
+
+% --- Executes on button press in checkbox_lme_usecustom.
+function checkbox_lme_usecustom_Callback(hObject, eventdata, handles)
+% hObject    handle to checkbox_lme_usecustom (see GCBO)
+% eventdata  reserved - to be defined in a future version of MATLAB
+% handles    structure with handles and user data (see GUIDATA)
+
+% Hint: get(hObject,'Value') returns toggle state of checkbox_lme_usecustom
+
+global ExFNIRS
+
+ExFNIRS.settings.LME_use_customStr=get(handles.checkbox_lme_usecustom,'Value');
+
+if(ExFNIRS.settings.LME_use_customStr&&isempty(ExFNIRS.settings.LME_customStr))
+    pushbutton_custom_lme_Callback([], [], handles);
+else
+    
+end
+
+
+% --- Executes on button press in pushbutton_custom_lme.
+function pushbutton_custom_lme_Callback(hObject, eventdata, handles)
+% hObject    handle to pushbutton_custom_lme (see GCBO)
+% eventdata  reserved - to be defined in a future version of MATLAB
+% handles    structure with handles and user data (see GUIDATA)
+
+global ExFNIRS
+
+prompt = {'Please enter custom LME string'};
+dlgtitle = 'Define custom LME model terms';
+dims = [1 100];
+answer = inputdlg(prompt,dlgtitle,dims,{ExFNIRS.settings.LME_customStr});
+
+if(~isempty(answer))
+    ExFNIRS.settings.LME_customStr=answer{1};
+    set(handles.checkbox_lme_usecustom,'Value',1);
+    ExFNIRS.settings.LME_use_customStr=true;
+else
+    ExFNIRS.settings.LME_use_customStr=false;
+    set(handles.checkbox_lme_usecustom,'Value',0);
+end
+
+set(handles.pushbutton_custom_lme,'TooltipString',answer{1});
 
