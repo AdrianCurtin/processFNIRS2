@@ -251,22 +251,23 @@ else
         outfNIR.CBSI=fNIR.CBSI(indexStart:indexEnd,:);
         outfNIR.HbTotal=fNIR.HbTotal(indexStart:indexEnd,:);
         
-     if(~isempty(blfNIR))
-            outfNIR.HbR=outfNIR.HbR-nanmean(blfNIR.HbR,1);
-            outfNIR.HbO=outfNIR.HbO-nanmean(blfNIR.HbO,1);
-            outfNIR.HbDiff=outfNIR.HbDiff-nanmean(blfNIR.HbDiff,1);
-            outfNIR.HbTotal=outfNIR.HbTotal-nanmean(blfNIR.HbTotal,1);
-            outfNIR.CBSI=outfNIR.CBSI-nanmean(blfNIR.CBSI,1);
-         
-     elseif(exist('blIndexStart'))
-            if (~isempty(blIndexStart)&&~isempty(blIndexEnd))&&(blIndexStart<=blIndexEnd)
-            %for i=1:length(outfNIR.HbR(1,:))
-               outfNIR.HbO=outfNIR.HbO-nanmean(fNIR.HbO(blIndexStart:blIndexEnd,:),1);
-               outfNIR.HbR=outfNIR.HbR-nanmean(fNIR.HbR(blIndexStart:blIndexEnd,:),1);
-               outfNIR.CBSI=outfNIR.CBSI-nanmean(fNIR.CBSI(blIndexStart:blIndexEnd,:),1);
-               outfNIR.HbDiff=outfNIR.HbDiff-nanmean(fNIR.HbDiff(blIndexStart:blIndexEnd,:),1);
-            end
-            %end
+        
+         if(~isempty(blfNIR))
+                outfNIR.HbR=outfNIR.HbR-nanmean(blfNIR.HbR,1);
+                outfNIR.HbO=outfNIR.HbO-nanmean(blfNIR.HbO,1);
+                outfNIR.HbDiff=outfNIR.HbDiff-nanmean(blfNIR.HbDiff,1);
+                outfNIR.HbTotal=outfNIR.HbTotal-nanmean(blfNIR.HbTotal,1);
+                outfNIR.CBSI=outfNIR.CBSI-nanmean(blfNIR.CBSI,1);
+
+         elseif(exist('blIndexStart'))
+                if (~isempty(blIndexStart)&&~isempty(blIndexEnd))&&(blIndexStart<=blIndexEnd)
+                %for i=1:length(outfNIR.HbR(1,:))
+                   outfNIR.HbO=outfNIR.HbO-nanmean(fNIR.HbO(blIndexStart:blIndexEnd,:),1);
+                   outfNIR.HbR=outfNIR.HbR-nanmean(fNIR.HbR(blIndexStart:blIndexEnd,:),1);
+                   outfNIR.CBSI=outfNIR.CBSI-nanmean(fNIR.CBSI(blIndexStart:blIndexEnd,:),1);
+                   outfNIR.HbDiff=outfNIR.HbDiff-nanmean(fNIR.HbDiff(blIndexStart:blIndexEnd,:),1);
+                end
+                %end
         end
      end
      
@@ -329,7 +330,7 @@ validFields=pf2_base.pf2_getFNIRSfields();
 fdataFields=fields(fNIR);  % Copy known fields
 for i=1:length(fdataFields)
    memberIdx=ismember(validFields,fdataFields{i});
-   if(any(memberIdx)&&~strcmp(fdataFields{i},'time'))
+   if(any(memberIdx)&&~strcmp(fdataFields{i},'time')&&~strcmp(fdataFields{i},'ROI'))
         outfNIR.(validFields{memberIdx})=fNIR.(fdataFields{i});
    end
 end
