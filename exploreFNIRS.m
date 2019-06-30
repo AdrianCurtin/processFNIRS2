@@ -483,12 +483,15 @@ else
     pf2_base.closeProgressHandles();
     
     numF=length(FNIRS_array);
-    ProgressHandles.h.hF=waitbar(0,sprintf('ExploreFNIRS\nBuilding Table: Row %i of %i',1,numF));
-    hF=ProgressHandles.h.hF;
+    hF=waitbar(0,sprintf('ExploreFNIRS\nBuilding Table: Row %i of %i',1,numF));
     
     outTable=table();
     for i=1:numF
-       waitbar(i/numF,hF,sprintf('ExploreFNIRS\nBuilding Table: Row %i of %i',i,numF));
+        try
+            waitbar(i/numF,hF,sprintf('ExploreFNIRS\nBuilding Table: Row %i of %i',i,numF));
+        catch
+            hF=waitbar(i/numF,0,sprintf('ExploreFNIRS\nBuilding Table: Row %i of %i',i,numF));
+        end
        curFNIRseg=FNIRS_array{i};
        
        if(~isfield(curFNIRseg,'info'))
@@ -3902,6 +3905,7 @@ ExFNIRS.curChartModelsCoefficents=cell(0);
 ExFNIRS.curChartModelsCoefficents_pval=table();
 ExFNIRS.curChartModelsCoefficents_tstat=table();
 ExFNIRS.curChartModelsCoefficents_df=table();
+ExFNIRS.curChartModelsANOVA=cell(0);
 ExFNIRS.curChartModelsANOVACoefficents_pval=table();
 ExFNIRS.curChartModelsANOVACoefficents_Fstat=table();
 ExFNIRS.curChartModelsANOVACoefficents_df1=table();
@@ -3911,6 +3915,8 @@ if(ExFNIRS.settings.LME_enable)
     fprintf('Generating Models...\nAccessed at ExFNIRS.curChartModels\n')
 end
 
+
+ LME_topo_mode='anova';
 for sH=1:length(subplotHandles)
     
     if(ExFNIRS.settings.LME_enable&&isfield(subplotGby{sH},'gby'))
@@ -3987,7 +3993,7 @@ for sH=1:length(subplotHandles)
         end
 
         try
-            if(~ExFNIRS.settings.LME_use_discreteTime&&numChartTimes>1)
+            if((~ExFNIRS.settings.LME_use_discreteTime||strcmp(LME_topo_mode,'anova'))&&numChartTimes>1)
                 mergedTables{sH}.Time=str2double(mergedTables{sH}.Time);
             end
             
@@ -4037,8 +4043,17 @@ for sH=1:length(subplotHandles)
                 
                 ExFNIRS.curChartModelsANOVACoefficents_pval{curRowName,varNames}=ExFNIRS.curChartModelsANOVA{sH}.pValue';
                 ExFNIRS.curChartModelsANOVACoefficents_Fstat{curRowName,varNames}=ExFNIRS.curChartModelsANOVA{sH}.FStat';
-                ExFNIRS.curChartModelsANOVACoefficents_df1{curRowName,varNames}=ExFNIRS.curChartModelsANOVA{sH}.DF1';
-                ExFNIRS.curChartModelsANOVACoefficents_df2{curRowName,varNames}=ExFNIRS.curChartModelsANOVA{sH}.DF2';
+                if(ismember('DF2',properties(ExFNIRS.curChartModelsANOVA{sH})))
+                    ExFNIRS.curChartModelsANOVACoefficents_df2{curRowName,varNames}=ExFNIRS.curChartModelsANOVA{sH}.DF2';
+                    ExFNIRS.curChartModelsANOVACoefficents_df1{curRowName,varNames}=ExFNIRS.curChartModelsANOVA{sH}.DF1';
+                else
+                    ExFNIRS.curChartModelsANOVACoefficents_df1{curRowName,varNames}=ExFNIRS.curChartModelsANOVA{sH}.DF';
+                    ExFNIRS.curChartModelsANOVACoefficents_df2{curRowName,varNames}=zeros(size(ExFNIRS.curChartModelsANOVA{sH}.DF'));
+                end
+                
+                
+                
+
                 
                 ExFNIRS.curChartModelsCoefficents_pval{curRowName,varNames}=ExFNIRS.curChartModelsCoefficents{sH}.pValue';
                 ExFNIRS.curChartModelsCoefficents_tstat{curRowName,varNames}=ExFNIRS.curChartModelsCoefficents{sH}.tStat';
@@ -4101,7 +4116,7 @@ if(showTopo)
          end
          bioMLabel=cell(0,0);
         
-         LME_topo_mode='anova';
+        
          
         if(~plotGroupByBioM)
             for b=1:numBioM
@@ -4149,7 +4164,7 @@ if(showTopo)
                            fNIR_f{b_idx,a}(curIdx(1),curIdx(2))=ExFNIRS.curChartModelsANOVACoefficents_Fstat{curChName,anovaNames(a)};
                            fNIR_p{b_idx,a}(curIdx(1),curIdx(2))=ExFNIRS.curChartModelsANOVACoefficents_pval{curChName,anovaNames(a)};
                            fNIR_df{b_idx,a}(curIdx(1),curIdx(2))=ExFNIRS.curChartModelsANOVACoefficents_df1{curChName,anovaNames(a)};
-                           fNIR_df{b_idx,a}(curIdx(1),curIdx(2))=ExFNIRS.curChartModelsANOVACoefficents_df2{curChName,anovaNames(a)};
+                           fNIR_df2{b_idx,a}(curIdx(1),curIdx(2))=ExFNIRS.curChartModelsANOVACoefficents_df2{curChName,anovaNames(a)};
                        end
                end
             end
@@ -4161,6 +4176,9 @@ if(showTopo)
                             subplot(numBioM,numCoeff,c+(b-1)*numCoeff)
                             curT=fNIR_t{b,c};
                             curP=fNIR_p{b,c};
+                            curDf=fNIR_df{b,c};
+                            
+                            
 
                             curQ=performFDR(curP);
 
@@ -4185,23 +4203,47 @@ if(showTopo)
                             subplot(numBioM,numANOVA,a+(b-1)*numANOVA)
                             curF=fNIR_f{b,a};
                             curP=fNIR_p{b,a};
+                            curDf1=fNIR_df{b,a};
+                            curDf2=fNIR_df2{b,a};
+                            
+                            estimateFPval=finv(ones(size(curF(:)))*0.95, curDf1(:), curDf2(:));
+                            estimatedFval_max=finv(ones(size(curF(:)))*0.99, curDf1(:), curDf2(:));
+                            
+                            estimatedPval_min=nanmin(estimateFPval);
+                            
+                            if(any(curF(:)>=estimatedPval_min))
 
-                            curQ=performFDR(curP);
+                                curQ=performFDR(curP);
+                                
+                                titleSTR=anovaNames{a};
 
-                            if(any(curQ<0.05))
-                                FDRfound=true;
-                                %FDR RESULTS FOUND
-                            end
+                                if(any(curQ<0.05))
+                                    FDRfound=true;
+                                    titleSTR=sprintf('%s*',anovaNames{a});
+                                    %FDR RESULTS FOUND
+                                end
 
-                            switch(ExFNIRS.settings.ChannelMode)
-                                case 'fNIR'
-                                    interpolateNIR(curF,'Mode','fstat','fontSize',12,'transparent',true,'pValueMask',curP,'TitleText',anovaNames{a})%,7,11,2,1,false,'[Hb-Oxy] Natural High Vs. Low',12,'hot',true)
-                                case 'ROI'
-                                    roiInfo=ExFNIRS.currentROI;
-                                    interpolateNIR(mapROIvaluesToCh(roiInfo,curF),'Mode','fstat','fontSize',12,'transparent',true,'pValueMask',mapROIvaluesToCh(roiInfo,curP),'TitleText',anovaNames{a})%,7,11,2,1,false,'[Hb-Oxy] Natural High Vs. Low',12,'hot',true)
-                            end
-                            if(a==1) % first column
-                                ylabel(selectedBioM(b));
+                                switch(ExFNIRS.settings.ChannelMode)
+                                    case 'fNIR'
+                                        interpolateNIR(curF,'Mode','fstat','fontSize',12,'transparent',true,'lowerThreshold',estimatedPval_min,'TitleText',titleSTR)%,7,11,2,1,false,'[Hb-Oxy] Natural High Vs. Low',12,'hot',true)
+                                    case 'ROI'
+                                        roiInfo=ExFNIRS.currentROI;
+                                        interpolateNIR(mapROIvaluesToCh(roiInfo,curF),'Mode','fstat','fontSize',12,'transparent',true,'lowerThreshold',estimatedPval_min,'TitleText',titleSTR)%,7,11,2,1,false,'[Hb-Oxy] Natural High Vs. Low',12,'hot',true)
+                                end
+                                if(a==1) % first column
+                                    curAxes=gca;
+                                    axesPos=curAxes.OuterPosition;
+                                    th=annotation(gcf,'textbox',[0,axesPos(2),axesPos(3),axesPos(4)/2],'String',selectedBioM(b),'FitBoxToText','on');
+                                end
+                            else
+                                plot(0,0);
+                                curAxes=gca;
+                                axesPos=curAxes.OuterPosition;
+                                axis off
+                                title(sprintf('%s_N_S',anovaNames{a}));
+                                if(a==1) % first column
+                                    th=annotation(gcf,'textbox',[0,axesPos(2),axesPos(3),axesPos(4)/2],'String',selectedBioM(b),'FitBoxToText','on');
+                                end
                             end
                         end
                        

@@ -55,8 +55,7 @@ if(length(data2plot)~=probeInfo.NumOptodes)
     error('Must have a value for all optodes');
 end
 
-
-
+clf(gcf);
 
 h{1}= axes('Position',[0.05,0.05,0.9,0.9],'Box','on');
 
