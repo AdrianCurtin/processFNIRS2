@@ -91,7 +91,7 @@ function varargout = exploreFNIRS(varargin) % exploreFNIRS(data,timeShiftTo0,blS
 
 % Edit the above text to modify the response to help exploreFNIRS
 
-% Last Modified by GUIDE v2.5 29-Jun-2019 12:19:36
+% Last Modified by GUIDE v2.5 30-Jun-2019 16:04:10
 
 % Begin initialization code - DO NOT EDIT
 gui_Singleton = 1;
@@ -163,7 +163,7 @@ if(~isfield(ExFNIRS,'settings')||~isfield(ExFNIRS.settings,'baseline_start'))
     ExFNIRS.settings.LME_use_discreteTime=get(handles.checkbox_discreteTime,'Value');
     ExFNIRS.settings.LME_randomFxStr='1|SubjectID';
     ExFNIRS.settings.LME_use_customStr=get(handles.checkbox_lme_usecustom,'Value');
-    
+    ExFNIRS.settings.topoSigThrehold={'p',0.05};
     ExFNIRS.settings.LME_customStr='';
 end
 
@@ -4206,14 +4206,26 @@ if(showTopo)
                             curDf1=fNIR_df{b,a};
                             curDf2=fNIR_df2{b,a};
                             
-                            estimateFPval=finv(ones(size(curF(:)))*0.95, curDf1(:), curDf2(:));
-                            estimatedFval_max=finv(ones(size(curF(:)))*0.99, curDf1(:), curDf2(:));
+                            estimateFPval=finv(ones(size(curF(:)))*(1-ExFNIRS.settings.topoSigThrehold{2}), curDf1(:), curDf2(:));
+                            
                             
                             estimatedPval_min=nanmin(estimateFPval);
                             
                             if(any(curF(:)>=estimatedPval_min))
+                                
+                                curQ=performFDR(curP,ExFNIRS.settings.topoSigThrehold{2});
+                                curQ_rev=performFDR_reverse(curP,ExFNIRS.settings.topoSigThrehold{2});
+                                
+                                switch(ExFNIRS.settings.topoSigThrehold{1})
+                                    case 'p'
+                                        
+                                    case 'q'
+                                        curF(curQ>ExFNIRS.settings.topoSigThrehold{2})=nan;
+                                    case 'qReverse'
+                                        curF(curQ_rev>ExFNIRS.settings.topoSigThrehold{2})=nan;
+                                end
 
-                                curQ=performFDR(curP);
+                                
                                 
                                 titleSTR=anovaNames{a};
 
@@ -4332,17 +4344,39 @@ end
 
 qvalues=pvalues;
 
-[pSorted,pIdx]=sort(pvalues);       
+[pSorted,pIdx]=sort(pvalues(:));       
 numP=length(pSorted);
 
 for i=0:numP-1
-    qThreshold=0.05/(numP-i);
+    qThreshold=pThreshold/(numP-i);
     qvalues(pIdx==i)=pvalues(pIdx==i)*(numP-i);
 end
 
-passed=qvalues<pThreshold;
+qvalues(qvalues>1)=1;
+passed=qvalues<=pThreshold;
         
-        
+function [qvalues,passed]=performFDR_reverse(pvalues,pThreshold)
+% Performs FDR correction per #CITATION HERE
+if(nargin<2)
+    pThreshold=0.05;
+end
+
+qvalues=pvalues;
+
+[pSorted,pIdx]=sort(pvalues(:));       
+numP=length(pSorted);
+
+for i=0:numP-1
+    qThreshold=pThreshold/(numP-i);
+    if(sum(pvalues(:)>qThreshold)>=(numP-i))
+        qvalues=pvalues*(i+1);
+       break; 
+    end
+    
+end
+
+qvalues(qvalues>1)=1;
+passed=qvalues<=pThreshold;
 
     
 
@@ -6982,3 +7016,40 @@ end
 
 set(handles.pushbutton_custom_lme,'TooltipString',answer{1});
 
+
+
+% --- Executes on selection change in popupmenu_topoSig.
+function popupmenu_topoSig_Callback(hObject, eventdata, handles)
+% hObject    handle to popupmenu_topoSig (see GCBO)
+% eventdata  reserved - to be defined in a future version of MATLAB
+% handles    structure with handles and user data (see GUIDATA)
+
+% Hints: contents = cellstr(get(hObject,'String')) returns popupmenu_topoSig contents as cell array
+%        contents{get(hObject,'Value')} returns selected item from popupmenu_lmer_randomeffects
+global ExFNIRS
+
+switch(get(handles.popupmenu_topoSig,'Value'))
+    case 1 % p=0.05
+       ExFNIRS.settings.topoSigThrehold={'p',0.05};
+    case 2
+       ExFNIRS.settings.topoSigThrehold={'p',0.01};
+   case 3
+       ExFNIRS.settings.topoSigThrehold={'q',0.05};
+   case 4
+       ExFNIRS.settings.topoSigThrehold={'q',0.1};
+   case 5
+       ExFNIRS.settings.topoSigThrehold={'qReverse',0.05};
+end
+
+
+% --- Executes during object creation, after setting all properties.
+function popupmenu_topoSig_CreateFcn(hObject, eventdata, handles)
+% hObject    handle to popupmenu_topoSig (see GCBO)
+% eventdata  reserved - to be defined in a future version of MATLAB
+% handles    empty - handles not created until after all CreateFcns called
+
+% Hint: popupmenu controls usually have a white background on Windows.
+%       See ISPC and COMPUTER.
+if ispc && isequal(get(hObject,'BackgroundColor'), get(0,'defaultUicontrolBackgroundColor'))
+    set(hObject,'BackgroundColor','white');
+end
