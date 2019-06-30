@@ -4122,7 +4122,6 @@ if(showTopo)
             for b=1:numBioM
               switch(LME_topo_mode)
                     case 'coef'
-
                         for c=1:numCoeff
                             fNIR_t{b,c}=nan(2,8);
                             fNIR_p{b,c}=nan(2,8);
@@ -4170,6 +4169,10 @@ if(showTopo)
             end
                    
             for b=1:numBioM
+                if(b==1)
+                   sigStr=sprintf('Thresholded at %s=%.2f',ExFNIRS.settings.topoSigThrehold{1},ExFNIRS.settings.topoSigThrehold{2});
+                   th=annotation(topoH,'textbox',[0,0,0,0.05],'String',sigStr,'FitBoxToText','on'); 
+                end
                switch(LME_topo_mode)
                     case 'coef'
                         for c=1:numCoeff
