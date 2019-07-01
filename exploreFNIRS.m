@@ -166,6 +166,7 @@ if(~isfield(ExFNIRS,'settings')||~isfield(ExFNIRS.settings,'baseline_start'))
     ExFNIRS.settings.topoSigThrehold={'p',0.05};
     ExFNIRS.settings.LME_customStr='';
     ExFNIRS.settings.use_info=true;
+    ExFNIRS.settings.use_group=get(handles.checkbox_use_group,'Value');
 end
 
 
