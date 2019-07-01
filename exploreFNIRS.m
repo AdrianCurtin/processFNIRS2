@@ -1462,6 +1462,7 @@ if(processDataNow)
     processCurrentFunction(handles);
     
     if(~isfield(ExFNIRS,'curProcessedData')||isempty(ExFNIRS.curProcessedData))
+       flagForUpdate(3,handles);
        error('No processed data yet!'); 
     end
 
@@ -4030,6 +4031,15 @@ for sH=1:length(subplotHandles)
             ExFNIRS.curChartModelsCoefficents{sH}=curChartLME{sH}.Coefficients;
             ExFNIRS.curChartModelsANOVA{sH}=curChartLME{sH}.anova;
             
+            anovaNames=curChartLME{sH}.anova.Term;
+            
+            for a=1:length(anovaNames)
+               str=anovaNames{a};
+               str(str=='('|str==')')=''; % replace shitty characters
+               str(str==':'|str=='_')=''; % replace shitty characters
+               str(str==' '|str=='-')=''; % replace shitty characters
+               anovaNames{a}=str;
+            end
             
             varNames=curChartLME{sH}.Coefficients.Name;
             for v=1:length(varNames)
@@ -4045,14 +4055,16 @@ for sH=1:length(subplotHandles)
                 curRowName=sprintf('%s_%s',chName,curBioM);
                 
                 
-                ExFNIRS.curChartModelsANOVACoefficents_pval{curRowName,varNames}=ExFNIRS.curChartModelsANOVA{sH}.pValue';
-                ExFNIRS.curChartModelsANOVACoefficents_Fstat{curRowName,varNames}=ExFNIRS.curChartModelsANOVA{sH}.FStat';
+                
+                
+                ExFNIRS.curChartModelsANOVACoefficents_pval{curRowName,anovaNames}= ExFNIRS.curChartModelsANOVA{sH}.pValue';
+                ExFNIRS.curChartModelsANOVACoefficents_Fstat{curRowName,anovaNames}=ExFNIRS.curChartModelsANOVA{sH}.FStat';
                 if(ismember('DF2',properties(ExFNIRS.curChartModelsANOVA{sH})))
-                    ExFNIRS.curChartModelsANOVACoefficents_df2{curRowName,varNames}=ExFNIRS.curChartModelsANOVA{sH}.DF2';
-                    ExFNIRS.curChartModelsANOVACoefficents_df1{curRowName,varNames}=ExFNIRS.curChartModelsANOVA{sH}.DF1';
+                    ExFNIRS.curChartModelsANOVACoefficents_df2{curRowName,anovaNames}=ExFNIRS.curChartModelsANOVA{sH}.DF2';
+                    ExFNIRS.curChartModelsANOVACoefficents_df1{curRowName,anovaNames}=ExFNIRS.curChartModelsANOVA{sH}.DF1';
                 else
-                    ExFNIRS.curChartModelsANOVACoefficents_df1{curRowName,varNames}=ExFNIRS.curChartModelsANOVA{sH}.DF';
-                    ExFNIRS.curChartModelsANOVACoefficents_df2{curRowName,varNames}=zeros(size(ExFNIRS.curChartModelsANOVA{sH}.DF'));
+                    ExFNIRS.curChartModelsANOVACoefficents_df1{curRowName,anovaNames}=ExFNIRS.curChartModelsANOVA{sH}.DF';
+                    ExFNIRS.curChartModelsANOVACoefficents_df2{curRowName,anovaNames}=zeros(size(ExFNIRS.curChartModelsANOVA{sH}.DF'));
                 end
                 
                 
@@ -4069,6 +4081,18 @@ for sH=1:length(subplotHandles)
                 ExFNIRS.curChartModelsCoefficents_pval{curRowName,varNames}=ExFNIRS.curChartModelsCoefficents{sH}.pValue';
                 ExFNIRS.curChartModelsCoefficents_tstat{curRowName,varNames}=ExFNIRS.curChartModelsCoefficents{sH}.tStat';
                 ExFNIRS.curChartModelsCoefficents_df{curRowName,varNames}=ExFNIRS.curChartModelsCoefficents{sH}.DF';
+                
+                
+                ExFNIRS.curChartModelsANOVACoefficents_pval{curRowName,anovaNames}=ExFNIRS.curChartModelsANOVA{sH}.pValue';
+                ExFNIRS.curChartModelsANOVACoefficents_Fstat{curRowName,anovaNames}=ExFNIRS.curChartModelsANOVA{sH}.FStat';
+                if(ismember('DF2',properties(ExFNIRS.curChartModelsANOVA{sH})))
+                    ExFNIRS.curChartModelsANOVACoefficents_df2{curRowName,anovaNames}=ExFNIRS.curChartModelsANOVA{sH}.DF2';
+                    ExFNIRS.curChartModelsANOVACoefficents_df1{curRowName,anovaNames}=ExFNIRS.curChartModelsANOVA{sH}.DF1';
+                else
+                    ExFNIRS.curChartModelsANOVACoefficents_df1{curRowName,anovaNames}=ExFNIRS.curChartModelsANOVA{sH}.DF';
+                    ExFNIRS.curChartModelsANOVACoefficents_df2{curRowName,anovaNames}=zeros(size(ExFNIRS.curChartModelsANOVA{sH}.DF'));
+                end
+                
                 ExFNIRS.curChartModels_ch(sH)=subplotGby{sH}.curCh;
             end
             disp(curChartLME{sH});
@@ -4104,7 +4128,7 @@ if(showTopo)
         numCoeff=size(ExFNIRS.curChartModelsCoefficents_tstat,2);
         
         numANOVA=size(ExFNIRS.curChartModelsANOVACoefficents_Fstat,2);
-        anovaNames=ExFNIRS.curChartModelsCoefficents_tstat.Properties.VariableNames;
+        anovaNames=ExFNIRS.curChartModelsANOVACoefficents_Fstat.Properties.VariableNames;
         
          for z=1:length(chNames)
             temp=strsplit(chNames{z},'_');
