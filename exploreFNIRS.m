@@ -4237,23 +4237,28 @@ if(showTopo)
                             curDf1=fNIR_df{b,a};
                             curDf2=fNIR_df2{b,a};
                             
+                            [curQ,curK]=performFDR(curP,ExFNIRS.settings.topoSigThrehold{2});
+                            [curQ_rev,curK_rev]=performFDR_reverse(curP,ExFNIRS.settings.topoSigThrehold{2});
+                            
                             estimateFPval=finv(ones(size(curF(:)))*(1-ExFNIRS.settings.topoSigThrehold{2}), curDf1(:), curDf2(:));
+                            estimateFPval_q=finv(ones(size(curF(:)))*(1-ExFNIRS.settings.topoSigThrehold{2}/curK), curDf1(:), curDf2(:));
+                            estimateFPval_qrev=finv(ones(size(curF(:)))*(1-ExFNIRS.settings.topoSigThrehold{2}/curK_rev), curDf1(:), curDf2(:));
+                            
                             
                             
                             estimatedPval_min=nanmin(estimateFPval);
                             
                             if(any(curF(:)>=estimatedPval_min))
                                 
-                                curQ=performFDR(curP,ExFNIRS.settings.topoSigThrehold{2});
-                                curQ_rev=performFDR_reverse(curP,ExFNIRS.settings.topoSigThrehold{2});
+                                
                                 
                                 switch(ExFNIRS.settings.topoSigThrehold{1})
                                     case 'p'
                                         
                                     case 'q'
-                                        curF(curQ>ExFNIRS.settings.topoSigThrehold{2})=nan;
+                                        estimateFPval=estimateFPval_q;
                                     case 'qReverse'
-                                        curF(curQ_rev>ExFNIRS.settings.topoSigThrehold{2})=nan;
+                                        estimateFPval=estimateFPval_qrev;
                                 end
 
                                 
@@ -4367,40 +4372,58 @@ if(showTopo)
     end
 end
 
-function [qvalues,passed]=performFDR(pvalues,pThreshold)
+function [qvalues,k,passed]=performFDR(pvalues,pThreshold)
 % Performs FDR correction per #CITATION HERE
 if(nargin<2)
     pThreshold=0.05;
 end
 
-qvalues=pvalues;
+qvalues=nan(size(pvalues));
+
+kVals=nan(size(pvalues(:)));
 
 [pSorted,pIdx]=sort(pvalues(:));       
 numP=length(pSorted);
 
-for i=0:numP-1
-    qThreshold=pThreshold/(numP-i);
-    qvalues(pIdx==i)=pvalues(pIdx==i)*(numP-i);
+for i=1:numP
+    k=numP-i+1;
+    qThreshold=pThreshold/k;
+    qvalues(pIdx(i))=pvalues(pIdx(i))*k;
+    
+    
+    kVals(pIdx(i))=k;
+    if(any(qvalues(pIdx(i))>pThreshold))
+        break;
+    end
 end
 
+qvalues=pvalues*k;
 qvalues(qvalues>1)=1;
 passed=qvalues<=pThreshold;
+
+if(any(passed(:)))
+   k=min(kVals(passed(:)));
+   qvalues=pvalues*k;
+end
+    
         
-function [qvalues,passed]=performFDR_reverse(pvalues,pThreshold)
+function [qvalues,k,passed]=performFDR_reverse(pvalues,pThreshold)
 % Performs FDR correction per #CITATION HERE
 if(nargin<2)
     pThreshold=0.05;
 end
 
-qvalues=pvalues;
+qvalues=nan(size(pvalues));
 
 [pSorted,pIdx]=sort(pvalues(:));       
 numP=length(pSorted);
 
 for i=0:numP-1
-    qThreshold=pThreshold/(numP-i);
+    k=i+1;
+    qThreshold=pThreshold/k;
     if(sum(pvalues(:)>qThreshold)>=(numP-i))
-        qvalues=pvalues*(i+1);
+        qvalues=pvalues*k;
+        
        break; 
     end
     

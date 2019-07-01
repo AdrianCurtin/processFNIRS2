@@ -54,10 +54,10 @@ if(pf2_base.isnestedfield(PF2,'myRawMethods.cfg.Sections')&&~isempty(PF2.myRawMe
 
         
         if(isfield(curFunc,'output'))
-            if(iscell(curFunc.output{1}))
+            if(iscell(curFunc.output(1)))
                 curFunc.output=curFunc.output{1}; 
             end
-            funcDescripStr=sprintf('%s\toutput:\t%s\n',funcDescripStr,curFunc.output{1});
+            funcDescripStr=sprintf('%s\toutput:\t%s\n',funcDescripStr,curFunc.output(1));
         
         end
         descripStr=sprintf('%s%s',descripStr,funcDescripStr);
