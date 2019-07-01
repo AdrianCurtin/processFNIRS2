@@ -4244,24 +4244,18 @@ if(showTopo)
                             estimateFPval_q=finv(ones(size(curF(:)))*(1-ExFNIRS.settings.topoSigThrehold{2}/curK), curDf1(:), curDf2(:));
                             estimateFPval_qrev=finv(ones(size(curF(:)))*(1-ExFNIRS.settings.topoSigThrehold{2}/curK_rev), curDf1(:), curDf2(:));
                             
-                            
+                            switch(ExFNIRS.settings.topoSigThrehold{1})
+                                case 'p'
+
+                                case 'q'
+                                    estimateFPval=estimateFPval_q;
+                                case 'qReverse'
+                                    estimateFPval=estimateFPval_qrev;
+                            end
                             
                             estimatedPval_min=nanmin(estimateFPval);
                             
                             if(any(curF(:)>=estimatedPval_min))
-                                
-                                
-                                
-                                switch(ExFNIRS.settings.topoSigThrehold{1})
-                                    case 'p'
-                                        
-                                    case 'q'
-                                        estimateFPval=estimateFPval_q;
-                                    case 'qReverse'
-                                        estimateFPval=estimateFPval_qrev;
-                                end
-
-                                
                                 
                                 titleSTR=anovaNames{a};
 
