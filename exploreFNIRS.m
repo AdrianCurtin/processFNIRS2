@@ -291,7 +291,7 @@ estimatedFS=nanmedian(fsArray(:));
 subIdAuto=1;
 
 for i=1:length(ExFNIRS.data)
-   if(~isfield(ExFNIRS.data{i},'raw')&&~isfield(ExFNIRS.data{i},'HbO')||(length(ExFNIRS.data{i}.time)==1&&(isnan(ExFNIRS.data{i}.time)))||sum(sum(~isnan(ExFNIRS.data{i}.raw(:,2:end)),1),2)==0) %info only
+   if((~isfield(ExFNIRS.data{i},'raw')&&~isfield(ExFNIRS.data{i},'HbO'))||(length(ExFNIRS.data{i}.time)==1&&(isnan(ExFNIRS.data{i}.time)))||sum(sum(~isnan(ExFNIRS.data{i}.raw(:,2:end)),1),2)==0) %info only
        ExFNIRS.data{i}.time=nan;
        ExFNIRS.data{i}.info.missingFNIRS=1;
    else
@@ -1489,6 +1489,7 @@ if(ExFNIRS.UpdateNeeded==2||~isfield(ExFNIRS,'curPreprocessedFNIR'))
     ExFNIRS.curPreprocessedFNIR.gbyFNIRS_blk=cell(size(ExFNIRS.curProcessedData));
 
     for i=1:numSegs2Process
+        
        try
             waitbar(i/numSegs2Process,hF,sprintf('ExploreFNIRS\nResampling and baselining fNIRS %i of %i',i,numSegs2Process));
        catch
@@ -1522,10 +1523,10 @@ hF=ProgressHandles.h.hF;
 numSegs2Process=size(ExFNIRS.selectedTable,1);
 
 ExFNIRS.gbyFlat=[];
-ExFNIRS.gbyFlat.fNIR=ExFNIRS.curPreprocessedFNIR.fNIR{sellFullIdx,:};
-ExFNIRS.gbyFlat.baseline=ExFNIRS.curPreprocessedFNIR.baseline{sellFullIdx,:};
-ExFNIRS.gbyFlat.gbyFNIRS=ExFNIRS.curPreprocessedFNIR.gbyFNIRS{sellFullIdx,:};
-ExFNIRS.gbyFlat.gbyFNIRS_blk=ExFNIRS.curPreprocessedFNIR.gbyFNIRS_blk{sellFullIdx,:};
+ExFNIRS.gbyFlat.fNIR=ExFNIRS.curPreprocessedFNIR.fNIR(sellFullIdx,:);
+ExFNIRS.gbyFlat.baseline=ExFNIRS.curPreprocessedFNIR.baseline(sellFullIdx,:);
+ExFNIRS.gbyFlat.gbyFNIRS=ExFNIRS.curPreprocessedFNIR.gbyFNIRS(sellFullIdx,:);
+ExFNIRS.gbyFlat.gbyFNIRS_blk=ExFNIRS.curPreprocessedFNIR.gbyFNIRS_blk(sellFullIdx,:);
 ExFNIRS.gbyFlat.gbyIndex=gbyIdx;
 
 
@@ -1536,8 +1537,8 @@ for i=1:max(gbyIdx)
         
     end
     ExFNIRS.gby(i).gbyTables=ExFNIRS.selectedTable(gbyIdx==i,:); 
-    ExFNIRS.gby(i).gbyFNIRS=ExFNIRS.curPreprocessedFNIR.gbyFNIRS(gbyIdx==i,:);
-    ExFNIRS.gby(i).gbyFNIRS_blk=ExFNIRS.curPreprocessedFNIR.gbyFNIRS_blk(gbyIdx==i,:);
+    ExFNIRS.gby(i).gbyFNIRS=ExFNIRS.gbyFlat.gbyFNIRS(gbyIdx==i,:);
+    ExFNIRS.gby(i).gbyFNIRS_blk=ExFNIRS.gbyFlat.gbyFNIRS_blk(gbyIdx==i,:);
     
     
     if(ExFNIRS.settings.within_sub_avg_mode==1)
@@ -2989,7 +2990,7 @@ for g=1:length(gbyTables)
                     tempTable.(chName)(:,1)=nan;
                     tempTable.(chName)(tempTable{:,'missingFNIRS'}==0,1)=permute(curBarGA.(curBioM).data(tDataIdx,chNum,:),[3,1,2]);
 
-                end
+                    end
 
             end
         end

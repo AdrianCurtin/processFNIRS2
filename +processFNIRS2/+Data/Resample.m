@@ -465,6 +465,12 @@ else %Return midpoint
     outFNIR.time=outFNIR.segmentTimes(1:end,2); %returns effective "sample point" at midpoint of segmentTimes
 end
 
+if(isempty(outFNIR.time))
+    outFNIR.time=nan;
+    outFNIR.empty=1;
+end
+    
+
 outFNIR.fs=1/segLength; %new "effective sampling frequency
 
 if(getPolyAvg) % returns a time X channel X coefficient array
