@@ -347,6 +347,8 @@ val=get(handles.popupmenu_groupby_info_field,'Value');
 selStr=strs{val};
 ExFNIRS.settings.curInfoGroupBy=selStr;
 
+popupmenu_groupby_info_field_Callback([], [], handles); %update fieldbox
+
 
 
 segInfoVars={'SubjectID','Group','Subgroup','Session','Trial','Block','Condition'};
