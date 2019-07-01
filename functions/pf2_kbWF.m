@@ -20,7 +20,7 @@ function signal_out=pf2_kbWF(signal,varargin)
 
 global WAVELABPATH
 if(isempty(WAVELABPATH))
-    setUpWaveLab
+    pf2_base.toolboxes.setup_wavelab();
 end
 
 

@@ -131,12 +131,12 @@ function [A_Idx,s2_1,s2_2] = MADetection(x,L,T,fs,alpha);
 % (1) Calculation of the MSD
 [s2] = MovStd(x,L); s2_1 = s2;
 
-if max(s2) < T
-    %disp(['--->   MARA T threshold ' num2str(T) ' is potentially too large, no artifacts detected. std for data is between ' num2str(min(s2)) ' and ' num2str(max(s2))])
+if nanmax(s2) < T
+    disp(['--->   MARA T threshold ' num2str(T) ' is potentially too large, no artifacts detected. std for data is between ' num2str(min(s2)) ' and ' num2str(max(s2))])
     %msgbox(['--->   Please choose a propper T value! T must be < ' num2str(max(s2))], 'Error','error');
 end
 
-if min(s2) > T
+if nanmin(s2) > T
     disp(['--->   MARA T threshold ' num2str(T) ' is potentially too small, all data is seen as an artifact! std for data is between ' num2str(min(s2)) ' and ' num2str(max(s2))])
     %msgbox(['--->   Please choose a propper T value! T must be > ' num2str(min(s2))], 'Error','error');
 end

@@ -1,6 +1,6 @@
 function [data1f,data2f,valica]=icaClean(data1,data2)
-% data1: either raw730 or raw850
-% data2: raw805
+% data1: either raw730 or raw850 (regular wavelength light intensities)
+% data2: raw805 (ambient channel)
 % data1f: raw805 effect eliminated data1
 
 %addpath('C:\Meltem\MeltemPC\fNIR\K9\RunICA')
@@ -28,6 +28,13 @@ if dum_ica==1 %runica
 
 
 elseif dum_ica==2 %fastica
+	
+	if(~exist('fastica'))
+		pf2_base.toolboxes.setup_fastICA();
+	end
+
+
+
     [whitesig, WM, DWM] = fastica(mixedsign, 'only', 'white');
     At=[];
     [icasig,At,Wt] = fastica(mixedsign,... %'whiteSig',whitesig,'dewhiteMat',DWM,'whiteMat',WM,...
