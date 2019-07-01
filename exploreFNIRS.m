@@ -332,6 +332,8 @@ end
 ExFNIRS.dataTable=BuildSegmentInfoTable(ExFNIRS.data);
 
 
+ExFNIRS.settings.updateOnChange=get(handles.checkbox_auto_update,'Value');
+
 
 set(handles.popupmenu_info_field,'String',ExFNIRS.dataTable.Properties.VariableNames);
 set(handles.popupmenu_info_field,'Value',length(ExFNIRS.dataTable.Properties.VariableNames));
@@ -430,8 +432,6 @@ ExFNIRS.settings.LME_all_interactions=get(handles.checkbox_LME_all_interactions,
 ExFNIRS.settings.LME_info_covariate=get(handles.checkbox_LME_info_covariate,'Value');
 
 ExFNIRS.settings.export_replace_missing_9999=get(handles.checkbox_export_9999,'Value');
-
-ExFNIRS.settings.updateOnChange=get(handles.checkbox_auto_update,'Value');
 
 ExFNIRS.settings.use_group=get(handles.checkbox_use_group,'Value');
 if(ExFNIRS.settings.use_group)
