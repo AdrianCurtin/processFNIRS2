@@ -165,6 +165,7 @@ if(~isfield(ExFNIRS,'settings')||~isfield(ExFNIRS.settings,'baseline_start'))
     ExFNIRS.settings.LME_use_customStr=get(handles.checkbox_lme_usecustom,'Value');
     ExFNIRS.settings.topoSigThrehold={'p',0.05};
     ExFNIRS.settings.LME_customStr='';
+    ExFNIRS.settings.use_info=true;
 end
 
 
@@ -1357,17 +1358,17 @@ else
 end
 selTrialIdx=ismember(ExFNIRS.dataTable.('Trial'),selectedTrial);
 
-if(ExFNIRS.settings.plotby.InfoGroupBy)
+if(ExFNIRS.settings.use_info)
     cInfoGBYstring=ExFNIRS.settings.curInfoGroupBy;
     strs=get(handles.listbox_info_groupby,'String');
     selectedStrs=get(handles.listbox_info_groupby,'Value');
     selectedInfoG=strs(selectedStrs,:);
     if(isnumeric(ExFNIRS.dataTable{1,cInfoGBYstring}))
-        selectedInfoG=num2str(table2array(selectedInfoG));
+        tblStrs=num2str(ExFNIRS.dataTable{:,cInfoGBYstring},'%.2f');
         if(~iscell(selectedInfoG))
             selectedInfoG={selectedInfoG};
         end
-        selInfoGIdx=ismember(num2str(table2array(ExFNIRS.dataTable(:,cInfoGBYstring)),'%.2f'),selectedInfoG);
+        selInfoGIdx=ismember(tblStrs,selectedInfoG);
     else
         selInfoGIdx=ismember(ExFNIRS.dataTable.(cInfoGBYstring),selectedInfoG);
     end
@@ -1375,7 +1376,7 @@ end
 
 sellFullIdx=selSubIdx&selConditionIdx&selSessionIdx&selBlockIdx&selGroupIdx&selTrialIdx;
 
-if(ExFNIRS.settings.plotby.InfoGroupBy)
+if(ExFNIRS.settings.use_info)
     sellFullIdx=sellFullIdx&selInfoGIdx;
 end
 
@@ -6421,6 +6422,9 @@ strs=get(handles.popupmenu_groupby_info_field,'String');
 val=get(handles.popupmenu_groupby_info_field,'Value');
 
 selStr=strs{val};
+
+ExFNIRS.settings.use_info=true;
+
 
 ExFNIRS.settings.curInfoGroupBy=selStr;
 infoVars=ExFNIRS.dataTable.Properties.VariableNames;
