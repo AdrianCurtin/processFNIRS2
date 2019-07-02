@@ -107,18 +107,18 @@ for i=numLevels:-1:1
         outHierarchy=outHierarchy(:,1:i);
         hierachyArr=hierachyArr(:,1:i);
         outHarr(:,i)=[];
-        continue;
+        continue;  %no need to average (at this level)! all the rows are already unique
     end
     
     newOut=nan(length(uVal),size(outAvg,2),size(outAvg,3));
     rows2keep=nan(size(uVal));
     
     for i2=1:length(uVal)
-        idx=hierachyArr(:,i)==i2;
-        if(~any(idx))
+        idx=hierachyArr(:,i)==i2;  %is this the current unique value?
+        if(~any(idx))   %can't find that value here
             continue;
         else
-            rows2keep(i2)=find(idx,1,'first');
+            rows2keep(i2)=find(idx,1,'first'); %still have to keep one col from the rest to merge with the average
         end
         
         newOut(i2,:,:)=funcAvg(outAvg(idx,:,:),1);
