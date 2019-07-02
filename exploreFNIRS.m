@@ -3437,7 +3437,7 @@ function txt = myDataTipUpdateFcn(pointDataTip, event_obj)
  else
      txt = {sprintf('t=%.2f, y=%.2f',pos(1),pos(2))};
  end
-disp(['You clicked X:',num2str(pos(1)),', Y:',num2str(pos(2))]);
+%disp(['You clicked X:',num2str(pos(1)),', Y:',num2str(pos(2))]);
     
 
  
