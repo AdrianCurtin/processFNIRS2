@@ -138,6 +138,7 @@ end
 minTime=inf;
 maxTime=-inf;
 numCh=0;
+numROI=0;
 
 if(isnan(resampleSize)||resampleSize<=0)
 
@@ -186,6 +187,10 @@ for i=1:numfSeg % Resample and find max/min and num channels
 
     if(size(FNIRScellArray{i}.HbO,2)>numCh)
        numCh=size(FNIRScellArray{i}.HbO,2);
+    end
+    
+    if(calcROI&&size(FNIRScellArray{i}.ROI.info,1)>numROI)
+        numROI=size(FNIRScellArray{i}.ROI.info,1);
     end
     
     FNIRScellArray{i}.timeIdx=[FNIRScellArray{i}.time,[1:length(FNIRScellArray{i}.time)]',zeros(size(FNIRScellArray{i}.time))];
@@ -253,7 +258,7 @@ for b=1:length(bioMs)
         
     if(calcROI)
         curBioM=bioMs{b};
-        outGA.ROI.(curBioM).data=nan(length(outGA.time),numCh,numfSeg);
+        outGA.ROI.(curBioM).data=nan(length(outGA.time),numROI,numfSeg);
     end
 end
 

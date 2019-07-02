@@ -88,7 +88,10 @@ function possibleStr=num2strOrNot(possibleStr)
         end
     elseif(~ischar(possibleStr)&&isnumeric(possibleStr))
         possibleStr=num2str(possibleStr);
-
+    end
+    
+    if(iscell(possibleStr)&&length(possibleStr)==1)
+       possibleStr=possibleStr{1}; 
     end
 end
 

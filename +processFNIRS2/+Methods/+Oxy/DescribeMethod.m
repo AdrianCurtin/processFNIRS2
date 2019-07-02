@@ -41,12 +41,27 @@ if(pf2_base.isnestedfield(PF2,'myOxyMethods.cfg.Sections')&&~isempty(PF2.myOxyMe
         curFunc=funcs{f};
         funcDescripStr=sprintf('%i. Function: %s\n',f,curFunc.f);
         for a=1:length(curFunc.args)
-            arg=curFunc.args{a};
-            argVal=curFunc.argvals{a};
+            if(~iscell(curFunc.args))
+                arg=curFunc.args;
+            else
+                arg=curFunc.args{a};
+            end
+            if(~iscell(curFunc.argvals))
+                argVal=curFunc.argvals;
+            else
+                argVal=curFunc.argvals{a};
+            end
 
             funcDescripStr=sprintf('%s\targ%i: \t%s\t%s\n',funcDescripStr,a,arg,num2strOrNot(argVal));      
         end
-        funcDescripStr=sprintf('%s\toutput:\t%s\n',funcDescripStr,curFunc.output{1});
+        
+        if(iscell(curFunc.output))
+           output=curFunc.output{1}; 
+        else
+           output=curFunc.output; 
+        end
+        
+        funcDescripStr=sprintf('%s\toutput:\t%s\n',funcDescripStr,output);
         descripStr=sprintf('%s%s',descripStr,funcDescripStr);
     end
     

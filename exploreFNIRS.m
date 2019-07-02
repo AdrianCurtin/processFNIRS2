@@ -2301,9 +2301,12 @@ curTime = datetime(now,'ConvertFrom','datenum');
 debugString=sprintf('%s\n%s (%s)\n%s',ExFNIRS.curMethodName,ExFNIRS.statusGroupByStr,ExFNIRS.settings.within_sub_avg_mode_label,curTime);
 
 debugString(debugString==('_'))='-';
-th=annotation(figHandle,'textbox',[0.9,1,0.1,0],'String',debugString,'FitBoxToText','on');
-th.FontSize = 8;
-        
+th=annotation(figHandle,'textbox',[0 0 0.1 1],'String',debugString,'FitBoxToText','on');
+th.FontSize = 6;
+th.LineStyle='none';
+th.HorizontalAlignment='left';
+th.VerticalAlignment='bottom';
+curPos=th.Position;
 
 
 function possibleStr=num2strOrNot(possibleStr)
@@ -2995,8 +2998,8 @@ for g=1:length(gbyTables)
 
                     tempTable.(chName)(:,1)=nan;
                     tempTable.(chName)(tempTable{:,'missingFNIRS'}==0,1)=permute(curBarGA.(curBioM).data(tDataIdx,chNum,:),[3,1,2]);
-
-                    end
+                    tempTable.(chName)(tempTable{:,'missingFNIRS'}==1,1)=nan;
+                end
 
             end
         end
@@ -3012,6 +3015,7 @@ for g=1:length(gbyTables)
 
                     tempTable.(chName)(:,1)=nan;
                     tempTable.(chName)(tempTable{:,'missingFNIRS'}==0,1)=permute(curBarGA.ROI.(curBioM).data(tDataIdx,chNum,:),[3,1,2]);
+                    tempTable.(chName)(tempTable{:,'missingFNIRS'}==1,1)=nan;
 
                 end
 
@@ -3028,11 +3032,13 @@ for g=1:length(gbyTables)
                     newAuxName=sprintf('aux_%s',curAuxName);
                     tempTable.(newAuxName)(:,1)=nan;
                     tempTable.(newAuxName)(tempTable{:,'missingFNIRS'}==0,1)=permute(curAux.data(tDataIdx,1,:),[3,1,2]);
+                    tempTable.(newAuxName)(tempTable{:,'missingFNIRS'}==1,1)=nan;
                else
                    for ch=1:numAuxCh
                        newAuxName=sprintf('aux_%s_%i',curAuxName,ch);
                        tempTable.(newAuxName)(:,1)=nan;
                        tempTable.(newAuxName)(tempTable{:,'missingFNIRS'}==0,1)=permute(curAux.data(tDataIdx,ch,:),[3,1,2]);
+                       tempTable.(newAuxName)(tempTable{:,'missingFNIRS'}==1,1)=nan;
                    end
                end
 
@@ -3459,6 +3465,8 @@ if(ExFNIRS.UpdateNeeded)
     updateSelectedTable(handles);
 end
 
+multiPlot=false;
+
 if(~isfield(ExFNIRS,'gby'))
     warning('No groups match selection criteria');
     return;
@@ -3532,7 +3540,7 @@ end
 
 [numUgroups]=length(unique(cellstr(gbyStrs)));
 
-if(numUgroups==1)
+if(numUgroups==1&&~showTopo)
     num2Plot=numBioM;
     plotGroupByBioM=true;
     cCell=table2cell(pf2_base.getBioColors());
@@ -3717,7 +3725,7 @@ for chIdx=1:numOpt
                   end
                   if(numUgroups>1||numBioM==1)
                        gAStrs{curUgroupIdx,curChart}=sprintf('%s',gbyStrs{g}); 
-                  elseif(numBioM>1&&~multiPlot)
+                  elseif(numBioM>1)
                        gAStrs{b,curChart}=sprintf('%s',selectedBioM{b}); 
                   end
             end
@@ -3954,10 +3962,10 @@ for sH=1:length(subplotHandles)
         if(ExFNIRS.settings.LME_info_covariate)
             basicMdlStrings{length(basicMdlStrings)+1}=ExFNIRS.settings.curInfoStr;
         end
-        if(plotGroupByBioM&&numBioM>1)
-            %basicMdlStrings{length(basicMdlStrings)+1}='BioM';
-            warning('GroupBy Biomarker Plots not supported yet\n Only using first biomarker');
-        end
+%         if(plotGroupByBioM&&numBioM>1)
+%             %basicMdlStrings{length(basicMdlStrings)+1}='BioM';
+%             warning('GroupBy Biomarker Plots not supported yet\n Only using first biomarker');
+%         end
         
         for z=1:length(basicMdlStrings)
             if(z==1)
@@ -4052,7 +4060,7 @@ for sH=1:length(subplotHandles)
                varNames{v}=str;
             end
             
-            if(~plotGroupByBioM)
+            if(true)%~plotGroupByBioM)
                 curBioM=subplotGby{sH}.curBioM{1};
                 curRowName=sprintf('%s_%s',chName,curBioM);
                 
@@ -4113,7 +4121,7 @@ for sH=1:length(subplotHandles)
     end
 end
 
-doublePlotWithFDR=true;
+doublePlotWithFDR=false;
 FDRfound=false;
 
 if(showTopo)
@@ -4148,7 +4156,7 @@ if(showTopo)
         
         
          
-        if(~plotGroupByBioM)
+        if(true)%~plotGroupByBioM)
             for b=1:numBioM
               switch(LME_topo_mode)
                     case 'coef'
@@ -4201,7 +4209,7 @@ if(showTopo)
             for b=1:numBioM
                 if(b==1)
                    sigStr=sprintf('Thresholded at %s=%.2f',ExFNIRS.settings.topoSigThrehold{1},ExFNIRS.settings.topoSigThrehold{2});
-                   th=annotation(topoH,'textbox',[0,0,0,0.05],'String',sigStr,'FitBoxToText','on'); 
+                   th=annotation(topoH,'textbox',[0,1,0,0],'String',sigStr,'FitBoxToText','on'); 
                 end
                switch(LME_topo_mode)
                     case 'coef'
@@ -4413,7 +4421,7 @@ qvalues=nan(size(pvalues));
 
 [pSorted,pIdx]=sort(pvalues(:));       
 numP=length(pSorted);
-
+k=length(pvalues(:));
 numNan=sum(isnan(pvalues(:)));
 
 for i=numNan:numP-1
@@ -5469,7 +5477,7 @@ global ExFNIRS
 
 
 if(ExFNIRS.UpdateNeeded)
-   UpdateSelectedTable(handles); 
+   updateSelectedTable(handles); 
 end
 
 if(~isfield(ExFNIRS,'gby'))
@@ -5543,7 +5551,7 @@ if(numUgroups==1)
     num2Plot=numBioM;
     plotGroupByBioM=true;
     cIndex=table2cell(pf2_base.getBioColors())';
-    cIndex=cIndex{selBioM,:};
+    cIndex=cIndex(selBioM,:);
 else
     num2Plot=numGroups;
     plotGroupByBioM=false;
@@ -5932,7 +5940,7 @@ for chIdx=1:numOpt
                      sColor=cIndex(curUgroupIdx,:);
                 elseif(numBioM>1)
                      %gAStrs{b,curChart}=sprintf('%s',selectedBioM{b}); 
-                     sColor=cIndex(b,:);
+                     sColor=cIndex{b,:};
                 end
                
                 
