@@ -32,6 +32,7 @@ end
 
 if(~isfield(fNIR,'ROI'))
     roi_out=fNIR;
+    return;
     %fNIR.ROI=[]; % return a blank thing if there wasn't a field
 end
 

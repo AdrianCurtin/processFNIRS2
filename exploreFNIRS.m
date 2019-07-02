@@ -2301,7 +2301,8 @@ curTime = datetime(now,'ConvertFrom','datenum');
 debugString=sprintf('%s\n%s (%s)\n%s',ExFNIRS.curMethodName,ExFNIRS.statusGroupByStr,ExFNIRS.settings.within_sub_avg_mode_label,curTime);
 
 debugString(debugString==('_'))='-';
-th=annotation(figHandle,'textbox',[0,1,0,0],'String',debugString,'FitBoxToText','on');
+th=annotation(figHandle,'textbox',[0.9,1,0.1,0],'String',debugString,'FitBoxToText','on');
+th.FontSize = 8;
         
 
 
@@ -4333,7 +4334,7 @@ if(showTopo)
                         case 'anova'
                            for a=1:numANOVA
                             subplot(numBioM,numANOVA,a+(b-1)*numANOVA)
-                            curT=fNIR_t{b,a};
+                            curT=fNIR_f{b,a};
                             curP=fNIR_p{b,a};
                             curQ=performFDR(curP);
 
@@ -4413,7 +4414,9 @@ qvalues=nan(size(pvalues));
 [pSorted,pIdx]=sort(pvalues(:));       
 numP=length(pSorted);
 
-for i=0:numP-1
+numNan=sum(isnan(pvalues(:)));
+
+for i=numNan:numP-1
     k=i+1;
     qThreshold=pThreshold/k;
     if(sum(pvalues(:)>qThreshold)>=(numP-i))

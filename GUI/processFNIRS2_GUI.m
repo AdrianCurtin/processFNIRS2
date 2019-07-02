@@ -855,10 +855,10 @@ else
                fstruct_out_ind=[];
                
                outputList=Fidx.output;
-               
-               if(iscell(outputList{1}))
-                  outputList=outputList{1}; 
+               if(~iscell(outputList))
+                  outputList={outputList}; 
                end
+               
                for output_idx=1:length(outputList)
                    if strcmpi(outputList{output_idx},'x')==1 && isempty(x_out_ind)
                         x_out_ind=output_idx;
@@ -988,7 +988,7 @@ else
                                 else
                                     curftimeMask=curftimeMask&funcOutput{ftimeMask_out_ind};
                                 end
-                                if(pf2_base.isnestedfield(data,'ROI.HbO'))
+                                if(pf2_base.isnestedfield(data,'ROI.HbO')&&~isempty(x_ind))
                                     if(size(funcOutput_roi{fmask_out_ind},2)<size(validChannels_roi,2)||size(funcOutput_roi{fmask_out_ind},2)<length(validRows))
                                         curftimeMask_roi(validRows,validChannels)=curftimeMask_roi(validRows,validChannels)&funcOutput{ftimeMask_out_ind};
                                     else
