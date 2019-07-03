@@ -1,4 +1,4 @@
-function [cleanOD_out] = waveClean( x,level,alpha,convert2OD,showPlot )
+function [cleanOD_out] = waveClean( dataIn,level,alpha,convert2OD,showPlot )
 %WAVECLEAN Summary of this function goes here
 %   Detailed explanation goes here
 
@@ -6,7 +6,7 @@ function [cleanOD_out] = waveClean( x,level,alpha,convert2OD,showPlot )
 disp('Wave Clean - Beta 01');
 global WAVELABPATH
 if(isempty(WAVELABPATH))
-    setUpWaveLab
+    pf2_base.toolboxes.setup_wavelab();
 end
 
 
@@ -26,23 +26,23 @@ if(nargin<4)
     convert2OD=0;
 else
     if(convert2OD)
-        x=-log10(x./1);
+        dataIn=-log10(dataIn./1);
     end
 end
 
 %waveshrink
 QMF_Filter = MakeONFilter('Daubechies',10);
 mL=9;
-cleanOD_out=nan(size(x));
-numCh=size(x,2);
-sigLength=size(x,1);
+cleanOD_out=nan(size(dataIn));
+numCh=size(dataIn,2);
+sigLength=size(dataIn,1);
 
 if(sigLength<2^level)
    error('Unable to reconstruct signal at Level %i\nSignal has %i samples and must have at least %i',level,sigLength,2^level); 
 end
 
 for ch=1:numCh
-    signalOD=x(:,ch);
+    signalOD=dataIn(:,ch);
     len=length(signalOD);
     maxPow=floor(log2(len));
     maxSize=2^maxPow;

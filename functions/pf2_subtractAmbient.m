@@ -11,6 +11,7 @@ function data=pf2_subtractAmbient(rawData,ambientData,channelList)
 [uCh]=unique(channelList);
 %uCh=channelList(idx);
 
+
 for i=1:length(uCh)
     
    rawData(:,channelList==uCh(i))=rawData(:,channelList==uCh(i))-ambientData(:,i); 

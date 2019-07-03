@@ -77,6 +77,8 @@ end
 
 if(isfield(pf2ChannelCheck,'multiFigure'))
     set(handles.checkbox_multiFigureMode,'Value',pf2ChannelCheck.multiFigure);
+else
+    pf2ChannelCheck.multiFigure=get(handles.checkbox_multiFigureMode,'Value');
 end
 
 

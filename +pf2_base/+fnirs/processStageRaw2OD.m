@@ -24,6 +24,7 @@ end
 
 
 validChannels=(wavelengths>0)&rawMask;  %Dark Channel should be 0, time should be NA, other information should be negative values
+validDarkChannels=((wavelengths==0)&rawMask);
 
 timeChMask=ones(size(data));
 
@@ -109,7 +110,7 @@ for i=1:length(method.F)
               passedArgVals{ftimeMask_ind}=timeChMask(:,validChannels); % always needs channel info when used in raw
            elseif strcmp(args{a},'fChannelNumbers')==1
               fchInfo_ind=a;
-              passedArgVals{fchInfo_ind}=channelNumbers;
+              passedArgVals{fchInfo_ind}=channelNumbers(validChannels);
            elseif strcmp(args{a},'fChannelSD')==1
               fsd_ind=a;
               passedArgVals{fsd_ind}=PF2.curSDSet(ismember(PF2.curChList,PF2.curChSet(validChannels)));
@@ -119,6 +120,9 @@ for i=1:length(method.F)
            elseif strcmp(args{a},'fAux')==1
               fAux_ind=a;
               passedArgVals{fAux_ind}=fAux;
+           elseif strcmp(args{a},'fAmbient')==1
+              fAmb_ind=a;
+              passedArgVals{fAmb_ind}=data(:,validDarkChannels);
            end
         end
 
