@@ -7093,6 +7093,8 @@ function popupmenu_topoSig_Callback(hObject, eventdata, handles)
 global ExFNIRS
 
 switch(get(handles.popupmenu_topoSig,'Value'))
+%     case 1 % p=0.1
+%        ExFNIRS.settings.topoSigThrehold={'p',0.1};
     case 1 % p=0.05
        ExFNIRS.settings.topoSigThrehold={'p',0.05};
     case 2
