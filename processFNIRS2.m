@@ -658,10 +658,22 @@ else
                     
                     if(~isempty(x_ind))
                         passedArgVals{x_ind}=data.(bioM_list{bioM})(:,validChannels);
+                        if(pf2_base.isnestedfield(data,'ROI.HbO'))
+                            % Note ROI functions may not be able to handle
+                            % functions using channel numbers of SD separation
+                            passedArgVals_roi=passedArgVals;
+                            passedArgVals_roi{x_ind}=data.ROI.(bioM_list{bioM})(:,validChannels_roi);
+                        end
                     end
                     
                     if(~isempty(fStruct_ind))
                         passedArgVals{fStruct_ind}=data;
+                        if(pf2_base.isnestedfield(data,'ROI.HbO'))
+                            % Note ROI functions may not be able to handle
+                            % functions using channel numbers of SD separation
+                           % passedArgVals_roi=passedArgVals;
+                           % passedArgVals_roi{x_ind}=data.ROI.(bioM_list{bioM})(:,validChannels_roi);
+                        end
                     end
                     
                     funcOutput{:}=func(passedArgVals{:});
@@ -676,7 +688,7 @@ else
                     
                     if(~isempty(x_out_ind)) % Assign values to fNIRS Biomarkers and ROIs when available
                         outData.(bioM_list{bioM})(:,validChannels)=funcOutput{x_out_ind};
-                        if(pf2_base.isnestedfield(data,'ROI.HbO'))
+                        if(pf2_base.isnestedfield(data,'ROI.HbO')&&~isempty(x_ind))
                             outData.ROI.(bioM_list{bioM})(:,validChannels_roi)=funcOutput_roi{x_out_ind};
                         end
                     end
@@ -690,7 +702,7 @@ else
                         
                         validChannels=validChannels&curfMask;
                         outData.(bioM_list{bioM})(:,~validChannels)=nan;
-                        if(pf2_base.isnestedfield(data,'ROI.HbO'))
+                        if(pf2_base.isnestedfield(data,'ROI.HbO')&&~isempty(x_ind))
                             if(size(funcOutput_roi{fmask_out_ind},2)<size(validChannels_roi,2))
                                 validChannels_roi(:,validChannels)=validChannels_roi(:,validChannels)&funcOutput{fmask_out_ind};
                             else
