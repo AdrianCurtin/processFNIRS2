@@ -91,7 +91,7 @@ function varargout = exploreFNIRS(varargin) % exploreFNIRS(data,timeShiftTo0,blS
 
 % Edit the above text to modify the response to help exploreFNIRS
 
-% Last Modified by GUIDE v2.5 30-Jun-2019 16:04:10
+% Last Modified by GUIDE v2.5 04-Jul-2019 02:02:40
 
 % Begin initialization code - DO NOT EDIT
 gui_Singleton = 1;
@@ -167,28 +167,12 @@ if(~isfield(ExFNIRS,'settings')||~isfield(ExFNIRS.settings,'baseline_start'))
     ExFNIRS.settings.LME_customStr='';
     ExFNIRS.settings.use_info=true;
     ExFNIRS.settings.use_group=get(handles.checkbox_use_group,'Value');
-
+    ExFNIRS.settings.plot_temporal_y0=get(handles.checkbox_yaxis,'Value');
+    ExFNIRS.dataHierarchy={'SubjectID','Session','Condition','Trial','Block'};
 end
 
 
-segInfoVars={'Group','Subgroup','Session','Trial','Block','Condition'};
-randFxStr{1}='1|SubjectID';
-for i=2:2:length(segInfoVars)*2
-   randFxStr{i}=sprintf('%s|SubjectID',segInfoVars{(i)/2}); 
-   randFxStr{i+1}=sprintf('1+%s|SubjectID',segInfoVars{(i)/2}); 
-end
-
-set(handles.popupmenu_lmer_randomeffects,'String',randFxStr);
-ExFNIRS.settings.LME_randomFxStrs=randFxStr;
-
-if(ExFNIRS.settings.processRaw)
-    set(handles.listbox_raw_methods,'Enable','on');
-else
-    set(handles.listbox_raw_methods,'Enable','off');
-    set(handles.listbox_raw_methods,'Value',1);
-end
-
-
+addOptional(p,'filename','',@ischar);
 addOptional(p,'data',[],@iscell); % Your data, as a cell of FNIRS structs (ideally with populated info fields and the task of interest starting at t=0)
 addOptional(p,'timeShiftTo0',ExFNIRS.settings.timeShiftTo0,@islogical); %Specifies whether to automatically shift the start of the FNIRS period to 0, 
 		%best practice though is to turn this off and do it yourself before hand so that task starts at 0s and the baseline is before/after/during. See setT0fnirs()
@@ -208,8 +192,13 @@ if(~isempty(p.Results.data)||~isfield(ExFNIRS,'data'))
     if(size(ExFNIRS.data,2)>size(ExFNIRS.data,1))
         ExFNIRS.data=ExFNIRS.data';
     end
+elseif(~isempty(p.Results.filename))
+   exploreFNIRS.LoadEx(p.results.filename);
 end
 
+
+
+    
 
 
 ExFNIRS.settings.baseline_start=p.Results.blStart;
@@ -220,6 +209,28 @@ ExFNIRS.settings.plot_start=p.Results.plotStart;
 ExFNIRS.settings.plot_end=p.Results.plotEnd;
 ExFNIRS.settings.barchart_resample_size=p.Results.barSegmentLength;
 
+
+
+segInfoVars={'Session','Trial','Block','Condition','Time'};
+randFxStr{1}='1|SubjectID';
+for i=2:2:length(segInfoVars)*2
+   randFxStr{i}=sprintf('%s|SubjectID',segInfoVars{(i)/2}); 
+   randFxStr{i+1}=sprintf('-1+%s|SubjectID',segInfoVars{(i)/2}); 
+end
+
+set(handles.popupmenu_lmer_randomeffects,'String',randFxStr);
+ExFNIRS.settings.LME_randomFxStrs=randFxStr;
+
+if(ExFNIRS.settings.processRaw)
+    set(handles.listbox_raw_methods,'Enable','on');
+else
+    set(handles.listbox_raw_methods,'Enable','off');
+    set(handles.listbox_raw_methods,'Value',1);
+end
+
+
+
+
 if(isempty(ExFNIRS.settings.plot_start))
    ExFNIRS.settings.plot_start=min(0,ExFNIRS.settings.block_start);
 end
@@ -228,7 +239,7 @@ if(isempty(ExFNIRS.settings.plot_end))
    ExFNIRS.settings.plot_end=ExFNIRS.settings.block_end;
 end
 
-ExFNIRS.dataHierarchy={'SubjectID','Session','Condition','Trial','Block'};
+
 
 ExFNIRS.settings.within_sub_avg_mode=get(handles.popupmenu_within_sub_avg,'Value'); %0 none, 1 flat, 2 hierarchy
 
@@ -467,6 +478,10 @@ strsOxy=get(handles.listbox_oxy_methods,'String');
 
 ExFNIRS.processedData=cell(length(strsOxy)*length(strsRaw),3);
 ExFNIRS.numProcessed=0;
+
+if(isfield(ExFNIRS,'UpdateNeeded')&&ExFNIRS.UpdateNeeded==4)
+    ExFNIRS.UpdateNeeded=3;
+end
 
 if(ExFNIRS.settings.updateOnChange)
     updateSelectedTable(handles);
@@ -1601,6 +1616,10 @@ function processCurrentFunction(handles)
 
 global ExFNIRS
 
+if(ExFNIRS.UpdateNeeded==4)
+    error('Dataset has been updated, please close and repoen ExFNIRS');
+end
+
 if(ExFNIRS.UpdateNeeded==3)
 
 strsRaw=get(handles.listbox_raw_methods,'String');
@@ -1875,6 +1894,8 @@ else %plot with biomarkers embedded
     end
 end
 
+
+
 switch(figType)
     case 'bioM'
         for i=1:numBioM
@@ -1888,6 +1909,10 @@ switch(figType)
                     xInd=numSubX;
                 end
                 h=subplot(numSubY,numSubX,s);
+                if(ExFNIRS.settings.plot_temporal_y0)
+                    yh=plot([ExFNIRS.settings.plot_start-ExFNIRS.settings.block_start,ExFNIRS.settings.plot_end-ExFNIRS.settings.block_start],[0,0],'k');
+                    set(yh,'HandleVisibility','off');
+                end
                 sH{i,1}.subH{floor((s-1)/numSubX)+1,xInd}=h;
                 legend(h, 'off');
             end
@@ -1904,6 +1929,10 @@ switch(figType)
                 xInd=numSubX;
             end
             h=subplot(numSubY,numSubX,s);
+            if(ExFNIRS.settings.plot_temporal_y0)
+                yh=plot([ExFNIRS.settings.plot_start-ExFNIRS.settings.block_start,ExFNIRS.settings.plot_end-ExFNIRS.settings.block_start],[0,0],'k');
+                set(yh,'HandleVisibility','off');
+            end
             sH{1,1}.subH{floor((s-1)/numSubX)+1,xInd}=h;
             legend(h, 'off');
         end
@@ -7103,17 +7132,17 @@ function popupmenu_topoSig_Callback(hObject, eventdata, handles)
 global ExFNIRS
 
 switch(get(handles.popupmenu_topoSig,'Value'))
-%     case 1 % p=0.1
-%        ExFNIRS.settings.topoSigThrehold={'p',0.1};
-    case 1 % p=0.05
+    case 1 % p=0.1
+       ExFNIRS.settings.topoSigThrehold={'p',0.1};
+    case 2 % p=0.05
        ExFNIRS.settings.topoSigThrehold={'p',0.05};
-    case 2
+    case 3
        ExFNIRS.settings.topoSigThrehold={'p',0.01};
-   case 3
-       ExFNIRS.settings.topoSigThrehold={'q',0.05};
    case 4
-       ExFNIRS.settings.topoSigThrehold={'q',0.1};
+       ExFNIRS.settings.topoSigThrehold={'q',0.05};
    case 5
+       ExFNIRS.settings.topoSigThrehold={'q',0.1};
+   case 6
        ExFNIRS.settings.topoSigThrehold={'qReverse',0.05};
 end
 
@@ -7129,3 +7158,35 @@ function popupmenu_topoSig_CreateFcn(hObject, eventdata, handles)
 if ispc && isequal(get(hObject,'BackgroundColor'), get(0,'defaultUicontrolBackgroundColor'))
     set(hObject,'BackgroundColor','white');
 end
+
+
+% --- Executes on button press in checkbox_yaxis.
+function checkbox_yaxis_Callback(hObject, eventdata, handles)
+% hObject    handle to checkbox_yaxis (see GCBO)
+% eventdata  reserved - to be defined in a future version of MATLAB
+% handles    structure with handles and user data (see GUIDATA)
+
+% Hint: get(hObject,'Value') returns toggle state of checkbox_yaxis
+
+global ExFNIRS
+
+ExFNIRS.settings.plot_temporal_y0=get(handles.checkbox_yaxis,'Value');
+
+
+
+
+% --- Executes on button press in pushbutton_exLoad.
+function pushbutton_exLoad_Callback(hObject, eventdata, handles)
+% hObject    handle to pushbutton_exLoad (see GCBO)
+% eventdata  reserved - to be defined in a future version of MATLAB
+% handles    structure with handles and user data (see GUIDATA)
+
+exploreFNIRS.LoadEx();
+
+% --- Executes on button press in pushbutton_exSave.
+function pushbutton_exSave_Callback(hObject, eventdata, handles)
+% hObject    handle to pushbutton_exSave (see GCBO)
+% eventdata  reserved - to be defined in a future version of MATLAB
+% handles    structure with handles and user data (see GUIDATA)
+
+exploreFNIRS.SaveEx();
