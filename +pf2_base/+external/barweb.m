@@ -118,7 +118,7 @@ ymax = 0;
 if size(barvalues,1) ~= size(errors,1) || size(barvalues,2) ~= size(errors,2)
 	error('barvalues and errors matrix must be of same dimension');
 else
-	if size(barvalues,2) == 1 && size(barvalues,1)~=size(groupnames,1)
+	if size(barvalues,2) == 1 && size(barvalues,1)~=size(groupnames,1)&&~isempty(groupnames)
 		barvalues = barvalues';
 		errors = errors';
  	end
@@ -195,8 +195,13 @@ else
         end
         ylim([ymin ymax*1.1]);
     end
-	xlim([0.5 numgroups-change_axis+0.5]);
-	
+    
+    if(numbars==1&&change_axis)
+        xlim([0.25 numgroups-change_axis+0.75]);    
+    else
+        xlim([0.5 numgroups-change_axis+0.5]);
+    end
+    
 	if strcmp(legend_type, 'axis')
 		for i = 1:numbars
 			xdata = get(handles.errors(i),'xdata');

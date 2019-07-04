@@ -167,6 +167,7 @@ if(~isfield(ExFNIRS,'settings')||~isfield(ExFNIRS.settings,'baseline_start'))
     ExFNIRS.settings.LME_customStr='';
     ExFNIRS.settings.use_info=true;
     ExFNIRS.settings.use_group=get(handles.checkbox_use_group,'Value');
+
 end
 
 
@@ -252,6 +253,8 @@ else
     selStr=strs{val};
 end
 ExFNIRS.settings.curInfoGroup=selStr;
+
+
 
 strs=get(handles.popupmenu_groupby_info_field,'String');
 val=get(handles.popupmenu_groupby_info_field,'Value');
@@ -344,7 +347,7 @@ selStr=strs{val};
 ExFNIRS.settings.curInfoStr=selStr;
 
 set(handles.popupmenu_groupby_info_field,'String',ExFNIRS.dataTable.Properties.VariableNames);
-set(handles.popupmenu_groupby_info_field,'Value',length(ExFNIRS.dataTable.Properties.VariableNames));
+set(handles.popupmenu_groupby_info_field,'Value',1);
 strs=get(handles.popupmenu_groupby_info_field,'String');
 val=get(handles.popupmenu_groupby_info_field,'Value');
 selStr=strs{val};
@@ -5551,7 +5554,10 @@ numUgroups=length(unique(cellstr(gbyStrs)));
 if(numUgroups==1)
     num2Plot=numBioM;
     plotGroupByBioM=true;
-    cIndex=table2cell(pf2_base.getBioColors())';
+    temp=table2cell(pf2_base.getBioColors())';
+    for i=1:size(temp,1)
+       cIndex(i,:)=temp{i,:}; 
+    end
     cIndex=cIndex(selBioM,:);
 else
     num2Plot=numGroups;
@@ -5884,6 +5890,10 @@ for chIdx=1:numOpt
                 %curHAvg=nanmedian(hierarchicalAverage(curData,curTable(:,dataH),@nanmedian));
             end
             
+            if(numChartTimes==0)
+                error('No data in selected time range!');
+            end
+            
             for t=1:numChartTimes
                 if(strcmp(xType,'time'))
                     curSx=t;
@@ -5941,7 +5951,7 @@ for chIdx=1:numOpt
                      sColor=cIndex(curUgroupIdx,:);
                 elseif(numBioM>1)
                      %gAStrs{b,curChart}=sprintf('%s',selectedBioM{b}); 
-                     sColor=cIndex{b,:};
+                     sColor=cIndex(b,:);
                 end
                
                 
