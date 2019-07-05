@@ -91,7 +91,7 @@ function varargout = exploreFNIRS(varargin) % exploreFNIRS(data,timeShiftTo0,blS
 
 % Edit the above text to modify the response to help exploreFNIRS
 
-% Last Modified by GUIDE v2.5 04-Jul-2019 02:02:40
+% Last Modified by GUIDE v2.5 05-Jul-2019 18:50:47
 
 % Begin initialization code - DO NOT EDIT
 gui_Singleton = 1;
@@ -171,8 +171,9 @@ if(~isfield(ExFNIRS,'settings')||~isfield(ExFNIRS.settings,'baseline_start'))
     ExFNIRS.dataHierarchy={'SubjectID','Session','Condition','Trial','Block'};
 end
 
+addParameter(p,'filename','',@ischar);
 
-addOptional(p,'filename','',@ischar);
+
 addOptional(p,'data',[],@iscell); % Your data, as a cell of FNIRS structs (ideally with populated info fields and the task of interest starting at t=0)
 addOptional(p,'timeShiftTo0',ExFNIRS.settings.timeShiftTo0,@islogical); %Specifies whether to automatically shift the start of the FNIRS period to 0, 
 		%best practice though is to turn this off and do it yourself before hand so that task starts at 0s and the baseline is before/after/during. See setT0fnirs()
@@ -7190,3 +7191,10 @@ function pushbutton_exSave_Callback(hObject, eventdata, handles)
 % handles    structure with handles and user data (see GUIDATA)
 
 exploreFNIRS.SaveEx();
+
+
+% --- Executes on button press in pushbutton_plot_scatter_topo.
+function pushbutton_plot_scatter_topo_Callback(hObject, eventdata, handles)
+% hObject    handle to pushbutton_plot_scatter_topo (see GCBO)
+% eventdata  reserved - to be defined in a future version of MATLAB
+% handles    structure with handles and user data (see GUIDATA)

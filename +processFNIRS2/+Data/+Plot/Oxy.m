@@ -352,13 +352,13 @@ for(optIdx=1:length(channels))
     end
     
     if(~isempty(baseline))
-        if(~isnan(baseline(1))&&baseline(1)>0)
-            bh=pf2_base.external.vline(tmin+baseline(1),'--r','Baseline Start',0.95);
-            set(bh,'Tag','Baseline Start');
+        if(~isnan(baseline(1))&&baseline(1)>=0)
+            bh=pf2_base.external.vline(baseline(1),'--r','Baseline Start',0.95);
+            set(bh,'Tag','Bl-Start');
         end
         if(length(baseline)==2&&~isnan(baseline(2))&&baseline(2)<tmax)
-            bh=pf2_base.external.vline(tmin+baseline(2),'--r','Baseline End',0.90);
-            set(bh,'Tag','Baseline End');
+            bh=pf2_base.external.vline(baseline(2),'--r','Baseline End',0.90);
+            set(bh,'Tag','Bl-End');
         end
     end
         

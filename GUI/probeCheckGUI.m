@@ -233,7 +233,7 @@ end
 
 
 
-if(isfield(pf2ChannelCheck,'fmask')&&isempty(pf2ChannelCheck.fmask))
+if(isfield(pf2ChannelCheck,'fmask')&&~isempty(pf2ChannelCheck.fmask))
     if(isfield(pf2ChannelCheck.nirsData,'fchMask')&&~isempty(pf2ChannelCheck.nirsData.fchMask))
         pf2ChannelCheck.fmask=pf2ChannelCheck.nirsData.fchMask;
     else
