@@ -7140,9 +7140,9 @@ switch(get(handles.popupmenu_topoSig,'Value'))
     case 3
        ExFNIRS.settings.topoSigThrehold={'p',0.01};
    case 4
-       ExFNIRS.settings.topoSigThrehold={'q',0.05};
-   case 5
        ExFNIRS.settings.topoSigThrehold={'q',0.1};
+   case 5
+       ExFNIRS.settings.topoSigThrehold={'q',0.05};
    case 6
        ExFNIRS.settings.topoSigThrehold={'qReverse',0.05};
 end
