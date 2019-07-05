@@ -7198,3 +7198,842 @@ function pushbutton_plot_scatter_topo_Callback(hObject, eventdata, handles)
 % hObject    handle to pushbutton_plot_scatter_topo (see GCBO)
 % eventdata  reserved - to be defined in a future version of MATLAB
 % handles    structure with handles and user data (see GUIDATA)
+
+
+
+global ExFNIRS
+
+
+if(ExFNIRS.UpdateNeeded)
+   updateSelectedTable(handles); 
+end
+
+if(~isfield(ExFNIRS,'gby'))
+    warning('No groups match selection criteria');
+    return;
+end
+
+curInfoGroup=ExFNIRS.settings.curInfoGroup;
+
+gbyVars=ExFNIRS.groupByVars;
+if(~isempty(curInfoGroup)&&~strcmp(curInfoGroup,'(Time)'))
+    [ismem,idx]=ismember(curInfoGroup,gbyVars);
+    if(ismem)
+        gbyVars(idx)=[];
+        useCurInfoGroup=true;
+    else
+        useCurInfoGroup=false;
+    end
+else
+    useCurInfoGroup=false;
+end
+
+numGroups=length(ExFNIRS.gby);
+
+biomStrs=get(handles.listbox_biomarker,'String');
+selBioM=get(handles.listbox_biomarker,'Value');
+selectedBioM=biomStrs(selBioM);
+numBioM=length(selBioM);
+
+optStrs=get(handles.listbox_optode,'String');
+selOpt=get(handles.listbox_optode,'Value');
+selectedOptStr=optStrs(selOpt',:);
+numOpt=length(selOpt);
+
+if(numOpt==0||numGroups==0||numBioM==0)
+    return;
+end
+
+
+if(ExFNIRS.settings.ylim_fixed)
+    ExFNIRS.settings.ylim_fixed_min=inf;
+    xlim_fixed_min=inf;
+    ExFNIRS.settings.ylim_fixed_max=-inf;
+    xlim_fixed_max=-inf;
+end
+
+
+% end
+
+gbyStrs=cell(numGroups,1);
+curInfoGby=cell(0);
+
+for g=1:numGroups
+    gbyStrs{g}='';
+   if(~isempty(ExFNIRS.gby(g).gbyTables))
+       for i=1:length(gbyVars)
+           gbyStrs{g}=sprintf('%s%s:%s,',gbyStrs{g},gbyVars{i},num2strOrNot(ExFNIRS.gby(g).gbyTables.(gbyVars{i})(1)));
+       end 
+       if(useCurInfoGroup)
+           curInfoGby{g}=num2strOrNot(ExFNIRS.gby(g).gbyTables.(curInfoGroup)(1));
+       end
+   end 
+   if(~isempty(gbyStrs{g}))
+        gbyStrs{g}(end)='';
+   end
+end
+
+numUgroups=length(unique(cellstr(gbyStrs)));
+
+if(numUgroups==1)
+    num2Plot=numBioM;
+    plotGroupByBioM=true;
+    temp=table2cell(pf2_base.getBioColors())';
+    for i=1:size(temp,1)
+       cIndex(i,:)=temp{i,:}; 
+    end
+    cIndex=cIndex(selBioM,:);
+else
+    num2Plot=numGroups;
+    plotGroupByBioM=false;
+    if(ExFNIRS.settings.use_gui_color)
+        cIndex=ExFNIRS.settings.guiColor(1:numUgroups,:);
+    else
+        cIndex=ExFNIRS.settings.cmap(numUgroups);%linspecer(num2Plot,'qualitative');
+    end
+end
+
+
+
+barChartTimes=[];
+for i=1:numGroups
+    curGrandTime=ExFNIRS.gby(i).gbyGrandBar.time;
+    barChartTimes=[barChartTimes;curGrandTime];
+end
+barChartTimes=sort(unique(round(barChartTimes)));
+
+[uCurInfoG,firstCurIdx,uCurIdx]=unique(cellstr(curInfoGby));
+numCurInfoG=max(uCurIdx);
+uCurGIdxCount=nan(size(uCurIdx));
+for i =1:numCurInfoG
+    uCurGIdxCount(uCurIdx==i)=1:sum(uCurIdx==i);
+end
+
+if(~useCurInfoGroup||isnan(numCurInfoG))
+   useCurInfoGroup=false;
+   numCurInfoG=1; 
+   uCurInfoG='';
+end
+
+
+barChartTimes=barChartTimes(barChartTimes<ExFNIRS.settings.plot_end&barChartTimes>=ExFNIRS.settings.plot_start);
+numChartTimes=length(barChartTimes);
+errorFeature=ExFNIRS.settings.plot_bar_err_feature;
+plotFeature=ExFNIRS.settings.plot_bar_feature;
+
+if(strcmp(plotFeature,'Count')&&ExFNIRS.settings.plot_bar_ga)
+    plotFeature='N';
+    plotCount=true;
+else
+    plotCount=false;
+end
+
+if(plotGroupByBioM)
+    subplotHandles=cell(numOpt*numCurInfoG*numChartTimes,1);
+else
+    subplotHandles=cell(numOpt*numBioM*numChartTimes*numCurInfoG,1);
+end
+
+if(~plotGroupByBioM)
+	if(numChartTimes>1)
+		if(numOpt>1&&numCurInfoG>1)
+			xType='groupby';
+			yType='time';
+			figType='bio,channels';
+            numSubX=numCurInfoG;
+            numSubY=numChartTimes;
+		elseif(numOpt==1&&numCurInfoG>1)
+			xType='groupby';
+			yType='time';
+			figType='bioM';
+            numSubX=numCurInfoG;
+            numSubY=numChartTimes;
+		elseif(numCurInfoG<=1&&numOpt>1)
+			xType='time';
+			yType='channels';
+			figType='bioM';
+            numSubX=numChartTimes;
+            numSubY=numOpt;
+		else
+			xType='time';
+			yType='bioM';
+			figType='';
+            numSubX=numChartTimes;
+            numSubY=numBioM;
+		end
+	else
+		if(numOpt>1&&numCurInfoG>1)
+			xType='groupby';
+			yType='channels';
+			figType='bioM';
+            numSubX=numCurInfoG;
+            numSubY=numOpt;
+		elseif(numOpt==1&&numCurInfoG>1)
+			xType='groupby';
+			yType='bioM';
+			figType='';
+            numSubX=numCurInfoG;
+            numSubY=numBioM;
+		elseif(numCurInfoG<=1&&numOpt>1)
+			xType='channels';
+			yType='bioM';
+			figType='';
+            numSubX=numOpt;
+            numSubY=numBioM;
+		else
+			xType='bioM';
+			yType='';
+			figType='';
+            numSubX=numBioM;
+            numSubY=1;
+		end
+	end
+else %plot with biomarkers embedded
+	if(numChartTimes>1)
+		if(numOpt>=1&&numCurInfoG>1)
+			xType='groupby';
+			yType='time';
+			figType='channels';
+            numSubX=numCurInfoG;
+            numSubY=numChartTimes;
+		elseif(numCurInfoG<=1&&numOpt>1)
+			xType='time';
+			yType='channels';
+			figType='';
+            numSubX=numChartTimes;
+            numSubY=numOpt;
+		else
+			xType='time';
+			yType='';
+			figType='';
+            numSubX=numChartTimes;
+            numSubY=1;
+		end
+	else
+		if(numOpt>=1&&numCurInfoG>1)
+			xType='groupby';
+			yType='channels';
+			figType='';
+            numSubX=numCurInfoG;
+            numSubY=numOpt;
+		elseif(numCurInfoG<=1&&numOpt>1)
+			xType='channels';
+			yType='';
+			figType='';
+            numSubX=numOpt;
+            numSubY=1;
+		else
+			xType='';
+			yType='';
+			figType='';
+            numSubX=1;
+            numSubY=1;
+		end
+	end
+end
+
+switch(figType)
+    case 'channels'
+        for i=1:numOpt
+            sH{i,1}.h=figure(1200+i);
+            clf(sH{i,1}.h);
+            dcm_obj = datacursormode(sH{i,1}.h);
+            set(dcm_obj,'UpdateFcn',@myDataTipUpdateFcn);
+            for s=1:(numSubX*numSubY)
+                xInd=rem(s,numSubX);
+                if(xInd==0)
+                    xInd=numSubX;
+                end
+                h=subplot(numSubY,numSubX,s);
+                sH{i,1}.subH{floor((s-1)/numSubX)+1,xInd}=h;
+                legend(h, 'off');
+            end
+        end
+    case 'bioM'
+        for i=1:numBioM
+            sH{i,1}.h=figure(1200+i);
+            clf(sH{i,1}.h);
+            dcm_obj = datacursormode(sH{i,1}.h);
+            set(dcm_obj,'UpdateFcn',@myDataTipUpdateFcn);
+            for s=1:(numSubX*numSubY)
+                xInd=rem(s,numSubX);
+                if(xInd==0)
+                    xInd=numSubX;
+                end
+                h=subplot(numSubY,numSubX,s);
+                sH{i,1}.subH{floor((s-1)/numSubX)+1,xInd}=h;
+                legend(h, 'off');
+            end
+        end
+    case 'bio,channels'
+        for i=1:numOpt
+            for b=1:numBioM
+                sH{i,b}.h=figure(1200+i+50*b);
+                clf(sH{i,b}.h);
+                dcm_obj = datacursormode(sH{i,b}.h);
+                set(dcm_obj,'UpdateFcn',@myDataTipUpdateFcn);
+                for s=1:(numSubX*numSubY)
+                    xInd=rem(s,numSubX);
+                    if(xInd==0)
+                        xInd=numSubX;
+                    end
+                    h=subplot(numSubY,numSubX,s);
+                    sH{i,b}.subH{floor((s-1)/numSubX)+1,xInd}=h;
+                    legend(h, 'off');
+                end
+            end
+
+        end
+    otherwise
+        sH{1,1}.h=figure(1200);
+        clf(sH{1,1}.h);
+        dcm_obj = datacursormode(sH{1,1}.h);
+        set(dcm_obj,'UpdateFcn',@myDataTipUpdateFcn);
+        for s=1:(numSubX*numSubY)
+            xInd=rem(s,numSubX);
+            if(xInd==0)
+                xInd=numSubX;
+            end
+            h=subplot(numSubY,numSubX,s);
+            sH{1,1}.subH{floor((s-1)/numSubX)+1,xInd}=h;
+            legend(h, 'off');
+        end
+end
+
+curSx=1;
+curSy=1;
+curFigIdx=[1,1];
+
+
+curInfoStr=ExFNIRS.settings.curInfoStr;
+
+if(ExFNIRS.settings.within_sub_avg_mode==3)
+    dataH=ExFNIRS.dataHierarchy;
+elseif(ExFNIRS.settings.within_sub_avg_mode==2)
+    dataH='SubjectID';
+else
+    dataH=[];
+end
+
+for chIdx=1:numOpt
+    
+    if(strcmp(figType,'channels'))
+        figure(sH{chIdx}.h);
+        curFigIdx=[chIdx,1];
+    elseif(strcmp(xType,'channels'))
+        curSx=chIdx;
+    elseif(strcmp(yType,'channels'))
+        curSy=chIdx;
+    end
+    
+    ch=selOpt(chIdx);
+    legendGFXhandles{1}=[];
+    legendGFXstrs{1}=cell(0);
+    
+    if(plotGroupByBioM)
+        num2Plot=numBioM;
+    elseif(numUgroups>1)
+        num2Plot=numUgroups;
+    end
+    
+    %barChartTimes=times;
+    
+    pointStrs=cell(num2Plot,1);
+    gAStrs=cell(num2Plot,1);
+    gAerrStrs=cell(num2Plot,1);
+    
+    for b=1:numBioM
+        bioM=selectedBioM(b);
+        if(iscell(bioM))
+            bioM=bioM{1};
+        end
+        
+        if(strcmp(figType,'bio,channels'))
+            figure(sH{chIdx,b}.h);
+            datacursormode(sH{chIdx,b}.h)
+            curFigIdx=[chIdx,b];
+        elseif(strcmp(figType,'bioM'))
+            figure(sH{b,1}.h);
+            datacursormode(sH{b,1}.h)
+            curFigIdx=[b,1];
+        elseif(strcmp(xType,'bioM'))
+            curSx=b;
+        elseif(strcmp(yType,'bioM'))
+            curSy=b;
+        end
+        
+        
+        if(numUgroups>1)
+            curChart=b;
+        else
+            curChart=1;
+        end
+        
+        
+        for g=1:numGroups
+            curGrand=ExFNIRS.gby(g).gbyGrandBar;
+            curTable=ExFNIRS.gby(g).gbyTables;
+            curData=curTable(:,curInfoStr);
+            
+            curData=table2array(curData);
+    
+            if(isstring(curData))
+               warning('Strings return count');
+               [~,~,curData]=unique(curData);
+               plotFeature='Count';
+               % return;
+            end
+            curData(curData==-9999)=nan;
+            
+            if(useCurInfoGroup)
+                curGroupInfoIdx=uCurIdx(g);
+                curGroupIdxOffset=(curGroupInfoIdx-1)*numChartTimes;
+                curUgroupIdx=uCurGIdxCount(g);
+            else
+                curGroupInfoIdx=1;
+                curGroupIdxOffset=0;
+                curUgroupIdx=g;
+            end
+            
+            if(useCurInfoGroup)
+                if(strcmp(xType,'groupby'))
+                    curSx=curGroupInfoIdx;
+                elseif(strcmp(yType,'groupby'))
+                    curSy=curGroupInfoIdx;
+                end
+            end
+            
+            if(strcmp(plotFeature,'Count'))
+                [curHAvg,outH]=pf2_base.hierarchicalAverage(curData,curTable(:,dataH),@nnz);
+            elseif(strcmp(plotFeature,'Mean'))
+                [curHAvg,outH]=pf2_base.hierarchicalAverage(curData,curTable(:,dataH),@nanmean);
+            elseif(strcmp(plotFeature,'Median'))
+                [curHAvg,outH]=pf2_base.hierarchicalAverage(curData,curTable(:,dataH),@nanmedian);
+            else
+                error('Unknown parameter');
+                %curHAvg=nanmedian(hierarchicalAverage(curData,curTable(:,dataH),@nanmedian));
+            end
+            
+            if(numChartTimes==0)
+                error('No data in selected time range!');
+            end
+            
+            for t=1:numChartTimes
+                if(strcmp(xType,'time'))
+                    curSx=t;
+                elseif(strcmp(yType,'time'))
+                    curSy=t;
+                end
+                
+                curPlotHandle=sH{curFigIdx(1),curFigIdx(2)}.subH{curSy,curSx};
+                lastSubPlot=(curSy==numSubY&&curSx==numSubX);
+                hold(curPlotHandle,'on')
+                
+                
+                [timeIdx,timeIdxRev]=ismember(round(curGrand.time),barChartTimes(t));
+                timeIdxRev=timeIdxRev(timeIdxRev>0);
+                
+                
+                
+              switch(ExFNIRS.settings.ChannelMode)
+                  case 'fNIR'
+                      data2plot=curGrand.(bioM);
+                  case 'ROI'
+                      if(~pf2_base.isnestedfield(curGrand,'ROI.HbO.data'))
+                          error('ROI data must be calculated using a build ROI step');
+                      end
+                          
+                      data2plot=curGrand.ROI.(bioM);
+                  case 'Aux'
+
+              end 
+                curFeatureY=permute(data2plot.data(timeIdx,ch,:),[3,1,2]);
+                
+                if(strcmp(plotFeature,'Count'))
+                    [curFeatureY]=pf2_base.hierarchicalAverage(curFeatureY,curGrand.info.Hierarchy,@nnz);
+                elseif(strcmp(plotFeature,'Mean'))
+                    [curFeatureY]=pf2_base.hierarchicalAverage(curFeatureY,curGrand.info.Hierarchy,@nanmean);
+                elseif(strcmp(plotFeature,'Median'))
+                    [curFeatureY]=pf2_base.hierarchicalAverage(curFeatureY,curGrand.info.Hierarchy,@nanmedian);
+                else
+                    error('Unknown parameter');
+                    %curHAvg=nanmedian(hierarchicalAverage(curData,curTable(:,dataH),@nanmedian));
+                end
+                
+                if(length(curFeatureY)~=length(curHAvg))
+                    if(length(curFeatureY)>length(curHAvg))
+                        curFeatureY=curFeatureY(ismember(curGrand.info.Observation,outH));
+                    else
+                        temp=nan(size(curFeatureY));
+                        temp(ismember(outH,curGrand.info.Observation))=curFeatureY;
+                        curFeatureY=temp;
+                    end
+                end
+                
+                if(~plotGroupByBioM||numBioM==1)
+                     %gAStrs{curUgroupIdx,curChart}=sprintf('%s',gbyStrs{curUgroupIdx}); 
+                     sColor=cIndex(curUgroupIdx,:);
+                elseif(numBioM>1)
+                     %gAStrs{b,curChart}=sprintf('%s',selectedBioM{b}); 
+                     sColor=cIndex(b,:);
+                end
+               
+                
+                if(ExFNIRS.settings.plot_scatter_nonparametric)
+                    
+                    validIdx=sum([isnan(curHAvg),isnan(curFeatureY)],2)==0;
+                    validIdx=validIdx&(~isempty(curHAvg)&&~isempty(curFeatureY));
+                    xVals=curHAvg(validIdx);
+                    yVals=curFeatureY(validIdx);
+                    
+                    [~,p] = sort(xVals,'descend');
+                    r = 1:length(xVals);
+                    r(p) = r;
+                    xVals=r';
+                    
+                    [~,p] = sort(yVals,'descend');
+                    r = 1:length(yVals);
+                    r(p) = r;
+                    yVals=r';
+                    
+                    validIdx=sum([isnan(xVals),isnan(yVals)],2)==0;
+                    validIdx=validIdx&(~isempty(curHAvg)&&~isempty(curFeatureY));
+                    
+                    xVals=xVals(validIdx);
+                    yVals=yVals(validIdx);
+                    N=length(xVals);
+                else
+                    validIdx=sum([isnan(curHAvg),isnan(curFeatureY)],2)==0;
+                    validIdx=validIdx&(~isempty(curHAvg)&&~isempty(curFeatureY));
+                    xVals=curHAvg(validIdx);
+                    yVals=curFeatureY(validIdx);
+                    N=length(xVals);
+                end
+                
+                if(ExFNIRS.settings.plot_scatter_flipxy)
+                    temp=xVals;
+                    xVals=yVals;
+                    yVals=temp;
+                end
+                
+                
+                sHdots=scatter(curPlotHandle,xVals,yVals,25,sColor,'filled');
+                if(~plotGroupByBioM)
+                   pointStrs{curUgroupIdx}= gbyStrs{g};
+                   curPointStr=pointStrs{curUgroupIdx};
+                   %if(ExFNIRS.settings.plot_legend_mode==3||(ExFNIRS.settings.plot_legend_mode==2&&lastSubPlot))
+                       sH{curFigIdx(1),curFigIdx(2)}.legendHandles{curSy,curSx}.h{curUgroupIdx}=sHdots;
+                   %end
+                else
+                   pointStrs{b}=bioM;
+                   curPointStr=bioM;
+                  %if(ExFNIRS.settings.plot_legend_mode==3||(ExFNIRS.settings.plot_legend_mode==2&&lastSubPlot))
+                       sH{curFigIdx(1),curFigIdx(2)}.legendHandles{curSy,curSx}.h{b}=sHdots;
+                   %end
+                end 
+                
+                tagStr=sprintf('%s',curPointStr); 
+                set(sHdots,'tag',tagStr);
+                
+                
+                if(plotGroupByBioM&&numBioM>1)
+                    curFeatureString=sprintf('\\Delta[X]');
+                else
+                    curFeatureString=sprintf('\\Delta[%s]',bioM);
+                end
+                
+                if(ExFNIRS.settings.plot_scatter_nonparametric)
+                    curFeatureString=sprintf('Rank %s',curFeatureString);
+                end
+                
+                switch(xType)
+                    case 'time'
+                        title(curPlotHandle,sprintf('t=%i',round(barChartTimes(t))));
+                    case 'groupby'
+                        title(curPlotHandle,curInfoGby{g});
+                    case 'channels'
+                        title(curPlotHandle,sprintf('Opt. %i',ch));
+                    case 'bioM'
+                        title(curPlotHandle,bioM);
+                end
+
+                
+                if(ExFNIRS.settings.plot_scatter_flipxy)
+
+                    switch(yType)
+                        case 'time'
+                            ylabel(curPlotHandle,{sprintf('t=%i',round(barChartTimes(t)));curInfoStr});
+                        case 'groupby'
+                            ylabel(curPlotHandle,{curInfoGby{g};curInfoStr});
+                        case 'channels'
+                            ylabel(curPlotHandle,{sprintf('Opt. %i',ch);curInfoStr});
+                        case 'bioM'
+                            ylabel(curPlotHandle,{bioM,curInfoStr});
+                        otherwise
+                            ylabel(curPlotHandle,curInfoStr);
+                    end
+                    xlabel(curPlotHandle,curFeatureString);
+                else
+
+
+                    switch(yType)
+                        case 'time'
+                            ylabel(curPlotHandle,{sprintf('t=%i',round(barChartTimes(t)));curFeatureString});
+                        case 'groupby'
+                            ylabel(curPlotHandle,{curInfoGby{curUgroupIdx};curFeatureString});
+                        case 'channels'
+                            ylabel(curPlotHandle,{sprintf('Opt. %i',ch);curFeatureString});
+                        case 'bioM'
+                            if(numBioM>1)
+                                ylabel(curPlotHandle,{bioM,curFeatureString});
+                            else
+                                ylabel(curPlotHandle,curFeatureString);
+                            end
+                        otherwise
+                            ylabel(curPlotHandle,curFeatureString);
+                    end
+                    if(ExFNIRS.settings.plot_scatter_nonparametric)
+                        xlabel(curPlotHandle,sprintf('Rank %s',curInfoStr));
+                    else
+                        xlabel(curPlotHandle,curInfoStr);
+                    end
+                end
+                
+                
+                
+                if(ExFNIRS.settings.plot_scatter_line||ExFNIRS.settings.plot_scatter_err)
+                    if(N>2)
+                        [coefficients,PolyS] = polyfit(xVals, yVals, 1);
+                        CI = pf2_base.external.polyparci(coefficients,PolyS);
+                        xFit = linspace(min(xVals), max(xVals), 1000);
+                        [yFit,deltaY] = polyval(coefficients, xFit,PolyS);
+                        
+                        if(ExFNIRS.settings.plot_scatter_extend)
+                            curXlim=xlim(curPlotHandle);
+                            xFitExtend = linspace(min(curXlim), max(curXlim), 1000);
+                            yFitExtend = polyval(coefficients, xFitExtend);
+                        end
+
+                        errMulitply=ExFNIRS.settings.plot_bar_err_mult;
+                        %CI=[0,0;0,0];
+                        
+                        yEst=polyval(coefficients, xVals,PolyS);
+                        yDiff=yVals-yEst;
+                        SD=std(yDiff);
+
+                        %SD=sqrt(N)*(CI(:,2)-CI(:,1))'/3.92;
+                        SEM=SD/sqrt(N);
+
+                        switch(ExFNIRS.settings.plot_scatter_err_feature)
+                            case 'SEM'
+                                %yCI_Upper = polyval(coefficients+SEM*errMulitply, xFit);
+                                %yCI_Lower = polyval(coefficients-SEM*errMulitply, xFit);
+                                yCI_Upper = yFit+SEM*errMulitply;
+                                yCI_Lower = yFit-SEM*errMulitply;
+                            case 'SD'
+                                %yCI_Upper = polyval(coefficients+SD*errMulitply, xFit);
+                                %yCI_Lower = polyval(coefficients-SD*errMulitply, xFit);
+                                yCI_Upper = yFit+SD*errMulitply;
+                                yCI_Lower = yFit-SD*errMulitply;
+                            case '95%CI'
+                                yCI_Upper = polyval(CI(1,:), xFit);
+                                yCI_Lower = polyval(CI(2,:), xFit);
+                            case '50%PI'
+                                yCI_Upper = yFit+deltaY*(tinv(0.50,(N-1)));
+                                yCI_Lower = yFit-deltaY*(tinv(0.50,(N-1)));
+                            case '67%PI'
+                                yCI_Upper = yFit+deltaY*(tinv(0.67,(N-1)));
+                                yCI_Lower = yFit-deltaY*(tinv(0.67,(N-1)));
+                            case '90%PI'
+                                yCI_Upper = yFit+deltaY*(tinv(0.90,(N-1)));
+                                yCI_Lower = yFit-deltaY*(tinv(0.90,(N-1)));
+                            case '95%PI'
+                                yCI_Upper = yFit+deltaY*(tinv(0.95,(N-1)));
+                                yCI_Lower = yFit-deltaY*(tinv(0.95,(N-1)));
+                        end
+                    end
+                end
+                
+                
+
+                if(ExFNIRS.settings.plot_scatter_err&&N>2)
+                    errStyle=ExFNIRS.settings.plot_scatter_error_style;
+                    
+                    plotShaded=false;
+                    
+                    switch(errStyle)
+                        case 'Dashed'
+                            errStyle='--';
+                            lineWidth=2;
+                        case 'Fine'
+                            errStyle='-';
+                            lineWidth=0.5;
+                        case 'Shaded'
+                            errStyle='-';
+                            lineWidth=0.5;
+                            plotShaded=true;
+                        otherwise
+                            error('Unspecified error style');
+                    end
+                    
+                    errColor=sColor+(1-sColor)*0.55;
+                    if(plotShaded)
+                          errAlpha=0.15;
+                          yPatch=[yCI_Lower,fliplr(yCI_Upper)];
+                          xPatch=[xFit,fliplr(xFit)];
+                          %xPatch(isnan(yPatch))=[];
+                          %yPatch(isnan(yPatch))=[];
+
+                          h=patch(curPlotHandle,xPatch,yPatch,-1,'facecolor',errColor,'edgecolor','none','facealpha',errAlpha);
+                          set(h,'HandleVisibility','off');
+                          set(h,'HitTest','off');
+                          set(h.Annotation.LegendInformation,'IconDisplayStyle','off');
+                    end
+                    
+                    h=plot(curPlotHandle,xFit,yCI_Upper,'LineStyle',errStyle,'Color',errColor,'LineWidth',lineWidth);
+                    set(h.Annotation.LegendInformation,'IconDisplayStyle','off');
+                    h=plot(curPlotHandle,xFit,yCI_Lower,'LineStyle',errStyle,'Color',errColor,'LineWidth',lineWidth);
+                    set(h.Annotation.LegendInformation,'IconDisplayStyle','off');
+                else
+                      if(numUgroups>1||numBioM==1)
+                           gAErrStrs{curGroupInfoIdx}=''; 
+                      elseif(numBioM>1)
+                           gAErrStrs{b}='';
+                      end 
+                end
+                
+                if(ExFNIRS.settings.plot_scatter_line&&N>2)
+                    hold(curPlotHandle,'on')
+                    if(ExFNIRS.settings.plot_scatter_extend)
+                        gaH=plot(curPlotHandle,xFitExtend, yFitExtend, 'r-', 'LineWidth', 2,'Color',sColor);
+                    else
+                        gaH=plot(curPlotHandle,xFit, yFit, 'r-', 'LineWidth', 2,'Color',sColor);
+                    end
+                    
+                    set(gaH.Annotation.LegendInformation,'IconDisplayStyle','off');
+                    
+                    [rho,pval] = corr(xVals,yVals,'Type','Spearman');
+
+
+                    [r,p]=corr(xVals,yVals,'Type','Pearson');
+
+                    if(~plotGroupByBioM)
+                       fitStr=gbyStrs{g};
+                       gAStrs{curUgroupIdx}= fitStr;
+                       %if(ExFNIRS.settings.plot_legend_mode==3||(ExFNIRS.settings.plot_legend_mode==2&&lastSubPlot))
+                           sH{curFigIdx(1),curFigIdx(2)}.legendHandles{curSy,curSx}.h{curUgroupIdx}=gaH;
+                       %end
+                    else
+                       gAStrs{b}=bioM;
+                       fitStr=bioM;
+                       %if(ExFNIRS.settings.plot_legend_mode==3||(ExFNIRS.settings.plot_legend_mode==2&&lastSubPlot))
+                           sH{curFigIdx(1),curFigIdx(2)}.legendHandles{curSy,curSx}.h{b}=gaH;
+                       %end
+                    end
+
+                    tagStr=sprintf('%s (N %i)\nRho=%.3f, p=%.4f\nr=%.3f p=%.4f',fitStr,N,rho,pval,r,p); 
+                    set(gaH,'tag',tagStr);
+                elseif(~ExFNIRS.settings.plot_scatter_line)
+                    %sH{curFigIdx(1),curFigIdx(2)}.legendHandles{curSy,curSx}.h=cell(0);
+                    %gAStrs=cell(0);
+                end
+                
+                
+                curLgdHandles=sH{curFigIdx(1),curFigIdx(2)}.legendHandles{curSy,curSx}.h(:);
+                numCurLgd=length(curLgdHandles);
+                numFilled=0;
+                for i=1:numCurLgd
+                	numFilled=numFilled+~isempty(curLgdHandles{i});
+                end
+                
+                if(ExFNIRS.settings.ylim_fixed)
+                    ylim(curPlotHandle,'auto');
+                    cylim=ylim(curPlotHandle);
+                    ExFNIRS.settings.ylim_fixed_min=min(ExFNIRS.settings.ylim_fixed_min,cylim(1));
+                    ExFNIRS.settings.ylim_fixed_max=max(ExFNIRS.settings.ylim_fixed_max,cylim(2));
+                    
+                    xlim(curPlotHandle,'auto');
+                    cxlim=xlim(curPlotHandle);
+                    xlim_fixed_min=min(xlim_fixed_min,cxlim(1));
+                    xlim_fixed_max=max(xlim_fixed_max,cxlim(2));
+                elseif(ExFNIRS.settings.ylim_manual)
+                    if(ExFNIRS.settings.plot_scatter_flipxy)
+                        if(~plotCount)
+                            xlim(curPlotHandle,[ExFNIRS.settings.ylim_manual_min,ExFNIRS.settings.ylim_manual_max]);
+                        else
+                            xlim(curPlotHandle,[0,ExFNIRS.settings.ylim_manual_max]);
+                        end
+                    else
+                        if(~plotCount)
+                            ylim(curPlotHandle,[ExFNIRS.settings.ylim_manual_min,ExFNIRS.settings.ylim_manual_max]);
+                        else
+                            ylim(curPlotHandle,[0,ExFNIRS.settings.ylim_manual_max]);
+                        end
+                    end
+                elseif(plotCount)
+                    if(ExFNIRS.settings.plot_scatter_flipxy)
+                        cxlim=xlim(curPlotHandle);
+                        xlim(curPlotHandle,[0,cxlim(2)]);
+                    else
+                        cylim=ylim(curPlotHandle);
+                        ylim(curPlotHandle,[0,cylim(2)]);
+                    end
+
+                else
+                    ylim(curPlotHandle,'auto');
+                end
+                
+            end
+                
+        end
+    end
+end
+
+if(plotCount)
+    if(ExFNIRS.settings.plot_scatter_flipxy)
+        xlim_fixed_min=0;
+    else
+        ExFNIRS.settings.ylim_fixed_min=0; 
+    end
+end
+
+
+for i=1:size(sH,1)
+    for b=1:size(sH,2)
+        for x=1:numSubX
+            for y=1:numSubY
+                if(ExFNIRS.settings.ylim_fixed)
+                    ylim(sH{i,b}.subH{y,x},[ExFNIRS.settings.ylim_fixed_min,ExFNIRS.settings.ylim_fixed_max]);
+                    xlim(sH{i,b}.subH{y,x},[xlim_fixed_min,xlim_fixed_max]);
+                end
+                
+                if((ExFNIRS.settings.plot_legend_mode==3||(ExFNIRS.settings.plot_legend_mode==2&&(x==numSubX)&&y==numSubY)))
+                    lgStrs=[];
+                    for k=1:length(pointStrs)
+                       if(isnumeric(pointStrs{k}))
+                           pointStrs{k}='';
+                       end
+                       lgStrs=[lgStrs;pointStrs(k)];
+                    end
+
+                    legend(sH{i,b}.subH{y,x},pointStrs(:));
+                end
+
+                hold(sH{i,b}.subH{y,x},'off')
+            end
+        end
+
+        addDebugAnnotation(sH{i,b}.h);
+        switch(figType)
+            case 'bioM'
+                pf2_base.external.suptitle(sH{i,b}.h,selectedBioM{i});
+            case 'channels'
+                pf2_base.external.suptitle(sH{i,b}.h,selectedOpt{i});
+            case 'bio,channels'
+                pf2_base.external.suptitle(sH{i,b}.h,sprintf('Optode %i [%s]',selectedOpt(i),selectedBioM{b}));
+            otherwise
+
+        end
+    end
+end
+
