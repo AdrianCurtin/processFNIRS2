@@ -6554,8 +6554,8 @@ if(~isempty(ExFNIRS.settings.curInfoGroupBy))
     end
     
     for i=1:length(uVars)
-       if(isempty(uVars{i})||ismissing(uVars{i}))
-          uVars{i}='Missing'; 
+       if(isempty(uVars{i,1})||(isstring(uVars{i})&&ismissing(uVars{i}))||(ischar(uVars{i})&&ismissing(uVars(i))))
+          uVars{i,1}='Missing'; 
        end
     end
     
