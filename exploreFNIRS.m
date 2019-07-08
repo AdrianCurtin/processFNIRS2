@@ -6552,7 +6552,15 @@ if(~isempty(ExFNIRS.settings.curInfoGroupBy))
     if(~iscell(uVars))
         uVars=cellstr(uVars);
     end
+    
+    for i=1:length(uVars)
+       if(isempty(uVars{i})||ismissing(uVars{i}))
+          uVars{i}='Missing'; 
+       end
+    end
+    
     nanIndex=strcmp('-9999.00',uVars);
+    
     
     uVars(nanIndex)={'NaN'};
     set(handles.listbox_info_groupby,'String',uVars);
