@@ -11,6 +11,8 @@ function hout=suptitle(figH,str)
 
 if(~ishandle(figH)&&isstring(figH)&&nargin==1)
     str=figH;
+else
+   figure(figH); 
 end
 
 

@@ -13,7 +13,7 @@ validScalarPosNum = @(x) isnumeric(x) && isscalar(x) && (x > 0);
 validMatrixPosNum = @(x) isnumeric(x) && ismatrix(x) && (sum(x(:)<0)==0);
 
 addOptional(p,'fNIRarr',[],validfNIRInput); % original data
-validSPM_mode = @(x) ischar(validatestring(x,{'value','HbR','HbO','HbDiff','HbTotal','CBSI','tstat','fstat','corr','pvalue','logical','percentage'}));
+validSPM_mode = @(x) ischar(validatestring(x,{'value','HbR','HbO','HbDiff','HbTotal','CBSI','tstat','fstat','corr','rcorr','rhocorr','pvalue','logical','percentage'}));
     %value plots the value with no specific cutoffs
     % Hb is the same as value for now
     % t stat assumes that you provide it with a pvalue for thresholding
@@ -210,6 +210,36 @@ switch(Mode)
             
         end
     case 'corr'
+        channelMask(abs(fNIRarr)<lowerThreshold)=false;
+        channelMask(abs(fNIRarr)>upperThreshold)=false;
+		cMapLabel='rho';
+        nanReplaceVal=0;
+        if(upperThreshold<0||lowerThreshold>0)
+            if(upperThreshold<0)
+               temp=upperThreshold;
+               upperThreshold=lowerThreshold;
+               lowerThreshold=temp;
+            end
+            twosided=false;
+        else
+            twoSided=true;
+        end
+    case 'rcorr'
+        channelMask(abs(fNIRarr)<lowerThreshold)=false;
+        channelMask(abs(fNIRarr)>upperThreshold)=false;
+		cMapLabel='r';
+        nanReplaceVal=0;
+        if(upperThreshold<0||lowerThreshold>0)
+            if(upperThreshold<0)
+               temp=upperThreshold;
+               upperThreshold=lowerThreshold;
+               lowerThreshold=temp;
+            end
+            twosided=false;
+        else
+            twoSided=true;
+        end
+    case 'rhocorr'
         channelMask(abs(fNIRarr)<lowerThreshold)=false;
         channelMask(abs(fNIRarr)>upperThreshold)=false;
 		cMapLabel='rho';

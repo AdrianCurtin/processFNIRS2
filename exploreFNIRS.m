@@ -5580,13 +5580,16 @@ end
 % end
 
 gbyStrs=cell(numGroups,1);
+gbyShortStrs=cell(numGroups,1);
 curInfoGby=cell(0);
 
 for g=1:numGroups
     gbyStrs{g}='';
+    gbyShortStrs{g}='';
    if(~isempty(ExFNIRS.gby(g).gbyTables))
        for i=1:length(gbyVars)
            gbyStrs{g}=sprintf('%s%s:%s,',gbyStrs{g},gbyVars{i},num2strOrNot(ExFNIRS.gby(g).gbyTables.(gbyVars{i})(1)));
+           gbyShortStrs{g}=sprintf('%s%s:%s,',gbyShortStrs{g},gbyVars{i}(1),num2strOrNot(ExFNIRS.gby(g).gbyTables.(gbyVars{i})(1)));
        end 
        if(useCurInfoGroup)
            curInfoGby{g}=num2strOrNot(ExFNIRS.gby(g).gbyTables.(curInfoGroup)(1));
@@ -5594,6 +5597,7 @@ for g=1:numGroups
    end 
    if(~isempty(gbyStrs{g}))
         gbyStrs{g}(end)='';
+        gbyShortStrs{g}(end)='';
    end
 end
 
@@ -6118,6 +6122,8 @@ for chIdx=1:numOpt
                 
                 if(ExFNIRS.settings.plot_scatter_nonparametric)
                     
+                    topoMode='rhocorr';
+                    
                     validIdx=sum([isnan(curHAvg),isnan(curFeatureY)],2)==0;
                     validIdx=validIdx&(~isempty(curHAvg)&&~isempty(curFeatureY));
                     xVals=curHAvg(validIdx);
@@ -6145,6 +6151,7 @@ for chIdx=1:numOpt
                     xVals=curHAvg(validIdx);
                     yVals=curFeatureY(validIdx);
                     N=length(xVals);
+                    topoMode='rcorr';
                 end
                 
                 if(ExFNIRS.settings.plot_scatter_flipxy)
@@ -6154,6 +6161,38 @@ for chIdx=1:numOpt
                 end
                 
                 if(plotTopo)
+                    
+                    switch(yType)
+                        case 'ugroup'
+                            rowLabel=gbyShortStrs{g};
+                        case 'groupby'
+                            rowLabel=curInfoGby{g};
+                        case 'bioM'
+                            rowLabel=sprintf('\\Delta[%s]',bioM);
+                        case 'time'
+                            rowLabel=sprintf('t=%i',round(barChartTimes(t)));
+                        otherwise
+                            rowLabel='Unkown';
+                    end
+
+                    switch(xType)
+                        case 'ugroup'
+                            titleSTR=gbyShortStrs{g};
+                        case 'groupby'
+                            titleSTR=curInfoGby{g};
+                        case 'bioM'
+                            titleSTR=sprintf('\\Delta[%s]',bioM);
+                        case 'time'
+                            titleSTR=sprintf('t=%i',round(barChartTimes(t)));
+                        otherwise
+                            titleSTR='Unkown';
+                    end
+
+                    
+                    
+                    
+                    
+                    
                     if(~isempty(xVals)&&~isempty(yVals))
                          [rho,pval] = corr(xVals,yVals,'Type','Spearman');
                          [r,p]=corr(xVals,yVals,'Type','Pearson');
@@ -6205,31 +6244,6 @@ for chIdx=1:numOpt
                                     curpthresh=ExFNIRS.settings.topoSigThrehold{2}/curK_rev;
                             end
                             
-                            switch(yType)
-                                case 'ugroup'
-                                    rowLabel=gbyStrs{g};
-                                case 'groupby'
-                                    rowLabel=curInfoGby{g};
-                                case 'bioM'
-                                    rowLabel=sprintf('\\Delta[%s]',bioM);
-                                case 'time'
-                                    rowLabel=sprintf('t=%i',round(barChartTimes(t)));
-                                otherwise
-                                    rowLabel='Unkown';
-                            end
-                            
-                             switch(xType)
-                                    case 'ugroup'
-                                        titleSTR=gbyStrs{g};
-                                    case 'groupby'
-                                        titleSTR=curInfoGby{g};
-                                    case 'bioM'
-                                        titleSTR=sprintf('\\Delta[%s]',bioM);
-                                    case 'time'
-                                        titleSTR=sprintf('t=%i',round(barChartTimes(t)));
-                                    otherwise
-                                        titleSTR='Unkown';
-                                end
                             
                             if(any(curP<=curpthresh))
                                
@@ -6260,7 +6274,7 @@ for chIdx=1:numOpt
                                     case 'fNIR'
                                          axes(curPlotHandle);
                                          %processFNIRS2.Data.Plot.InterpolateValues([],curR,[minR1,minR2],[],1,titleSTR,clrBtitle);
-                                        interpolateNIR(abs(curR),'Mode','corr','fontSize',12,'transparent',true,'lowerThreshold',min([abs(minR2),minR1]),'TitleText',titleSTR,'ChannelLabels',true)%,7,11,2,1,false,'[Hb-Oxy] Natural High Vs. Low',12,'hot',true)
+                                        interpolateNIR(abs(curR),'Mode',topoMode,'fontSize',12,'transparent',true,'lowerThreshold',min([abs(minR2),minR1]),'TitleText',titleSTR,'ChannelLabels',true)%,7,11,2,1,false,'[Hb-Oxy] Natural High Vs. Low',12,'hot',true)
                                     case 'ROI'
                                         roiInfo=ExFNIRS.currentROI;
                                         interpolateNIR(mapROIvaluesToCh(roiInfo,abs(curR)),'Mode','corr','fontSize',12,'transparent',true,'lowerThreshold',min([abs(minR2),minR1]),'TitleText',titleST,'ChannelLabels',true)%,7,11,2,1,false,'[Hb-Oxy] Natural High Vs. Low',12,'hot',true)
@@ -6282,6 +6296,16 @@ for chIdx=1:numOpt
                                 end
                             end
                          end
+                    elseif(chIdx==numOpt)
+                        plot(curPlotHandle,0,0);
+                        curAxes=curPlotHandle;
+                        axes(curPlotHandle);
+                        axesPos=curAxes.OuterPosition;
+                        axis off
+                        title(sprintf('%s_N_S',titleSTR));
+                        if(curSx==1) % first column
+                            th=annotation(gcf,'textbox',[0,axesPos(2),axesPos(3),axesPos(4)/2],'String',rowLabel,'FitBoxToText','on');
+                        end
                     end
 
                 else
@@ -6600,9 +6624,14 @@ for i=1:size(sH,1)
             case 'bio,channels'
                 pf2_base.external.suptitle(sH{i,b}.h,sprintf('Optode %i [%s]',selectedOpt(i),selectedBioM{b}));
             case 'groupby,bio'
-                pf2_base.external.suptitle(sH{i,b}.h,sprintf('Groupby [%s]',selectedBioM{b}));
+                pf2_base.external.suptitle(sH{i,b}.h,sprintf('%s [%s]',uCurInfoG{i},selectedBioM{b}));
             otherwise
 
+        end
+        
+        if(plotTopo)
+           sigStr=sprintf('Thresholded at %s=%.2f',ExFNIRS.settings.topoSigThrehold{1},ExFNIRS.settings.topoSigThrehold{2});
+           th=annotation(sH{i,b}.h,'textbox',[0,1,0,0],'String',sigStr,'FitBoxToText','on'); 
         end
     end
 end
