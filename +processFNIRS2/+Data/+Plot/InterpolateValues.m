@@ -17,12 +17,18 @@ else
     bufferMult=round(bufferMult);
 end
 
-if(nargin<4)
-    maxVal=nanmax(data2plot);
-end
+
 
 if(nargin<3||isempty(minVal))
    minVal=nanmin(data2plot); 
+end
+
+if(nargin<4)
+    if(length(minVal)==2)
+        maxVal=[];
+    else
+        maxVal=nanmax(data2plot);
+    end
 end
 
 cla
@@ -38,11 +44,10 @@ if(length(minVal)==2&&sum(minVal>0)==1&&isempty(maxVal))  %% expects two minimum
         twosided=false;
         minVal=minVal(2);
         maxVal=maxVal(1);
-    elseif(maxVal(1)<=minVal(2))
+    elseif(maxVal(1)<=minVal(2)) % reverse plot
         twosided=false;
-        temp=minVal;
-        minVal=maxVal(2);
-        maxVal=temp(1);
+        maxVal=maxVal(2);
+        minVal=minVal(1);
     end
     
 else
@@ -169,7 +174,7 @@ for optIdx=1:length(data2plot)
     optYidx(optIdx)=round(OptPosY(optNum)/OptDistY+bufferMult+1);
     
     if(~twosided&&~isnan(data2plot(optIdx))&&((data2plot(optIdx)>=minVal&&maxVal>minVal)||...
-            (data2plot(optIdx)<=(maxVal*-1)&&minVal>maxVal)))
+            (data2plot(optIdx)<=(minVal)&&minVal>maxVal)))
         interpBuffer(optYidx(optIdx),optXidx(optIdx))=data2plot(optIdx);
         alphaBuffer(optYidx(optIdx),optXidx(optIdx))=1;
         alphaBufferNeg(optYidx(optIdx),optXidx(optIdx))=-1;
@@ -180,6 +185,7 @@ for optIdx=1:length(data2plot)
     elseif(twosided&&~isnan(data2plot(optIdx))&&data2plot(optIdx)>=minVal(2))
         interpBuffer(optYidx(optIdx),optXidx(optIdx))=data2plot(optIdx);
         alphaBuffer(optYidx(optIdx),optXidx(optIdx))=1;
+        alphaBufferNeg(optYidx(optIdx),optXidx(optIdx))=-1;
     else
         interpBuffer(optYidx(optIdx),optXidx(optIdx))=data2plot(optIdx);
     end
@@ -194,10 +200,14 @@ end
 [Xq,Yq] = meshgrid(1:imgSize);
 
 
-intArr=interp2(inpX,inpY,interpBuffer,Xq,Yq,'spline',minVal(end));%,method,extrapval)
+
 
 if(twosided)
     intArr=interp2(inpX,inpY,interpBuffer,Xq,Yq,'spline',0);%,method,extrapval)
+elseif(minVal>maxVal)
+    intArr=interp2(inpX,inpY,interpBuffer,Xq,Yq,'spline',nanmean(maxVal));%,method,extrapval)
+elseif(maxVal>=minVal)
+    intArr=interp2(inpX,inpY,interpBuffer,Xq,Yq,'spline',nanmean(minVal));%,method,extrapval)
 end
 
 intArrAlpha=interp2(inpX,inpY,alphaBuffer,Xq,Yq,'cubic',0);%,method,extrapval)
@@ -222,7 +232,7 @@ optPos2Plot=round([inpX(1,optXidx);inpX(1,optYidx)]);
 
 
 intArr2plot=intArr(y2keep(1):y2keep(2),(x2keep(1)):x2keep(2));
-intArr2plotNeg=intArr(y2keep(1):y2keep(2),(x2keep(1)):x2keep(2));
+%intArr2plotNeg=intArr(y2keep(1):y2keep(2),(x2keep(1)):x2keep(2));
 intArrAlpha=intArrAlpha(y2keep(1):y2keep(2),(x2keep(1)):x2keep(2));
 intArrAlpha(intArrAlpha==0)=0;
 
@@ -241,11 +251,12 @@ curAxPosition=ax1.Position;
 if(~twosided)
     
     if(maxVal>minVal)
-        colormap(gca,hot);
+        hot382=hot(512);
+        colormap(ax1,hot382(92:end-64,:));
         negColorbar=false;
     else
         cool256=hot(512);
-        colormap(gca,cool256(end:-1:92,[3,2,1]));
+        colormap(gca,cool256(end-64:-1:92,[3,2,1]));
         temp=minVal;
         minVal=maxVal;
         maxVal=temp;
@@ -255,6 +266,8 @@ if(~twosided)
     imgFinal=imagesc(intArr2plot,[minVal,maxVal]);
     set(gca,'xtick',[]);
     set(gca,'ytick',[]);
+    xlim([1,size(intArrAlpha,2)]);
+    ylim([1,size(intArrAlpha,1)]);
     chPos=colorbar();
     
     
@@ -266,44 +279,55 @@ if(~twosided)
         %set( chPos, 'YDir', 'reverse' );
     end
 else
-
-    ax1 = gca;
+    curAxPosition=ax1.OuterPosition;
     imgFinalPos=imagesc(intArr2plot,[minVal(2),maxVal(1)]);
     imgFinalPos.AlphaData=intArrAlpha;
     imgFinalPos.AlphaDataMapping='none';
     set(gca,'xtick',[]);
     set(gca,'ytick',[]);
+    xlim([1,size(intArrAlpha,2)]);
+    ylim([1,size(intArrAlpha,1)]);
     
     hot382=hot(512);
-    colormap(ax1,hot382(92:end,:));
+    colormap(ax1,hot382(92:end-64,:));
     axis off
     
+    
+
+    
     ax2=axes('OuterPosition',curAxPosition);
+    ax2.Position=ax1.Position;
 
     %yyaxis left
-    imgFinalNeg=imagesc(intArr2plotNeg,[maxVal(2),minVal(1)]);
+    imgFinalNeg=imagesc(intArr2plot,[maxVal(2),minVal(1)]);
+    set(gca,'YDir','normal');
     imgFinalNeg.AlphaData=intArrAlphaNeg;
     imgFinalNeg.AlphaDataMapping='none';
     set(gca,'xtick',[]);
     set(gca,'ytick',[]);
     
+    xlim([1,size(intArrAlpha,2)]);
+    ylim([1,size(intArrAlpha,1)]);
+    
     %set( chNeg, 'YDir', 'reverse' );
     cool256=hot(512);
-    colormap(ax2,cool256(end:-1:92,[3,2,1]));
+    colormap(ax2,cool256(end-64:-1:92,[3,2,1]));
     %caxis([-1*minVal(1),-1*maxVal(2)])
   
     axis off
+    
+    curAxInnerPosition=ax1.Position;
     
     linkaxes([ax1,ax2]);
     %set([ax1,ax2],'Position',[.05 .11 .885 .815]);
     chPos=colorbar(ax1);
     %chPos_position=chPos.OuterPosition;
-    cbHeight=curAxPosition(4)/2;
+    cbHeight=curAxInnerPosition(4)/2;
     
-    set(chPos,'Position',[curAxPosition(1)+curAxPosition(3),curAxPosition(2)+cbHeight,0.02,cbHeight]);
+    set(chPos,'Position',[curAxInnerPosition(1)+curAxInnerPosition(3),curAxInnerPosition(2)+cbHeight,0.02,cbHeight]);
     
     
-    chNeg=colorbar(ax2,'Position',[curAxPosition(1)+curAxPosition(3),curAxPosition(2)-cbHeight/20,0.02,cbHeight]);
+    chNeg=colorbar(ax2,'Position',[curAxInnerPosition(1)+curAxInnerPosition(3),curAxInnerPosition(2)-cbHeight/20,0.02,cbHeight]);
     
     
     
