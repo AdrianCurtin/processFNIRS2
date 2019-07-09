@@ -1462,7 +1462,11 @@ for i=1:length(ExFNIRS.groupByVars)
 end
 
 statusTextStr(end-2:end)=[];
-ExFNIRS.statusGroupByStr(end-2:end)=[];
+if(length(ExFNIRS.statusGroupByStr)>2)
+    ExFNIRS.statusGroupByStr(end-2:end)=[];
+else
+    ExFNIRS.statusGroupByStr='One Group';
+end
 
 
 if(isempty(ExFNIRS.groupByVars))

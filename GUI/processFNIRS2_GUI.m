@@ -291,8 +291,11 @@ if(isstruct(data)) %treat as fNIR struct
         end
     end
     
-    if(pf2_base.isnestedfield(data,'ROI.info'))
+    if(isfield(data,'ROI')&&isstruct(data.ROI)&&pf2_base.isnestedfield(data,'ROI.info'))
         PF2.data.ROI=data.ROI;
+    elseif(isfield(data,'ROI')&&iscell(data.ROI))
+        PF2.data.ROI=[];
+        PF2.data.ROI.info=data.ROI;
     end
 end
 
@@ -1047,10 +1050,11 @@ end
 
 
 if(pf2_base.isnestedfield(outData,'ROI.info')&&~isempty(outData.ROI.info)&&~isfield(outData.ROI,'HbO'))
-    fprintf(2,'No ROI information was built\nDefaulting to nanmean of valid channels');
+    fprintf(2,'No ROI build step was specified\nDefaulting to nanmean of valid channels\n');
     outData=pf2_build_nanmean_ROI(outData);
     if(~isempty(outData.ROI))
         validChannels_roi=true(1,size(outData.ROI.('HbO'),2));
+        curftimeMask_roi=true(size(outData.ROI.('HbO')));
     else
         clear outData.ROI; 
     end
