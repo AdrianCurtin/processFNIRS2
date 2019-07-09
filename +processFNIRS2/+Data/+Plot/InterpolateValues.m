@@ -28,7 +28,7 @@ end
 cla
 
 
-if(length(minVal)==2&&sum(minVal>0)==1&&isempty(maxVal))
+if(length(minVal)==2&&sum(minVal>0)==1&&isempty(maxVal))  %% expects two minimum values
     twosided=true; 
     minVal=sort(minVal);
     maxVal(1)=nanmax(data2plot(:));
@@ -49,16 +49,31 @@ else
     twosided=false;
 end
 
+if(isempty(fNIR))
+    global setF
+end
 
-if(pf2_base.isnestedfield(fNIR,'info.probename')&&isfield(fNIR.info,'probename')&&~contains(fNIR.info.probename,'Unknown')) 
+probeInfo=[];
+
+if(isempty(fNIR)&&isfield(setF,'device'))
+    
+    cfgFilePath=setF.device.cfg.File;
+    if(~isfield(setF.device.Probe{1},'OptLayout2D'))
+        probeInfo=pf2_base.loadDeviceCfg(cfgFilePath,true);
+        setF.device=probeInfo;
+    else
+       probeInfo=setF.device; 
+    end
+elseif(pf2_base.isnestedfield(fNIR,'info.probename')&&isfield(fNIR.info,'probename')&&~contains(fNIR.info.probename,'Unknown')) 
     %try to load the probename cfg file
     cfgFilePath=sprintf('%s.cfg',fNIR.info.probename);
 else
     cfgFilePath='';
 end
 
+if(~isempty(probeInfo))
 
-if(isempty(cfgFilePath)||~contains(cfgFilePath,'.cfg'))
+elseif(isempty(cfgFilePath)||~contains(cfgFilePath,'.cfg'))
     
     warning('Missing or invalid configuration file path\n')
     
@@ -153,16 +168,16 @@ for optIdx=1:length(data2plot)
     optXidx(optIdx)=round(OptPosX(optNum)/OptDistX+bufferMult+1);
     optYidx(optIdx)=round(OptPosY(optNum)/OptDistY+bufferMult+1);
     
-    if(~twosided&&~isnan(data2plot(optIdx))&&((data2plot(optIdx)>minVal)&&maxVal>minVal||...
-            data2plot(optIdx)<minVal)&&minVal>maxVal)
+    if(~twosided&&~isnan(data2plot(optIdx))&&((data2plot(optIdx)>=minVal&&maxVal>minVal)||...
+            (data2plot(optIdx)<=(maxVal*-1)&&minVal>maxVal)))
         interpBuffer(optYidx(optIdx),optXidx(optIdx))=data2plot(optIdx);
         alphaBuffer(optYidx(optIdx),optXidx(optIdx))=1;
         alphaBufferNeg(optYidx(optIdx),optXidx(optIdx))=-1;
-    elseif(twosided&&~isnan(data2plot(optIdx))&&data2plot(optIdx)<minVal(1))
+    elseif(twosided&&~isnan(data2plot(optIdx))&&data2plot(optIdx)<=minVal(1))
         interpBuffer(optYidx(optIdx),optXidx(optIdx))=data2plot(optIdx);
         alphaBufferNeg(optYidx(optIdx),optXidx(optIdx))=1;
         alphaBuffer(optYidx(optIdx),optXidx(optIdx))=-1;
-    elseif(twosided&&~isnan(data2plot(optIdx))&&data2plot(optIdx)>minVal(2))
+    elseif(twosided&&~isnan(data2plot(optIdx))&&data2plot(optIdx)>=minVal(2))
         interpBuffer(optYidx(optIdx),optXidx(optIdx))=data2plot(optIdx);
         alphaBuffer(optYidx(optIdx),optXidx(optIdx))=1;
     else
@@ -226,11 +241,11 @@ curAxPosition=ax1.Position;
 if(~twosided)
     
     if(maxVal>minVal)
-        colormap(hot);
+        colormap(gca,hot);
         negColorbar=false;
     else
         cool256=hot(512);
-        colormap(cool256(end:-1:92,[3,2,1]));
+        colormap(gca,cool256(end:-1:92,[3,2,1]));
         temp=minVal;
         minVal=maxVal;
         maxVal=temp;
@@ -241,6 +256,7 @@ if(~twosided)
     set(gca,'xtick',[]);
     set(gca,'ytick',[]);
     chPos=colorbar();
+    
     
     imgFinal.AlphaData=intArrAlpha;
     imgFinal.AlphaDataMapping='none';

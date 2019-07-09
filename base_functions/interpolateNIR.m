@@ -78,6 +78,12 @@ if(isempty(fNIRarr))
    fNIRarr=nan(2,8); 
 end
 
+if(length(fNIRarr)==16)
+   temp=fNIRarr(1:2:15);
+   temp2=fNIRarr(2:2:16);
+   fNIRarr=[temp;temp2];
+end
+
 if(~isempty(channelMask))
     channelMask(isnan(fNIRarr))=false;
 else
@@ -369,7 +375,7 @@ nCol=size(cmp,1);
 if(debugPlot)
     figure(10);
     
-    colormap(cmp);
+    colormap(gca,cmp);
     caxis([minVal,maxVal]);
     subplot(3,1,1);
 
@@ -594,7 +600,7 @@ rsRGBarr=imresize(rgbArr,[brainRectY(2)+1-brainRectY(1),brainRectX(2)+1-brainRec
 
 %figure(11);
 hold off;
-colormap(cmp);
+colormap(gca,cmp);
 
 if(~emptyplot)
     caxis([minVal,maxVal]);
@@ -640,7 +646,7 @@ h=gca;
 
 if(~emptyplot)
     c=colorbar();
-    colormap(cmp);
+    colormap(gca,cmp);
 
 
     if(invertAxis)
