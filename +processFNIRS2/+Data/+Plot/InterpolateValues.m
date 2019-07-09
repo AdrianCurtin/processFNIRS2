@@ -116,14 +116,16 @@ imgSize=1000;
 OptPosX=probeInfo.OptPosX(~probeInfo.IsShortSeparation);
 OptPosY=probeInfo.OptPosY(~probeInfo.IsShortSeparation);
 
+OptPosY=-OptPosY;
+
 maxPosX=nanmax(OptPosX);
 maxPosY=nanmax(OptPosY);
 minPosX=nanmin(OptPosX);
 minPosY=nanmin(OptPosY);
-optDiffX=abs(OptPosX(1)-OptPosX(2:end));
-optDiffY=abs(OptPosY(1)-OptPosY(2:end));
-OptDistX=nanmin(optDiffX(optDiffX>0));
-OptDistY=nanmin(optDiffY(optDiffY>0));
+OptDiffX=abs(OptPosX(1)-OptPosX(2:end));
+OptDiffY=abs(OptPosY(1)-OptPosY(2:end));
+OptDistX=nanmin(OptDiffX(OptDiffX>0));
+OptDistY=nanmin(OptDiffY(OptDiffY>0));
 
 OptDistX=round(OptDistX,5);
 OptDistY=round(OptDistY,5);
@@ -140,8 +142,8 @@ pixelPerCm=imgSize/max([dimX+bufferSize*2,dimY+bufferSize*2]);
 
 optDataSize=10;
 
-optPosX=probeInfo.OptPosX-minPosX;
-optPosY=probeInfo.OptPosY-minPosY;
+OptPosX=OptPosX-minPosX;
+OptPosY=OptPosY-minPosY;
 
 
 buffer=bufferSize*pixelPerCm/2;
@@ -170,8 +172,8 @@ numRows=size(inpY,1);
 
 for optIdx=1:length(data2plot)
     optNum=probeInfo.ChannelList(optIdx);
-    optXidx(optIdx)=round(OptPosX(optNum)/OptDistX+bufferMult+1);
-    optYidx(optIdx)=round(OptPosY(optNum)/OptDistY+bufferMult+1);
+    optXidx(optIdx)=round(OptPosX(optNum)/OptDistX)+bufferMult+1;
+    optYidx(optIdx)=round(OptPosY(optNum)/OptDistY)+bufferMult+1;
     
     if(~twosided&&~isnan(data2plot(optIdx))&&((data2plot(optIdx)>=minVal&&maxVal>minVal)||...
             (data2plot(optIdx)<=(minVal)&&minVal>maxVal)))
@@ -281,6 +283,7 @@ if(~twosided)
 else
     curAxPosition=ax1.OuterPosition;
     imgFinalPos=imagesc(intArr2plot,[minVal(2),maxVal(1)]);
+    set(gca,'YDir','normal');
     imgFinalPos.AlphaData=intArrAlpha;
     imgFinalPos.AlphaDataMapping='none';
     set(gca,'xtick',[]);
