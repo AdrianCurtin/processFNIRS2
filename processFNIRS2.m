@@ -536,6 +536,14 @@ else
     curftimeMask=ones(size(data.HbO));
 end
 
+
+if(pf2_base.isnestedfield(data,'ROI.info')&&~isempty(data.ROI.info)&&isfield(data.ROI,'HbO')&&~isempty(data.ROI.HbO))
+    if(~isempty(data.ROI)&&isfield(data.ROI,'HbO'))
+        validChannels_roi=true(1,size(data.ROI.('HbO'),2));
+        curftimeMask_roi=true(size(data.ROI.('HbO')));
+    end
+end
+
 if(pf2_base.isnestedfield(data,'ROI.HbO')&&~isempty(data.ROI))
     validChannels_roi=true(1,size(data.ROI.('HbO'),2));
 end
