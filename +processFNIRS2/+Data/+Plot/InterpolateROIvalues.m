@@ -178,7 +178,7 @@ end
 
 
 
-intArr=interp2(inpX,inpY,interpBuffer,Xq,Yq,'spline',minVal);%,method,extrapval)
+intArr=interp2(inpX,inpY,interpBuffer,Xq,Yq,'makima',minVal);%,method,extrapval)
 intArrAlpha=interp2(inpX,inpY,alphaBuffer,Xq,Yq,'cubic',-1);%,method,extrapval)
 intArrLinear=interp2(inpX,inpY,alphaBuffer,Xq,Yq,'linear',-1);%,method,extrapval)
 

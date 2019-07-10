@@ -2324,7 +2324,7 @@ for i=1:size(sH,1)
 
                        end
                     end
-                    legend(sH{i,b}.subH{y,x},legendGFXstrs(:)');
+                    legend(sH{i,b}.subH{y,x},legendGFXstrs(:)','Location', 'Best');
                 end
 
                 if(ExFNIRS.settings.plot_task_lines)
@@ -3955,7 +3955,7 @@ for chIdx=1:numOpt
                    gAStrs{i,curChart}='';
                end
             end
-            legend(gAStrs(:,curChart));
+            legend(gAStrs(:,curChart),'Location', 'Best');
             legend boxoff;
         end
         hold off;
@@ -5282,7 +5282,7 @@ else
 end
 
 if(ExFNIRS.settings.plot_legend_mode==3||(ExFNIRS.settings.plot_legend_mode==2))
-    legend(gAStrs(:));
+    legend(gAStrs(:),'Location', 'Best');
     legend boxoff;
 end
 
@@ -6612,7 +6612,7 @@ for i=1:size(sH,1)
                        lgStrs=[lgStrs;pointStrs(k)];
                     end
 
-                    legend(sH{i,b}.subH{y,x},pointStrs(:));
+                    legend(sH{i,b}.subH{y,x},pointStrs(:),'Location', 'Best');
                 end
 
                 hold(sH{i,b}.subH{y,x},'off')

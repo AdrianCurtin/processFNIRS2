@@ -372,7 +372,7 @@ else
     invertAxis=false;
 end
 
-minE=minVal-abs(maxVal-minVal)*0.5;
+minE=min([minVal-abs(maxVal-minVal),nanmin(fNIRarr)]);
 
 if(logScale)
     minE=minVal/2;
@@ -450,36 +450,41 @@ rWidth=100+1;
 if(~strcmp(interpolationType,'broadened')) 
     [intArrX,intArrY]= meshgrid(1:(size(fNIRarr,2))*rWidth,1:size(fNIRarr,1)*rWidth);
 
-    midArrY=(1:xLen)*(rWidth)-(rWidth-1)/2+1;
-    midArrX=(1:yLen)*(rWidth)-(rWidth-1)/2+1;
+    midArrYorig=(1:xLen)*(rWidth)-(rWidth-1)/2+1;
+    midArrX_orig=(1:yLen)*(rWidth)-(rWidth-1)/2+1;
 else
     [intArrX,intArrY]= meshgrid(1:((size(fNIRarr,2)-2)*rWidth+2),1:((size(fNIRarr,1)-2)*rWidth+2));
 
-    midArrY=(1:(xLen-2))*(rWidth)-(rWidth-1)/2+1;
-    midArrY=[1,midArrY,max(midArrY)+round(rWidth/2)];
-    midArrX=(1:(yLen-2))*(rWidth)-(rWidth-1)/2+1;
-    midArrX=[1,midArrX,max(midArrX)+round(rWidth/2)];
+    midArrYorig=(1:(xLen-2))*(rWidth)-(rWidth-1)/2+1;
+    midArrYorig=[1,midArrYorig,max(midArrYorig)+round(rWidth/2)];
+    midArrX_orig=(1:(yLen-2))*(rWidth)-(rWidth-1)/2+1;
+    midArrX_orig=[1,midArrX_orig,max(midArrX_orig)+round(rWidth/2)-1];
 end
 
 %%%Curve handling
-flexArrX=midArrX;%(2:end-1);
-midpoint=(length(flexArrX)+1)/2;
-if(rem(midpoint,1)~=0)
-    midpoint=mean([flexArrX(floor(midpoint)),flexArrX(ceil(midpoint))]);
+flexArrX=midArrX_orig;%(2:end-1);
+flexArrY=midArrYorig;%(2:end-1);
+midpointX=(length(flexArrX)+1)/2;
+
+if(rem(midpointX,1)~=0)
+    midpointX=mean([flexArrX(floor(midpointX)),flexArrX(ceil(midpointX))]);
 else
-    midpoint=flexArrX(midpoint);
+    midpointX=flexArrX(midpointX);
 end
 
+
 constAngle=0.19;
-flexArrX=(flexArrX-midpoint)/rWidth;
+rangeFlex=(max(midArrX_orig)-min(midArrX_orig));
+flexArrX=(flexArrX-midpointX)/rWidth;
 flexArrX=flexArrX.*cos(constAngle*flexArrX);
-flexArrX=flexArrX*rWidth+midpoint;
+flexArrX=flexArrX-min(flexArrX);
+flexArrX=flexArrX/max(flexArrX)*rangeFlex+1;
 
 
-intArr=interp2(midArrX,midArrY,fNIRarr,intArrX,intArrY,'spline',minE);%,method,extrapval)
+intArr=interp2(midArrX_orig,midArrYorig,fNIRarr,intArrX,intArrY,'makima',minE);%,method,extrapval)
 
-intAlphaArrLinear=interp2(midArrX,midArrY,alphaArr,intArrX,intArrY,'linear',0);%,method,extrapval)
-intAlphaArr=interp2(midArrX,midArrY,alphaArr,intArrX,intArrY,'spline',0);%,method,extrapval)
+intAlphaArrLinear=interp2(midArrX_orig,midArrYorig,alphaArr,intArrX,intArrY,'linear',0);%,method,extrapval)
+intAlphaArr=interp2(midArrX_orig,midArrYorig,alphaArr,intArrX,intArrY,'spline',0);%,method,extrapval)
 % 
 % intArr(intAlphaArrLinear<0.1)=minE;
 % 
@@ -492,7 +497,9 @@ if(debugPlot)
 end
 
 midArrX=flexArrX;
+midArrY=flexArrY;
 rW2=ceil(size(intArr,2)-max(flexArrX));
+
  
 
 if(strcmp(interpolationType,"Interpolated")) %%Should remove everything not inbetween optodes 
@@ -504,13 +511,13 @@ if(strcmp(interpolationType,"Interpolated")) %%Should remove everything not inbe
    midArrX=midArrX-min(midArrX)+1;
    midArrY=midArrY-min(midArrY)+1;
 else
-   intArr(:,[1:rW2,(size(intArr,2)-rW2):size(intArr,2)])=[]; 
-   intAlphaArr(:,[1:rW2,(size(intAlphaArr,2)-rW2):size(intAlphaArr,2)])=[]; 
-   midArrX=midArrX-min(midArrX)+1;
+%    intArr(:,[(size(intArr,2)-rW2):size(intArr,2)])=[]; 
+%    intAlphaArr(:,[(size(intAlphaArr,2)-rW2):size(intAlphaArr,2)])=[]; 
+%    midArrX=midArrX-min(midArrX)+1;
 end
 
 
-nullCol=ind2rgb(0,cmp);
+nullColInd=ind2rgb(0,cmp);
 
 scaleArr=intArr;
 %First crop by max/min
@@ -563,12 +570,17 @@ end
 bYlen=size(brainImg,1);
 bXlen=size(brainImg,2);
 
+bWidth=852;
+bHeight=733;
+
 if(~strcmp(interpolationType,'broadened'))     %259 from top to first row-mid, 144 from left to first row mid %233 from right to last, %408 from bottom
-    brainRectX=[144/852*bXlen,(852-233)/852*bXlen];
-    brainRectY=[259/733*bYlen,(733-408)/733*bYlen];
+    brainRectX=[144/bWidth*bXlen,(bWidth-233)/bWidth*bXlen];
+    brainRectY=[259/bHeight*bYlen,(bHeight-408)/bHeight*bYlen];
 else %Add 50 to top/bottom/
-    brainRectX=[144/852*bXlen-20/852*bXlen,(852-233)/852*bXlen+20/852*bXlen];
-    brainRectY=[259/733*bYlen-32/733*bYlen,(733-408)/733*bYlen+32/733*bYlen];
+    chOffsetX=5;
+    chOffsetY=50;
+    brainRectX=[134/bWidth*bXlen-chOffsetX/bWidth*bXlen,(bWidth-218)/bWidth*bXlen+chOffsetX/bWidth*bXlen];
+    brainRectY=[242/bHeight*bYlen-32/bHeight*bYlen,(bHeight-412)/bHeight*bYlen+32/bHeight*bYlen];
 end
 
 brainRectY=round(brainRectY);
@@ -581,15 +593,6 @@ for(i=1:length(midArrX))
     end
 end
     
-
-
-rsRGBarr=imresize(rgbArr,[brainRectY(2)+1-brainRectY(1),brainRectX(2)+1-brainRectX(1)]);
-
-
-
-temp=rgb2ind(rsRGBarr,nCol);
-rsRGBarr=ind2rgb(temp,cmp);
-
 rsCh=imresize(chArr,[brainRectY(2)+1-brainRectY(1),brainRectX(2)+1-brainRectX(1)])>0;
 xChLoc=find(sum(rsCh,1)>0);
  xChLoc(diff(xChLoc)<3)=[];
@@ -609,24 +612,68 @@ if(strcmp(interpolationType,'broadened'))
 end
 
 
-nullArr=(rsRGBarr(:,:,1)==nullCol(:,:,1)&rsRGBarr(:,:,2)==nullCol(:,:,2)&rsRGBarr(:,:,3)==nullCol(:,:,3));
-for i=1:3
-     b=rsRGBarr(:,:,i);
-     b(nullArr)=0;
-     rsRGBarr(:,:,i)=rsRGBarr(:,:,i).*b;
-end
- 
-nullCol=ind2rgb(0,cmp)*0;
-
-% Masking happens here based on null colors
-maskRect=zeros(bYlen,bXlen);
-maskRect(brainRectY(1):brainRectY(2),brainRectX(1):brainRectX(2))=(rsRGBarr(:,:,1)~=nullCol(:,:,1)|rsRGBarr(:,:,2)~=nullCol(:,:,2)|rsRGBarr(:,:,3)~=nullCol(:,:,3));
-maskRect=maskRect==1;
-
 xChLoc=xChLoc+brainRectX(1);%+brainRectX(2)-rCrop;
 yChLoc=yChLoc+brainRectY(1)-yCrop;
 
-rsRGBarr=imresize(rgbArr,[brainRectY(2)+1-brainRectY(1),brainRectX(2)+1-brainRectX(1)]);
+xChLocParts=[brainRectX(1),xChLoc,brainRectX(2)+1]-brainRectX(1);
+numXlocs=length(xChLoc);
+midArrX_orig(end)=size(rgbArr,2);
+midArrX_orig=round(midArrX_orig);
+for i=1:length(xChLoc)+1  % break apart into parts, resize each part separately to account for changing channel spacing (x direction)
+    rsRGBarr(:,xChLocParts(i)+1:xChLocParts(i+1),:)=imresize(rgbArr(:,midArrX_orig(i):midArrX_orig(i+1),:),[brainRectY(2)+1-brainRectY(1),(xChLocParts(i+1)-xChLocParts(i))]);
+end
+
+
+%yX deformation happens here (ydirection channel spacing changes with x)
+
+%%%Curve handling
+flexArrY=zeros(size(xChLocParts));%(2:end-1);
+rangeFlexX=round(max(xChLocParts)-min(xChLocParts));
+midpointX=(length(xChLocParts)+1)/2;
+
+if(rem(midpointX,1)~=0)
+    midpointX=mean(xChLocParts);
+else
+    midpointX=xChLocParts(midpointX);
+end
+
+nDeformBuffer=150;
+nDeformAngle=0.4;
+
+constAngle=pi/(rangeFlexX/2)*nDeformAngle;
+flexArrX=(xChLocParts-midpointX);
+flexArrY=-1*cos(constAngle*(flexArrX));
+yChLocShift=(flexArrY-min(flexArrY))/(max(flexArrY)-min(flexArrY))*nDeformBuffer/2;
+flexArrImgY=-1*cos(constAngle*([1:rangeFlexX]-midpointX));
+flexArrImgY=(flexArrImgY-min(flexArrImgY))/(max(flexArrY)-min(flexArrY))*nDeformBuffer/2;
+
+%get nullColor
+nullColInd=ind2rgb(0,cmp);
+nullCol=rgb2ind(nullColInd,cmp);
+
+warpedRSrgb=nan(size(rsRGBarr,1)+nDeformBuffer,size(rsRGBarr,2),3);
+warpedRSrgb(:,:,1)=nullColInd(1);
+warpedRSrgb(:,:,2)=nullColInd(2);
+warpedRSrgb(:,:,3)=nullColInd(3);
+
+for i=1:size(rsRGBarr,2)
+    offset=floor(flexArrImgY(i));
+    warpedRSrgb(offset+1:(offset+size(rsRGBarr,1)),i,:)=rsRGBarr(:,i,:);
+end
+
+temp=rgb2ind(warpedRSrgb,nCol);
+
+maskArr=temp>0;
+
+ 
+brainRectY(2)=brainRectY(2)+nDeformBuffer;
+
+% Masking happens here based on null colors
+maskRect=zeros(bYlen,bXlen);
+maskRect(brainRectY(1):brainRectY(2),brainRectX(1):brainRectX(2))=maskArr;
+maskRect=maskRect==1;
+
+
 
 %figure(11);
 hold off;
@@ -637,7 +684,7 @@ if(~emptyplot)
 end
 
 blank=double(brainImg*0);
-blank(brainRectY(1):brainRectY(2),brainRectX(1):brainRectX(2),:)=blank(brainRectY(1):brainRectY(2),brainRectX(1):brainRectX(2),:)+rsRGBarr(:,:,:);
+blank(brainRectY(1):brainRectY(2),brainRectX(1):brainRectX(2),:)=blank(brainRectY(1):brainRectY(2),brainRectX(1):brainRectX(2),:)+warpedRSrgb(:,:,:);
 
 
 
@@ -750,19 +797,25 @@ for(i=1:length(xChLoc))
         hold on;
         chNum=(length(xChLoc)-i+1)*2-rem((length(yChLoc)-j),2);
         cLen=length(sprintf('%i',chNum));
+        
+        curYloc=yChLoc(j)+yChLocShift(i+1);
         if(showChannelLabels)
             if(~brainStyle)
-                plot(xChLoc(i), yChLoc(j), '.k', 'MarkerSize',42);
-                chT=text(xChLoc(i)-cLen*8,yChLoc(j)-cLen*4,sprintf('%i',chNum),'FontWeight','Bold');
+                plot(xChLoc(i), curYloc, '.k', 'MarkerSize',42);
+                chT=text(xChLoc(i),curYloc,sprintf('%i',chNum),'FontWeight','Bold',...
+                    'HorizontalAlignment', 'center','VerticalAlignment', 'middle');
+                plot(xChLoc(i), curYloc, 'ok', 'MarkerSize',11);
                 chT.Color=[1,1,1];
             else
                 %plot(xChLoc(i), yChLoc(j), '.k', 'MarkerSize',42);
-                chT=text(xChLoc(i)-cLen*6,yChLoc(j)-cLen*4,sprintf('%i',chNum),'FontWeight','Bold');
+                chT=text(xChLoc(i),curYloc,sprintf('%i',chNum),'FontWeight','Bold',...
+                    'HorizontalAlignment', 'center','VerticalAlignment', 'middle');
                 chT.Color=[0,0,0];
+                plot(xChLoc(i), curYloc, 'ok', 'MarkerSize',11);
             end
         else
-            plot(xChLoc(i), yChLoc(j), 'ok', 'MarkerSize',10);
-            plot(xChLoc(i), yChLoc(j), 'xk', 'MarkerSize',10);
+            plot(xChLoc(i), curYloc, 'ok', 'MarkerSize',10);
+            plot(xChLoc(i), curYloc, 'xk', 'MarkerSize',10);
         end
         hold off;
     end
