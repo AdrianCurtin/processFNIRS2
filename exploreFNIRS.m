@@ -5748,7 +5748,7 @@ elseif(~plotGroupByBioM)
 		else
 			xType='time';
 			yType='bioM';
-			figType='';
+			figType='channels';
             numSubX=numChartTimes;
             numSubY=numBioM;
 		end
@@ -5773,7 +5773,7 @@ elseif(~plotGroupByBioM)
             numSubY=numBioM;
 		else
 			xType='bioM';
-			yType='';
+			yType='channels';
 			figType='';
             numSubX=numBioM;
             numSubY=1;
@@ -5795,7 +5795,7 @@ else %plot with biomarkers embedded
             numSubY=numOpt;
 		else
 			xType='time';
-			yType='';
+			yType='channels';
 			figType='';
             numSubX=numChartTimes;
             numSubY=1;
@@ -5814,7 +5814,7 @@ else %plot with biomarkers embedded
             numSubX=numOpt;
             numSubY=1;
 		else
-			xType='';
+			xType='channels';
 			yType='';
 			figType='';
             numSubX=1;
