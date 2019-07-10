@@ -663,7 +663,13 @@ end
 
 temp=rgb2ind(warpedRSrgb,nCol);
 
-maskArr=temp>0;
+maskArr=temp>mode(temp(:));
+
+if(nnz(~maskArr)==0)
+    maskArr=(warpedRSrgb(:,:,1)==nullCol(1)&...
+        warpedRSrgb(:,:,2)==nullCol(2)&...
+        warpedRSrgb(:,:,3)==nullCol(3));
+end
 
  
 brainRectY(2)=brainRectY(2)+nDeformBuffer;

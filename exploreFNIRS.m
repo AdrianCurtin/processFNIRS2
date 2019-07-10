@@ -6624,9 +6624,9 @@ for i=1:size(sH,1)
             case 'bioM'
                 pf2_base.external.suptitle(sH{i,b}.h,selectedBioM{i});
             case 'channels'
-                pf2_base.external.suptitle(sH{i,b}.h,selectedOpt{i});
+                pf2_base.external.suptitle(sH{i,b}.h,sprintf('Optode %i',selOpt(i)));
             case 'bio,channels'
-                pf2_base.external.suptitle(sH{i,b}.h,sprintf('Optode %i [%s]',selectedOpt(i),selectedBioM{b}));
+                pf2_base.external.suptitle(sH{i,b}.h,sprintf('Optode %i [%s]',selOpt(i),selectedBioM{b}));
             case 'groupby,bio'
                 pf2_base.external.suptitle(sH{i,b}.h,sprintf('%s [%s]',uCurInfoG{i},selectedBioM{b}));
             otherwise
