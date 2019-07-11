@@ -4066,9 +4066,10 @@ for sH=1:length(subplotHandles)
             
             
             
-            curChartLME{sH}=fitlme(mergedTables{sH},lmeString);
+            curChartLME{sH}=fitlme(mergedTables{sH},lmeString,'CheckHessian',true);
           %   curChartLME_emm{sH}= pf2_base.external.emmeans(curChartLME{sH}, {'orig'}, 'effects');
 %             h = emmip(curChartLME_emm{sH},'orig');
+
             
             switch (ExFNIRS.settings.ChannelMode)
                 case 'fNIR'
@@ -4300,7 +4301,7 @@ if(showTopo)
                             curDf2=fNIR_df2{b,a};
                             
                             [curQ,curK]=performFDR(curP,ExFNIRS.settings.topoSigThrehold{2});
-                            [curQ_rev,curK_rev]=performFDR_reverse(curP,ExFNIRS.settings.topoSigThrehold{2});
+                            [curQ_rev,curK_rev]=performFDR_twostep(curP,ExFNIRS.settings.topoSigThrehold{2});
                             
                             estimateFPval=finv(ones(size(curF(:)))*(1-ExFNIRS.settings.topoSigThrehold{2}), curDf1(:), curDf2(:));
                             estimateFPval_q=finv(ones(size(curF(:)))*(1-ExFNIRS.settings.topoSigThrehold{2}/curK), curDf1(:), curDf2(:));
@@ -4311,7 +4312,7 @@ if(showTopo)
 
                                 case 'q'
                                     estimateFPval=estimateFPval_q;
-                                case 'qReverse'
+                                case 'q-twostep'
                                     estimateFPval=estimateFPval_qrev;
                             end
                             
@@ -4473,46 +4474,33 @@ if(any(passed(:)))
 end
 
 
-function [qvalues,k,passed]=performFDR_strict(pvalues,pThreshold)
+function [qvalues,k,passed]=performFDR_twostep(pvalues,pThreshold)
 % Performs FDR correction per #CITATION HERE
 if(nargin<2)
     pThreshold=0.05;
 end
 
-qvalues=nan(size(pvalues));
+q_prime=pThreshold/(1+pThreshold);
+[qvalues,k,passed]=performFDR(pvalues,q_prime);
 
-kVals=nan(size(pvalues(:)));
-
-[pSorted,pIdx]=sort(pvalues(:));       
-numP=length(pSorted);
-
-for i=1:numP
-    k=numP-i+1;
-    qThreshold=pThreshold/k;
-    qvalues(pIdx(i))=pvalues(pIdx(i))*k;
+if(sum(passed(:))>0&&sum(~passed(:))>0)  %if some things passed (but not all)
+    q_star=q_prime*sum(~isnan(pvalues)/sum(passed(~isnan(pvalues))));
+    
+    [qvalues,k,passed]=performFDR(pvalues,q_star);
     
     
-    kVals(pIdx(i))=k;
-    if(any(qvalues(pIdx(i))>pThreshold))
-        break;
-    end
 end
 
-qvalues=pvalues*k;
-qvalues(qvalues>1)=1;
-passed=qvalues<=pThreshold;
 
-if(any(passed(:)))
-   k=min(kVals(passed(:)));
-   qvalues=pvalues*k;
-end
-    
         
 function [qvalues,k,passed]=performFDR_reverse(pvalues,pThreshold)
 % Performs FDR correction per #CITATION HERE
 if(nargin<2)
     pThreshold=0.05;
 end
+
+
+
 
 qvalues=nan(size(pvalues));
 
@@ -6270,7 +6258,7 @@ for chIdx=1:numOpt
                              curDf=curData.N-2;
                              
                             [curQ,curK]=performFDR(curP,ExFNIRS.settings.topoSigThrehold{2});
-                            [curQ_rev,curK_rev]=performFDR_reverse(curP,ExFNIRS.settings.topoSigThrehold{2});
+                            [curQ_rev,curK_rev]=performFDR_twostep(curP,ExFNIRS.settings.topoSigThrehold{2});
                             
                             curT=(curR./sqrt((1-curR.^2)/(N-2)));
 
@@ -6288,7 +6276,7 @@ for chIdx=1:numOpt
                                 case 'q'
                                     estimate_rPval=estimate_rPval_q;
                                     curpthresh=ExFNIRS.settings.topoSigThrehold{2}/curK;
-                                case 'qReverse'
+                                case 'q-twostep'
                                     estimate_rPval=estimate_rPval_qrev;
                                     curpthresh=ExFNIRS.settings.topoSigThrehold{2}/curK_rev;
                             end
@@ -7494,7 +7482,9 @@ switch(get(handles.popupmenu_topoSig,'Value'))
    case 5
        ExFNIRS.settings.topoSigThrehold={'q',0.05};
    case 6
-       ExFNIRS.settings.topoSigThrehold={'qReverse',0.05};
+       ExFNIRS.settings.topoSigThrehold={'q-twostep',0.1};
+   case 7
+       ExFNIRS.settings.topoSigThrehold={'q-twostep',0.05};
 end
 
 
