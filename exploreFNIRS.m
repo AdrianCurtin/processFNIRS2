@@ -4428,7 +4428,52 @@ if(showTopo)
     end
 end
 
+
 function [qvalues,k,passed]=performFDR(pvalues,pThreshold)
+% Performs FDR correction per #CITATION HERE
+if(nargin<2)
+    pThreshold=0.05;
+end
+
+qvalues=nan(size(pvalues));
+
+kVals=nan(size(pvalues(:)));
+
+[pSorted,pIdx]=sort(pvalues(:));       
+numP=length(pSorted);
+
+kPass=zeros(1,numP);
+
+for i=1:numP
+    k=numP-i+1;
+    qThreshold=pThreshold/k;
+    qvalues(pIdx(i))=pvalues(pIdx(i))*k;
+    
+    if(pvalues(pIdx(i))*k<=pThreshold)
+        kPass(k)=1;
+    end
+    kVals(pIdx(i))=k;
+end
+
+k_ind=find(kPass==1);
+
+if(isempty(k_ind))
+    k=numP;
+else
+   k=max(k); 
+end
+
+qvalues=pvalues*k;
+qvalues(qvalues>1)=1;
+passed=qvalues<=pThreshold;
+
+if(any(passed(:)))
+   k=min(kVals(passed(:)));
+   qvalues=pvalues*k;
+end
+
+
+function [qvalues,k,passed]=performFDR_strict(pvalues,pThreshold)
 % Performs FDR correction per #CITATION HERE
 if(nargin<2)
     pThreshold=0.05;
@@ -4479,7 +4524,7 @@ numNan=sum(isnan(pvalues(:)));
 for i=numNan:numP-1
     k=i+1;
     qThreshold=pThreshold/k;
-    if(sum(pvalues(:)>qThreshold)>=(numP-i))
+    if(sum(pvalues(:)<=qThreshold)>=(numP-i))
         qvalues=pvalues*k;
         
        break; 
