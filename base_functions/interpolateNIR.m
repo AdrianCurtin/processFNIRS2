@@ -473,7 +473,7 @@ else
 end
 
 
-constAngle=0.19;
+constAngle=0.12;
 rangeFlex=(max(midArrX_orig)-min(midArrX_orig));
 flexArrX=(flexArrX-midpointX)/rWidth;
 flexArrX=flexArrX.*cos(constAngle*flexArrX);
@@ -573,14 +573,20 @@ bXlen=size(brainImg,2);
 bWidth=852;
 bHeight=733;
 
+bBrainHoffset=325;
+bBrainHeight=86;
+
+bBrainWOffset=112;
+bBrainWidth=556;
+
 if(~strcmp(interpolationType,'broadened'))     %259 from top to first row-mid, 144 from left to first row mid %233 from right to last, %408 from bottom
-    brainRectX=[144/bWidth*bXlen,(bWidth-233)/bWidth*bXlen];
-    brainRectY=[259/bHeight*bYlen,(bHeight-408)/bHeight*bYlen];
+    brainRectX=[bBrainWOffset/bWidth*bXlen,(bBrainWoffset+bBrainWidth)/bWidth*bXlen];
+    brainRectY=[bBrainHoffset/bHeight*bYlen,(bBrainHoffset+bBrainHeight)/bHeight*bYlen];
 else %Add 50 to top/bottom/
     chOffsetX=5;
     chOffsetY=50;
-    brainRectX=[134/bWidth*bXlen-chOffsetX/bWidth*bXlen,(bWidth-218)/bWidth*bXlen+chOffsetX/bWidth*bXlen];
-    brainRectY=[242/bHeight*bYlen-32/bHeight*bYlen,(bHeight-412)/bHeight*bYlen+32/bHeight*bYlen];
+    brainRectX=[bBrainWOffset/bWidth*bXlen-chOffsetX/bWidth*bXlen,(bBrainWOffset+bBrainWidth)/bWidth*bXlen+chOffsetX/bWidth*bXlen];
+    brainRectY=[bBrainHoffset/bHeight*bYlen-32/bHeight*bYlen,(bBrainHoffset+bBrainHeight)/bHeight*bYlen+32/bHeight*bYlen];
 end
 
 brainRectY=round(brainRectY);
@@ -637,7 +643,7 @@ else
     midpointX=xChLocParts(midpointX);
 end
 
-nDeformBuffer=150;
+nDeformBuffer=68;
 nDeformAngle=0.4;
 
 constAngle=pi/(rangeFlexX/2)*nDeformAngle;
