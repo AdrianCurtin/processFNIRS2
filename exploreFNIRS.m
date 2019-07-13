@@ -4162,7 +4162,11 @@ for sH=1:length(subplotHandles)
             disp(curChartLME{sH}.anova);
             [curMdlFit{1:4}]=coefTest(curChartLME{sH});
             fprintf('\nModel Fit: p=%.5f\tF=%.2f\tdf1=%i\tdf2=%i\n\n',curMdlFit{1},curMdlFit{2},curMdlFit{3},curMdlFit{4});
-            disp(autoContrast(curChartLME{sH}));
+            curChartContrast=autoContrast(curChartLME{sH});
+            if(~isempty(curChartContrast))
+                disp(curChartContrast);
+            end
+            %curChartLME{sH}.contrastTable=autoContrast(curChartLME{sH},0.5);
         catch ME
             fprintf(2,'Could not generate model for figure %i\n',sH);
             fprintf(2,'\nLME: %s\n',lmeString);
@@ -4510,7 +4514,7 @@ end
 sigAnv=find(anv.pValue<pThreshold);
 
 if(isempty(sigAnv))
-    stringToPrint='No Significant anova';
+    contrastTable=table();
     return;
 else
    sigAnvNames=anv.Term(sigAnv);
@@ -4522,6 +4526,7 @@ else
 end
 
 cRows=[];
+cAnvGrp=[];
 cName={};
 numCoef=length(coefNames);
 for s=1:length(sigAnvNames)
@@ -4534,11 +4539,22 @@ for s=1:length(sigAnvNames)
           cRow(basic_contrast_idx(c))=1;
           cRows(end+1,:)=cRow;
           cName{end+1}=sprintf('%s vs %s',coefNames{basic_contrast_idx(c)},'Intercept');
+          cAnvGrp(end+1)=c;
       elseif(hasIntercept) %compare vs 0
-
+          
+          
+          
           curCterms=coefTermIdx(basic_contrast_idx(c),:);
           curCterms=curCterms(curCterms>0);
-          basic_contrast_idx=[basic_contrast_idx,curCterms];
+          for c2=1:length(curCterms) % compare within similar groups
+              cRow=zeros(1,numCoef);
+              cRow(curCterms)=1;
+              cRow(curCterms(c2))=0;
+              cRow(basic_contrast_idx(c))=1;
+              cRows(end+1,:)=cRow;
+              cName{end+1}=sprintf('%s vs %s',coefNames{basic_contrast_idx(c)},coefNames{curCterms(c2)});
+                cAnvGrp(end+1)=c;
+          end
           
        
       else %compare vs 0
@@ -4549,7 +4565,7 @@ for s=1:length(sigAnvNames)
           cRows(end+1,:)=cRow;
         
           cName{end+1}=sprintf('%s vs 0',coefNames{basic_contrast_idx(c)});
-          
+          cAnvGrp(end+1)=c;
       end
       for c2=c+1:length(basic_contrast_idx) % compare within similar groups
           cRow=zeros(1,numCoef);
@@ -4557,7 +4573,7 @@ for s=1:length(sigAnvNames)
           cRow(basic_contrast_idx(c))=1;
           cRows(end+1,:)=cRow;
           cName{end+1}=sprintf('%s vs %s',coefNames{basic_contrast_idx(c)},coefNames{basic_contrast_idx(c2)});
-          
+          cAnvGrp(end+1)=c;
       end
    end
 end
@@ -4565,7 +4581,11 @@ end
 for c=1:size(cRows,1)
     curRow=cRows(c,:);
    [pVal(c),F(c),df(c),df2(c)]= coefTest(mdl,curRow);
-   deltaE(c)=sum(mdl.Coefficients.Estimate(curRow==1))-sum(mdl.Coefficients.Estimate(curRow==-1));
+   if(contains(cName{c},'Intercept'))
+        deltaE(c)=sum(mdl.Coefficients.Estimate(curRow==1));
+   else
+        deltaE(c)=sum(mdl.Coefficients.Estimate(curRow==1))-sum(mdl.Coefficients.Estimate(curRow==-1));
+   end
    SD_p(c)=sqrt(sum((mdl.Coefficients.DF(curRow==1)-1).*(mdl.Coefficients.SE(curRow==1).*(mdl.Coefficients.DF(curRow==1))).^2)+...
        sum((mdl.Coefficients.DF(curRow==-1)-1).*(mdl.Coefficients.SE(curRow==-1).*(mdl.Coefficients.DF(curRow==-1))).^2))...
        /(sum(mdl.Coefficients.DF(curRow==1))+sum(mdl.Coefficients.DF(curRow==-1)));
@@ -4573,7 +4593,12 @@ for c=1:size(cRows,1)
 end
 
 contrastTable=table(deltaE',SD_p',SE_p',F',df',df2',pVal','VariableNames',{'deltaE','SD','SE','F','df1','df2','pVal'},'RowNames',cName');
-contrastTable.pVal_corr=contrastTable.pVal*size(cRows,1);
+
+[uAnvG,~,idxAnvG]=unique(cAnvGrp);
+uCount=histc(cAnvGrp,1);
+
+
+contrastTable.pVal_corr=contrastTable.pVal.*uCount(idxAnvG);
 
 
 function coef2coefIdx(coefNames,anvNames)
@@ -5525,6 +5550,11 @@ if(ExFNIRS.settings.LME_enable)
         ExFNIRS.curInfoChartModel=curInfoChartLME;
         disp(curInfoChartLME);
         disp(curInfoChartLME.anova);
+        [curMdlFit{1:4}]=coefTest(curInfoChartLME);
+            fprintf('\nModel Fit: p=%.5f\tF=%.2f\tdf1=%i\tdf2=%i\n\n',curMdlFit{1},curMdlFit{2},curMdlFit{3},curMdlFit{4});
+            curChartContrast=autoContrast(curInfoChartLME);
+            disp(curChartContrast);
+        ExFNIRS.curInfoChartContrast=curChartContrast;
     catch ME
         warning('Could not generate model for info figure %s',ExFNIRS.settings.curInfoStr);
         warning(ME.message);
@@ -7603,12 +7633,12 @@ if(~isempty(answer))
     ExFNIRS.settings.LME_customStr=answer{1};
     set(handles.checkbox_lme_usecustom,'Value',1);
     ExFNIRS.settings.LME_use_customStr=true;
+    set(handles.pushbutton_custom_lme,'TooltipString',answer{1});
+
 else
-    ExFNIRS.settings.LME_use_customStr=false;
-    set(handles.checkbox_lme_usecustom,'Value',0);
+    
 end
 
-set(handles.pushbutton_custom_lme,'TooltipString',answer{1});
 
 
 
