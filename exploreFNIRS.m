@@ -538,16 +538,16 @@ else
               elseif(~isempty(curField))
                   if(ischar(curField)) % adds columns
                       outTable.(curFieldName)=strings(size(outTable,1),1);
-                      outTable.(curFieldName)(i,1)=curField;
+                      outTable.(curFieldName)(i,1)=nominal(curField);
                   elseif(isstring(curField))
                       outTable.(curFieldName)=strings(size(outTable,1),1);
-                      outTable.(curFieldName)(i,1)=curField;
+                      outTable.(curFieldName)(i,1)=nominal(curField);
                   elseif(isnumeric(curField))
                       outTable.(curFieldName)=nan(size(outTable,1),1);
                       outTable.(curFieldName)(i,1)=curField;
                   elseif(islogical(curField))
                       outTable.(curFieldName)=nan(size(outTable,1),1);
-                      outTable.(curFieldName)(i,1)=curField;
+                      outTable.(curFieldName)(i,1)=nominal(curField);
                   end
                   
               end
@@ -4160,6 +4160,9 @@ for sH=1:length(subplotHandles)
             end
             disp(curChartLME{sH});
             disp(curChartLME{sH}.anova);
+            [curMdlFit{1:4}]=coefTest(curChartLME{sH});
+            fprintf('\nModel Fit: p=%.5f\tF=%.2f\tdf1=%i\tdf2=%i\n\n',curMdlFit{1},curMdlFit{2},curMdlFit{3},curMdlFit{4});
+            disp(autoContrast(curChartLME{sH}));
         catch ME
             fprintf(2,'Could not generate model for figure %i\n',sH);
             fprintf(2,'\nLME: %s\n',lmeString);
@@ -4428,6 +4431,155 @@ if(showTopo)
         
     end
 end
+
+function [contrastTable]=autoContrast(mdl,pThreshold)
+
+if(nargin<2)
+    pThreshold=0.1;
+end
+
+anv=anova(mdl);
+
+for i=1:length(anv.Term)
+   curTerm=strsplit(anv.Term{i},':');
+   if(contains(curTerm{1},'Intercept'))
+      hasIntercept=true; 
+   end
+   if(length(curTerm)==1)
+       curTerm=curTerm{1};
+       curTerm(curTerm=='('|curTerm==')')=[];
+       rootAnvTerm{i}=curTerm;
+   else
+       break;
+   end
+end
+
+coefNames=mdl.CoefficientNames;
+rootCoefNames=cell(length(rootAnvTerm),1);
+rootCoefIdx=cell(length(rootAnvTerm),1);
+for i=1:length(coefNames)
+   curTerm=strsplit(coefNames{i},':');
+   if(length(curTerm)==1)
+       curTerm=curTerm{1};
+       curTerm(curTerm=='('|curTerm==')')=[];
+       for j=1:length(rootAnvTerm)
+           if(~isempty(regexp(curTerm,sprintf('^%s',rootAnvTerm{j}))))
+               rootCoefNames{j}=[{curTerm},rootCoefNames{j}];
+               rootCoefIdx{j}=[i,rootCoefIdx{j}];
+           end
+       end   
+   else
+       break;
+   end
+end
+
+coefIdx=1:length(coefNames);
+coefTermAnv=[];
+coefTermIdx=zeros(length(coefNames),size(rootAnvTerm,2));
+
+% makes table where index is the anv of each term
+
+for i=1:length(coefNames)
+    curCoefName=coefNames{i};
+     curCoefName(curCoefName=='('|curCoefName==')')=[];
+    coefNameParts=strsplit(curCoefName,':');
+        
+        for j=1:length(anv.Term)
+            curTerm=anv.Term{j};
+            curTerm(curTerm=='('|curTerm==')')=[];
+            curTermParts=strsplit(curTerm,':');
+        if(length(curTermParts)==length(coefNameParts))
+            for k=1:length(curTermParts)
+                if( ~isempty(regexp(coefNameParts{k},sprintf('^%s',curTermParts{k}))))
+                    rootIdx=ismember(rootAnvTerm,curTermParts{k});
+                    coefRootIdx=ismember(rootCoefNames{rootIdx},coefNameParts{k});
+                    coefTermIdx(i,rootIdx)=rootCoefIdx{rootIdx}(coefRootIdx);
+                    
+                    if(k==length(curTermParts))
+                        coefTermAnv(i,j)=1;
+                    end
+                else
+                   break; 
+                end
+            end
+        end
+    end
+end
+
+
+sigAnv=find(anv.pValue<pThreshold);
+
+if(isempty(sigAnv))
+    stringToPrint='No Significant anova';
+    return;
+else
+   sigAnvNames=anv.Term(sigAnv);
+   
+   numTerms=nan(1,length(sigAnvNames));
+   for i=1:length(sigAnvNames)
+       numTerms(i)=sum(sigAnvNames{i}==':')+1;
+   end
+end
+
+cRows=[];
+cName={};
+numCoef=length(coefNames);
+for s=1:length(sigAnvNames)
+   sIdx=sigAnv(s); 
+   basic_contrast_idx=find(coefTermAnv(:,sIdx)==1);
+   for c=1:length(basic_contrast_idx)
+      if(numTerms(s)==1&&hasIntercept) %compare with intercept only
+          cRow=zeros(1,numCoef);
+          cRow(1)=-1;
+          cRow(basic_contrast_idx(c))=1;
+          cRows(end+1,:)=cRow;
+          cName{end+1}=sprintf('%s vs %s',coefNames{basic_contrast_idx(c)},'Intercept');
+      elseif(hasIntercept) %compare vs 0
+
+          curCterms=coefTermIdx(basic_contrast_idx(c),:);
+          curCterms=curCterms(curCterms>0);
+          basic_contrast_idx=[basic_contrast_idx,curCterms];
+          
+       
+      else %compare vs 0
+          cRow=zeros(1,numCoef);
+          curCterms=coefTermIdx(basic_contrast_idx(c),:);
+          curCterms=curCterms(curCterms>0);
+          cRow(basic_contrast_idx(c))=1;
+          cRows(end+1,:)=cRow;
+        
+          cName{end+1}=sprintf('%s vs 0',coefNames{basic_contrast_idx(c)});
+          
+      end
+      for c2=c+1:length(basic_contrast_idx) % compare within similar groups
+          cRow=zeros(1,numCoef);
+          cRow(basic_contrast_idx(c2))=-1;
+          cRow(basic_contrast_idx(c))=1;
+          cRows(end+1,:)=cRow;
+          cName{end+1}=sprintf('%s vs %s',coefNames{basic_contrast_idx(c)},coefNames{basic_contrast_idx(c2)});
+          
+      end
+   end
+end
+
+for c=1:size(cRows,1)
+    curRow=cRows(c,:);
+   [pVal(c),F(c),df(c),df2(c)]= coefTest(mdl,curRow);
+   deltaE(c)=sum(mdl.Coefficients.Estimate(curRow==1))-sum(mdl.Coefficients.Estimate(curRow==-1));
+   SD_p(c)=sqrt(sum((mdl.Coefficients.DF(curRow==1)-1).*(mdl.Coefficients.SE(curRow==1).*(mdl.Coefficients.DF(curRow==1))).^2)+...
+       sum((mdl.Coefficients.DF(curRow==-1)-1).*(mdl.Coefficients.SE(curRow==-1).*(mdl.Coefficients.DF(curRow==-1))).^2))...
+       /(sum(mdl.Coefficients.DF(curRow==1))+sum(mdl.Coefficients.DF(curRow==-1)));
+   SE_p(c)=SD_p(c)/sqrt(mean(mdl.Coefficients.DF(curRow==1)));
+end
+
+contrastTable=table(deltaE',SD_p',SE_p',F',df',df2',pVal','VariableNames',{'deltaE','SD','SE','F','df1','df2','pVal'},'RowNames',cName');
+contrastTable.pVal_corr=contrastTable.pVal*size(cRows,1);
+
+
+function coef2coefIdx(coefNames,anvNames)
+
+mdlIdx
+
 
 
 function [qvalues,k,passed]=performFDR(pvalues,pThreshold)
