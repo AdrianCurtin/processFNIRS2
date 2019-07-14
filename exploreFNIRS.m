@@ -4162,9 +4162,11 @@ for sH=1:length(subplotHandles)
             displayLME(curChartLME{sH});
             [curMdlFit{1:4}]=coefTest(curChartLME{sH});
             fprintf('\nModel Fit: p=%.5f\tF=%.2f\tdf1=%i\tdf2=%i\n\n',curMdlFit{1},curMdlFit{2},curMdlFit{3},curMdlFit{4});
-            curChartContrast=autoContrast(curChartLME{sH});
-            if(~isempty(curChartContrast))
-                disp(curChartContrast);
+            if(~showTopo)
+                curChartContrast=autoContrast(curChartLME{sH});
+                if(~isempty(curChartContrast))
+                    disp(curChartContrast);
+                end
             end
             %curChartLME{sH}.contrastTable=autoContrast(curChartLME{sH},0.5);
         catch ME
