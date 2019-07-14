@@ -4541,9 +4541,6 @@ for s=1:length(sigAnvNames)
           cName{end+1}=sprintf('%s vs %s',coefNames{basic_contrast_idx(c)},'Intercept');
           cAnvGrp(end+1)=c;
       elseif(numTerms(s)>1) %compare vs 0
-          
-          
-          
           curCterms=coefTermIdx(basic_contrast_idx(c),:);
           curCterms=curCterms(curCterms>0);
           for c2=1:length(curCterms) % compare within similar groups
@@ -4595,10 +4592,10 @@ end
 contrastTable=table(deltaE',SD_p',SE_p',F',df',df2',pVal','VariableNames',{'deltaE','SD','SE','F','df1','df2','pVal'},'RowNames',cName');
 
 [uAnvG,~,idxAnvG]=unique(cAnvGrp);
-uCount=histc(cAnvGrp,1);
+uCount=histcounts(cAnvGrp);
 
 
-contrastTable.pVal_corr=contrastTable.pVal.*uCount(idxAnvG);
+contrastTable.pVal_corr=contrastTable.pVal.*uCount(idxAnvG)';
 
 
 function coef2coefIdx(coefNames,anvNames)
