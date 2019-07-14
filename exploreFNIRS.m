@@ -4439,7 +4439,7 @@ end
 function [contrastTable]=autoContrast(mdl,pThreshold)
 
 if(nargin<2)
-    pThreshold=1;
+    pThreshold=0.1;
 end
 
 coefNames=mdl.CoefficientNames;
@@ -4560,7 +4560,7 @@ for s=1:length(sigAnvNames)
           nRows(end+1)=1;
           cRow=zeros(1,numCoef);
           cRow(1)=-1;
-          cRow(basic_contrast_idx(c))=-1;
+          cRow(basic_contrast_idx(c))=1;
           cRows(end+1,:)=cRow;
           if(contains(coefNames{basic_contrast_idx(c)},'(Intercept)'))
             cName{end+1}='Intercept vs 0';
@@ -4575,8 +4575,8 @@ for s=1:length(sigAnvNames)
           numContrasts=length(cIdx);
           for c2=1:numContrasts % compare within matched groups
               cRow=zeros(1,numCoef);
-              %cRow(curCterms)=0;
-              cRow(cIdx(c2))=1;
+              cRow(cIdx)=1;
+              cRow(cIdx(c2))=0;
               cRow(basic_contrast_idx(c))=1;
               cRows(end+1,:)=cRow;
               cName{end+1}=sprintf('%s vs %s',coefNames{basic_contrast_idx(c)},coefNames{cIdx(c2)});
@@ -4591,7 +4591,6 @@ for s=1:length(sigAnvNames)
           curCterms=curCterms(curCterms>0);
           cRow(basic_contrast_idx(c))=1;
           cRows(end+1,:)=cRow;
-        
           cName{end+1}=sprintf('%s vs 0',coefNames{basic_contrast_idx(c)});
           cAnvGrp(end+1)=c;
       end
@@ -4619,7 +4618,7 @@ for c=1:size(cRows,1)
    if(contains(cName{c},'Intercept'))
         deltaE(c)=sum(mdlCoefAnv.Estimate);
    else
-        deltaE(c)=sum(mdlCoefAnv.Estimate)-sum(mdlCoefAnv.Estimate);
+        deltaE(c)=sum(mdlCoefAnv.Estimate)-sum(mdlCoefCompare.Estimate);
    end
    
    SD_anv_temp=mdlCoefAnv.SE;
@@ -4638,7 +4637,8 @@ end
 [uAnvG,~,idxAnvG]=unique(cAnvGrp);
 uCount=histcounts(cAnvGrp);
 
-pVal_corr=pVal.*uCount(idxAnvG)';
+pVal_corr=pVal.*uCount(idxAnvG);
+pVal_corr(pVal_corr>1)=1;
 
 contrastTable=table(deltaE',SD_p',F',df',df2',pVal',pVal_corr',HedgesG',GlassesDelta','VariableNames',{'deltaE','SD','F','df1','df2','pVal','pVal_corr','HedgesG','GlassesDelta'},'RowNames',cName');
 
