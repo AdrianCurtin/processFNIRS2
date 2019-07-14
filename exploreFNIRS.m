@@ -4443,7 +4443,7 @@ if(nargin<2)
 end
 
 anv=anova(mdl);
-
+hasIntercept=false;
 for i=1:length(anv.Term)
    curTerm=strsplit(anv.Term{i},':');
    if(contains(curTerm{1},'Intercept'))
@@ -4540,7 +4540,7 @@ for s=1:length(sigAnvNames)
           cRows(end+1,:)=cRow;
           cName{end+1}=sprintf('%s vs %s',coefNames{basic_contrast_idx(c)},'Intercept');
           cAnvGrp(end+1)=c;
-      elseif(hasIntercept) %compare vs 0
+      elseif(numTerms(s)>1) %compare vs 0
           
           
           
