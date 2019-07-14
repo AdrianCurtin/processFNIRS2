@@ -4065,8 +4065,8 @@ for sH=1:length(subplotHandles)
             end
             
             
-            
-            curChartLME{sH}=fitlme(mergedTables{sH},lmeString,'CheckHessian',true);
+            rng(2019);
+            curChartLME{sH}=fitlme(mergedTables{sH},lmeString,'FitMethod','REML', 'DummyVarCoding', 'effects','CheckHessian',true);
           %   curChartLME_emm{sH}= pf2_base.external.emmeans(curChartLME{sH}, {'orig'}, 'effects');
 %             h = emmip(curChartLME_emm{sH},'orig');
 
@@ -4091,8 +4091,8 @@ for sH=1:length(subplotHandles)
             end
             ExFNIRS.curChartModels{sH}=curChartLME{sH};
             ExFNIRS.curChartModelsAIC(sH)=curChartLME{sH}.ModelCriterion.AIC;
-            ExFNIRS.curChartModelsCoefficents{sH}=curChartLME{sH}.Coefficients;
-            ExFNIRS.curChartModelsANOVA{sH}=curChartLME{sH}.anova;
+            [~,~,ExFNIRS.curChartModelsCoefficents{sH}]=randomEffects(curChartLME{sH},'DFMethod','satterthwaite');
+            ExFNIRS.curChartModelsANOVA{sH}=anova(curChartLME{sH},'DFMethod','satterthwaite');
             
             anovaNames=curChartLME{sH}.anova.Term;
             
@@ -4104,7 +4104,7 @@ for sH=1:length(subplotHandles)
                anovaNames{a}=str;
             end
             
-            varNames=curChartLME{sH}.Coefficients.Name;
+            varNames=ExFNIRS.curChartModelsCoefficents{sH}.Name;
             for v=1:length(varNames)
                str=varNames{v};
                str(str=='('|str==')')=''; % replace shitty characters
@@ -4159,7 +4159,7 @@ for sH=1:length(subplotHandles)
                 ExFNIRS.curChartModels_ch(sH)=subplotGby{sH}.curCh;
             end
             disp(curChartLME{sH});
-            disp(curChartLME{sH}.anova);
+            displayLME(curChartLME{sH});
             [curMdlFit{1:4}]=coefTest(curChartLME{sH});
             fprintf('\nModel Fit: p=%.5f\tF=%.2f\tdf1=%i\tdf2=%i\n\n',curMdlFit{1},curMdlFit{2},curMdlFit{3},curMdlFit{4});
             curChartContrast=autoContrast(curChartLME{sH});
@@ -4439,76 +4439,97 @@ end
 function [contrastTable]=autoContrast(mdl,pThreshold)
 
 if(nargin<2)
-    pThreshold=0.1;
+    pThreshold=1;
 end
 
-anv=anova(mdl);
+coefNames=mdl.CoefficientNames;
+numCoef=length(coefNames);
+
+[uCoefParts,b,uCoefIdx]=unique(strsplit(sprintf('%s:',coefNames{:}),':'));
+
+[~,idx]=sort(b);
+uCoefParts=uCoefParts(idx);
+if(contains(uCoefParts{1},'(Intercept)'))
+    uCoefParts{1}='Intercept';
+end
+anv=anova(mdl,'DFMethod','satterthwaite');
 hasIntercept=false;
-for i=1:length(anv.Term)
-   curTerm=strsplit(anv.Term{i},':');
+anvTerms=anv.Term;
+numAnv=length(anvTerms);
+for i=1:numAnv % Get "root' terms (non-interaction terms)
+   
+   curTerm=strsplit(anvTerms{i},':');
+   numAnvTerms(i)=length(curTerm);
    if(contains(curTerm{1},'Intercept'))
       hasIntercept=true; 
+      anvTerms{i}='Intercept';
    end
    if(length(curTerm)==1)
        curTerm=curTerm{1};
        curTerm(curTerm=='('|curTerm==')')=[];
        rootAnvTerm{i}=curTerm;
+       uCoefTerms{i}=uCoefParts(contains(uCoefParts,sprintf('%s',curTerm)));
    else
-       break;
+       
    end
 end
 
-coefNames=mdl.CoefficientNames;
+
 rootCoefNames=cell(length(rootAnvTerm),1);
-rootCoefIdx=cell(length(rootAnvTerm),1);
-for i=1:length(coefNames)
-   curTerm=strsplit(coefNames{i},':');
-   if(length(curTerm)==1)
-       curTerm=curTerm{1};
+rootCoefIdx=nan(length(rootAnvTerm),max(numAnvTerms));
+coefTermParts=cell(length(coefNames),size(rootAnvTerm,2));
+coefTermPartsIdx=nan(size(coefTermParts));
+for i=1:numCoef %find which are the root terms in coefficients
+   curTerms=strsplit(coefNames{i},':');
+   numCoefTerms=length(curTerms);
+   curAnvTerms='';
+   curRootTerm=nan(size(curTerms));
+   for t=1:numCoefTerms
+       curTerm=curTerms{t};
        curTerm(curTerm=='('|curTerm==')')=[];
        for j=1:length(rootAnvTerm)
            if(~isempty(regexp(curTerm,sprintf('^%s',rootAnvTerm{j}))))
                rootCoefNames{j}=[{curTerm},rootCoefNames{j}];
-               rootCoefIdx{j}=[i,rootCoefIdx{j}];
+               rootCoefIdx(i,j)=find(ismember(uCoefTerms{j},curTerm));
+               coefTermParts{i,j}=curTerm;
+               curRootTerm(t)=j;
+               curAnvTerms=sprintf('%s:%s',curAnvTerms,rootAnvTerm{j});
+               break;
            end
        end   
-   else
-       break;
+   end
+   curAnvTerms(1)='';
+   coefTermAnv(i)=find(ismember(anvTerms,curAnvTerms));
+   if(numCoefTerms>1)
+       curCoefIdx=rootCoefIdx(i,:);
+       for t=1:length(curTerms)
+           j=curRootTerm(t);
+           curCoefIdx_loo=curCoefIdx;
+           curCoefIdx_loo(j)=nan;
+           strParts={};
+           for(t2=1:length(curCoefIdx_loo))
+               if(~isnan(curCoefIdx_loo(t2))&&curCoefIdx_loo(t2)>0)
+                    strParts{end+1}=uCoefTerms{t2}{curCoefIdx_loo(t2)};
+               end
+           end
+           
+           for r=1:i-1
+                isStr=true;
+               for s=1:length(strParts)
+                    isStr=isStr&&contains(coefNames{r},strParts{s});
+               end
+               if(isStr)
+                  break; 
+               end
+           end
+           
+           coefTermPartsIdx(i,j)=r;
+       end
+       
    end
 end
 
-coefIdx=1:length(coefNames);
-coefTermAnv=[];
-coefTermIdx=zeros(length(coefNames),size(rootAnvTerm,2));
-
-% makes table where index is the anv of each term
-
-for i=1:length(coefNames)
-    curCoefName=coefNames{i};
-     curCoefName(curCoefName=='('|curCoefName==')')=[];
-    coefNameParts=strsplit(curCoefName,':');
-        
-        for j=1:length(anv.Term)
-            curTerm=anv.Term{j};
-            curTerm(curTerm=='('|curTerm==')')=[];
-            curTermParts=strsplit(curTerm,':');
-        if(length(curTermParts)==length(coefNameParts))
-            for k=1:length(curTermParts)
-                if( ~isempty(regexp(coefNameParts{k},sprintf('^%s',curTermParts{k}))))
-                    rootIdx=ismember(rootAnvTerm,curTermParts{k});
-                    coefRootIdx=ismember(rootCoefNames{rootIdx},coefNameParts{k});
-                    coefTermIdx(i,rootIdx)=rootCoefIdx{rootIdx}(coefRootIdx);
-                    
-                    if(k==length(curTermParts))
-                        coefTermAnv(i,j)=1;
-                    end
-                else
-                   break; 
-                end
-            end
-        end
-    end
-end
+rootCoefIdx(rootCoefIdx==0)=nan;
 
 
 sigAnv=find(anv.pValue<pThreshold);
@@ -4528,33 +4549,43 @@ end
 cRows=[];
 cAnvGrp=[];
 cName={};
-numCoef=length(coefNames);
+nRows=[];
+
 for s=1:length(sigAnvNames)
    sIdx=sigAnv(s); 
-   basic_contrast_idx=find(coefTermAnv(:,sIdx)==1);
+   basic_contrast_idx=find(coefTermAnv==s);
+   interaction_contrast_idx=coefTermPartsIdx(coefTermAnv==s,:);
    for c=1:length(basic_contrast_idx)
       if(numTerms(s)==1&&hasIntercept) %compare with intercept only
+          nRows(end+1)=1;
           cRow=zeros(1,numCoef);
           cRow(1)=-1;
-          cRow(basic_contrast_idx(c))=1;
+          cRow(basic_contrast_idx(c))=-1;
           cRows(end+1,:)=cRow;
-          cName{end+1}=sprintf('%s vs %s',coefNames{basic_contrast_idx(c)},'Intercept');
+          if(contains(coefNames{basic_contrast_idx(c)},'(Intercept)'))
+            cName{end+1}='Intercept vs 0';
+          else
+            cName{end+1}=sprintf('%s vs %s',coefNames{basic_contrast_idx(c)},'Intercept');
+          end
           cAnvGrp(end+1)=c;
-      elseif(numTerms(s)>1) %compare vs 0
-          curCterms=coefTermIdx(basic_contrast_idx(c),:);
-          curCterms=curCterms(curCterms>0);
-          for c2=1:length(curCterms) % compare within similar groups
+      elseif(numTerms(s)>1) %compare term and numterms-1 vs 0
+          nRows(end+1)=1;
+          cIdx=interaction_contrast_idx(c,:);
+          cIdx=cIdx(~isnan(cIdx));
+          numContrasts=length(cIdx);
+          for c2=1:numContrasts % compare within matched groups
               cRow=zeros(1,numCoef);
-              cRow(curCterms)=1;
-              cRow(curCterms(c2))=0;
+              %cRow(curCterms)=0;
+              cRow(cIdx(c2))=1;
               cRow(basic_contrast_idx(c))=1;
               cRows(end+1,:)=cRow;
-              cName{end+1}=sprintf('%s vs %s',coefNames{basic_contrast_idx(c)},coefNames{curCterms(c2)});
+              cName{end+1}=sprintf('%s vs %s',coefNames{basic_contrast_idx(c)},coefNames{cIdx(c2)});
                 cAnvGrp(end+1)=c;
           end
           
        
       else %compare vs 0
+          nRows(end+1)=1;
           cRow=zeros(1,numCoef);
           curCterms=coefTermIdx(basic_contrast_idx(c),:);
           curCterms=curCterms(curCterms>0);
@@ -4565,6 +4596,7 @@ for s=1:length(sigAnvNames)
           cAnvGrp(end+1)=c;
       end
       for c2=c+1:length(basic_contrast_idx) % compare within similar groups
+          nRows(end+1)=1;
           cRow=zeros(1,numCoef);
           cRow(basic_contrast_idx(c2))=-1;
           cRow(basic_contrast_idx(c))=1;
@@ -4575,27 +4607,42 @@ for s=1:length(sigAnvNames)
    end
 end
 
+[~,~,mdlCoef]=fixedEffects(mdl,'DFMethod','satterthwaite');
 for c=1:size(cRows,1)
     curRow=cRows(c,:);
-   [pVal(c),F(c),df(c),df2(c)]= coefTest(mdl,curRow);
+   [pVal(c),F(c),df(c),df2(c)]= coefTest(mdl,curRow,0,'DFMethod','satterthwaite');
+   
+   %df2(c)=mdlCoef.DF(c); %overwrite with satterwaite coefs
+   
+   mdlCoefAnv=mdlCoef(curRow==1,:);
+   mdlCoefCompare=mdlCoef(curRow==-1,:);
    if(contains(cName{c},'Intercept'))
-        deltaE(c)=sum(mdl.Coefficients.Estimate(curRow==1));
+        deltaE(c)=sum(mdlCoefAnv.Estimate);
    else
-        deltaE(c)=sum(mdl.Coefficients.Estimate(curRow==1))-sum(mdl.Coefficients.Estimate(curRow==-1));
+        deltaE(c)=sum(mdlCoefAnv.Estimate)-sum(mdlCoefAnv.Estimate);
    end
-   SD_p(c)=sqrt(sum((mdl.Coefficients.DF(curRow==1)-1).*(mdl.Coefficients.SE(curRow==1).*(mdl.Coefficients.DF(curRow==1))).^2)+...
-       sum((mdl.Coefficients.DF(curRow==-1)-1).*(mdl.Coefficients.SE(curRow==-1).*(mdl.Coefficients.DF(curRow==-1))).^2))...
-       /(sum(mdl.Coefficients.DF(curRow==1))+sum(mdl.Coefficients.DF(curRow==-1)));
-   SE_p(c)=SD_p(c)/sqrt(mean(mdl.Coefficients.DF(curRow==1)));
+   
+   SD_anv_temp=mdlCoefAnv.SE;
+   SD_cmp=mdlCoefCompare.SE;
+   
+   SD_p(c)=sqrt(sum((mdlCoefAnv.DF).*(SD_anv_temp.^2))+...
+       sum((mdlCoefCompare.DF).*(SD_cmp.^2)))...
+       /sqrt(sum(mdlCoefAnv.DF)+sum(mdlCoefCompare.DF));
+   SD_anv(c)=sqrt(sum((mdlCoefAnv.DF).*(SD_anv_temp.^2)))...
+       /sqrt(sum(mdlCoefAnv.DF));
+   %SE_p(c)=SD_p(c)/sqrt(mean(mdlCoefAnv.DF));
+   HedgesG(c)=deltaE(c)/SD_p(c);
+   GlassesDelta(c)=deltaE(c)/SD_anv(c);
 end
-
-contrastTable=table(deltaE',SD_p',SE_p',F',df',df2',pVal','VariableNames',{'deltaE','SD','SE','F','df1','df2','pVal'},'RowNames',cName');
 
 [uAnvG,~,idxAnvG]=unique(cAnvGrp);
 uCount=histcounts(cAnvGrp);
 
+pVal_corr=pVal.*uCount(idxAnvG)';
 
-contrastTable.pVal_corr=contrastTable.pVal.*uCount(idxAnvG)';
+contrastTable=table(deltaE',SD_p',F',df',df2',pVal',pVal_corr',HedgesG',GlassesDelta','VariableNames',{'deltaE','SD','F','df1','df2','pVal','pVal_corr','HedgesG','GlassesDelta'},'RowNames',cName');
+
+
 
 
 function coef2coefIdx(coefNames,anvNames)
@@ -5534,7 +5581,8 @@ if(ExFNIRS.settings.LME_enable)
     
 
     try
-        curInfoChartLME=fitlme(ExFNIRS.selectedTable,lmeString);
+        rng(2019);
+        curInfoChartLME=fitlme(ExFNIRS.selectedTable,lmeString,'FitMethod','REML', 'DummyVarCoding', 'effects','CheckHessian',true);
 %         curInfoChartLME_emm= pf2_base.external.emmeans(curInfoChartLME, {'orig'}, 'effects');
 %         h = emmip(curInfoChartLME_emm,'orig');
 
@@ -5545,11 +5593,16 @@ if(ExFNIRS.settings.LME_enable)
             fprintf(' - No Interactions\n');
         end
         ExFNIRS.curInfoChartModel=curInfoChartLME;
+        
         disp(curInfoChartLME);
-        disp(curInfoChartLME.anova);
+        displayLME(curInfoChartLME);
+        
+        %disp(curInfoChartLME.anova);
         [curMdlFit{1:4}]=coefTest(curInfoChartLME);
             fprintf('\nModel Fit: p=%.5f\tF=%.2f\tdf1=%i\tdf2=%i\n\n',curMdlFit{1},curMdlFit{2},curMdlFit{3},curMdlFit{4});
+            tic
             curChartContrast=autoContrast(curInfoChartLME);
+            toc
             disp(curChartContrast);
         ExFNIRS.curInfoChartContrast=curChartContrast;
     catch ME
@@ -5557,7 +5610,18 @@ if(ExFNIRS.settings.LME_enable)
         warning(ME.message);
     end
 end
-     
+
+function displayLME(lme_mdl)
+%disp(lme_mdl.Forumla);
+fprintf(2,'\nUse These DFs\n');
+[~,~,stats]=fixedEffects(lme_mdl,'DFMethod','satterthwaite');
+disp(stats);
+%disp(lme_mdl.RandomEffects);
+% [~,~,stats]=randomEffects(lme_mdl,'DFMethod','satterthwaite');
+% disp(stats);
+disp(anova(lme_mdl,'DFMethod','satterthwaite'));
+
+
 
 % --- Executes on selection change in popupmenu_info_field.
 function popupmenu_info_field_Callback(hObject, eventdata, handles)
