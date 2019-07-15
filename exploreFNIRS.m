@@ -4069,7 +4069,24 @@ for sH=1:length(subplotHandles)
             curChartLME{sH}=fitlme(mergedTables{sH},lmeString,'FitMethod','REML','CheckHessian',true);
           %   curChartLME_emm{sH}= pf2_base.external.emmeans(curChartLME{sH}, {'orig'}, 'effects');
 %             h = emmip(curChartLME_emm{sH},'orig');
-
+            nullMdlstring=sprintf('%s%i_%s~1+(1|SubjectID)',varNameStart,subplotGby{sH}.curCh,subplotGby{sH}.curBioM{1});
+            curChartLME_ML=fitlme(mergedTables{sH},lmeString,'FitMethod','ML','CheckHessian',true);
+            nullChartLME=fitlme(mergedTables{sH},nullMdlstring,'FitMethod','ML','CheckHessian',true);
+            nullCompare{sH}=compare(curChartLME_ML,nullChartLME);
+            pVal=nullCompare{sH}.pValue(end);
+            if(pVal>0.05)
+                nullCompareStr{sH}='Model is marginally worse than naive model';
+            elseif(~isnan(pVal))
+                nullCompareStr{sH}='Model is significantly worse than naive model';
+            else
+                nullCompare{sH}=compare(nullChartLME,curChartLME_ML);
+                pVal=nullCompare{sH}.pValue(end);
+                if(pVal>0.05)
+                    nullCompareStr{sH}='Model is marginally better than naive model';
+                else
+                    nullCompareStr{sH}='Model is significantly better than naive model';
+                end
+            end
             
             switch (ExFNIRS.settings.ChannelMode)
                 case 'fNIR'
@@ -4160,7 +4177,14 @@ for sH=1:length(subplotHandles)
             end
             disp(curChartLME{sH});
             displayLME(curChartLME{sH});
-            [curMdlFit{1:4}]=coefTest(curChartLME{sH});
+            fprintf(2,'\n%s\n',nullCompareStr{sH});
+            disp(nullCompare{sH});
+            
+            mdlTest=eye(length(curChartLME{sH}.Coefficients.Name));
+            if(ExFNIRS.settings.LME_use_intercept)
+                mdlTest=mdlTest(2:end,:);
+            end
+            [curMdlFit{1:4}]=coefTest(curChartLME{sH},mdlTest,zeros(size(mdlTest,1),1),'DFMethod','satterthwaite');
             fprintf('\nModel Fit: p=%.5f\tF=%.2f\tdf1=%i\tdf2=%i\n\n',curMdlFit{1},curMdlFit{2},curMdlFit{3},curMdlFit{4});
             if(~showTopo)
                 curChartContrast=autoContrast(curChartLME{sH});
@@ -4441,7 +4465,7 @@ end
 function [contrastTable]=autoContrast(mdl,pThreshold)
 
 if(nargin<2)
-    pThreshold=1;
+    pThreshold=0.1;
 end
 
 coefNames=mdl.CoefficientNames;
@@ -4633,11 +4657,11 @@ end
 
 [uAnvG,~,idxAnvG]=unique(cAnvGrp);
 uCount=histcounts(cAnvGrp);
-
-pVal_corr=pVal.*uCount(idxAnvG);
+uCounts=uCount(idxAnvG);
+pVal_corr=pVal(:).*uCounts(:);
 pVal_corr(pVal_corr>1)=1;
 
-contrastTable=table(deltaE',SD_p',F',df',df2',pVal',pVal_corr',HedgesG',GlassesDelta','VariableNames',{'deltaE','SD','F','df1','df2','pVal','pVal_corr','HedgesG','GlassesDelta'},'RowNames',cName');
+contrastTable=table(deltaE',SD_p',F',df',df2',pVal',pVal_corr,HedgesG',GlassesDelta','VariableNames',{'deltaE','SD','F','df1','df2','pVal','pVal_corr','HedgesG','GlassesDelta'},'RowNames',cName');
 
 
 
@@ -5580,6 +5604,11 @@ if(ExFNIRS.settings.LME_enable)
     try
         rng(2019);
         curInfoChartLME=fitlme(ExFNIRS.selectedTable,lmeString,'FitMethod','REML','CheckHessian',true);
+        
+        nullMdlstring=sprintf('%s~1+(1|SubjectID)',ExFNIRS.settings.curInfoStr);
+        curInfoChartLME_ML=fitlme(ExFNIRS.selectedTable,lmeString,'FitMethod','ML');
+        nullInfoChartLME=fitlme(ExFNIRS.selectedTable,nullMdlstring,'FitMethod','ML');
+        
 %         curInfoChartLME_emm= pf2_base.external.emmeans(curInfoChartLME, {'orig'}, 'effects');
 %         h = emmip(curInfoChartLME_emm,'orig');
 
@@ -5593,9 +5622,15 @@ if(ExFNIRS.settings.LME_enable)
         
         disp(curInfoChartLME);
         displayLME(curInfoChartLME);
+        disp(compare(nullInfoChartLME,curInfoChartLME_ML));
         
         %disp(curInfoChartLME.anova);
-        [curMdlFit{1:4}]=coefTest(curInfoChartLME);
+        mdlTest=eye(length(curInfoChartLME.Coefficients.Name));
+        if(ExFNIRS.settings.LME_use_intercept)
+            mdlTest=mdlTest(2:end,:);
+        end
+        
+        [curMdlFit{1:4}]=coefTest(curInfoChartLME,mdlTest,zeros(size(mdlTest,1),1),'DFMethod','satterthwaite');
             fprintf('\nModel Fit: p=%.5f\tF=%.2f\tdf1=%i\tdf2=%i\n\n',curMdlFit{1},curMdlFit{2},curMdlFit{3},curMdlFit{4});
             tic
             curChartContrast=autoContrast(curInfoChartLME);
