@@ -4051,7 +4051,7 @@ for sH=1:length(subplotHandles)
         
         
         if(ExFNIRS.settings.LME_use_customStr&&~isempty(ExFNIRS.settings.LME_customStr))
-            lmeString=sprintf('%s%i_%s~%s+(%s)',varNameStart,subplotGby{sH}.curCh,subplotGby{sH}.curBioM{1},ExFNIRS.settings.LME_customStr,ExFNIRS.settings.LME_randomFxStr);
+            lmeString=sprintf('%s%i_%s~%s',varNameStart,subplotGby{sH}.curCh,subplotGby{sH}.curBioM{1},ExFNIRS.settings.LME_customStr);
         elseif(ExFNIRS.settings.LME_use_intercept)
             lmeString=sprintf('%s%i_%s~%s+(%s)',varNameStart,subplotGby{sH}.curCh,subplotGby{sH}.curBioM{1},curLMEGbyString,ExFNIRS.settings.LME_randomFxStr);
         else
@@ -4066,7 +4066,7 @@ for sH=1:length(subplotHandles)
             
             
             rng(2019);
-            curChartLME{sH}=fitlme(mergedTables{sH},lmeString,'FitMethod','REML', 'DummyVarCoding', 'effects','CheckHessian',true);
+            curChartLME{sH}=fitlme(mergedTables{sH},lmeString,'FitMethod','REML','CheckHessian',true);
           %   curChartLME_emm{sH}= pf2_base.external.emmeans(curChartLME{sH}, {'orig'}, 'effects');
 %             h = emmip(curChartLME_emm{sH},'orig');
 
@@ -4441,7 +4441,7 @@ end
 function [contrastTable]=autoContrast(mdl,pThreshold)
 
 if(nargin<2)
-    pThreshold=0.1;
+    pThreshold=1;
 end
 
 coefNames=mdl.CoefficientNames;
@@ -4541,11 +4541,6 @@ if(isempty(sigAnv))
     return;
 else
    sigAnvNames=anv.Term(sigAnv);
-   
-   numTerms=nan(1,length(sigAnvNames));
-   for i=1:length(sigAnvNames)
-       numTerms(i)=sum(sigAnvNames{i}==':')+1;
-   end
 end
 
 cRows=[];
@@ -4555,10 +4550,10 @@ nRows=[];
 
 for s=1:length(sigAnvNames)
    sIdx=sigAnv(s); 
-   basic_contrast_idx=find(coefTermAnv==s);
-   interaction_contrast_idx=coefTermPartsIdx(coefTermAnv==s,:);
+   basic_contrast_idx=find(coefTermAnv==sIdx);
+   interaction_contrast_idx=coefTermPartsIdx(coefTermAnv==sIdx,:);
    for c=1:length(basic_contrast_idx)
-      if(numTerms(s)==1&&hasIntercept) %compare with intercept only
+      if(numAnvTerms(sIdx)==1&&hasIntercept) %compare with intercept only
           nRows(end+1)=1;
           cRow=zeros(1,numCoef);
           cRow(1)=-1;
@@ -4570,7 +4565,7 @@ for s=1:length(sigAnvNames)
             cName{end+1}=sprintf('%s vs %s',coefNames{basic_contrast_idx(c)},'Intercept');
           end
           cAnvGrp(end+1)=c;
-      elseif(numTerms(s)>1) %compare term and numterms-1 vs 0
+      elseif(numAnvTerms(sIdx)>1) %compare term and numterms-1 vs 0
           nRows(end+1)=1;
           cIdx=interaction_contrast_idx(c,:);
           cIdx=cIdx(~isnan(cIdx));
@@ -5574,7 +5569,7 @@ if(ExFNIRS.settings.LME_enable)
     
     
     if(ExFNIRS.settings.LME_use_customStr&&~isempty(ExFNIRS.settings.LME_customStr))
-        lmeString=sprintf('%s~%s+(%s)',ExFNIRS.settings.curInfoStr,ExFNIRS.settings.LME_customStr,ExFNIRS.settings.LME_randomFxStr);
+        lmeString=sprintf('%s~%s',ExFNIRS.settings.curInfoStr,ExFNIRS.settings.LME_customStr);
     elseif(ExFNIRS.settings.LME_use_intercept)
         lmeString=sprintf('%s~%s+(%s)',ExFNIRS.settings.curInfoStr,curLMEGbyString,ExFNIRS.settings.LME_randomFxStr);
     else
@@ -5584,7 +5579,7 @@ if(ExFNIRS.settings.LME_enable)
 
     try
         rng(2019);
-        curInfoChartLME=fitlme(ExFNIRS.selectedTable,lmeString,'FitMethod','REML', 'DummyVarCoding', 'effects','CheckHessian',true);
+        curInfoChartLME=fitlme(ExFNIRS.selectedTable,lmeString,'FitMethod','REML','CheckHessian',true);
 %         curInfoChartLME_emm= pf2_base.external.emmeans(curInfoChartLME, {'orig'}, 'effects');
 %         h = emmip(curInfoChartLME_emm,'orig');
 
