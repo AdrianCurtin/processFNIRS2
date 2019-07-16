@@ -6,7 +6,6 @@ warning('Please replace with processFNIRS2.Import.ImportNIR()\n');
 if(nargout>0)
     varargout{1:nargout}=processFNIRS2.Import.ImportNIR(varargin{:});
 else
-   processFNIRS2.Import.ImportNIR(varargin{:}); 
-   varargout=[];
+   varargout{1:nargout}=processFNIRS2.Import.ImportNIR(varargin{:}); 
 end
 
