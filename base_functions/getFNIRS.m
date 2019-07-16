@@ -7,6 +7,6 @@ if(nargout>0)
     varargout{1:nargout}=processFNIRS2.Data.Split(varargin{:});
 else
    processFNIRS2.Data.Split(varargin{:}); 
-   varargout=[];
+
 end
 

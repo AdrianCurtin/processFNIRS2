@@ -172,7 +172,8 @@ if(isfield(pf2ChannelCheck,'filepath')&&~isempty(pf2ChannelCheck.filepath))
     
 
     if exist(filestr, 'file') == 2
-        chMaskFile=load(filestr,'fchMask');
+        chMaskFile=load(filestr,'fmask');
+        
         pf2ChannelCheck.fchMask=chMaskFile.fmask;
         fprintf('Channel mask loaded from: %s\n',filestr);
         
@@ -762,7 +763,7 @@ if(isfield(handles,'figure1'))
 end
 
 
-close();
+%close();
 
 % --- Executes on button press in markerCheck.
 function markerCheck_Callback(hObject, eventdata, handles)
