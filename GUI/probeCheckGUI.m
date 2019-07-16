@@ -110,7 +110,7 @@ if (isempty(varargin))
     %error('No data');
     fprintf(2,'Using simulated Data\n');
     pf2ChannelCheck.filepath=[];
-else
+elseif(isstruct(varargin{1}))
     pf2ChannelCheck.nirsData=varargin{1};
     
     if(isempty(pf2ChannelCheck.nirsData)||~isfield(pf2ChannelCheck.nirsData,'raw'))
@@ -130,6 +130,26 @@ else
     
     if(length(varargin)>2) % pf2ChannelCheck.filepath
         pf2ChannelCheck.overwriteExisting=varargin{3};
+    end
+elseif((isstring(varargin{1})||ischar(varargin{1}))&&length(varargin)>1)
+    pf2ChannelCheck.nirsData=processFNIRS2.Import.ImportNIR(varargin{2},true,false);
+    
+     if(isempty(pf2ChannelCheck.nirsData)||~isfield(pf2ChannelCheck.nirsData,'raw'))
+       error('Empty dataset'); 
+    end
+    
+    if(isfield(pf2ChannelCheck.nirsData,'fchMask'))
+        pf2ChannelCheck.fmask=pf2ChannelCheck.nirsData.fchMask;
+    end
+    
+    
+    pf2ChannelCheck.filepath=varargin{2};
+    
+    
+    if(length(varargin)>2) % pf2ChannelCheck.filepath
+        pf2ChannelCheck.overwriteExisting=varargin{3};
+    else
+        pf2ChannelCheck.overwriteExisting=true;
     end
 end
 
@@ -941,13 +961,14 @@ function marker_listbox_Callback(hObject, eventdata, handles)
 %        contents{get(hObject,'Value')} returns selected item from marker_listbox
   
 global pf2ChannelCheck
+global pf2ChannelCheckHandles
 pf2ChannelCheck.curMarkersInd=get(handles.marker_listbox,'Value');
 pf2ChannelCheck.curMarkers=pf2ChannelCheck.curMarkerset(pf2ChannelCheck.curMarkersInd);
 
 axes(pf2ChannelCheckHandles.chCurAxesHandle);
 plotChannel(pf2ChannelCheck.curChannel,pf2ChannelCheck.showMarkers,true);
 
-axes(pf2ChannelCheck.chAxesHandle{pf2ChannelCheck.curChannel});
+axes(pf2ChannelCheckHandles.chAxesHandles{pf2ChannelCheck.curChannel});
 plotChannel(pf2ChannelCheck.curChannel,false,false);
 
 % --- Executes during object creation, after setting all properties.

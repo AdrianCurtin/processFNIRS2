@@ -18,6 +18,7 @@ data=[];
 markers=[];
 baseline=[];
 fchMask=[];
+autoLoadMrk=true;
 
 forceChannelCheck=false; % if channelcheck is enabled manually, then honor, otherwise load only first time
 
@@ -35,14 +36,51 @@ if nargin < 1 % No Arguments - Open fNIRS and mrk file
     if(~isstr(mrk_filename)) %cancelled
         mrk_filename=[];
     end
-    
+    autoLoadMrk=false;
 	channelCheck=true; %Plots raw channel light intensity and asks user to mark as either noisy, invalid, or clean
 elseif nargin<2
+    if(isempty(nir_filename))
+        [nir_filename, pathname] = uigetfile({'*.nir';'*.*'},'Open fNIRS nir_filename');
+        nir_filename=[pathname nir_filename];
+
+        if(isempty(nir_filename)||~isstr(nir_filename))
+           return; 
+        end
+    end
+    
     channelCheck=true; %Plots raw channel light intensity and asks user to mark as either noisy, invalid, or clean
     mrk_filename=[];
+    autoLoadMrk=true;
 elseif nargin<3
+    if(isempty(nir_filename))
+        [nir_filename, pathname] = uigetfile({'*.nir';'*.*'},'Open fNIRS nir_filename');
+        nir_filename=[pathname nir_filename];
+
+        if(isempty(nir_filename)||~isstr(nir_filename))
+           return; 
+        end
+    end
+    
+    if(islogical(mrk_filename))
+        autoLoadMrk=mrk_filename; 
+    else
+       autoLoadMrk=false; 
+    end
     channelCheck=true; %Plots raw channel light intensity and asks user to mark as either noisy, invalid, or clean
-elseif nargin<5
+else
+    if(isempty(nir_filename))
+        [nir_filename, pathname] = uigetfile({'*.nir';'*.*'},'Open fNIRS nir_filename');
+        nir_filename=[pathname nir_filename];
+
+        if(isempty(nir_filename)||~isstr(nir_filename))
+           return; 
+        end
+    end
+    if(islogical(mrk_filename))
+        autoLoadMrk=mrk_filename; 
+    else
+       autoLoadMrk=false; 
+    end
     forceChannelCheck=true;
     % if channel Check is enabled, will force the GUI to load even if the
     % file already exists
@@ -65,6 +103,12 @@ end
 header.fname=nir_filename;
 
 fileroot=nir_filename(1:strfind(lower(nir_filename),'.nir')-1);
+
+if(autoLoadMrk)
+   mrk_filename=cell(2,1);
+   mrk_filename{1}=sprintf('%s.mrk',fileroot);
+   mrk_filename{2}=sprintf('%s_C.mrk',fileroot);
+end
 
 if(contains(fileroot,'_Dev'))
     fileroot=nir_filename(1:strfind(lower(nir_filename),'_Dev')-1);
