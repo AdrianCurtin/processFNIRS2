@@ -173,7 +173,7 @@ if(isfield(pf2ChannelCheck,'filepath')&&~isempty(pf2ChannelCheck.filepath))
 
     if exist(filestr, 'file') == 2
         chMaskFile=load(filestr,'fchMask');
-        pf2ChannelCheck.fchMask=chMaskFile.fchMask;
+        pf2ChannelCheck.fchMask=chMaskFile.fmask;
         fprintf('Channel mask loaded from: %s\n',filestr);
         
     else
@@ -746,8 +746,8 @@ if(isfield(pf2ChannelCheck,'fchMask')&&~isempty(pf2ChannelCheck.fchMask)&&~isemp
     if(~skipSave)
         pf2ChannelCheck.saved=true;
         
-        fchMask=pf2ChannelCheck.fchMask;
-        save(filestr,'fchMask');
+        fmask=pf2ChannelCheck.fchMask;
+        save(filestr,'fmask');
         fprintf('Channel mask saved to %s\n',filestr);
     end
     

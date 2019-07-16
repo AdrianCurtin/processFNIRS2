@@ -22,7 +22,7 @@ function varargout = exploreFNIRS_browse(varargin)
 
 % Edit the above text to modify the response to help exploreFNIRS_browse
 
-% Last Modified by GUIDE v2.5 16-Jul-2019 10:09:03
+% Last Modified by GUIDE v2.5 16-Jul-2019 11:05:53
 
 % Begin initialization code - DO NOT EDIT
 gui_Singleton = 1;
@@ -364,3 +364,23 @@ if(~isempty(data))
     end
 end
 
+
+% --- Executes on button press in pushbutton_prev.
+function pushbutton_prev_Callback(hObject, eventdata, handles)
+% hObject    handle to pushbutton_prev (see GCBO)
+% eventdata  reserved - to be defined in a future version of MATLAB
+% handles    structure with handles and user data (see GUIDATA)
+val=get(handles.listbox_dataTable,'Value');
+val=max(val-1,1);
+set(handles.listbox_dataTable,'Value',val);
+listbox_dataTable_Callback(hObject, eventdata, handles);
+
+% --- Executes on button press in pushbutton_next.
+function pushbutton_next_Callback(hObject, eventdata, handles)
+% hObject    handle to pushbutton_next (see GCBO)
+% eventdata  reserved - to be defined in a future version of MATLAB
+% handles    structure with handles and user data (see GUIDATA)
+val=get(handles.listbox_dataTable,'Value');
+val=min(val+1,length(get(handles.listbox_dataTable,'String')));
+set(handles.listbox_dataTable,'Value',val);
+listbox_dataTable_Callback(hObject, eventdata, handles);
