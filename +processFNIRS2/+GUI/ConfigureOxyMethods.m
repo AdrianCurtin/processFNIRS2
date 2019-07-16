@@ -1,4 +1,4 @@
-function varargout=ConfigureMethods(varargin)
+function varargout=ConfigureOxyMethods(varargin)
 
 % ConfigureMethods is a wrapper function for processFNIRS2_configureMethods
 

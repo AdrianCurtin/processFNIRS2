@@ -1273,6 +1273,7 @@ pf2_base.closeProgressHandles();
 
 ExFNIRS.selectedTable=table();
 ExFNIRS.selectedFNIR=cell(0);
+ExFNIRS.selectedIdx=[];
 
 strs=get(handles.listbox_subjectID,'String');
 selectedStrs=get(handles.listbox_subjectID,'Value');
@@ -1414,7 +1415,7 @@ end
 
 ExFNIRS.selectedTable=ExFNIRS.dataTable(sellFullIdx,:);
 
-
+ExFNIRS.selectedIdx=sellFullIdx;
 
 subColIdx=find(strcmp('SubjectID',ExFNIRS.dataTable.Properties.VariableNames));
 groupColIdx=find(strcmp('Group',ExFNIRS.dataTable.Properties.VariableNames));
@@ -1492,6 +1493,8 @@ if(processDataNow)
     end
 
     ExFNIRS.selectedFNIR=ExFNIRS.curProcessedData(sellFullIdx,:);
+    
+    
     
     
     preprocessFNIRSData();

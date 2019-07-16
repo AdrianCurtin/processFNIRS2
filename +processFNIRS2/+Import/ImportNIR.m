@@ -391,12 +391,20 @@ else
 end
 
 if(channelCheck)
-    fNIR=probeCheckGUI(fNIR,nir_filename,forceChannelCheck);
+    if(forceChannelCheck)
+        fNIR=probeCheckGUI(fNIR,nir_filename,forceChannelCheck);
+    else
+        fNIR=pf2_base.loadExistingMaskOrCheck(fNIR,nir_filename); 
+    end
 else
    if(~isempty(fmask))
        fNIR.fchMask=fmask; 
    end
 end
+
+end
+
+function loadExistingOrOpen()
 
 end
 

@@ -118,7 +118,7 @@ elseif(isstruct(varargin{1}))
     end
     
     if(isfield(pf2ChannelCheck.nirsData,'fchMask'))
-        pf2ChannelCheck.fmask=pf2ChannelCheck.nirsData.fchMask;
+        pf2ChannelCheck.fchMask=pf2ChannelCheck.nirsData.fchMask;
     end
     
     
@@ -139,7 +139,7 @@ elseif((isstring(varargin{1})||ischar(varargin{1}))&&length(varargin)>1)
     end
     
     if(isfield(pf2ChannelCheck.nirsData,'fchMask'))
-        pf2ChannelCheck.fmask=pf2ChannelCheck.nirsData.fchMask;
+        pf2ChannelCheck.fchMask=pf2ChannelCheck.nirsData.fchMask;
     end
     
     pf2ChannelCheck.filepath=varargin{2};
@@ -172,15 +172,15 @@ if(isfield(pf2ChannelCheck,'filepath')&&~isempty(pf2ChannelCheck.filepath))
     
 
     if exist(filestr, 'file') == 2
-        chMaskFile=load(filestr,'fmask');
-        pf2ChannelCheck.fmask=chMaskFile.fmask;
+        chMaskFile=load(filestr,'fchMask');
+        pf2ChannelCheck.fchMask=chMaskFile.fchMask;
         fprintf('Channel mask loaded from: %s\n',filestr);
         
     else
-        pf2ChannelCheck.fmask=[];
+        pf2ChannelCheck.fchMask=[];
     end
     
-    if(~pf2ChannelCheck.overwriteExisting&&~isempty(pf2ChannelCheck.fmask))
+    if(~pf2ChannelCheck.overwriteExisting&&~isempty(pf2ChannelCheck.fchMask))
         exitAndReturn(hObject, eventdata, handles,true)
         return;
     end
@@ -259,14 +259,14 @@ end
 
 
 
-if(isfield(pf2ChannelCheck,'fmask')&&~isempty(pf2ChannelCheck.fmask))
+if(isfield(pf2ChannelCheck,'fchMask')&&~isempty(pf2ChannelCheck.fchMask))
     if(isfield(pf2ChannelCheck.nirsData,'fchMask')&&~isempty(pf2ChannelCheck.nirsData.fchMask))
-        pf2ChannelCheck.fmask=pf2ChannelCheck.nirsData.fchMask;
+        pf2ChannelCheck.fchMask=pf2ChannelCheck.nirsData.fchMask;
     else
-         pf2ChannelCheck.fmask=ones(1,pf2ChannelCheck.numChannels);
+         pf2ChannelCheck.fchMask=ones(1,pf2ChannelCheck.numChannels);
     end
 else
-   pf2ChannelCheck.fmask=ones(1,pf2ChannelCheck.numChannels);
+   pf2ChannelCheck.fchMask=ones(1,pf2ChannelCheck.numChannels);
 end
 
 globalData=pf2ChannelCheck.nirsData.raw(:,...
@@ -332,6 +332,8 @@ if(pf2ChannelCheck.multiFigure)
     checkbox_multiFigureMode_Callback([], [], handles);
 end
 
+pf2ChannelCheck.orig_fmask=pf2ChannelCheck.fchMask;
+
 
 % This sets up the initial plot - only do when we are invisible
 % so window can get raised using probeCheckGUI.
@@ -345,6 +347,9 @@ end
 
 % UIWAIT makes probeCheckGUI wait for user response (see UIRESUME)
 uiwait(handles.figure1);
+
+
+
 
 
 function setUpAxes(handles,probInfo)
@@ -449,12 +454,12 @@ end
     
     yl=ylim();
 
-    if(pf2ChannelCheck.fmask(ch)==0) % big red x to mark rejected
+    if(pf2ChannelCheck.fchMask(ch)==0) % big red x to mark rejected
         th=text(mean(xl)/2+15,mean(yl),'X','FontSize',40,'color',[1,0,0]);
         set(th,'ButtonDownFcn',temp.ButtonDownFcn);
         set(th,'Tag',temp.Tag);
         hold on;
-    elseif(pf2ChannelCheck.fmask(ch)==0.5)
+    elseif(pf2ChannelCheck.fchMask(ch)==0.5)
         th=text(mean(xl)/2+15,mean(yl),'~','FontSize',50,'color',[ 0.9100,0.4100,0.1700]);
         set(th,'ButtonDownFcn',temp.ButtonDownFcn);
         set(th,'Tag',temp.Tag);
@@ -595,7 +600,7 @@ function varargout = probeCheckGUI_OutputFcn(hObject, eventdata, handles)
 
 global pf2ChannelCheck
 global pf2ChannelCheckHandles
-pf2ChannelCheck.nirsData.fchMask=pf2ChannelCheck.fmask;
+pf2ChannelCheck.nirsData.fchMask=pf2ChannelCheck.fchMask;
 varargout = {pf2ChannelCheck.nirsData};
 
 autoscale=pf2ChannelCheck.autoscale;
@@ -661,7 +666,7 @@ function rejectButton_Callback(hObject, eventdata, handles)
 global pf2ChannelCheck
 global pf2ChannelCheckHandles
 
-pf2ChannelCheck.fmask(pf2ChannelCheck.curChannel)=0;
+pf2ChannelCheck.fchMask(pf2ChannelCheck.curChannel)=0;
 axes(pf2ChannelCheckHandles.chAxesHandles{pf2ChannelCheck.curChannel});
 plotChannel(pf2ChannelCheck.curChannel,false);
 axes(pf2ChannelCheckHandles.chCurAxesHandle);
@@ -676,7 +681,7 @@ function noisyButton_Callback(hObject, eventdata, handles)
   
 global pf2ChannelCheck
 global pf2ChannelCheckHandles
-pf2ChannelCheck.fmask(pf2ChannelCheck.curChannel)=0.5;
+pf2ChannelCheck.fchMask(pf2ChannelCheck.curChannel)=0.5;
 axes(pf2ChannelCheckHandles.chAxesHandles{pf2ChannelCheck.curChannel});
 plotChannel(pf2ChannelCheck.curChannel,false);
 axes(pf2ChannelCheckHandles.chCurAxesHandle);
@@ -694,7 +699,7 @@ function cleanButton_Callback(hObject, eventdata, handles)
   
 global pf2ChannelCheck
 global pf2ChannelCheckHandles
-pf2ChannelCheck.fmask(pf2ChannelCheck.curChannel)=1;
+pf2ChannelCheck.fchMask(pf2ChannelCheck.curChannel)=1;
 axes(pf2ChannelCheckHandles.chAxesHandles{pf2ChannelCheck.curChannel});
 plotChannel(pf2ChannelCheck.curChannel,false);
 axes(pf2ChannelCheckHandles.chCurAxesHandle);
@@ -729,7 +734,7 @@ if(isfield(pf2ChannelCheck,'saved')&&~pf2ChannelCheck.saved)
 end
 
 %If not already loaded write output
-if(isfield(pf2ChannelCheck,'fmask')&&~isempty(pf2ChannelCheck.fmask)&&~isempty(pf2ChannelCheck.filepath))
+if(isfield(pf2ChannelCheck,'fchMask')&&~isempty(pf2ChannelCheck.fchMask)&&~isempty(pf2ChannelCheck.filepath))
    % doc fileparts:
     [pathstr, name, ext] = fileparts(pf2ChannelCheck.filepath);
     pathstr=sprintf('%s/',pathstr);
@@ -741,8 +746,8 @@ if(isfield(pf2ChannelCheck,'fmask')&&~isempty(pf2ChannelCheck.fmask)&&~isempty(p
     if(~skipSave)
         pf2ChannelCheck.saved=true;
         
-        fmask=pf2ChannelCheck.fmask;
-        save(filestr,'fmask');
+        fchMask=pf2ChannelCheck.fchMask;
+        save(filestr,'fchMask');
         fprintf('Channel mask saved to %s\n',filestr);
     end
     
@@ -802,13 +807,13 @@ b = eventdata.Button;
 if b==1
     
 else
-    switch pf2ChannelCheck.fmask(ch)
+    switch pf2ChannelCheck.fchMask(ch)
         case 0
-            pf2ChannelCheck.fmask(ch)=0.5;
+            pf2ChannelCheck.fchMask(ch)=0.5;
         case 0.5
-            pf2ChannelCheck.fmask(ch)=1;
+            pf2ChannelCheck.fchMask(ch)=1;
         case 1
-            pf2ChannelCheck.fmask(ch)=0;
+            pf2ChannelCheck.fchMask(ch)=0;
     end
 end
 
@@ -840,8 +845,8 @@ if(isfield(pf2ChannelCheck,'filepath')&&~isempty(pf2ChannelCheck.filepath))
         filestr=[pathstr,filestr];
     end
     %filestr=[pathstr,'/',name,'_CH.mat'];
-    fmask=pf2ChannelCheck.fmask;
-    save(filestr,'fmask');
+    fchMask=pf2ChannelCheck.fchMask;
+    save(filestr,'fchMask');
     
     fprintf('Channel mask saved to %s\n',filestr);
 end
@@ -929,7 +934,7 @@ function menu_close_Callback(hObject, eventdata, handles)
 % handles    structure with handles and user data (see GUIDATA)
   
 global pf2ChannelCheck
-pf2ChannelCheck.fmask=[];
+pf2ChannelCheck.fchMask=[];
 exitAndReturn(hObject, eventdata, handles)
 
 
@@ -940,7 +945,7 @@ function cancelbutton_Callback(hObject, eventdata, handles)
 % handles    structure with handles and user data (see GUIDATA)
   
 global pf2ChannelCheck
-pf2ChannelCheck.fmask=[];
+pf2ChannelCheck.fchMask=pf2ChannelCheck.orig_fmask;
 exitAndReturn(hObject, eventdata, handles,true)
 
 

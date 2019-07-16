@@ -5,7 +5,7 @@ function probeInfo=loadDeviceCfg(deviceCfgFilename,buildProbeLayout,includeSScha
 %   plot layouts and figures
 
 if(nargin<2)
-   buildProbeLayout=false; 
+   buildProbeLayout=true; 
 end
 
 if(nargin<3)
@@ -15,12 +15,29 @@ end
 pF2_folder=pf2_base.pf2_defaultRootPath();
 
 
+
+
 if(nargin>0||isempty(deviceCfgFilename)) % If file name is specified, try to load it
+    
+    global setF
+    
+    [devCfg_folder,name,ext] = fileparts(deviceCfgFilename);
+    
+    saveOptLayout2=false;
+    if(pf2_base.isnestedfield(setF,'device.Info.CfgName')&&(strcmpi(setF.device.Info.CfgName,name)))
+        if(~isfield(setF.device.Probe{1},'OptLayout2D')&&buildProbeLayout)
+            saveOptLayout2=true;
+        else
+            probeInfo=setF.device;
+            return;
+        end
+    end
+    
     
     fid = fopen(deviceCfgFilename);
     
     
-    [devCfg_folder,name,ext] = fileparts(deviceCfgFilename);
+    
     
     if fid==-1 && isempty(devCfg_folder) % if the file wasn't immediately accessible...
                         %try loading from root/devices
@@ -133,23 +150,27 @@ for j=1:length(probeInfo.cfg.Sections)
         if(buildProbeLayout) % auto generate plot layour
             if(isfield(p,'OptPosX')&&isfield(p,'OptPosY')&&~isfield(p,'OptPosZ'))
                 if(includeSSchannels)
-                    p.OptLayout2D=pf2_base.fitProbe2D(p.OptPosX,p.OptPosY);
-                else
-                    p.OptLayout2D=pf2_base.fitProbe2D(p.OptPosX(~p.IsShortSeparation),p.OptPosY(~p.IsShortSeparation));
+                    p.OptLayout2D_ss=pf2_base.fitProbe2D(p.OptPosX,p.OptPosY);
                 end
-            elseif(isfield(p,'OptPosX')&&isfield(p,'OptPosY')&&isfield(p,'OptPosZ'))
-                if(includeSSchannels)
-                    p.OptLayout2D=pf2_base.fitProbe2D(p.OptPosX,p.OptPosY,p.OptPosZ);
-                else
-                    p.OptLayout2D=pf2_base.fitProbe2D(p.OptPosX(~p.IsShortSeparation),p.OptPosY(~p.IsShortSeparation),p.OptPosZ(~p.IsShortSeparation));
-                end
+                p.OptLayout2D=pf2_base.fitProbe2D(p.OptPosX(~p.IsShortSeparation),p.OptPosY(~p.IsShortSeparation));
+            end
+            if(isfield(p,'OptPosX')&&isfield(p,'OptPosY')&&isfield(p,'OptPosZ'))
+            if(includeSSchannels)
+                p.OptLayout2D_ss=pf2_base.fitProbe2D(p.OptPosX,p.OptPosY,p.OptPosZ);
+            end
+            p.OptLayout2D=pf2_base.fitProbe2D(p.OptPosX(~p.IsShortSeparation),p.OptPosY(~p.IsShortSeparation),p.OptPosZ(~p.IsShortSeparation));
+                
                 
             else
                 warning('buildProbeLayout option selected, but not enough information to generate Optode locations');
                 p.OptLayout2D=setUpFalse2D(p.NumOptodes);  % generate false channels if not requested
             end
         else
-            p.OptLayout2D=setUpFalse2D(p.NumOptodes);  % generate false channels if not requested
+            %p.OptLayout2D=setUpFalse2D(p.NumOptodes);  % generate false channels if not requested
+        end
+        
+        if(saveOptLayout2&&isfield(p,'OptLayout2D'))
+            setF.device.Probe{probeCount}=p;
         end
         probeInfo.Probe{probeCount}=p;
     end
