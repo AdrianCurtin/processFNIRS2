@@ -362,7 +362,7 @@ end
 if(~isempty(data))
     newData=processFNIRS2.Data.EditChannelMaskGUI(ExFNIRS.data{curIdx}.info.filename);
     if(~isempty(newData))
-        ExFNIRS.data{curIdx}=newData;
+        ExFNIRS.data{curIdx}.fchMask=newData.fchMask;
     end
 end
 
