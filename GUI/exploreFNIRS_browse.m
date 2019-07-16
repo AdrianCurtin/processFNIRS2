@@ -224,6 +224,9 @@ function outStr=toNumOrStr(possibleStr)
     elseif(isnumeric(possibleStr))
         outStr=sprintf('%.2f',possibleStr);
     elseif(ischar(possibleStr)||isstring(possibleStr))
+        if(ismissing(possibleStr))
+            possibleStr='missing';
+        end
         outStr=sprintf('%s',possibleStr);
     elseif(islogical(possibleStr))
         outStr=sprintf('%i',possibleStr');
