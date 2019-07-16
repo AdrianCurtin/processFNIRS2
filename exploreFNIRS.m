@@ -4010,9 +4010,7 @@ for sH=1:length(subplotHandles)
         useAllInteractions=ExFNIRS.settings.LME_all_interactions;
         
         basicMdlStrings=cell(0);
-        if(numChartTimes>1)
-            basicMdlStrings{length(basicMdlStrings)+1}='Time';
-        end
+        
         
         if(ExFNIRS.settings.LME_info_covariate)
             basicMdlStrings{length(basicMdlStrings)+1}=ExFNIRS.settings.curInfoStr;
@@ -4049,6 +4047,10 @@ for sH=1:length(subplotHandles)
             end
 
             
+        end
+        
+        if(numChartTimes>1)
+            curLMEGbyString=sprintf('%s+Time',curLMEGbyString);
         end
         
         
