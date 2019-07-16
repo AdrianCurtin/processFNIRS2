@@ -142,8 +142,14 @@ elseif((isstring(varargin{1})||ischar(varargin{1}))&&length(varargin)>1)
         pf2ChannelCheck.fmask=pf2ChannelCheck.nirsData.fchMask;
     end
     
-    
     pf2ChannelCheck.filepath=varargin{2};
+    
+    if(pf2_base.isnestedfield(pf2ChannelCheck,'nirsData.info.filename'))
+        pf2ChannelCheck.filepath=pf2ChannelCheck.nirsData.info.filename;
+    end
+    
+    
+    
     
     
     if(length(varargin)>2) % pf2ChannelCheck.filepath
