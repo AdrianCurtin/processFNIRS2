@@ -1,7 +1,7 @@
 function [ fNIR] = ImportNIRX( folderDIR,channelCheck)
 %ImportNIRX imports data from NIRX device recordings
 
-if(nargin<1)
+if(nargin<2)
    channelCheck=true; 
    forceChannelCheck=false;
 else
@@ -17,10 +17,14 @@ if nargin < 1
   %error('Function requires at least one input argument');
 elseif ~ischar(folderDIR)
   error('Input must be a string representing a filename');
+else
+   pathname=''; 
 end
 
 if(isempty(pathname))
-    folderDIR(folderDIR=='\\')='/';
+    if(contains(folderDIR,'\\'))
+        folderDIR(folderDIR=='\\')='/';
+    end
 
     folderDIRparts=strsplit(folderDIR,'/');
 

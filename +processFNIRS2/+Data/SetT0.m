@@ -15,7 +15,7 @@ if(isfield(outFNIR,'markers'))
 end
 
 if(isfield(outFNIR,'raw'))
-   outFNIR.raw(:,1)= outFNIR.raw(:,1)-t0time;
+   %outFNIR.raw(:,1)= outFNIR.raw(:,1)-t0time;
 end
 
 

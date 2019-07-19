@@ -34,8 +34,8 @@ aCVx=abs(CVx);
 CVx_median=nanmedian(aCVx);
 lowerStd=nanstd(aCVx(aCVx<2*CVx_median));
 
-CVthreshold=CVx_median+tauArtifact*lowerStd;%CVx_median;
-CVthresholdClean=CVx_median+tauClean*lowerStd;%CVx_median;%+tauUpMult*CVx_median/2;
+CVthreshold=CVx_median*tauArtifact;%CVx_median;
+CVthresholdClean=CVx_median*tauClean;%CVx_median;%+tauUpMult*CVx_median/2;
 
 
 aCVxm=[zeros(1,size(x,2));aCVx;zeros(1,size(x,2))];

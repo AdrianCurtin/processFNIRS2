@@ -2,7 +2,7 @@ function [x_recon] = pf2_sSMART(x,fs,chNum,tauArtifact,tauClean,minSeg,SGdegree)
 
 ArtifactTime=3;
 
-N=round(ArtifactTime/fs);
+N=round(ArtifactTime*fs);
 
 %offset=nanmean(abs(x(:)))*100;
 
@@ -37,7 +37,7 @@ for ch=1:numCh
        lenMA=MA_ch(i,2)-MA_ch(i,1)+1;
        %MA_seg_smooth
        if(lenMA>2)
-            MA_seg_smooth = csaps(1:lenMA,MA_seg,0.01,1:lenMA)';%smooth(MA_seg,4,'loess');%,'sgolay',SGdegree);
+            MA_seg_smooth = csaps(1:lenMA,MA_seg,0.1,1:lenMA)';%smooth(MA_seg,4,'loess');%,'sgolay',SGdegree);
        else
             MA_seg_smooth = MA_seg;
        end
