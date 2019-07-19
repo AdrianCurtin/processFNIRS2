@@ -34,7 +34,14 @@ for ch=1:numCh
        end
        
        MA_seg=x([MA_ch(i,1):MA_ch(i,2)],ch);
-       MA_seg_smooth = smooth(MA_seg,4,'loess');%,'sgolay',SGdegree);
+       lenMA=MA_ch(i,2)-MA_ch(i,1)+1;
+       %MA_seg_smooth
+       if(lenMA>2)
+            MA_seg_smooth = csaps(1:lenMA,MA_seg,0.01,1:lenMA)';%smooth(MA_seg,4,'loess');%,'sgolay',SGdegree);
+       else
+            MA_seg_smooth = MA_seg;
+       end
+       
        MA_seg_cleaned = MA_seg-interpft(MA_seg_smooth,length(MA_seg_smooth));
        
        if(i==1)
@@ -43,8 +50,8 @@ for ch=1:numCh
            cleanSegIdx=[MA_ch(i-1,2)+1,MA_ch(i,1)-1];
        end
        
-       lenClean=cleanSegIdx(2)-cleanSegIdx(1);
-       lenMA=MA_ch(i,2)-MA_ch(i,1);
+       lenClean=cleanSegIdx(2)-cleanSegIdx(1)+1;
+       
        
        cleanSeg=x((cleanSegIdx(1):cleanSegIdx(2)),ch);
        
@@ -74,7 +81,7 @@ for ch=1:numCh
        if(lenMA<=beta)
            b=nanmean(MA_seg_cleaned(1:min(alpha,lenMA)));
            MA_seg_cleaned=MA_seg_cleaned-(b-a);
-           MA_a=nanmean(MA_seg_cleaned(end-min(alpha,lenMA):end)); %use to adjust next clean segment
+           MA_a=nanmean(MA_seg_cleaned(end-min(alpha,(lenMA-1)):end)); %use to adjust next clean segment
        else
            b=nanmean(MA_seg_cleaned(1:round(0.1*lenMA)));
            MA_seg_cleaned=MA_seg_cleaned-(b-a);
