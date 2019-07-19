@@ -1,13 +1,13 @@
-function [x_recon] = pf2_sSMART(x,fs,tauArtifact,tauClean,minSeg,SGdegree)
+function [x_recon] = pf2_sSMART(x,fs,chNum,tauArtifact,tauClean,minSeg,SGdegree)
 
 ArtifactTime=3;
 
 N=round(ArtifactTime/fs);
 
-offset=nanmean(abs(x(:)))*100;
+%offset=nanmean(abs(x(:)))*100;
 
-[Xcorr, maskCV, MA_idx]=pf2_SMAR2(x+offset,N,tauArtifact,tauClean,minSeg);
-Xcorr=Xcorr-offset;
+[Xcorr, maskCV, MA_idx]=pf2_SMAR2(x,N,chNum,tauArtifact,tauClean,minSeg);
+%Xcorr=Xcorr-offset;
 
 numCh=size(x,2);
 
@@ -34,7 +34,7 @@ for ch=1:numCh
        end
        
        MA_seg=x([MA_ch(i,1):MA_ch(i,2)],ch);
-       MA_seg_smooth = smooth(MA_seg,4,'sgolay',SGdegree);
+       MA_seg_smooth = smooth(MA_seg,4,'loess');%,'sgolay',SGdegree);
        MA_seg_cleaned = MA_seg-interpft(MA_seg_smooth,length(MA_seg_smooth));
        
        if(i==1)
@@ -85,7 +85,12 @@ for ch=1:numCh
            z=1;
        end
            
-       
+%        figure(4);
+%        subplot(1,2,1);
+%        plot(cleanSeg);
+%        subplot(1,2,2);
+%        plot(MA_seg_cleaned);
+%        
           
        x_recon(MA_ch(i,1):MA_ch(i,2),ch)=MA_seg_cleaned;
        
