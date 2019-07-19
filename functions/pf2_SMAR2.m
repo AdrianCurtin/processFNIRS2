@@ -1,4 +1,4 @@
-function [Xcorr, maskCV, MA_idx]=pf2_SMAR2(x,N,tauArtifact,tauClean,minSeg)
+function [Xcorr, maskCV, MA_idx]=pf2_SMAR2(x,N,chNum,tauArtifact,tauClean,minSeg)
 % Implementation of Sliding Motion Artificat Rejection algorithim from Ayaz, 2010
 % Updated with expansion to remove artifacts from start
 
@@ -8,14 +8,18 @@ elseif nargin==1
      N=10;  %Default Window Length
 end
 
-if(nargin<3)
+if(nargin<3||isempty(chNum))
+   chNum=1:size(x,2); 
+end
+
+if(nargin<4)
      tauArtifact=3;
 end
-if(nargin<4)
+if(nargin<5)
      tauClean=1;
 end
 
-if(nargin<5)
+if(nargin<6)
     minSeg=N/2;
 end
 
@@ -31,7 +35,7 @@ CVx_median=nanmedian(aCVx);
 lowerStd=nanstd(aCVx(aCVx<2*CVx_median));
 
 CVthreshold=CVx_median+tauArtifact*lowerStd;%CVx_median;
-CVthresholdClean=CVx_median+tauClean*lowerStd/2;%CVx_median;%+tauUpMult*CVx_median/2;
+CVthresholdClean=CVx_median+tauClean*lowerStd;%CVx_median;%+tauUpMult*CVx_median/2;
 
 
 aCVxm=[zeros(1,size(x,2));aCVx;zeros(1,size(x,2))];
@@ -57,6 +61,26 @@ for(i=1:size(x,2))
        end
    end
    
+end
+
+[uCh,~,uChIdx]=unique(chNum);
+
+if(length(uCh)<length(chNum))
+   for i=1:length(uCh)
+      chMatch=find(uChIdx==i);
+      
+      if(length(chMatch)<=1)
+          continue;
+      end
+      
+      temp=any(maskCV(:,chMatch),2);
+      
+      maskCV(:,chMatch)=repmat(temp,[1,length(chMatch)]);
+      
+   end
+end
+
+for(i=1:size(x,2))
    dX=diff([0;maskCV(:,i);0]);
    
    segMaskStart=find(dX==1);
