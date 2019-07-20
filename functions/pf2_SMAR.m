@@ -13,7 +13,7 @@ if(nargin<3)
 end
 
 if(nargin<4)
-    tauLow=0.003;
+    tauLow=-1; % don't use unless using with dark channel
 end
 
 if(N<1)
@@ -67,7 +67,7 @@ CVx=nan(len,wid);
 for i=wSize+1:len-wSize
     idx=i-wSize:i+wSize;
     x_val=x(idx,:);
-    CVx(i,:)=std(x_val)/nanmean(x_val);
+    CVx(i,:)=nanstd(x_val)./nanmean(x_val);
 end
 
 

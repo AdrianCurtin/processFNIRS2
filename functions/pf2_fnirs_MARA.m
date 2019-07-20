@@ -73,7 +73,7 @@ for ch=1:numCh
     [x_n] = MARemoval(segments,alpha);
 
     % (4) Signal reconstruction
-    [y(:,ch)] = MAReconstruction(segments,x_n)';
+    [y(:,ch)] = MAReconstruction(segments,x_n,fs)';
 
 
     %__________________________________________________________________________
@@ -192,7 +192,7 @@ A_Idx = q1(d);
 
 
 
-function [y] = MAReconstruction(segments,x_n)
+function [y] = MAReconstruction(segments,x_n,fs)
 
 % INPUT
 % segments:	Array containing the segments of x
@@ -209,30 +209,30 @@ for i = 2:2:size(segments,2)
 end
 
 for i = 2:size(segmentsNEU,2)
-    if length(segmentsNEU{2,i-1})<=30
+    if length(segmentsNEU{2,i-1})<=round(fs/3)
         a = mean(segmentsNEU{2,i-1}(1:end));
-        if length(segmentsNEU{2,i})<=30
+        if length(segmentsNEU{2,i})<=round(fs/3)
             b = mean(segmentsNEU{2,i}(1:end));
-        elseif ((length(segmentsNEU{2,i})>30) && (length(segmentsNEU{2,i})<200))
-            b = mean(segmentsNEU{2,i}(1:30));
+        elseif ((length(segmentsNEU{2,i})>round(fs/3)) && (length(segmentsNEU{2,i})<round(fs*2)))
+            b = mean(segmentsNEU{2,i}(1:round(fs/3)));
         else
             b = mean(segmentsNEU{2,i}(1:round(0.1*end)));
         end
-    elseif ((length(segmentsNEU{2,i-1})>30) && (length(segmentsNEU{2,i-1})<200))
-        a = mean(segmentsNEU{2,i-1}(end-30:end));
-        if length(segmentsNEU{2,i})<=30
+    elseif ((length(segmentsNEU{2,i-1})>round(fs/3)) && (length(segmentsNEU{2,i-1})<round(fs*2)))
+        a = mean(segmentsNEU{2,i-1}(end-round(fs/3):end));
+        if length(segmentsNEU{2,i})<=round(fs/3)
             b = mean(segmentsNEU{2,i}(1:end));
-        elseif ((length(segmentsNEU{2,i})>30) && (length(segmentsNEU{2,i})<200))
-            b = mean(segmentsNEU{2,i}(1:30));
+        elseif ((length(segmentsNEU{2,i})>round(fs/3)) && (length(segmentsNEU{2,i})<round(fs*2)))
+            b = mean(segmentsNEU{2,i}(1:round(fs/3)));
         else
             b = mean(segmentsNEU{2,i}(1:round(0.1*end)));
         end
     else 
         a = mean(segmentsNEU{2,i-1}(end-round(0.1*end):end)); 
-        if length(segmentsNEU{2,i})<=30
+        if length(segmentsNEU{2,i})<=round(fs/3)
             b = mean(segmentsNEU{2,i}(1:end));
-        elseif ((length(segmentsNEU{2,i})>30) && (length(segmentsNEU{2,i})<200))
-            b = mean(segmentsNEU{2,i}(1:30));
+        elseif ((length(segmentsNEU{2,i})>round(fs/3)) && (length(segmentsNEU{2,i})<round(fs*2)))
+            b = mean(segmentsNEU{2,i}(1:round(fs/3)));
         else
             b = mean(segmentsNEU{2,i}(1:round(0.1*end)));
         end       

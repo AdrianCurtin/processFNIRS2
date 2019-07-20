@@ -421,7 +421,10 @@ if(nargout>0)
     
    if(isfield(fData,'stage')&&(size(fData.stage,2)==5))
        if(outputData.ProcessOxy&&~isempty(fData.stage{5}))
-          outfNIR=fData.stage{5};
+           stage5fields=fields(fData.stage{5});
+            for i=1:length(stage5fields)
+                outfNIR.(stage5fields{i})=fData.stage{5}.(stage5fields{i});
+            end
           if(~isempty(fData.stage{1}))
             outfNIR.raw=fData.stage{1};
           end

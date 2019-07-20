@@ -1425,7 +1425,10 @@ if(nargout>0)
     
    if(isfield(PF2,'data')&&isfield(PF2.data,'stage')&&(size(PF2.data.stage,2)==5))
        if(outputData.ProcessOxy&&~isempty(PF2.data.stage{5}))
-          outfNIR=PF2.data.stage{5};
+            stage5fields=fields(PF2.data.stage{5});
+            for i=1:length(stage5fields)
+                outfNIR.(stage5fields{i})=PF2.data.stage{5}.(stage5fields{i});
+            end
           if(~isempty(PF2.data.stage{1}))
             outfNIR.raw=PF2.data.stage{1};
           end
@@ -2578,8 +2581,8 @@ function BuildProbeTables()
 global PF2
 global setF
 
-probeTable=table([],[],[],[],[],'VariableNames',{'ProbeNum','Index','Optode','Wv','Label'});
-optodeTable=table([],[],[],[],[],[],{},'VariableNames',{'ProbeNum','Optode','ManualRej','AutoRej','IsROI','Label','Optodes_roi'});
+probeTable=table([],[],[],[],{},'VariableNames',{'ProbeNum','Index','Optode','Wv','Label'});
+optodeTable=table([],[],[],[],[],{},{},'VariableNames',{'ProbeNum','Optode','ManualRej','AutoRej','IsROI','Label','Optodes_roi'});
 for i=1:length(setF.device.Probe)
     probeNum=i;
     rawChannels=setF.device.Probe{probeNum}.ChannelNumbers;
@@ -2592,9 +2595,9 @@ for i=1:length(setF.device.Probe)
     probeTable.ProbeNum(startIdx_probe:endIdx_probe)=probeNum;
     probeTable.Wv(startIdx_probe:endIdx_probe)=setF.device.Probe{probeNum}.Wavelength;
     
-    if(i==1)%need to convert to string only the first time
-        probeTable.Label=cellstr(num2str(probeTable.Label));
-    end
+    %if(i==1)%need to convert to string only the first time
+    %    probeTable.Label{startIdx_probe:endIdx_probe}=num2str(probeTable.Label);
+    %end
     
     for ch=1:numCh
         idx=startIdx_probe+ch-1;
@@ -2607,14 +2610,12 @@ for i=1:length(setF.device.Probe)
     startIdx_opt=size(optodeTable,1)+1;
     endIdx_opt=numOpt;
     
-    optodeTable.ProbeNum(startIdx_opt:endIdx_opt)=probeNum;
-    optodeTable.Optode(startIdx_opt:endIdx_opt)=probeOptodes;
-    optodeTable.IsROI(startIdx_opt:endIdx_opt)=false;
+    optodeTable.ProbeNum(startIdx_opt:endIdx_opt,1)=probeNum;
+    optodeTable.Optode(startIdx_opt:endIdx_opt,1)=probeOptodes;
+    optodeTable.IsROI(startIdx_opt:endIdx_opt,1)=false;
     
 
-    if(i==1)
-        optodeTable.Label=cellstr(num2str(optodeTable.Label));
-    end
+   
 end
 
 
