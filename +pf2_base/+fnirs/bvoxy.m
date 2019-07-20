@@ -103,9 +103,6 @@ else
 end
 
 
-
-
-
 HbO=zeros(len,numCh);
 HbR=zeros(len,numCh);
 
