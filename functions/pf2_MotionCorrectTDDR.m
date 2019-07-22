@@ -37,7 +37,7 @@ for ii=1:length(lstAct)
     if Fc<1
         [fb,fa] = butter(filter_order,Fc);
         try
-            signal_low = filtfilt(fb,fa,dod(:,idx_ch));
+            signal_low = pf2_base.filtfilt_piecewise(fb,fa,dod(:,idx_ch),10);
         catch 
             signal_low = pf2_base.external.filtfilt_classic(fb,fa,dod(:,idx_ch));
         end

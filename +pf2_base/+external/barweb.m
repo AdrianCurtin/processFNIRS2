@@ -112,13 +112,15 @@ elseif nargin == 11
 	legend_type = 'plot';
 end
 
+
 change_axis = 0;
 ymax = 0;
 
 if size(barvalues,1) ~= size(errors,1) || size(barvalues,2) ~= size(errors,2)
 	error('barvalues and errors matrix must be of same dimension');
 else
-	if size(barvalues,2) == 1 && size(barvalues,1)~=size(groupnames,1)&&~isempty(groupnames)
+	if size(barvalues,2) == 1 && size(barvalues,1)~=length(groupnames)&&~isempty(groupnames)
+        warning('Mismatch between groupnames and columns, assuming data is transposed');
 		barvalues = barvalues';
 		errors = errors';
  	end
@@ -169,6 +171,8 @@ else
         if(length(bw_legend)>=i&&~isempty(bw_legend{i}))
             set(handles.errors(i),'Tag',bw_legend{i});
         end
+        set(handles.errors(i),'HandleVisibility','off');
+        
         
         nonNanErrors=errors;
         nonNanErrors(isnan(errors))=0;
