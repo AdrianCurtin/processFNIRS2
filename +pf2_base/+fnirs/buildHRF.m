@@ -35,9 +35,8 @@ iEnd=find(hrf<0);
 
 hrf=[time;hrf]';
 
-%hrf=hrf(1:iEnd,:);
+hrf=hrf(1:iEnd,:);
 
-hrf(iEnd:end,2)=0;
 
 end
 

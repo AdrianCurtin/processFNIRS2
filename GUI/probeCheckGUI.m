@@ -86,6 +86,7 @@ pf2ChannelCheck.autoscale=get(handles.checkbox_autoscale,'Value');
 pf2ChannelCheck.mark_noisy=get(handles.checkbox_automark_noisy,'Value');
 
 pf2ChannelCheck.noisyThreshold=0.1;
+pf2ChannelCheck.overwriteExisting=false;
 
 
 if(~isfield(pf2ChannelCheck,'showMarkers'))

@@ -1,4 +1,4 @@
-function outFNIR=setT0(fnirStruct,t0time)
+function outFNIR=SetT0(fnirStruct,t0time)
 
 %This function takes an incoming fNIRstruct and shifts the time such that
 %t0 is now 0;

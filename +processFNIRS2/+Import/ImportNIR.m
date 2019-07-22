@@ -381,9 +381,9 @@ if(~channelCheck)
     try
         fmask=load(ch_mask_file,'fmask');
         fmask=fmask.fmask;
-        fprintf('%i Channels marked bad\n',sum(fmask<1));
+        fprintf('\n%i Channels marked bad\n',sum(fmask<1));
     catch
-        fprintf('No channel rejection present\n');
+        fprintf('\nNo channel rejection present\n');
         fmask=[];
     end
 else
