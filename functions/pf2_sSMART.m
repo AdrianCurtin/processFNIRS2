@@ -1,6 +1,10 @@
-function [x_recon] = pf2_sSMART(x,fs,chNum,tauArtifact,tauClean,minSeg,SGdegree)
+function [x_recon] = pf2_sSMART(x,fs,chNum,tauArtifact,tauClean,minSeg,ArtifactTime)
 
-ArtifactTime=3;
+if(nargin<7)
+    ArtifactTime=10;
+end
+
+
 
 N=round(ArtifactTime*fs);
 
@@ -37,7 +41,7 @@ for ch=1:numCh
        lenMA=MA_ch(i,2)-MA_ch(i,1)+1;
        %MA_seg_smooth
        if(lenMA>2)
-            MA_seg_smooth = csaps(1:lenMA,MA_seg,0.1,1:lenMA)';%smooth(MA_seg,4,'loess');%,'sgolay',SGdegree);
+            MA_seg_smooth = smooth(MA_seg,4,'loess');%,'sgolay',SGdegree);% csaps(1:lenMA,MA_seg,0.1,1:lenMA)';%
        else
             MA_seg_smooth = MA_seg;
        end

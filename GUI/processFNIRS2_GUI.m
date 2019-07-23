@@ -75,7 +75,7 @@ end
 
 
 PF2.GUIPF2=struct();
-PF2.view.processWindowOnly=false; %GUI option to only process the current window of data
+PF2.GUIPF2.processWindowOnly=false; %GUI option to only process the current window of data
 
 
 %%
@@ -206,7 +206,7 @@ elseif(isempty(data)||(isstruct(data)&&isfield(data,'info')&&~isfield(data,'raw'
 end
 
 for i=1:5
-   PF2.data.stage{i}=[];
+   PF2.GUIPF2.data.stage{i}=[];
 end
 
 tempOxyStage=[];
@@ -247,7 +247,7 @@ if(isstruct(data)) %treat as fNIR struct
            memberIdx=ismember(altSpellings{j},curField);
            if(any(memberIdx))
                 if(strcmpi(validBioFields{j},'raw'))
-                    PF2.data.stage{1}=data.(curField);
+                    PF2.GUIPF2.data.stage{1}=data.(curField);
                 else
                     tempOxyStage.(validBioFields{j})=data.(curField);
                 end
@@ -265,52 +265,52 @@ if(isstruct(data)) %treat as fNIR struct
                     strcmpi(validFields{memberIdx},'DPF_factor'))
                 tempOxyStage.(validFields{memberIdx})=data.(curField);
             else
-                PF2.data.(validFields{memberIdx})=data.(curField);
+                PF2.GUIPF2.data.(validFields{memberIdx})=data.(curField);
             end
        end
     end
 
     
-    if(~isfield(PF2.data,'markers'))
-       PF2.data.markers=[]; 
+    if(~isfield(PF2.GUIPF2.data,'markers'))
+       PF2.GUIPF2.data.markers=[]; 
     end
     
-    if(~isfield(PF2.data,'info'))
-        PF2.data.info=[]; 
+    if(~isfield(PF2.GUIPF2.data,'info'))
+        PF2.GUIPF2.data.info=[]; 
     end
     
-    if(~isfield(PF2.data,'Aux'))
-        PF2.data.Aux=[];
+    if(~isfield(PF2.GUIPF2.data,'Aux'))
+        PF2.GUIPF2.data.Aux=[];
     end
     
     [defaultInfoFields,defaultValues]=pf2_base.pf2_getDefaultInfoFields();
     
     for i=1:length(defaultInfoFields)
-        if(~isfield(PF2.data.info,defaultInfoFields{i}))
-            PF2.data.info.(defaultInfoFields{i})=defaultValues{i};
+        if(~isfield(PF2.GUIPF2.data.info,defaultInfoFields{i}))
+            PF2.GUIPF2.data.info.(defaultInfoFields{i})=defaultValues{i};
         end
     end
     
     if(isfield(data,'ROI')&&isstruct(data.ROI)&&pf2_base.isnestedfield(data,'ROI.info'))
-        PF2.data.ROI=data.ROI;
+        PF2.GUIPF2.data.ROI=data.ROI;
     elseif(isfield(data,'ROI')&&iscell(data.ROI))
-        PF2.data.ROI=[];
-        PF2.data.ROI.info=data.ROI;
+        PF2.GUIPF2.data.ROI=[];
+        PF2.GUIPF2.data.ROI.info=data.ROI;
     end
 end
 
 
-if(isempty(PF2.data.info.Age))
+if(isempty(PF2.GUIPF2.data.info.Age))
    warning('fData.info.Age is empty\nDPF calculations will be performed using an age of %i years old\nPlease assign subject age for accurate chromophore calculations',PF2.curDPF_age);
 
 end
 
 if(~isempty(p.Results.markers))
-    PF2.data.markers=p.Results.markers; %Overwrite markers if specified
+    PF2.GUIPF2.data.markers=p.Results.markers; %Overwrite markers if specified
 end
 
 if(isstruct(tempOxyStage))
-    PF2.data.stage{4}=tempOxyStage; %Assign stage3 if exists
+    PF2.GUIPF2.data.stage{4}=tempOxyStage; %Assign stage3 if exists
 end
 
 skipCFG=false;
@@ -355,28 +355,28 @@ end
 
 updateCurrentDevice();
 
-[numDataRows,numDataCols]=size(PF2.data.stage{1});
+[numDataRows,numDataCols]=size(PF2.GUIPF2.data.stage{1});
 numDevCols=length(setF.device.Probe{1}.ChannelNumbers);
 while(numDataCols~=numDevCols)
     
     if(numDataCols==numDataRows)
-       PF2.data.stage{1}=PF2.data.stage{1}';
+       PF2.GUIPF2.data.stage{1}=PF2.GUIPF2.data.stage{1}';
        break;
     else
        fprintf('Data size %i x %i: Expected %i columns in loaded device',numDevCols);
        warning('Channel/Device mismatch, please load new configuration file');
        pf2_base.loadDeviceCfg();
     end
-    [numDataRows,numDataCols]=size(PF2.data.stage{1});
+    [numDataRows,numDataCols]=size(PF2.GUIPF2.data.stage{1});
     numDevCols=length(setF.device.Probe{1}.ChannelNumbers);  
 end
 
-if(~isfield(PF2.data,'fchMask')||(isfield(PF2.data,'fchMask')&&isempty(PF2.data.fchMask)))
-    PF2.data.fchMask=true(1,length(setF.device.Probe{1}.ChannelList));
+if(~isfield(PF2.GUIPF2.data,'fchMask')||(isfield(PF2.GUIPF2.data,'fchMask')&&isempty(PF2.GUIPF2.data.fchMask)))
+    PF2.GUIPF2.data.fchMask=true(1,length(setF.device.Probe{1}.ChannelList));
 end
 
 numChannels=length(setF.device.Probe{1}.ChannelList);
-PF2.data.rawMask=ismember(setF.device.Probe{1}.ChannelNumbers,setF.device.Probe{1}.ChannelList(reshape(PF2.data.fchMask>PF2.RejectLevel|outputData.ProcessRejected,[1,numChannels])));
+PF2.GUIPF2.data.rawMask=ismember(setF.device.Probe{1}.ChannelNumbers,setF.device.Probe{1}.ChannelList(reshape(PF2.GUIPF2.data.fchMask>PF2.RejectLevel|outputData.ProcessRejected,[1,numChannels])));
 
 
 if(~isempty(data))
@@ -388,8 +388,8 @@ if(~outputData.ShowGUI)
     return;
 end
 
-if(isfield(PF2.data,'markers')&&~isempty(PF2.data.markers))
-    PF2.curMarkerSet=sort(unique(PF2.data.markers(:,2)));
+if(isfield(PF2.GUIPF2.data,'markers')&&~isempty(PF2.GUIPF2.data.markers))
+    PF2.curMarkerSet=sort(unique(PF2.GUIPF2.data.markers(:,2)));
     mrkStr=cell(length(PF2.curMarkerSet),1);
     for i=1:length(PF2.curMarkerSet)
        mrkStr{i}=sprintf('%i',PF2.curMarkerSet(i));
@@ -444,40 +444,40 @@ global setF
 clearAutoRejectedChannels();
 
 if(outputData.ProcessRaw)
-    if(PF2.view.processWindowOnly)
-        croppedData=PF2.data.stage{1};
-        startSample=find(PF2.data.time>=PF2.view.startTime,1);
-        endSample=find(PF2.data.time>PF2.view.endTime,1);
+    if(PF2.GUIPF2.processWindowOnly)
+        croppedData=PF2.GUIPF2.data.stage{1};
+        startSample=find(PF2.GUIPF2.data.time>=PF2.GUIPF2.view.startTime,1);
+        endSample=find(PF2.GUIPF2.data.time>PF2.GUIPF2.view.endTime,1);
         croppedData(1:(startSample-1),:)=nan;
         croppedData(endSample:end,:)=nan;
-        [PF2.data.stage{3},PF2.data.stage{2}]=processStageRaw2OD(croppedData); % Raw data processing
+        [PF2.GUIPF2.data.stage{3},PF2.GUIPF2.data.stage{2}]=processStageRaw2OD(croppedData); % Raw data processing
     else
-        [PF2.data.stage{3},PF2.data.stage{2}]=processStageRaw2OD(PF2.data.stage{1}); % Raw data processing
+        [PF2.GUIPF2.data.stage{3},PF2.GUIPF2.data.stage{2}]=processStageRaw2OD(PF2.GUIPF2.data.stage{1}); % Raw data processing
     end
     
     if(outputData.ProcessOxy)
-        PF2.data.stage{4}=processStageOD2Hb(PF2.data.stage{3},PF2.GUIPF2.curDPF_age); % Beer-Lambert conversion
+        PF2.GUIPF2.data.stage{4}=processStageOD2Hb(PF2.GUIPF2.data.stage{3},PF2.GUIPF2.curDPF_age); % Beer-Lambert conversion
     end
     
     if(pf2_base.isnestedfield(PF2,'data.ROI.info'))
-        PF2.data.stage{4}.ROI.info=PF2.data.ROI.info; %Regenerate from info
+        PF2.GUIPF2.data.stage{4}.ROI.info=PF2.GUIPF2.data.ROI.info; %Regenerate from info
     end
 else
-    PF2.data.stage{2}=PF2.data.stage{1};
-    if(~isempty(PF2.data.stage{4})&&~isfield(PF2.data.stage{4},'channels'))
-       PF2.data.stage{4}.channels=setF.device.Probe{1}.ChannelList;
+    PF2.GUIPF2.data.stage{2}=PF2.GUIPF2.data.stage{1};
+    if(~isempty(PF2.GUIPF2.data.stage{4})&&~isfield(PF2.GUIPF2.data.stage{4},'channels'))
+       PF2.GUIPF2.data.stage{4}.channels=setF.device.Probe{1}.ChannelList;
        warning('No channel information given, assuming all columns indexs correspond with channel numbers');
     end
     if(pf2_base.isnestedfield(PF2,'data.ROI.info'))
-        PF2.data.stage{4}.ROI=PF2.data.ROI; %Use all ROI information
+        PF2.GUIPF2.data.stage{4}.ROI=PF2.GUIPF2.data.ROI; %Use all ROI information
     end
 end
 
 
 if(outputData.ProcessOxy)
-    PF2.data.stage{5}=processStageFilterHb(PF2.data.stage{4}); % Oxy data processing
+    PF2.GUIPF2.data.stage{5}=processStageFilterHb(PF2.GUIPF2.data.stage{4}); % Oxy data processing
 else
-    PF2.data.stage{5}=PF2.data.stage{4};
+    PF2.GUIPF2.data.stage{5}=PF2.GUIPF2.data.stage{4};
 end
 
 
@@ -490,10 +490,10 @@ global PF2
 outData=data;
 OD_converted=false;
 
-validChannels=((PF2.curWvSet>0)&PF2.data.rawMask);  %Dark Channel should be 0, time should be NA, other information should be negative values
-validDarkChannels=((PF2.curWvSet==0)&PF2.data.rawMask);
+validChannels=((PF2.curWvSet>0)&PF2.GUIPF2.data.rawMask);  %Dark Channel should be 0, time should be NA, other information should be negative values
+validDarkChannels=((PF2.curWvSet==0)&PF2.GUIPF2.data.rawMask);
 
-curRawMask=PF2.data.rawMask;
+curRawMask=PF2.GUIPF2.data.rawMask;
 
 timeChMask=ones(size(data));
 
@@ -596,10 +596,10 @@ else
                   passedArgVals{x_ind}=data(validRows,validChannels);
                elseif strcmp(args{a},'fs')==1
                   fs_ind=a; 
-                  passedArgVals{fs_ind}=PF2.data.fs;
+                  passedArgVals{fs_ind}=PF2.GUIPF2.data.fs;
                elseif strcmp(args{a},'fTime')==1
                   time_ind=a; 
-                  passedArgVals{time_ind}=PF2.data.time(validRows);
+                  passedArgVals{time_ind}=PF2.GUIPF2.data.time(validRows);
                elseif strcmp(args{a},'fchMask')==1
                   fmask_ind=a;
                   passedArgVals{fmask_ind}=curRawMask(:,validChannels);
@@ -614,10 +614,10 @@ else
                   passedArgVals{fsd_ind}=PF2.curSDSet(ismember(PF2.curChList,PF2.curChSet(validChannels)));
                elseif strcmp(args{a},'fMarkers')==1
                   fmrk_ind=a; 
-                  passedArgVals{fmrk_ind}=PF2.data.markers;
+                  passedArgVals{fmrk_ind}=PF2.GUIPF2.data.markers;
                elseif strcmp(args{a},'fAux')==1
                   fAux_ind=a;
-                  passedArgVals{fAux_ind}=PF2.data.Aux;
+                  passedArgVals{fAux_ind}=PF2.GUIPF2.data.Aux;
                elseif strcmp(args{a},'fAmbient')==1
                   fAmb_ind=a;
                   passedArgVals{fAmb_ind}=data(validRows,validDarkChannels);
@@ -718,18 +718,18 @@ global outputData
 
 
 if(outputData.DirtyBaseline)
-    baselineSamples=1:length(PF2.data.time);
+    baselineSamples=1:length(PF2.GUIPF2.data.time);
 else
-    if(PF2.GUIPF2.baseline.relative2View==1||PF2.view.processWindowOnly)
-        startTime=PF2.view.startTime+PF2.GUIPF2.baseline.windowStartTime;
-        endTime=PF2.view.startTime+PF2.GUIPF2.baseline.windowStartTime+PF2.GUIPF2.baseline.blLength;
+    if(PF2.GUIPF2.baseline.relative2View==1||PF2.GUIPF2.processWindowOnly)
+        startTime=PF2.GUIPF2.view.startTime+PF2.GUIPF2.baseline.windowStartTime;
+        endTime=PF2.GUIPF2.view.startTime+PF2.GUIPF2.baseline.windowStartTime+PF2.GUIPF2.baseline.blLength;
     else
-        startTime=min(PF2.data.time)+PF2.GUIPF2.baseline.startTime;
+        startTime=min(PF2.GUIPF2.data.time)+PF2.GUIPF2.baseline.startTime;
         endTime=startTime+PF2.GUIPF2.baseline.blLength;
     end
 
-    startSample=find(PF2.data.time>=startTime,1);
-    endSample=find(PF2.data.time>=endTime,1);
+    startSample=find(PF2.GUIPF2.data.time>=startTime,1);
+    endSample=find(PF2.GUIPF2.data.time>=endTime,1);
     baselineSamples=startSample:endSample;
 
 end
@@ -753,7 +753,7 @@ end
     
 [outData.HbO, outData.HbR, outData.HbTotal, outData.HbDiff,outData.CBSI,outData.channels,~,outData.units,outData.DPF_factor]=...
     pf2_base.fnirs.bvoxy(data,setF.device.Probe{1}.ChannelNumbers,setF.device.Probe{1}.Wavelength,setF.device.Probe{1}.SD,baselineSamples,subAge,[],true,'NoPathlength',NoPathlength,'DiffPathlengthFactor',fixedDPF);
-outData.time=PF2.data.time;
+outData.time=PF2.GUIPF2.data.time;
 
                                                           %BASELINE
                                                           %START/END
@@ -772,9 +772,9 @@ bioM_list={'HbO','HbR','HbDiff','HbTotal','CBSI'};
 
 validChannels=false(size(data.channels));
 numChannels=length(data.channels(data.channels>0));
-validChannels(data.channels>0)=data.channels(data.channels>0)&(reshape(PF2.data.fchMask>PF2.RejectLevel|outputData.ProcessRejected,[1,numChannels]));
+validChannels(data.channels>0)=data.channels(data.channels>0)&(reshape(PF2.GUIPF2.data.fchMask>PF2.RejectLevel|outputData.ProcessRejected,[1,numChannels]));
 
-curfMask=PF2.data.fchMask>PF2.RejectLevel|outputData.ProcessRejected;
+curfMask=PF2.GUIPF2.data.fchMask>PF2.RejectLevel|outputData.ProcessRejected;
 
 if(pf2_base.isnestedfield(data,'ROI.HbO')&&~isempty(data.ROI))
     validChannels_roi=true(1,size(data.ROI.('HbO'),2));
@@ -895,10 +895,10 @@ else
                   x_ind=a;
                elseif strcmp(args{a},'fs')==1
                   fs_ind=a; 
-                  passedArgVals{fs_ind}=PF2.data.fs;
+                  passedArgVals{fs_ind}=PF2.GUIPF2.data.fs;
                elseif strcmp(args{a},'fTime')==1
                   time_ind=a; 
-                  passedArgVals{time_ind}=PF2.data.time(validRows);
+                  passedArgVals{time_ind}=PF2.GUIPF2.data.time(validRows);
                elseif strcmp(args{a},'fchMask')==1
                   fmask_ind=a;
                   passedArgVals{fmask_ind}=curfMask;
@@ -910,10 +910,10 @@ else
                   passedArgVals{fsd_ind}=PF2.curSDSet(validChannels);
                elseif strcmp(args{a},'fMarkers')==1
                   fmrk_ind=a; 
-                  passedArgVals{fmrk_ind}=PF2.data.markers;
+                  passedArgVals{fmrk_ind}=PF2.GUIPF2.data.markers;
                elseif strcmp(args{a},'fAux')==1
                   fAux_ind=a;
-                  passedArgVals{fAux_ind}=PF2.data.Aux;
+                  passedArgVals{fAux_ind}=PF2.GUIPF2.data.Aux;
                elseif strcmp(args{a},'ftimeChMask')==1
                   ftimeMask_ind=a;
                   passedArgVals{ftimeMask_ind}=curftimeMask(:,validChannels); % always needs channel info when used in raw
@@ -1069,7 +1069,7 @@ end
 
 invalidChannels=false(size(data.channels));
 invalidChannels(data.channels>0)=data.channels(data.channels>0)&(reshape(~curfMask&~outputData.ProcessRejected,[1,numChannels]));
-PF2.data.curChMask=curfMask;
+PF2.GUIPF2.data.curChMask=curfMask;
 
 
 
@@ -1083,7 +1083,7 @@ for bioM=1:length(bioM_list) % go through each biomarker and set invalid cahnnel
 end
 
 
-if(PF2.view.processWindowOnly)
+if(PF2.GUIPF2.processWindowOnly)
     outData.validRows=validRows;
 end
 
@@ -1135,47 +1135,47 @@ PF2.curChList=PF2.curChSet(i);
 
 if(PF2.mergedProbe) %All channel numbers are unique for merged probes  
     
-    data=PF2.data.stage{1};
+    data=PF2.GUIPF2.data.stage{1};
     if(~isempty(data))
         if(PF2.timeIndex==0) % No time index
-            PF2.data.sampleTime=1:length(data(:,1));
-            PF2.data.time=(PF2.data.sampleTime-1)./setF.device.Info.DefaultSamplingRate;
-            PF2.data.fs=setF.device.Info.DefaultSamplingRate;
+            PF2.GUIPF2.data.sampleTime=1:length(data(:,1));
+            PF2.GUIPF2.data.time=(PF2.GUIPF2.data.sampleTime-1)./setF.device.Info.DefaultSamplingRate;
+            PF2.GUIPF2.data.fs=setF.device.Info.DefaultSamplingRate;
         elseif(setF.device.Info.TimeIsSampleCount==1)  %time index is sample time
-            PF2.data.sampleTime=data(:,PF2.timeIndex);
-            PF2.data.time=(PF2.data.sampleTime-1)./setF.device.Info.DefaultSamplingRate;
-            PF2.data.fs=setF.device.Info.DefaultSamplingRate;
+            PF2.GUIPF2.data.sampleTime=data(:,PF2.timeIndex);
+            PF2.GUIPF2.data.time=(PF2.GUIPF2.data.sampleTime-1)./setF.device.Info.DefaultSamplingRate;
+            PF2.GUIPF2.data.fs=setF.device.Info.DefaultSamplingRate;
         else
-            PF2.data.sampleTime=1:length(data(:,1));
-            PF2.data.time=data(:,PF2.timeIndex);
-            PF2.data.fs=1./median(diff(PF2.data.time));
+            PF2.GUIPF2.data.sampleTime=1:length(data(:,1));
+            PF2.GUIPF2.data.time=data(:,PF2.timeIndex);
+            PF2.GUIPF2.data.fs=1./median(diff(PF2.GUIPF2.data.time));
         end
 
-        PF2.view.startTime=min(PF2.data.time);
-        PF2.view.endTime=max(PF2.data.time);
-        PF2.view.timeStepSize=round((max(PF2.data.time)-min(PF2.data.time))/10);
-    elseif(isfield(data,'time')&&~isempty(PF2.data.time))  %If time exists
-        PF2.data.sampleTime=1:length(PF2.data.time);
-        PF2.data.fs=1./median(diff(PF2.data.time));
-    elseif(~isempty(PF2.data.stage{4})) %try to calculate from oxy data
-        data=PF2.data.stage{4};
+        PF2.GUIPF2.view.startTime=min(PF2.GUIPF2.data.time);
+        PF2.GUIPF2.view.endTime=max(PF2.GUIPF2.data.time);
+        PF2.GUIPF2.view.timeStepSize=round((max(PF2.GUIPF2.data.time)-min(PF2.GUIPF2.data.time))/10);
+    elseif(isfield(data,'time')&&~isempty(PF2.GUIPF2.data.time))  %If time exists
+        PF2.GUIPF2.data.sampleTime=1:length(PF2.GUIPF2.data.time);
+        PF2.GUIPF2.data.fs=1./median(diff(PF2.GUIPF2.data.time));
+    elseif(~isempty(PF2.GUIPF2.data.stage{4})) %try to calculate from oxy data
+        data=PF2.GUIPF2.data.stage{4};
         if(PF2.timeIndex==0)
-            PF2.data.sampleTime=1:length(data.HbO(:,1));
-            PF2.data.time=(PF2.data.sampleTime-1)./setF.device.Info.DefaultSamplingRate;
-            PF2.data.fs=setF.device.Info.DefaultSamplingRate;
+            PF2.GUIPF2.data.sampleTime=1:length(data.HbO(:,1));
+            PF2.GUIPF2.data.time=(PF2.GUIPF2.data.sampleTime-1)./setF.device.Info.DefaultSamplingRate;
+            PF2.GUIPF2.data.fs=setF.device.Info.DefaultSamplingRate;
         elseif(setF.device.Info.TimeIsSampleCount==1)
-            PF2.data.sampleTime=data.HbO(:,PF2.timeIndex);
-            PF2.data.time=(PF2.data.sampleTime-1)./setF.device.Info.DefaultSamplingRate;
-            PF2.data.fs=setF.device.Info.DefaultSamplingRate;
+            PF2.GUIPF2.data.sampleTime=data.HbO(:,PF2.timeIndex);
+            PF2.GUIPF2.data.time=(PF2.GUIPF2.data.sampleTime-1)./setF.device.Info.DefaultSamplingRate;
+            PF2.GUIPF2.data.fs=setF.device.Info.DefaultSamplingRate;
         else
-            PF2.data.sampleTime=1:length(data.HbO(:,1));
-            PF2.data.time=data.HbO(:,PF2.timeIndex);
-            PF2.data.fs=1./median(diff(PF2.data.time));
+            PF2.GUIPF2.data.sampleTime=1:length(data.HbO(:,1));
+            PF2.GUIPF2.data.time=data.HbO(:,PF2.timeIndex);
+            PF2.GUIPF2.data.fs=1./median(diff(PF2.GUIPF2.data.time));
         end
 
-        PF2.view.startTime=min(PF2.data.time);
-        PF2.view.endTime=max(PF2.data.time);
-        PF2.view.timeStepSize=round((max(PF2.data.time)-min(PF2.data.time))/10);
+        PF2.GUIPF2.view.startTime=min(PF2.GUIPF2.data.time);
+        PF2.GUIPF2.view.endTime=max(PF2.GUIPF2.data.time);
+        PF2.GUIPF2.view.timeStepSize=round((max(PF2.GUIPF2.data.time)-min(PF2.GUIPF2.data.time))/10);
     end
 
 else
@@ -1261,7 +1261,7 @@ handles.text_numProbes.String=sprintf('%i',setF.device.Info.NumberProbes);
 handles.text_defaultFs.String=sprintf('%i',setF.device.Info.DefaultSamplingRate);
 
 
-handles.text_segment_info.String=BuildSegmentInfoString(PF2.data.info);
+handles.text_segment_info.String=BuildSegmentInfoString(PF2.GUIPF2.data.info);
 
 set(handles.checkbox_baseline_global,'Value',outputData.DirtyBaseline);
 handles.edit_baseline_length=sprintf('%.2f',PF2.GUIPF2.baseline.blLength);
@@ -1275,33 +1275,33 @@ end
 set(handles.listbox_probes,'string',new_str);
 set(handles.listbox_probes,'Value',1:probeCount);
 
-set(handles.edit_stepSize,'String',sprintf('%.2f',PF2.view.timeStepSize))
-set(handles.edit_startTime,'String',sprintf('%.2f',PF2.view.startTime))
-set(handles.edit_endTime,'String',sprintf('%.2f',PF2.view.endTime))
+set(handles.edit_stepSize,'String',sprintf('%.2f',PF2.GUIPF2.view.timeStepSize))
+set(handles.edit_startTime,'String',sprintf('%.2f',PF2.GUIPF2.view.startTime))
+set(handles.edit_endTime,'String',sprintf('%.2f',PF2.GUIPF2.view.endTime))
 
-PF2.view.plotOD=false;
-PF2.view.OxyAuto=1;
-PF2.view.LightAuto=1;
-set(handles.checkbox_viewLightAuto,'Value',PF2.view.LightAuto);
-set(handles.checkbox_viewOxyAuto,'Value',PF2.view.OxyAuto);
-PF2.view.LightColorAuto=0;
-PF2.view.OxyColorAuto=1;
-set(handles.checkbox_viewLightColorAuto,'Value',PF2.view.LightColorAuto);
-set(handles.checkbox_viewOxyColorAuto,'Value',PF2.view.OxyColorAuto);
-PF2.view.LightMax=setF.device.Info.RawMax;
-PF2.view.LightMin=setF.device.Info.RawMin;
-set(handles.edit_viewLightMin,'String',sprintf('%.1f',PF2.view.LightMin));
-set(handles.edit_viewLightMax,'String',sprintf('%.1f',PF2.view.LightMax));
+PF2.GUIPF2.view.plotOD=false;
+PF2.GUIPF2.view.OxyAuto=1;
+PF2.GUIPF2.view.LightAuto=1;
+set(handles.checkbox_viewLightAuto,'Value',PF2.GUIPF2.view.LightAuto);
+set(handles.checkbox_viewOxyAuto,'Value',PF2.GUIPF2.view.OxyAuto);
+PF2.GUIPF2.view.LightColorAuto=0;
+PF2.GUIPF2.view.OxyColorAuto=1;
+set(handles.checkbox_viewLightColorAuto,'Value',PF2.GUIPF2.view.LightColorAuto);
+set(handles.checkbox_viewOxyColorAuto,'Value',PF2.GUIPF2.view.OxyColorAuto);
+PF2.GUIPF2.view.LightMax=setF.device.Info.RawMax;
+PF2.GUIPF2.view.LightMin=setF.device.Info.RawMin;
+set(handles.edit_viewLightMin,'String',sprintf('%.1f',PF2.GUIPF2.view.LightMin));
+set(handles.edit_viewLightMax,'String',sprintf('%.1f',PF2.GUIPF2.view.LightMax));
 
-PF2.view.OxyMax=3;
-PF2.view.OxyMin=-3;
-set(handles.edit_viewOxyMin,'String',sprintf('%.1f',PF2.view.OxyMin));
-set(handles.edit_viewOxyMax,'String',sprintf('%.1f',PF2.view.OxyMax));
+PF2.GUIPF2.view.OxyMax=3;
+PF2.GUIPF2.view.OxyMin=-3;
+set(handles.edit_viewOxyMin,'String',sprintf('%.1f',PF2.GUIPF2.view.OxyMin));
+set(handles.edit_viewOxyMax,'String',sprintf('%.1f',PF2.GUIPF2.view.OxyMax));
 
-if(isempty(PF2.data.info.Age))
+if(isempty(PF2.GUIPF2.data.info.Age))
     set(handles.edit_DPF_age,'String',num2str(PF2.GUIPF2.curDPF_age));
 else
-    set(handles.edit_DPF_age,'String',num2str(PF2.data.info.Age));
+    set(handles.edit_DPF_age,'String',num2str(PF2.GUIPF2.data.info.Age));
 end
 
 set(handles.edit_DPF_fixed,'String',num2str(PF2.GUIPF2.curDPF_fixed,'%.2f'));
@@ -1415,47 +1415,47 @@ varargout={};
 [validFields]=pf2_base.pf2_getFNIRSfields();
 
 if(nargout>0)
-    fdataFields=fields(PF2.data);
+    fdataFields=fields(PF2.GUIPF2.data);
        for i=1:length(fdataFields)
            memberIdx=ismember(validFields,fdataFields{i});
            if(any(memberIdx))
-                outfNIR.(validFields{memberIdx})=PF2.data.(fdataFields{i});
+                outfNIR.(validFields{memberIdx})=PF2.GUIPF2.data.(fdataFields{i});
            end
        end
     
-   if(isfield(PF2,'data')&&isfield(PF2.data,'stage')&&(size(PF2.data.stage,2)==5))
-       if(outputData.ProcessOxy&&~isempty(PF2.data.stage{5}))
-            stage5fields=fields(PF2.data.stage{5});
+   if(isfield(PF2,'data')&&isfield(PF2.GUIPF2.data,'stage')&&(size(PF2.GUIPF2.data.stage,2)==5))
+       if(outputData.ProcessOxy&&~isempty(PF2.GUIPF2.data.stage{5}))
+            stage5fields=fields(PF2.GUIPF2.data.stage{5});
             for i=1:length(stage5fields)
-                outfNIR.(stage5fields{i})=PF2.data.stage{5}.(stage5fields{i});
+                outfNIR.(stage5fields{i})=PF2.GUIPF2.data.stage{5}.(stage5fields{i});
             end
-          if(~isempty(PF2.data.stage{1}))
-            outfNIR.raw=PF2.data.stage{1};
+          if(~isempty(PF2.GUIPF2.data.stage{1}))
+            outfNIR.raw=PF2.GUIPF2.data.stage{1};
           end
        elseif(outputData.ProcessRaw&&~outputData.OutputRaw)
-          if(~isempty(PF2.data.stage{3}))
-           outfNIR.OD=PF2.data.stage{3}; %start with OD
+          if(~isempty(PF2.GUIPF2.data.stage{3}))
+           outfNIR.OD=PF2.GUIPF2.data.stage{3}; %start with OD
           end
-          if(~isempty(PF2.data.stage{1}))
-            outfNIR.raw=PF2.data.stage{1};
+          if(~isempty(PF2.GUIPF2.data.stage{1}))
+            outfNIR.raw=PF2.GUIPF2.data.stage{1};
           end
        elseif(outputData.ProcessRaw)
-           if(~isempty(PF2.data.stage{2}))
-                outfNIR.rawProcessed=PF2.data.stage{2};
+           if(~isempty(PF2.GUIPF2.data.stage{2}))
+                outfNIR.rawProcessed=PF2.GUIPF2.data.stage{2};
            end
-          if(~isempty(PF2.data.stage{1}))
-            outfNIR.raw=PF2.data.stage{1};
+          if(~isempty(PF2.GUIPF2.data.stage{1}))
+            outfNIR.raw=PF2.GUIPF2.data.stage{1};
           end
        end
        
   
-       if(isfield(PF2.data,'markers'))
+       if(isfield(PF2.GUIPF2.data,'markers'))
            
            if(PF2.OutputLegacyMarkers)
                outfNIR.markers=[];
-               outfNIR.markers.data=PF2.data.markers;
+               outfNIR.markers.data=PF2.GUIPF2.data.markers;
            else
-               outfNIR.markers=PF2.data.markers;
+               outfNIR.markers=PF2.GUIPF2.data.markers;
            end
        end
        
@@ -1555,8 +1555,8 @@ curSelectedOptode=get(handles.listbox_optodes,'Value');
 PF2.curProbes=get(handles.listbox_probes,'Value');
 for i=1:length(PF2.curProbes)
     curCh=[curCh,setF.device.Probe{PF2.curProbes(i)}.ChannelNumbers];
-    if(isfield(PF2,'data')&&isfield(PF2.data,'fchMask'))
-        curChMask=[curChMask,PF2.data.fchMask]; 
+    if(isfield(PF2,'data')&&isfield(PF2.GUIPF2.data,'fchMask'))
+        curChMask=[curChMask,PF2.GUIPF2.data.fchMask]; 
     else
         curChMask=[curChMask,true(size(curCh))];
     end
@@ -1584,8 +1584,8 @@ curSelectedOptode=get(handles.listbox_optodes,'Value');
 PF2.curProbes=get(handles.listbox_probes,'Value');
 for i=1:length(PF2.curProbes)
     curCh=[curCh,setF.device.Probe{PF2.curProbes(i)}.ChannelNumbers];
-    if(isfield(PF2,'data')&&isfield(PF2.data,'fchMask'))
-        curChMask=[curChMask,PF2.data.fchMask]; 
+    if(isfield(PF2,'data')&&isfield(PF2.GUIPF2.data,'fchMask'))
+        curChMask=[curChMask,PF2.GUIPF2.data.fchMask]; 
     else
         curChMask=[curChMask,true(size(curCh))];
     end
@@ -1597,8 +1597,8 @@ curChMask=curChMask(idx);
 newVal=get(handles.checkbox_rejectCh,'Value')==0;
 
 if(length(PF2.curProbes)==1)
-    PF2.data.fchMask(curCh==listCh(curSelectedOptode))=newVal;
-    PF2.data.rawMask=ismember(setF.device.Probe{1}.ChannelNumbers,setF.device.Probe{1}.ChannelList(PF2.data.fchMask>PF2.RejectLevel|outputData.ProcessRejected));
+    PF2.GUIPF2.data.fchMask(curCh==listCh(curSelectedOptode))=newVal;
+    PF2.GUIPF2.data.rawMask=ismember(setF.device.Probe{1}.ChannelNumbers,setF.device.Probe{1}.ChannelList(PF2.GUIPF2.data.fchMask>PF2.RejectLevel|outputData.ProcessRejected));
 end
 
 
@@ -1614,8 +1614,8 @@ function edit_back(hObject, eventdata, handles)
 % Hints: get(hObject,'String') returns contents of edit_startTime as text
 %        str2double(get(hObject,'String')) returns contents of edit_startTime as a double
 global PF2
-PF2.view.startTime=str2double(get(handles.edit_startTime,'String'));
-if(PF2.GUIPF2.baseline.relative2View||PF2.view.processWindowOnly)
+PF2.GUIPF2.view.startTime=str2double(get(handles.edit_startTime,'String'));
+if(PF2.GUIPF2.baseline.relative2View||PF2.GUIPF2.processWindowOnly)
     processFNIR_GUI();
 end
 updatePlots(handles);
@@ -1642,10 +1642,10 @@ function edit_startTime_Callback(hObject, eventdata, handles)
 % Hints: get(hObject,'String') returns contents of edit_endTime as text
 %        str2double(get(hObject,'String')) returns contents of edit_endTime as a double
 global PF2
-PF2.view.startTime=min(str2double(get(handles.edit_startTime,'String')),PF2.view.endTime);
-set(handles.edit_startTime,'String',sprintf('%.2f',PF2.view.startTime));
+PF2.GUIPF2.view.startTime=min(str2double(get(handles.edit_startTime,'String')),PF2.GUIPF2.view.endTime);
+set(handles.edit_startTime,'String',sprintf('%.2f',PF2.GUIPF2.view.startTime));
 
-if(PF2.GUIPF2.baseline.relative2View||PF2.view.processWindowOnly)
+if(PF2.GUIPF2.baseline.relative2View||PF2.GUIPF2.processWindowOnly)
     processFNIR_GUI()
 end
 updatePlots(handles)
@@ -1660,9 +1660,9 @@ function edit_endTime_Callback(hObject, eventdata, handles)
 % Hints: get(hObject,'String') returns contents of edit_endTime as text
 %        str2double(get(hObject,'String')) returns contents of edit_endTime as a double
 global PF2
-PF2.view.endTime=max(str2double(get(handles.edit_endTime,'String')),PF2.view.startTime);
-set(handles.edit_endTime,'String',sprintf('%.2f',PF2.view.endTime));
-if(PF2.GUIPF2.baseline.relative2View||PF2.view.processWindowOnly)
+PF2.GUIPF2.view.endTime=max(str2double(get(handles.edit_endTime,'String')),PF2.GUIPF2.view.startTime);
+set(handles.edit_endTime,'String',sprintf('%.2f',PF2.GUIPF2.view.endTime));
+if(PF2.GUIPF2.baseline.relative2View||PF2.GUIPF2.processWindowOnly)
     processFNIR_GUI()
 end
 updatePlots(handles)
@@ -1689,7 +1689,7 @@ function edit_stepSize_Callback(hObject, eventdata, handles)
 % Hints: get(hObject,'String') returns contents of edit_stepSize as text
 %        str2double(get(hObject,'String')) returns contents of edit_stepSize as a double
 global PF2
-PF2.view.timeStepSize=str2double(get(handles.edit_stepSize,'String'));
+PF2.GUIPF2.view.timeStepSize=str2double(get(handles.edit_stepSize,'String'));
 
 
 % --- Executes during object creation, after setting all properties.
@@ -1711,9 +1711,9 @@ function pushbutton_viewPrevLargeStep_Callback(hObject, eventdata, handles)
 % eventdata  reserved - to be defined in a future version of MATLAB
 % handles    structure with handles and user data (see GUIDATA)
 global PF2
-PF2.view.endTime=min(PF2.data.time)+PF2.view.timeStepSize;
-PF2.view.startTime=min(PF2.data.time);
-if(PF2.GUIPF2.baseline.relative2View||PF2.view.processWindowOnly)
+PF2.GUIPF2.view.endTime=min(PF2.GUIPF2.data.time)+PF2.GUIPF2.view.timeStepSize;
+PF2.GUIPF2.view.startTime=min(PF2.GUIPF2.data.time);
+if(PF2.GUIPF2.baseline.relative2View||PF2.GUIPF2.processWindowOnly)
     processFNIR_GUI()
 end
 updateViewTimeEdits(handles)
@@ -1727,9 +1727,9 @@ function pushbutton_viewPrevSmallStep_Callback(hObject, eventdata, handles)
 % handles    structure with handles and user data (see GUIDATA)
 global PF2
 
-PF2.view.startTime=max(PF2.view.startTime-PF2.view.timeStepSize,min(PF2.data.time));
-PF2.view.endTime=max(PF2.view.endTime-PF2.view.timeStepSize,PF2.view.startTime+PF2.view.timeStepSize);
-if(PF2.GUIPF2.baseline.relative2View||PF2.view.processWindowOnly)
+PF2.GUIPF2.view.startTime=max(PF2.GUIPF2.view.startTime-PF2.GUIPF2.view.timeStepSize,min(PF2.GUIPF2.data.time));
+PF2.GUIPF2.view.endTime=max(PF2.GUIPF2.view.endTime-PF2.GUIPF2.view.timeStepSize,PF2.GUIPF2.view.startTime+PF2.GUIPF2.view.timeStepSize);
+if(PF2.GUIPF2.baseline.relative2View||PF2.GUIPF2.processWindowOnly)
     processFNIR_GUI()
 end
 updateViewTimeEdits(handles)
@@ -1742,9 +1742,9 @@ function pushbutton_viewNextSmallStep_Callback(hObject, eventdata, handles)
 % handles    structure with handles and user data (see GUIDATA)
 
 global PF2
-PF2.view.endTime=min(PF2.view.endTime+PF2.view.timeStepSize,max(PF2.data.time));
-PF2.view.startTime=min(PF2.view.startTime+PF2.view.timeStepSize,max(PF2.data.time)-PF2.view.timeStepSize);
-if(PF2.GUIPF2.baseline.relative2View||PF2.view.processWindowOnly)
+PF2.GUIPF2.view.endTime=min(PF2.GUIPF2.view.endTime+PF2.GUIPF2.view.timeStepSize,max(PF2.GUIPF2.data.time));
+PF2.GUIPF2.view.startTime=min(PF2.GUIPF2.view.startTime+PF2.GUIPF2.view.timeStepSize,max(PF2.GUIPF2.data.time)-PF2.GUIPF2.view.timeStepSize);
+if(PF2.GUIPF2.baseline.relative2View||PF2.GUIPF2.processWindowOnly)
     processFNIR_GUI();
 end
 updateViewTimeEdits(handles)
@@ -1756,9 +1756,9 @@ function pushbutton_ViewNextLargeStep_Callback(hObject, eventdata, handles)
 % eventdata  reserved - to be defined in a future version of MATLAB
 % handles    structure with handles and user data (see GUIDATA)
 global PF2
-PF2.view.endTime=max(PF2.data.time);
-PF2.view.startTime=max(min(PF2.data.time),max(PF2.data.time)-PF2.view.timeStepSize);
-if(PF2.GUIPF2.baseline.relative2View||PF2.view.processWindowOnly)
+PF2.GUIPF2.view.endTime=max(PF2.GUIPF2.data.time);
+PF2.GUIPF2.view.startTime=max(min(PF2.GUIPF2.data.time),max(PF2.GUIPF2.data.time)-PF2.GUIPF2.view.timeStepSize);
+if(PF2.GUIPF2.baseline.relative2View||PF2.GUIPF2.processWindowOnly)
     processFNIR_GUI();
 end
 updateViewTimeEdits(handles);
@@ -1818,15 +1818,15 @@ else
    error('Not Yet Implemented for seperate probe data,\nAssumes concatenated datasets with unique channels in the config file'); 
 end
 
-time=PF2.data.time;
+time=PF2.GUIPF2.data.time;
 
-startInd=find(PF2.view.startTime<=time);
+startInd=find(PF2.GUIPF2.view.startTime<=time);
 if(isempty(startInd))
     startInd=1;
 else
     startInd=startInd(1);
 end
-endInd=find(PF2.view.endTime<=time);
+endInd=find(PF2.GUIPF2.view.endTime<=time);
 if(isempty(endInd))
     endInd=length(time);
 else
@@ -1865,25 +1865,25 @@ if(~isempty(dataTipSelectionHandleTag))
 else
     cla(timelineAxesHandle);
 end
-h=plot(timelineAxesHandle,PF2.data.time,0*PF2.data.time+0.1,'color','White','linewidth',4);
+h=plot(timelineAxesHandle,PF2.GUIPF2.data.time,0*PF2.GUIPF2.data.time+0.1,'color','White','linewidth',4);
 set(h,'Tag','ViewLine');
 hold(timelineAxesHandle,'on');
-h=plot(timelineAxesHandle,PF2.data.time,0*PF2.data.time-0.1,'color','White','linewidth',4);
+h=plot(timelineAxesHandle,PF2.GUIPF2.data.time,0*PF2.GUIPF2.data.time-0.1,'color','White','linewidth',4);
 set(h,'Tag','ViewLine');
-h=plot(timelineAxesHandle,PF2.data.time,0*PF2.data.time,'color','White','linewidth',4);
+h=plot(timelineAxesHandle,PF2.GUIPF2.data.time,0*PF2.GUIPF2.data.time,'color','White','linewidth',4);
 set(h,'Tag','ViewLine');
-h=plot(timelineAxesHandle,PF2.data.time,0*PF2.data.time,'color','White','linewidth',4);
+h=plot(timelineAxesHandle,PF2.GUIPF2.data.time,0*PF2.GUIPF2.data.time,'color','White','linewidth',4);
 set(h,'Tag','ViewLine');
-h=plot(timelineAxesHandle,PF2.data.time,0*PF2.data.time,'--k');
+h=plot(timelineAxesHandle,PF2.GUIPF2.data.time,0*PF2.GUIPF2.data.time,'--k');
 set(h,'Tag','ViewLine');
 
-h=plot(timelineAxesHandle,PF2.data.time(timeInd),0*PF2.data.time(timeInd),'r','linewidth',4);
+h=plot(timelineAxesHandle,PF2.GUIPF2.data.time(timeInd),0*PF2.GUIPF2.data.time(timeInd),'r','linewidth',4);
 set(h,'Tag','ViewLine');
-h=pf2_base.external.vline(timelineAxesHandle,PF2.view.startTime,{'r','linewidth',4});
+h=pf2_base.external.vline(timelineAxesHandle,PF2.GUIPF2.view.startTime,{'r','linewidth',4});
 set(h,'Tag','StartVLine');
-h=pf2_base.external.vline(timelineAxesHandle,PF2.view.endTime,{'r','linewidth',4});
+h=pf2_base.external.vline(timelineAxesHandle,PF2.GUIPF2.view.endTime,{'r','linewidth',4});
 set(h,'Tag','EndVLine');
-xlim(timelineAxesHandle,[min(PF2.data.time),max(PF2.data.time)]);
+xlim(timelineAxesHandle,[min(PF2.GUIPF2.data.time),max(PF2.GUIPF2.data.time)]);
 ylim(timelineAxesHandle,[-1,1]);
 set(timelineAxesHandle,'xtick',[],'ytick',[])
 set(timelineAxesHandle,'Tag','Timeline');
@@ -1897,7 +1897,7 @@ axes(stageAxesHandles{1});
 %    text(max(nirsData(:,1))/2+15,2000,'X','FontSize',40,'Color','red');
 %    hold on;
 %end
-data=PF2.data.stage{1};
+data=PF2.GUIPF2.data.stage{1};
 optTable=PF2.GUIPF2.optodeTable;
 
 if(~isempty(data))
@@ -1945,7 +1945,7 @@ if(~isempty(data))
     plotIdx=find(plotIdx.*plotIdx2);
     num2Plot=length(plotIdx);
 
-    if(PF2.view.LightColorAuto)
+    if(PF2.GUIPF2.view.LightColorAuto)
         [wvUnique]=sort(unique(round(PF2.curWvSet)));
         wvUnique(isnan(wvUnique))=[];
          cc=lines(length(wvUnique));%linspecer(length(wvUnique),'qualitative');
@@ -1964,13 +1964,13 @@ if(~isempty(data))
 
     cla(stageAxesHandles{1});
     for i=1:num2Plot
-       h=plot(stageAxesHandles{1},PF2.data.time(timeInd),data(timeInd,plotIdx(i)),'color',cIndex(i,:)); 
+       h=plot(stageAxesHandles{1},PF2.GUIPF2.data.time(timeInd),data(timeInd,plotIdx(i)),'color',cIndex(i,:)); 
        set(h,'Tag',sprintf('Ch%i_%inm',PF2.curChSet(plotIdx(i)),PF2.curWvSet(plotIdx(i))));
        hold(stageAxesHandles{1},'on');
     end
 
-    if(~PF2.view.LightAuto)
-       ylim(stageAxesHandles{1},[PF2.view.LightMin,PF2.view.LightMax]); 
+    if(~PF2.GUIPF2.view.LightAuto)
+       ylim(stageAxesHandles{1},[PF2.GUIPF2.view.LightMin,PF2.GUIPF2.view.LightMax]); 
     end
 
 
@@ -1978,11 +1978,11 @@ if(~isempty(data))
        yl=ylim(stageAxesHandles{1});
 
        if(max(yl)>0.95*setF.device.Info.RawMax)
-           plot(stageAxesHandles{1},PF2.data.time(timeInd),PF2.data.time(timeInd)*0+setF.device.Info.RawMax,'--r','linewidth',2);
+           plot(stageAxesHandles{1},PF2.GUIPF2.data.time(timeInd),PF2.GUIPF2.data.time(timeInd)*0+setF.device.Info.RawMax,'--r','linewidth',2);
        end
     end
 
-    xl=[PF2.view.startTime,PF2.view.endTime]; plotMarkers(xl,stageAxesHandles{1});
+    xl=[PF2.GUIPF2.view.startTime,PF2.GUIPF2.view.endTime]; plotMarkers(xl,stageAxesHandles{1});
     hold(stageAxesHandles{1},'off');
     xlim(stageAxesHandles{1},xl);
     if(setF.device.Info.TimeIsSampleCount)
@@ -1991,7 +1991,7 @@ if(~isempty(data))
         xlabel(stageAxesHandles{1},'Time (s)');
     end
 
-    %*%xlim([PF2.view.startTime,PF2.view.endTime])
+    %*%xlim([PF2.GUIPF2.view.startTime,PF2.GUIPF2.view.endTime])
 
     ylabel(stageAxesHandles{1},'Intensity -  I_i_n');
     set(stageAxesHandles{1},'Tag','Stage1');
@@ -2004,10 +2004,10 @@ axes(stageAxesHandles{2});
 %    text(max(nirsData(:,1))/2+15,2000,'X','FontSize',40,'Color','red');
 %    hold on;
 %end
-if(PF2.view.plotOD)
-    data=PF2.data.stage{3};
+if(PF2.GUIPF2.view.plotOD)
+    data=PF2.GUIPF2.data.stage{3};
 else
-    data=PF2.data.stage{2};
+    data=PF2.GUIPF2.data.stage{2};
 end
 
 cla(stageAxesHandles{2});
@@ -2052,7 +2052,7 @@ if(~isempty(data)&&~isempty(plotSingleTable))
     plotIdx=find(plotIdx.*plotIdx2);
     num2Plot=length(plotIdx);
 
-    if(PF2.view.LightColorAuto)
+    if(PF2.GUIPF2.view.LightColorAuto)
         [wvUnique]=sort(unique(round(PF2.curWvSet)));
         wvUnique(isnan(wvUnique))=[];
          cc=lines(length(wvUnique));%linspecer(length(wvUnique),'qualitative');
@@ -2071,14 +2071,14 @@ if(~isempty(data)&&~isempty(plotSingleTable))
 
     
     for i=1:num2Plot
-       h=plot(stageAxesHandles{2},PF2.data.time(timeInd),data(timeInd,plotIdx(i)),'color',cIndex(i,:)); 
+       h=plot(stageAxesHandles{2},PF2.GUIPF2.data.time(timeInd),data(timeInd,plotIdx(i)),'color',cIndex(i,:)); 
        set(h,'Tag',sprintf('Ch%i_%inm',PF2.curChSet(plotIdx(i)),PF2.curWvSet(plotIdx(i))));
        hold(stageAxesHandles{2},'on');
     end
 
 
-    if(~PF2.view.LightAuto&&~PF2.view.plotOD)
-       ylim([PF2.view.LightMin,PF2.view.LightMax]); 
+    if(~PF2.GUIPF2.view.LightAuto&&~PF2.GUIPF2.view.plotOD)
+       ylim([PF2.GUIPF2.view.LightMin,PF2.GUIPF2.view.LightMax]); 
     else
         %ylim(yl);
     end
@@ -2087,11 +2087,11 @@ if(~isempty(data)&&~isempty(plotSingleTable))
        yl=ylim(stageAxesHandles{2});
 
        if(max(yl)>0.95*setF.device.Info.RawMax)
-           plot(stageAxesHandles{2},PF2.data.time(timeInd),PF2.data.time(timeInd)*0+setF.device.Info.RawMax,'--r','linewidth',2);
+           plot(stageAxesHandles{2},PF2.GUIPF2.data.time(timeInd),PF2.GUIPF2.data.time(timeInd)*0+setF.device.Info.RawMax,'--r','linewidth',2);
        end
     end
 
-    xl=[PF2.view.startTime,PF2.view.endTime]; plotMarkers(xl,stageAxesHandles{2});
+    xl=[PF2.GUIPF2.view.startTime,PF2.GUIPF2.view.endTime]; plotMarkers(xl,stageAxesHandles{2});
     hold(stageAxesHandles{2},'off');
     xlim(stageAxesHandles{2},xl);
     if(setF.device.Info.TimeIsSampleCount)
@@ -2100,8 +2100,8 @@ if(~isempty(data)&&~isempty(plotSingleTable))
         xlabel(stageAxesHandles{2},'Time (s)');
     end
 
-    %*%xlim([PF2.view.startTime,PF2.view.endTime])
-    if(PF2.view.plotOD)
+    %*%xlim([PF2.GUIPF2.view.startTime,PF2.GUIPF2.view.endTime])
+    if(PF2.GUIPF2.view.plotOD)
         ylabel(stageAxesHandles{2},'Optical Denisty -  log_1_0(I_i_n)');
     else
         ylabel(stageAxesHandles{2},'Intensity - I_i_n');
@@ -2116,7 +2116,7 @@ axes(stageAxesHandles{3});
 %    text(max(nirsData(:,1))/2+15,2000,'X','FontSize',40,'Color','red');
 %    hold on;
 %end
-data=PF2.data.stage{4};
+data=PF2.GUIPF2.data.stage{4};
 
 
 if(~isempty(data))
@@ -2159,7 +2159,7 @@ if(~isempty(data))
     %plotIdx2=(ismember(PF2.curConcSet,PF2.curConc));
     
 
-    % if(PF2.view.OxyColorAuto)
+    % if(PF2.GUIPF2.view.OxyColorAuto)
     %     [wvUnique]=sort(unique(round(PF2.curWvSet)));
     %     wvUnique(isnan(wvUnique))=[];
     %      cc=lines(length(wvUnique));%linspecer(length(wvUnique),'qualitative');
@@ -2174,7 +2174,7 @@ if(~isempty(data))
     %     cc=lines(num2Plot);%linspecer(num2Plot,'qualitative');
     %     cIndex=cc;
     % end
-    yl=[PF2.view.OxyMin,PF2.view.OxyMax];
+    yl=[PF2.GUIPF2.view.OxyMin,PF2.GUIPF2.view.OxyMax];
 
     cla(stageAxesHandles{3})
     
@@ -2187,7 +2187,7 @@ if(~isempty(data))
     for b=1:numBioM
         if(sum(ismember(PF2.curConc,b))>0)
             for i=1:size(plotSingleTable,1)
-               h=plot(stageAxesHandles{3},PF2.data.time(timeInd),data.(bioM{b})(timeInd,plotSingleTable.Optode(i)),'color',bioMclr{b}); 
+               h=plot(stageAxesHandles{3},PF2.GUIPF2.data.time(timeInd),data.(bioM{b})(timeInd,plotSingleTable.Optode(i)),'color',bioMclr{b}); 
                set(h,'Tag',sprintf('Opt%i_%s',plotSingleTable.Optode(i),bioM{b}));
                hold(stageAxesHandles{3},'on');
             end
@@ -2195,18 +2195,18 @@ if(~isempty(data))
     end
 
 
-    if(~PF2.view.OxyAuto)
-       ylim(stageAxesHandles{3},[PF2.view.OxyMin,PF2.view.OxyMax]); 
+    if(~PF2.GUIPF2.view.OxyAuto)
+       ylim(stageAxesHandles{3},[PF2.GUIPF2.view.OxyMin,PF2.GUIPF2.view.OxyMax]); 
     end
 
 
     if(size(plotOptTable,1)>0)
        yl=ylim(stageAxesHandles{3});
 
-       plot(stageAxesHandles{3},PF2.data.time(timeInd),PF2.data.time(timeInd)*0,'--k','linewidth',1);
+       plot(stageAxesHandles{3},PF2.GUIPF2.data.time(timeInd),PF2.GUIPF2.data.time(timeInd)*0,'--k','linewidth',1);
     end
 
-    xl=[PF2.view.startTime,PF2.view.endTime]; plotMarkers(xl,stageAxesHandles{3});
+    xl=[PF2.GUIPF2.view.startTime,PF2.GUIPF2.view.endTime]; plotMarkers(xl,stageAxesHandles{3});
     hold(stageAxesHandles{3},'off');
     xlim(stageAxesHandles{3},xl);
     if(setF.device.Info.TimeIsSampleCount)
@@ -2215,7 +2215,7 @@ if(~isempty(data))
         xlabel(stageAxesHandles{3},'Time (s)');
     end
 
-    %*%xlim([PF2.view.startTime,PF2.view.endTime])
+    %*%xlim([PF2.GUIPF2.view.startTime,PF2.GUIPF2.view.endTime])
 
     if(strcmp(PF2.GUIPF2.dpf_mode,'None'))
         ylabel(stageAxesHandles{3},'\Delta[X] (mM*mm)');
@@ -2231,7 +2231,7 @@ axes(stageAxesHandles{4});
 %    text(max(nirsData(:,1))/2+15,2000,'X','FontSize',40,'Color','red');
 %    hold on;
 %end
-data=PF2.data.stage{5};
+data=PF2.GUIPF2.data.stage{5};
 
 if(~isempty(data))
     plotOptTable=plotOptTable(~plotOptTable.AutoRej,:);
@@ -2251,7 +2251,7 @@ if(~isempty(data))
     for b=1:numBioM
         if(sum(ismember(PF2.curConc,b))>0)
             for i=1:size(plotSingleTable,1)
-               h=plot(stageAxesHandles{4},PF2.data.time(timeInd),data.(bioM{b})(timeInd,plotSingleTable.Optode(i)),'color',bioMclr{b}); 
+               h=plot(stageAxesHandles{4},PF2.GUIPF2.data.time(timeInd),data.(bioM{b})(timeInd,plotSingleTable.Optode(i)),'color',bioMclr{b}); 
                set(h,'Tag',sprintf('Opt%i_%s',plotSingleTable.Optode(i),bioM{b}));
                hold(stageAxesHandles{4},'on');
             end
@@ -2263,7 +2263,7 @@ if(~isempty(data))
         if(pf2_base.isnestedfield(data,'ROI.HbO'))
             for b=1:numBioM
                 if(sum(ismember(PF2.curConc,b))>0)
-                   h=plot(stageAxesHandles{4},PF2.data.time(timeInd),data.ROI.(bioM{b})(timeInd,plotROITable.Optode(i)),'color',bioMclr{b}*0.8,'linewidth',1); 
+                   h=plot(stageAxesHandles{4},PF2.GUIPF2.data.time(timeInd),data.ROI.(bioM{b})(timeInd,plotROITable.Optode(i)),'color',bioMclr{b}*0.8,'linewidth',1); 
                    set(h,'Tag',sprintf('%s_%s',plotROITable.Label{i},bioM{b}));
                    hold(stageAxesHandles{4},'on');
                 end
@@ -2277,8 +2277,8 @@ if(~isempty(data))
 
 
 
-    if(~PF2.view.OxyAuto)
-       ylim(stageAxesHandles{4},[PF2.view.OxyMin,PF2.view.OxyMax]); 
+    if(~PF2.GUIPF2.view.OxyAuto)
+       ylim(stageAxesHandles{4},[PF2.GUIPF2.view.OxyMin,PF2.GUIPF2.view.OxyMax]); 
     else
 
         %ylim(stageAxesHandles{4},yl);
@@ -2288,10 +2288,10 @@ if(~isempty(data))
     if(size(plotOptTable,1)>0)
        yl=ylim(stageAxesHandles{4});
 
-       plot(stageAxesHandles{4},PF2.data.time(timeInd),PF2.data.time(timeInd)*0,'--k','linewidth',1);
+       plot(stageAxesHandles{4},PF2.GUIPF2.data.time(timeInd),PF2.GUIPF2.data.time(timeInd)*0,'--k','linewidth',1);
     end
 
-    xl=[PF2.view.startTime,PF2.view.endTime]; plotMarkers(xl,stageAxesHandles{4});
+    xl=[PF2.GUIPF2.view.startTime,PF2.GUIPF2.view.endTime]; plotMarkers(xl,stageAxesHandles{4});
     xlim(stageAxesHandles{4},xl);
     hold(stageAxesHandles{4},'off');
 
@@ -2301,7 +2301,7 @@ if(~isempty(data))
         xlabel(stageAxesHandles{4},'Time (s)');
     end
 
-    %*%xlim([PF2.view.startTime,PF2.view.endTime])
+    %*%xlim([PF2.GUIPF2.view.startTime,PF2.GUIPF2.view.endTime])
 
     if(strcmp(PF2.GUIPF2.dpf_mode,'None'))
         ylabel(stageAxesHandles{4},'\Delta[X] (mM*mm)');
@@ -2374,10 +2374,10 @@ end
 function runPF2Analyze(curTopoH)
 
 global PF2
-data=PF2.data.stage{5};
-if(PF2.view.processWindowOnly)
+data=PF2.GUIPF2.data.stage{5};
+if(PF2.GUIPF2.processWindowOnly)
     validRows=data.validRows;
-    data.raw=PF2.data.stage{1};
+    data.raw=PF2.GUIPF2.data.stage{1};
     data.HbO=data.HbO(validRows,:);
     data.HbR=data.HbR(validRows,:);
     data.HbDiff=data.HbDiff(validRows,:);
@@ -2385,8 +2385,8 @@ if(PF2.view.processWindowOnly)
     data.CBSI=data.CBSI(validRows,:);
     data.time=data.time(validRows,:);
 end
-if(isfield(PF2.data,'markers'))
-    data.markers=PF2.data.markers;
+if(isfield(PF2.GUIPF2.data,'markers'))
+    data.markers=PF2.GUIPF2.data.markers;
 end
 pt=1;
 PF2.PF2Analyze{pt}=PF2Analyze(data,curTopoH);
@@ -2633,31 +2633,31 @@ numProbes=length(setF.device.Probe);
 
 if(pf2_base.isnestedfield(PF2,'data.ROI.info'))
    for probeNum=1:numProbes
-       if(iscell(PF2.data.ROI))
-           temp=PF2.data.ROI;
-           PF2.data.ROI=[];
-           PF2.data.ROI.info=temp;
+       if(iscell(PF2.GUIPF2.data.ROI))
+           temp=PF2.GUIPF2.data.ROI;
+           PF2.GUIPF2.data.ROI=[];
+           PF2.GUIPF2.data.ROI.info=temp;
        end
        
-       if(iscell(PF2.data.ROI.info)) % If its a cell, make it a better format
-           rownames=cell(1,length(PF2.data.ROI.info));
-           for r=1:length(PF2.data.ROI.info)
+       if(iscell(PF2.GUIPF2.data.ROI.info)) % If its a cell, make it a better format
+           rownames=cell(1,length(PF2.GUIPF2.data.ROI.info));
+           for r=1:length(PF2.GUIPF2.data.ROI.info)
                rownames{r}=sprintf('ROI%i',r);
            end
-           PF2.data.ROI.info=table(PF2.data.ROI.info(:),'VariableNames',{'Optodes'},'RowNames',rownames);
+           PF2.GUIPF2.data.ROI.info=table(PF2.GUIPF2.data.ROI.info(:),'VariableNames',{'Optodes'},'RowNames',rownames);
        end
        
-       if(istable(PF2.data.ROI.info))
-           roi_names=PF2.data.ROI.info.Properties.RowNames;
+       if(istable(PF2.GUIPF2.data.ROI.info))
+           roi_names=PF2.GUIPF2.data.ROI.info.Properties.RowNames;
            start_idx=size(PF2.GUIPF2.optodeTable,1);
-            for roi=1:size(PF2.data.ROI.info,1)
+            for roi=1:size(PF2.GUIPF2.data.ROI.info,1)
                 
                 idx=start_idx+roi;
 
                 PF2.GUIPF2.optodeTable.ProbeNum(idx)=probeNum;
                 PF2.GUIPF2.optodeTable.Optode(idx)=roi;
                 PF2.GUIPF2.optodeTable.IsROI(idx)=true;
-                PF2.GUIPF2.optodeTable.Optodes_roi(idx)=PF2.data.ROI.info.Optodes(roi);
+                PF2.GUIPF2.optodeTable.Optodes_roi(idx)=PF2.GUIPF2.data.ROI.info.Optodes(roi);
                 
                 if(numProbes>1)
                     PF2.GUIPF2.optodeTable.Label{idx}=sprintf('P%i-%s',probeNum,roi_names{roi});
@@ -2680,7 +2680,7 @@ for probeNum=1:numProbes
     probeOptIdx=(PF2.GUIPF2.optodeTable.ProbeNum==probeNum&~PF2.GUIPF2.optodeTable.IsROI);
     
     if(pf2_base.isnestedfield(PF2,'data.fchMask'))
-        PF2.GUIPF2.optodeTable.AutoRej(probeOptIdx)=~(PF2.data.fchMask>PF2.RejectLevel);
+        PF2.GUIPF2.optodeTable.AutoRej(probeOptIdx)=~(PF2.GUIPF2.data.fchMask>PF2.RejectLevel);
     else
         PF2.GUIPF2.optodeTable.AutoRej(probeOptIdx)=false;
     end
@@ -2734,13 +2734,13 @@ for probeNum=1:numProbes
     probeOptIdx=(PF2.GUIPF2.optodeTable.ProbeNum==probeNum&~PF2.GUIPF2.optodeTable.IsROI);
     
     if(pf2_base.isnestedfield(PF2,'data.curChMask'))
-        PF2.GUIPF2.optodeTable.AutoRej(probeOptIdx)=~PF2.data.curChMask;
+        PF2.GUIPF2.optodeTable.AutoRej(probeOptIdx)=~PF2.GUIPF2.data.curChMask;
     else
         PF2.GUIPF2.optodeTable.AutoRej(probeOptIdx)=false;
     end
     
-    if(isfield(PF2,'data')&&isfield(PF2.data,'fchMask'))
-        PF2.GUIPF2.optodeTable.ManualRej(probeOptIdx)=~PF2.data.fchMask>PF2.RejectLevel; 
+    if(isfield(PF2,'data')&&isfield(PF2.GUIPF2.data,'fchMask'))
+        PF2.GUIPF2.optodeTable.ManualRej(probeOptIdx)=~PF2.GUIPF2.data.fchMask>PF2.RejectLevel; 
     else
         PF2.GUIPF2.optodeTable.ManualRej(probeOptIdx)=false;
     end
@@ -2867,11 +2867,11 @@ function pushbutton_viewAll_Callback(hObject, eventdata, handles)
 % eventdata  reserved - to be defined in a future version of MATLAB
 % handles    structure with handles and user data (see GUIDATA)
 global PF2
-PF2.view.endTime=max(PF2.data.time);
-PF2.view.startTime=min(PF2.data.time);
+PF2.GUIPF2.view.endTime=max(PF2.GUIPF2.data.time);
+PF2.GUIPF2.view.startTime=min(PF2.GUIPF2.data.time);
 
 updateViewTimeEdits(handles)
-if(PF2.GUIPF2.baseline.relative2View||PF2.view.processWindowOnly)
+if(PF2.GUIPF2.baseline.relative2View||PF2.GUIPF2.processWindowOnly)
     processFNIR_GUI();
 end
 updatePlots(handles)
@@ -2879,8 +2879,8 @@ updatePlots(handles)
 
 function updateViewTimeEdits(handles)
 global PF2
-set(handles.edit_endTime,'String',sprintf('%.2f',PF2.view.endTime));
-set(handles.edit_startTime,'String',sprintf('%.2f',PF2.view.startTime));
+set(handles.edit_endTime,'String',sprintf('%.2f',PF2.GUIPF2.view.endTime));
+set(handles.edit_startTime,'String',sprintf('%.2f',PF2.GUIPF2.view.startTime));
 
 
 
@@ -2893,7 +2893,7 @@ function edit_viewLightMin_Callback(hObject, eventdata, handles)
 %        str2double(get(hObject,'String')) returns contents of edit_viewLightMin as a double
 global PF2
 
-PF2.view.LightMin=str2double(get(hObject,'String'));
+PF2.GUIPF2.view.LightMin=str2double(get(hObject,'String'));
 updatePlots(handles)
 
 
@@ -2920,7 +2920,7 @@ function edit_viewOxyMin_Callback(hObject, eventdata, handles)
 %        str2double(get(hObject,'String')) returns contents of edit_viewOxyMin as a double
 global PF2
 
-PF2.view.OxyMin=str2double(get(hObject,'String'));
+PF2.GUIPF2.view.OxyMin=str2double(get(hObject,'String'));
 updatePlots(handles)
 
 
@@ -2947,7 +2947,7 @@ function edit_viewLightMax_Callback(hObject, eventdata, handles)
 %        str2double(get(hObject,'String')) returns contents of edit_viewLightMax as a double
 global PF2
 
-PF2.view.LightMax=str2double(get(hObject,'String'));
+PF2.GUIPF2.view.LightMax=str2double(get(hObject,'String'));
 updatePlots(handles)
 
 
@@ -2974,7 +2974,7 @@ function edit_viewOxyMax_Callback(hObject, eventdata, handles)
 %        str2double(get(hObject,'String')) returns contents of edit_viewOxyMax as a double
 global PF2
 
-PF2.view.OxyMax=str2double(get(hObject,'String'));
+PF2.GUIPF2.view.OxyMax=str2double(get(hObject,'String'));
 updatePlots(handles)
 
 % --- Executes during object creation, after setting all properties.
@@ -2999,7 +2999,7 @@ function checkbox_viewLightAuto_Callback(hObject, eventdata, handles)
 % Hint: get(hObject,'Value') returns toggle state of checkbox_viewLightAuto
 global PF2
 
-PF2.view.LightAuto=get(hObject,'Value');
+PF2.GUIPF2.view.LightAuto=get(hObject,'Value');
 updatePlots(handles);
 
 % --- Executes on button press in checkbox_viewOxyAuto.
@@ -3011,7 +3011,7 @@ function checkbox_viewOxyAuto_Callback(hObject, eventdata, handles)
 % Hint: get(hObject,'Value') returns toggle state of checkbox_viewOxyAuto
 global PF2
 
-PF2.view.OxyAuto=get(hObject,'Value');
+PF2.GUIPF2.view.OxyAuto=get(hObject,'Value');
 updatePlots(handles);
 
 
@@ -3024,7 +3024,7 @@ function checkbox_viewLightColorAuto_Callback(hObject, eventdata, handles)
 % Hint: get(hObject,'Value') returns toggle state of checkbox_viewLightColorAuto
 global PF2
 
-PF2.view.LightColorAuto=get(hObject,'Value');
+PF2.GUIPF2.view.LightColorAuto=get(hObject,'Value');
 updatePlots(handles);
 
 % --- Executes on button press in checkbox_viewOxyColorAuto.
@@ -3036,7 +3036,7 @@ function checkbox_viewOxyColorAuto_Callback(hObject, eventdata, handles)
 % Hint: get(hObject,'Value') returns toggle state of checkbox_viewOxyColorAuto
 global PF2
 
-PF2.view.OxyColorAuto=get(hObject,'Value');
+PF2.GUIPF2.view.OxyColorAuto=get(hObject,'Value');
 updatePlots(handles);
 
 
@@ -3288,15 +3288,15 @@ else
    error('Not Yet Implemented for seperate probe data,\nAssumes concatenated datasets with unique channels in the config file'); 
 end
 
-time=PF2.data.time;
+time=PF2.GUIPF2.data.time;
 
-startInd=find(PF2.view.startTime<=time);
+startInd=find(PF2.GUIPF2.view.startTime<=time);
 if(isempty(startInd))
     startInd=1;
 else
     startInd=startInd(1);
 end
-endInd=find(PF2.view.endTime<=time);
+endInd=find(PF2.GUIPF2.view.endTime<=time);
 if(isempty(endInd))
     endInd=length(time);
 else
@@ -3312,9 +3312,9 @@ end
 inds=1:length(time);
 timeInd=inds>=startInd&inds<=endInd;
 if(preProcessed)
-    data=PF2.data.stage{4};
+    data=PF2.GUIPF2.data.stage{4};
 else
-    data=PF2.data.stage{5};
+    data=PF2.GUIPF2.data.stage{5};
 end
 
 if(~isempty(data))
@@ -3351,7 +3351,7 @@ if(~isempty(data))
             %plotIdx2=(ismember(PF2.curConcSet,PF2.curConc));
             plotIdx=find(plotIdx);%.*plotIdx2);
 
-            % if(PF2.view.OxyColorAuto)
+            % if(PF2.GUIPF2.view.OxyColorAuto)
             %     [wvUnique]=sort(unique(round(PF2.curWvSet)));
             %     wvUnique(isnan(wvUnique))=[];
             %      cc=lines(length(wvUnique));%linspecer(length(wvUnique),'qualitative');
@@ -3403,8 +3403,8 @@ if(~isempty(data))
                 end
             end
 
-            if(~PF2.view.OxyAuto)
-               ylim([PF2.view.OxyMin,PF2.view.OxyMax]); 
+            if(~PF2.GUIPF2.view.OxyAuto)
+               ylim([PF2.GUIPF2.view.OxyMin,PF2.GUIPF2.view.OxyMax]); 
             end
 
 
@@ -3417,7 +3417,7 @@ if(~isempty(data))
                th=text(0.5,0.5,'X','FontSize',40,'color',[1,0,0]); axis off
             end
 
-            xl=[PF2.view.startTime,PF2.view.endTime]; plotMarkers(xl);
+            xl=[PF2.GUIPF2.view.startTime,PF2.GUIPF2.view.endTime]; plotMarkers(xl);
             hold off;
 
             if(setF.device.Info.TimeIsSampleCount)
@@ -3426,7 +3426,7 @@ if(~isempty(data))
                 xlabel('Time (s)');
             end
 
-            %*%xlim([PF2.view.startTime,PF2.view.endTime])
+            %*%xlim([PF2.GUIPF2.view.startTime,PF2.GUIPF2.view.endTime])
             title(sprintf('P%i: Opt%i',prb,optIdx));
             if(strcmp(PF2.GUIPF2.dpf_mode,'None'))
                 ylabel('\Delta[X] (mM*mm)');
@@ -3478,15 +3478,15 @@ else
    error('Not Yet Implemented for seperate probe data,\nAssumes concatenated datasets with unique channels in the config file'); 
 end
 
-time=PF2.data.time;
+time=PF2.GUIPF2.data.time;
 
-startInd=find(PF2.view.startTime<=time);
+startInd=find(PF2.GUIPF2.view.startTime<=time);
 if(isempty(startInd))
     startInd=1;
 else
     startInd=startInd(1);
 end
-endInd=find(PF2.view.endTime<=time);
+endInd=find(PF2.GUIPF2.view.endTime<=time);
 if(isempty(endInd))
     endInd=length(time);
 else
@@ -3506,11 +3506,11 @@ inds=1:length(time);
 timeInd=inds>=startInd&inds<=endInd;
 
 if(preProcessed==true)
-    data=PF2.data.stage{1};
+    data=PF2.GUIPF2.data.stage{1};
 elseif(plotIntensity)
-    data=PF2.data.stage{2};
+    data=PF2.GUIPF2.data.stage{2};
 else % plot OD
-    data=PF2.data.stage{3};
+    data=PF2.GUIPF2.data.stage{3};
 end
 
 if(~isempty(data))
@@ -3553,7 +3553,7 @@ if(~isempty(data))
             plotIdx=find(plotIdx.*plotIdx2==1);
             num2Plot=length(plotIdx);
 
-            if(PF2.view.LightColorAuto)
+            if(PF2.GUIPF2.view.LightColorAuto)
                 [wvUnique]=sort(unique(round(PF2.curWvSet)));
                 wvUnique(isnan(wvUnique))=[];
                  cc=lines(length(wvUnique));%linspecer(length(wvUnique),'qualitative');
@@ -3572,12 +3572,12 @@ if(~isempty(data))
 
             cla
             for i=1:num2Plot
-               plot(PF2.data.time(timeInd),data(timeInd,plotIdx(i)),'color',cIndex(i,:)); 
+               plot(PF2.GUIPF2.data.time(timeInd),data(timeInd,plotIdx(i)),'color',cIndex(i,:)); 
                hold on;
             end
 
-            if(~PF2.view.LightAuto&&plotIntensity)
-               ylim([PF2.view.LightMin,PF2.view.LightMax]); 
+            if(~PF2.GUIPF2.view.LightAuto&&plotIntensity)
+               ylim([PF2.GUIPF2.view.LightMin,PF2.GUIPF2.view.LightMax]); 
             end
 
 
@@ -3585,11 +3585,11 @@ if(~isempty(data))
                yl=ylim;
 
                if(max(yl)>0.95*setF.device.Info.RawMax)
-                   plot(PF2.data.time(timeInd),PF2.data.time(timeInd)*0+setF.device.Info.RawMax,'--r','linewidth',2);
+                   plot(PF2.GUIPF2.data.time(timeInd),PF2.GUIPF2.data.time(timeInd)*0+setF.device.Info.RawMax,'--r','linewidth',2);
                end
             end
 
-            xl=[PF2.view.startTime,PF2.view.endTime]; plotMarkers(xl);
+            xl=[PF2.GUIPF2.view.startTime,PF2.GUIPF2.view.endTime]; plotMarkers(xl);
             hold off;
 
             if(setF.device.Info.TimeIsSampleCount)
@@ -3600,7 +3600,7 @@ if(~isempty(data))
 
             title(sprintf('P%i: Opt%i',prb,optIdx));
 
-            %*%xlim([PF2.view.startTime,PF2.view.endTime])
+            %*%xlim([PF2.GUIPF2.view.startTime,PF2.GUIPF2.view.endTime])
             if(plotIntensity)
                 ylabel('Intensity (I_in)');
             else
@@ -3634,7 +3634,7 @@ global PF2
 
 PF2.baseline.startTime=str2double(get(hObject,'String'));
 
-if(isempty(PF2.baseline.startTime)||PF2.baseline.startTime<0||PF2.baseline.startTime>max(PF2.data.time))
+if(isempty(PF2.baseline.startTime)||PF2.baseline.startTime<0||PF2.baseline.startTime>max(PF2.GUIPF2.data.time))
     set(hObject,'String','0');
     edit_baseline_start_time_Callback(hObject, eventdata, handles);
 else
@@ -3715,7 +3715,7 @@ global PF2
 if(isfield(PF2,'curMarkerSet')&&~isempty(PF2.curMarkerSet))
     curMarkersInd=get(handles.listbox_markers,'Value');
     PF2.curMarkers=PF2.curMarkerSet(curMarkersInd);
-    reducedMarkers=PF2.data.markers(ismember(PF2.data.markers(:,2),PF2.curMarkers),:);
+    reducedMarkers=PF2.GUIPF2.data.markers(ismember(PF2.GUIPF2.data.markers(:,2),PF2.curMarkers),:);
     PF2.curMarkersPlot=reducedMarkers;
 
     if(~isempty(PF2.curMarkersPlot))
@@ -3790,7 +3790,7 @@ function checkbox_plot_OD_Callback(hObject, eventdata, handles)
 % Hint: get(hObject,'Value') returns toggle state of checkbox_plot_OD
 global PF2
 
-PF2.view.plotOD=get(handles.checkbox_plot_OD,'Value');
+PF2.GUIPF2.view.plotOD=get(handles.checkbox_plot_OD,'Value');
 updatePlots(handles);
 
 
@@ -3812,9 +3812,9 @@ end
 if(isfield(PF2,'curMarkersPlot')&&~isempty(PF2.curMarkersPlot))
     mrkStartTime=PF2.curMarkersPlot(curNavIndex,1);
     set(handles.edit_startTime,'String',sprintf('%.2f',mrkStartTime-PF2.GUIPF2.baseline.blLength));
-    PF2.view.startTime=str2double(get(handles.edit_startTime,'String'));
+    PF2.GUIPF2.view.startTime=str2double(get(handles.edit_startTime,'String'));
     %edit_startTime_Callback(hObject, eventdata, handles);
-    set(handles.edit_endTime,'String',sprintf('%.2f',mrkStartTime+PF2.view.timeStepSize));
+    set(handles.edit_endTime,'String',sprintf('%.2f',mrkStartTime+PF2.GUIPF2.view.timeStepSize));
     edit_endTime_Callback(hObject, eventdata, handles);
 end
 
@@ -3939,9 +3939,9 @@ function pushbutton_customCallback_Callback(hObject, eventdata, handles)
 % eventdata  reserved - to be defined in a future version of MATLAB
 % handles    structure with handles and user data (see GUIDATA)
 global PF2
-data=PF2.data.stage{5};
-if(isfield(PF2.data,'markers'))
-    data.markers=PF2.data.markers;
+data=PF2.GUIPF2.data.stage{5};
+if(isfield(PF2.GUIPF2.data,'markers'))
+    data.markers=PF2.GUIPF2.data.markers;
 end
 if(exist('PF2Analyze')==2)
     if(isempty(PF2.PF2Analyze))
@@ -3959,7 +3959,7 @@ function checkbox_view_processWindowOnly_Callback(hObject, eventdata, handles)
 % eventdata  reserved - to be defined in a future version of MATLAB
 % handles    structure with handles and user data (see GUIDATA)
 global PF2
-PF2.view.processWindowOnly=get(hObject,'Value');
+PF2.GUIPF2.processWindowOnly=get(hObject,'Value');
 processFNIR_GUI();
 updatePlots(handles);
 
@@ -3989,14 +3989,14 @@ function txt = myupdatefcn(pointDataTip, event_obj)
      
      
      if(strcmp(cursorTimelineMode,'start'))
-         if(pos(1)~= PF2.view.startTime)
+         if(pos(1)~= PF2.GUIPF2.view.startTime)
             dataTipSelectionHandleTag=selectedObjectTag;
-            if(pos(1)>PF2.view.endTime||contains(dataTipSelectionHandleTag,'End'))
+            if(pos(1)>PF2.GUIPF2.view.endTime||contains(dataTipSelectionHandleTag,'End'))
                 cursorTimelineMode='end';
             else
-                PF2.view.startTime=pos(1);
-                set(handles.edit_startTime,'String',sprintf('%.2f',PF2.view.startTime));
-                if(PF2.GUIPF2.baseline.relative2View||PF2.view.processWindowOnly)
+                PF2.GUIPF2.view.startTime=pos(1);
+                set(handles.edit_startTime,'String',sprintf('%.2f',PF2.GUIPF2.view.startTime));
+                if(PF2.GUIPF2.baseline.relative2View||PF2.GUIPF2.processWindowOnly)
                     processFNIR_GUI();
                 end
                 updatePlots(handles);
@@ -4005,14 +4005,14 @@ function txt = myupdatefcn(pointDataTip, event_obj)
             
          end
      elseif(strcmp(cursorTimelineMode,'end'))
-         if(pos(1)~= PF2.view.endTime)
+         if(pos(1)~= PF2.GUIPF2.view.endTime)
             dataTipSelectionHandleTag=selectedObjectTag;
-            if(pos(1)<PF2.view.startTime||contains(dataTipSelectionHandleTag,'Start'))
+            if(pos(1)<PF2.GUIPF2.view.startTime||contains(dataTipSelectionHandleTag,'Start'))
                 cursorTimelineMode='start';
             else
-                PF2.view.endTime=pos(1);
-                set(handles.edit_endTime,'String',sprintf('%.2f',PF2.view.endTime));
-                if(PF2.GUIPF2.baseline.relative2View||PF2.view.processWindowOnly)
+                PF2.GUIPF2.view.endTime=pos(1);
+                set(handles.edit_endTime,'String',sprintf('%.2f',PF2.GUIPF2.view.endTime));
+                if(PF2.GUIPF2.baseline.relative2View||PF2.GUIPF2.processWindowOnly)
                     processFNIR_GUI();
                 end
                 updatePlots(handles);
