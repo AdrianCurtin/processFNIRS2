@@ -8,6 +8,13 @@ end
 
 N=round(ArtifactTime*fs);
 
+% global smar2
+% 
+% tauArtifact=smar2.tauArtifact;
+% N=smar2.N;
+% tauClean=smar2.tauClean;
+% minSeg=2;
+
 %offset=nanmean(abs(x(:)))*100;
 
 [Xcorr, maskCV, MA_idx]=pf2_SMAR2(x,N,chNum,tauArtifact,tauClean,minSeg);
@@ -40,8 +47,8 @@ for ch=1:numCh
        MA_seg=x([MA_ch(i,1):MA_ch(i,2)],ch);
        lenMA=MA_ch(i,2)-MA_ch(i,1)+1;
        %MA_seg_smooth
-       if(lenMA>2)
-            MA_seg_smooth = smooth(MA_seg,4,'loess');%,'sgolay',SGdegree);% csaps(1:lenMA,MA_seg,0.1,1:lenMA)';%
+       if(lenMA>3)
+            MA_seg_smooth = smooth(MA_seg,4,'sgolay',3);%,'sgolay',SGdegree);% csaps(1:lenMA,MA_seg,0.1,1:lenMA)';%
        else
             MA_seg_smooth = MA_seg;
        end
@@ -72,10 +79,12 @@ for ch=1:numCh
            x_recon([cleanSegIdx(1):cleanSegIdx(2)],ch)=cleanSeg;
        end
        
-       if(lenClean<=beta)
+       if(lenClean<=beta&&lenClean>1)
            a=nanmean(cleanSeg(lenClean-min(alpha,lenClean))); %grab last good points 
        elseif(lenClean>beta)
            a=nanmean(cleanSeg(lenClean-ceil(0.1*lenClean):lenClean));
+       else
+          a=cleanSeg; 
        end
        
        if(isnan(a))

@@ -26,67 +26,35 @@ end
 if(N<1)
     error('Invalid Window Length');
 end
-% 
-% global smar2
-% 
-% tauArtifact=smar2.tauArtifact;
-% N=smar2.N;
-% tauClean=smar2.tauClean;
 
 len=size(x,1);
 
-[CVx,dCVx]=calcLocalCV(x,N);
+[CVx]=calcLocalCV(x,N);
 aCVx=abs(CVx);
-adCVx=abs(dCVx);
 CVx_median=nanmedian(aCVx,1);
-dCVx_median=nanmedian(adCVx,1);
 aCVx_lower=aCVx;
 aCVx_lower(aCVx_lower<(2.*repmat(CVx_median,[size(aCVx_lower,1),1])))=nan;
 lowerStd=nanstd(aCVx_lower);
 
-
-%CVthreshold=CVx_median.*tauArtifact;%CVx_median
-%CVthresholdClean=CVx_median.*tauClean;%CVx_median;%+tauUpMult*CVx_median/2;
-
-
-CVthreshold=CVx_median*2+lowerStd.*tauArtifact;%CVx_median
-CVthresholdClean=CVx_median*2+lowerStd.*tauClean;%CVx_median;%+tauUpMult*CVx_median/2;
+CVthreshold=CVx_median.*tauArtifact;%CVx_median
+CVthresholdClean=CVx_median.*tauClean;%CVx_median;%+tauUpMult*CVx_median/2;
 
 
-dCVthreshold=dCVx_median.*tauArtifact;%CVx_median
-dCVthresholdClean=dCVx_median.*tauClean;%CVx_median;%+tauUpMult*CVx_median/2;
-% 
-% figure(10);
+%CVthreshold=CVx_median*2+lowerStd.*tauArtifact;%CVx_median
+%CVthresholdClean=CVx_median*2+lowerStd.*tauClean;%CVx_median;%+tauUpMult*CVx_median/2;
 
-
-% 
-% figure(10);
-% subplot(1,2,1);
-% z=5;
-% plot(adCVx(:,z))
-% hold on
-% plot([0,size(adCVx,1)],dCVthreshold(z).*ones(1,2));
-% plot([0,size(adCVx,1)],dCVthresholdClean(z).*ones(1,2),'--');
-% hold off;
-% 
-% subplot(1,2,2);
-% plot(CVx(:,z))
-% hold on
-% plot([0,size(CVx,1)],CVthreshold(z).*ones(1,2));
-% plot([0,size(CVx,1)],CVthresholdClean(z).*ones(1,2),'--');
-% hold off;
-% % 
-% %   pause
+figure(10);
+z=5;
+plot(CVx(:,z))
+hold on
+plot([0,size(CVx,1)],CVthreshold(z).*ones(1,2));
+plot([0,size(CVx,1)],CVthresholdClean(z).*ones(1,2),'--');
+hold off;
 
 
 aCVxm=[zeros(1,size(x,2));aCVx;zeros(1,size(x,2))];
-adCVxm=[zeros(1,size(x,2));adCVx;zeros(1,size(x,2))];
-
-% maskCV=aCVxm>CVthreshold|isnan(aCVxm);%|aCVd>CVdthreshold;
-% maskCVclean=aCVxm>CVthresholdClean|isnan(aCVxm);%|aCVd>CVdthreshold;
-
-maskCV=adCVxm>dCVthreshold|isnan(adCVxm);%|aCVd>CVdthreshold;
-maskCVclean=adCVxm>dCVthresholdClean|isnan(adCVxm);%|aCVd>CVdthreshold;
+maskCV=aCVxm>CVthreshold|isnan(aCVxm);%|aCVd>CVdthreshold;
+maskCVclean=aCVxm>CVthresholdClean|isnan(aCVxm);%|aCVd>CVdthreshold;
 
 dMask=diff(maskCV);
 aMask=abs(dMask);
@@ -178,7 +146,7 @@ end
 %%_Subfunctions_________________________________________________________
 
 %__________________________________________________________________________
-function [CVx, dCVx] = calcLocalCV(x,N)
+function [CVx] = calcLocalCV(x,N)
 % Function to calculate coefficient of variation for use in SMAR technique
 % x:	input signal
 % N:	window length for SMAR
@@ -210,10 +178,6 @@ for i=wSize+1:len-wSize
     x_val=x(idx,:);
     CVx(i,:)=nanstd(x_val)./nanmean(x_val);
 end
-
-dCVx=diff(CVx);
-dCVx=[zeros([1,size(CVx,2)]);dCVx];
-
 % 
 % figure(3);
 % plot(CVx(:,11));

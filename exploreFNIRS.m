@@ -534,7 +534,11 @@ else
               end
                
               if(ismember(curFieldName,outTable.Properties.VariableNames)&&~isempty(curField))
-                  outTable.(curFieldName)(i,1)=curField;
+                  if(strcmpi(curField,'missing')&&isnumeric(outTable.(curFieldName)(1,1)))
+                      outTable.(curFieldName)(i,1)=nan;
+                  else
+                      outTable.(curFieldName)(i,1)=curField;
+                  end
               elseif(~isempty(curField))
                   if(ischar(curField)) % adds columns
                       outTable.(curFieldName)=strings(size(outTable,1),1);

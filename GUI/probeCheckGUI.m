@@ -755,16 +755,20 @@ if(isfield(pf2ChannelCheck,'fchMask')&&~isempty(pf2ChannelCheck.fchMask)&&~isemp
     
 end
 
-if(pf2_base.isnestedfield(hObject,'Parent.Parent'))
-    uiresume(hObject.Parent.Parent);
-end
+close();
 
 if(isfield(handles,'figure1'))
    delete(handles.figure1); 
 end
 
 
-%close();
+if(pf2_base.isnestedfield(hObject,'Parent.Parent'))
+    uiresume(hObject.Parent.Parent);
+end
+
+
+
+
 
 % --- Executes on button press in markerCheck.
 function markerCheck_Callback(hObject, eventdata, handles)
