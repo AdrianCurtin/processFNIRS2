@@ -50,8 +50,12 @@ if(length(minVal)==2&&sum(minVal>0)==1&&isempty(maxVal))  %% expects two minimum
         minVal=minVal(1);
     end
     
-else
+elseif(isempty(maxVal))
+     maxVal=nanmax(data2plot(:));
+    
     twosided=false;
+else
+    twosided=false; 
 end
 
 if(isempty(fNIR))

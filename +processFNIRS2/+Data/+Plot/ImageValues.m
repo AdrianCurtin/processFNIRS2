@@ -18,27 +18,42 @@ end
 if(nargin<3||isempty(minVal))
    minVal=nanmin(data2plot); 
 end
+probeInfo=[];
 
-if(pf2_base.isnestedfield(fNIR,'info.probename')&&isfield(fNIR.info,'probename')&&~contains(fNIR.info.probename,'Unknown')) 
+if(isempty(fNIR))
+    global setF
+end
+
+if(isempty(fNIR)&&isfield(setF,'device'))
+    
+    cfgFilePath=setF.device.cfg.File;
+    if(~isfield(setF.device.Probe{1},'OptLayout2D'))
+        probeInfo=pf2_base.loadDeviceCfg(cfgFilePath,true);
+        setF.device=probeInfo;
+    else
+       probeInfo=setF.device; 
+    end
+elseif(pf2_base.isnestedfield(fNIR,'info.probename')&&isfield(fNIR.info,'probename')&&~contains(fNIR.info.probename,'Unknown')) 
     %try to load the probename cfg file
     cfgFilePath=sprintf('%s.cfg',fNIR.info.probename);
 else
     cfgFilePath='';
 end
 
+if(isempty(probeInfo))
+    if(isempty(cfgFilePath)||~contains(cfgFilePath,'.cfg'))
 
-if(isempty(cfgFilePath)||~contains(cfgFilePath,'.cfg'))
-    
-    warning('Missing or invalid configuration file path\n')
-    
-    disp('No device specified. Please load device configuration');
-    probeInfo=pf2_base.loadDeviceCfg([],true);
-    if(~isempty(probeInfo))
-        error('No valid devices selected');
+        warning('Missing or invalid configuration file path\n')
+
+        disp('No device specified. Please load device configuration');
+        probeInfo=pf2_base.loadDeviceCfg([],true);
+        if(~isempty(probeInfo))
+            error('No valid devices selected');
+        end
+
+    elseif(~isempty(cfgFilePath)) % If we're not looking at the GUI, doesn't matter
+        probeInfo=pf2_base.loadDeviceCfg(cfgFilePath,true);
     end
-    
-elseif(~isempty(cfgFilePath)) % If we're not looking at the GUI, doesn't matter
-    probeInfo=pf2_base.loadDeviceCfg(cfgFilePath,true);
 end
 
 if(pf2_base.isnestedfield(probeInfo,'Probe'))
@@ -54,10 +69,11 @@ end
 if(length(data2plot)~=probeInfo.NumOptodes)
     error('Must have a value for all optodes');
 end
-
-clf(gcf);
-
-h{1}= axes('Position',[0.05,0.05,0.9,0.9],'Box','on');
+% 
+% clf(gcf);
+% 
+% h{1}= axes('Position',[0.05,0.05,0.9,0.9],'Box','on');
+cla
 
 imgSize=1000;
 imgData=nan(imgSize,imgSize);

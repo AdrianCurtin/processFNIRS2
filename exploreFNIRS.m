@@ -4260,16 +4260,16 @@ if(showTopo)
               switch(LME_topo_mode)
                     case 'coef'
                         for c=1:numCoeff
-                            fNIR_t{b,c}=nan(2,8);
-                            fNIR_p{b,c}=nan(2,8);
-                            fNIR_df{b,c}=nan(2,8);
+                            fNIR_t{b,c}=nan(1,max(chArr));
+                            fNIR_p{b,c}=nan(1,max(chArr));
+                            fNIR_df{b,c}=nan(1,max(chArr));
                         end
                   case 'anova'
                         for a=1:numANOVA
-                            fNIR_f{b,a}=nan(2,8);
-                            fNIR_p{b,a}=nan(2,8);
-                            fNIR_df{b,a}=nan(2,8);
-                            fNIR_df2{b,a}=nan(2,8);
+                            fNIR_f{b,a}=nan(1,max(chArr));
+                            fNIR_p{b,a}=nan(1,max(chArr));
+                            fNIR_df{b,a}=nan(1,max(chArr));
+                            fNIR_df2{b,a}=nan(1,max(chArr));
                         end
 
               end
@@ -4280,7 +4280,7 @@ if(showTopo)
             for coefIdx=1:size(ExFNIRS.curChartModelsCoefficents_tstat,1)
                     
                curCh= chArr(coefIdx);
-               curIdx=[rem(curCh-1,2)+1,1+floor((curCh-0.01)/2)];
+               
                curChName=chNames(coefIdx);
 
                b_idx=strcmp(bioMarr{coefIdx},selectedBioM);
@@ -4290,17 +4290,17 @@ if(showTopo)
    
                        for c=1:numCoeff
 
-                           fNIR_t{b_idx,c}(curIdx(1),curIdx(2))=ExFNIRS.curChartModelsCoefficents_tstat{curChName,coefNames(c)};
-                           fNIR_p{b_idx,c}(curIdx(1),curIdx(2))=ExFNIRS.curChartModelsCoefficents_pval{curChName,coefNames(c)};
-                           fNIR_df{b_idx,c}(curIdx(1),curIdx(2))=ExFNIRS.curChartModelsCoefficents_df{curChName,coefNames(c)};
+                           fNIR_t{b_idx,c}(curCh)=ExFNIRS.curChartModelsCoefficents_tstat{curChName,coefNames(c)};
+                           fNIR_p{b_idx,c}(curCh)=ExFNIRS.curChartModelsCoefficents_pval{curChName,coefNames(c)};
+                           fNIR_df{b_idx,c}(curCh)=ExFNIRS.curChartModelsCoefficents_df{curChName,coefNames(c)};
                        end
                    case 'anova'
                        for a=1:numANOVA
 
-                           fNIR_f{b_idx,a}(curIdx(1),curIdx(2))=ExFNIRS.curChartModelsANOVACoefficents_Fstat{curChName,anovaNames(a)};
-                           fNIR_p{b_idx,a}(curIdx(1),curIdx(2))=ExFNIRS.curChartModelsANOVACoefficents_pval{curChName,anovaNames(a)};
-                           fNIR_df{b_idx,a}(curIdx(1),curIdx(2))=ExFNIRS.curChartModelsANOVACoefficents_df1{curChName,anovaNames(a)};
-                           fNIR_df2{b_idx,a}(curIdx(1),curIdx(2))=ExFNIRS.curChartModelsANOVACoefficents_df2{curChName,anovaNames(a)};
+                           fNIR_f{b_idx,a}(curCh)=ExFNIRS.curChartModelsANOVACoefficents_Fstat{curChName,anovaNames(a)};
+                           fNIR_p{b_idx,a}(curCh)=ExFNIRS.curChartModelsANOVACoefficents_pval{curChName,anovaNames(a)};
+                           fNIR_df{b_idx,a}(curCh)=ExFNIRS.curChartModelsANOVACoefficents_df1{curChName,anovaNames(a)};
+                           fNIR_df2{b_idx,a}(curCh)=ExFNIRS.curChartModelsANOVACoefficents_df2{curChName,anovaNames(a)};
                        end
                end
             end
@@ -4327,12 +4327,48 @@ if(showTopo)
                                 %FDR RESULTS FOUND
                             end
 
-                            switch(ExFNIRS.settings.ChannelMode)
-                                case 'fNIR'
-                                    interpolateNIR(curT,'Mode','tstat','fontSize',12,'transparent',true,'pValueMask',curP,'TitleText',coefNames{c},'ChannelLabels',true)%,7,11,2,1,false,'[Hb-Oxy] Natural High Vs. Low',12,'hot',true)
-                                case 'ROI'
-                                    roiInfo=ExFNIRS.currentROI;
-                                    interpolateNIR(mapROIvaluesToCh(roiInfo,curT),'Mode','tstat','fontSize',12,'transparent',true,'pValueMask',mapROIvaluesToCh(roiInfo,curP),'TitleText',coefNames{c},'ChannelLabels',true)%,7,11,2,1,false,'[Hb-Oxy] Natural High Vs. Low',12,'hot',true)
+                            global setF
+                            
+                            switch(setF.device.Info.CfgName)
+                                case 'fNIR_Devices_fNIR1000'
+                                    curT=nan(2,8);
+                                    curP=nan(2,8);
+                                    curDf=nan(2,8);
+
+                                    curT(:)=fNIR_t{b,c};
+                                    curP(:)=fNIR_p{b,c};
+                                    curDf(:)=fNIR_df{b,c};
+
+
+                                    switch(ExFNIRS.settings.ChannelMode)
+                                        case 'fNIR'
+                                            interpolateNIR(curT,'Mode','tstat','fontSize',12,'transparent',true,'pValueMask',curP,'TitleText',coefNames{c},'ChannelLabels',true)%,7,11,2,1,false,'[Hb-Oxy] Natural High Vs. Low',12,'hot',true)
+                                        case 'ROI'
+                                            roiInfo=ExFNIRS.currentROI;
+                                            interpolateNIR(mapROIvaluesToCh(roiInfo,curT),'Mode','tstat','fontSize',12,'transparent',true,'pValueMask',mapROIvaluesToCh(roiInfo,curP),'TitleText',coefNames{c},'ChannelLabels',true)%,7,11,2,1,false,'[Hb-Oxy] Natural High Vs. Low',12,'hot',true)
+                                    end
+                                otherwise
+                                    passingVals=curT(curP<0.05);
+                                    if(~isempty(passingVals))
+                                        minVal(1)=min(abs(passingVals));
+                                        minVal(2)=-1*min(abs(passingVals));
+                                        switch(ExFNIRS.settings.ChannelMode)
+                                            case 'fNIR'
+                                                processFNIRS2.Data.Plot.ImageValues([],curT,minVal,[],coefNames{c},'t-Stat');%,7,11,2,1,false,'[Hb-Oxy] Natural High Vs. Low',12,'hot',true)
+                                            case 'ROI'
+                                                roiInfo=ExFNIRS.currentROI;
+                                                processFNIRS2.Data.Plot.ImageValues([],mapROIvaluesToCh(roiInfo,curT),minVal,[],coefNames{c},'t-Stat');%,7,11,2,1,false,'[Hb-Oxy] Natural High Vs. Low',12,'hot',true)
+                                        end
+                                    else
+                                        plot(0,0);
+                                        curAxes=gca;
+                                        axesPos=curAxes.OuterPosition;
+                                        axis off
+                                        title(sprintf('%s_N_S',coefNames{c}));
+                                        if(a==1) % first column
+                                            th=annotation(gcf,'textbox',[0,axesPos(2),axesPos(3),axesPos(4)/2],'String',selectedBioM(b),'FitBoxToText','on');
+                                        end
+                                    end
                             end
                             if(c==1) % first column
                                 ylabel(selectedBioM(b));
@@ -4373,14 +4409,43 @@ if(showTopo)
                                     titleSTR=sprintf('%s*',anovaNames{a});
                                     %FDR RESULTS FOUND
                                 end
+                                
+                                global setF
+                            
+                                switch(setF.device.Info.CfgName)
+                                    case 'fNIR_Devices_fNIR1000'
+                                        curF=nan(2,8);
+                                        curP=nan(2,8);
+                                        curDf1=nan(2,8);
+                                        curDf2=nan(2,8);
 
-                                switch(ExFNIRS.settings.ChannelMode)
-                                    case 'fNIR'
-                                        interpolateNIR(curF,'Mode','fstat','fontSize',12,'transparent',true,'lowerThreshold',estimatedPval_min,'TitleText',titleSTR,'ChannelLabels',true)%,7,11,2,1,false,'[Hb-Oxy] Natural High Vs. Low',12,'hot',true)
-                                    case 'ROI'
-                                        roiInfo=ExFNIRS.currentROI;
-                                        interpolateNIR(mapROIvaluesToCh(roiInfo,curF),'Mode','fstat','fontSize',12,'transparent',true,'lowerThreshold',estimatedPval_min,'TitleText',titleSTR,'ChannelLabels',true)%,7,11,2,1,false,'[Hb-Oxy] Natural High Vs. Low',12,'hot',true)
+                                        curF(:)=fNIR_f{b,a};
+                                        curP(:)=fNIR_p{b,a};
+                                        curDf1(:)=fNIR_df{b,a};
+                                        curDf2(:)=fNIR_df2{b,a};
+
+
+                                        
+                    
+                                        switch(ExFNIRS.settings.ChannelMode)
+                                            case 'fNIR'
+                                                interpolateNIR(curF,'Mode','fstat','fontSize',12,'transparent',true,'lowerThreshold',estimatedPval_min,'TitleText',titleSTR,'ChannelLabels',true)%,7,11,2,1,false,'[Hb-Oxy] Natural High Vs. Low',12,'hot',true)
+                                            case 'ROI'
+                                                roiInfo=ExFNIRS.currentROI;
+                                                interpolateNIR(mapROIvaluesToCh(roiInfo,curF),'Mode','fstat','fontSize',12,'transparent',true,'lowerThreshold',estimatedPval_min,'TitleText',titleSTR,'ChannelLabels',true)%,7,11,2,1,false,'[Hb-Oxy] Natural High Vs. Low',12,'hot',true)
+                                        end
+                                    otherwise
+                                                                               
+                                        switch(ExFNIRS.settings.ChannelMode)
+                                            case 'fNIR'
+                                                processFNIRS2.Data.Plot.InterpolateValues([],curF,estimatedPval_min,[],1,titleSTR,'F-val');%InterpolateValues(fNIR,data2plot,minVal,maxVal,bufferMult,titleString,clrBarTitle)
+                                            case 'ROI'
+                                                roiInfo=ExFNIRS.currentROI;
+                                                processFNIRS2.Data.Plot.InterpolateValues([],mapROIvaluesToCh(roiInfo,curF),estimatedPval_min,[],1,titleSTR,'F-val');%,7,11,2,1,false,'[Hb-Oxy] Natural High Vs. Low',12,'hot',true)
+                                        end
                                 end
+
+                                
                                 if(a==1) % first column
                                     curAxes=gca;
                                     axesPos=curAxes.OuterPosition;
