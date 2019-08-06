@@ -1534,19 +1534,23 @@ if(ExFNIRS.UpdateNeeded==2||~isfield(ExFNIRS,'curPreprocessedFNIR'))
        if(ExFNIRS.settings.use_baseline)
             ExFNIRS.curPreprocessedFNIR.baseline{i}=processFNIRS2.Data.Split(ExFNIRS.curPreprocessedFNIR.fNIR{i},ExFNIRS.settings.baseline_start,ExFNIRS.settings.baseline_end); %baselineining is handled in processing section
             ExFNIRS.curPreprocessedFNIR.gbyFNIRS{i}.time=ExFNIRS.curPreprocessedFNIR.gbyFNIRS{i}.time-ExFNIRS.settings.block_start; %change time so that 0 is start of block
+            
             ExFNIRS.curPreprocessedFNIR.gbyFNIRS_blk{i}=processFNIRS2.Data.Resample(ExFNIRS.curPreprocessedFNIR.gbyFNIRS{i}, ExFNIRS.settings.barchart_resample_size,'centerOnT0',true,'timeOutMode','start','blfNIR',ExFNIRS.curPreprocessedFNIR.baseline{i},'averageAux',true);
             ExFNIRS.curPreprocessedFNIR.gbyFNIRS_blk{i}.time=ExFNIRS.curPreprocessedFNIR.gbyFNIRS_blk{i}.time+ExFNIRS.settings.block_start; %change time so that 0 is start of block
-
+            ExFNIRS.curPreprocessedFNIR.gbyFNIRS_blk{i}.segmentTimes=ExFNIRS.curPreprocessedFNIR.gbyFNIRS_blk{i}.segmentTimes+ExFNIRS.settings.block_start;
             ExFNIRS.curPreprocessedFNIR.gbyFNIRS{i}=processFNIRS2.Data.Resample(ExFNIRS.curPreprocessedFNIR.gbyFNIRS{i}, ExFNIRS.settings.grandavg_resample_size,'centerOnT0',true,'timeOutMode','start','blfNIR',ExFNIRS.curPreprocessedFNIR.baseline{i},'averageAux',true);
             ExFNIRS.curPreprocessedFNIR.gbyFNIRS{i}.time=ExFNIRS.curPreprocessedFNIR.gbyFNIRS{i}.time+ExFNIRS.settings.block_start; %change time so that 0 is start of block
+            ExFNIRS.curPreprocessedFNIR.gbyFNIRS{i}.segmentTimes=ExFNIRS.curPreprocessedFNIR.gbyFNIRS{i}.segmentTimes+ExFNIRS.settings.block_start;
        else
             ExFNIRS.curPreprocessedFNIR.baseline{i}=[];
             ExFNIRS.curPreprocessedFNIR.gbyFNIRS{i}.time=ExFNIRS.curPreprocessedFNIR.gbyFNIRS{i}.time-ExFNIRS.settings.block_start; %change time so that 0 is start of block
             ExFNIRS.curPreprocessedFNIR.gbyFNIRS_blk{i}=processFNIRS2.Data.Resample(ExFNIRS.curPreprocessedFNIR.gbyFNIRS{i}, ExFNIRS.settings.barchart_resample_size,'centerOnT0',true,'timeOutMode','start','averageAux',true);
             ExFNIRS.curPreprocessedFNIR.gbyFNIRS_blk{i}.time=ExFNIRS.curPreprocessedFNIR.gbyFNIRS_blk{i}.time+ExFNIRS.settings.block_start; %change time so that 0 is start of block
-
+            ExFNIRS.curPreprocessedFNIR.gbyFNIRS_blk{i}.segmentTimes=ExFNIRS.curPreprocessedFNIR.gbyFNIRS_blk{i}.segmentTimes+ExFNIRS.settings.block_start;
+            
             ExFNIRS.curPreprocessedFNIR.gbyFNIRS{i}=processFNIRS2.Data.Resample(ExFNIRS.curPreprocessedFNIR.gbyFNIRS{i}, ExFNIRS.settings.grandavg_resample_size,'centerOnT0',true,'timeOutMode','start','averageAux',true);
             ExFNIRS.curPreprocessedFNIR.gbyFNIRS{i}.time=ExFNIRS.curPreprocessedFNIR.gbyFNIRS{i}.time+ExFNIRS.settings.block_start; %change time so that 0 is start of block
+            ExFNIRS.curPreprocessedFNIR.gbyFNIRS{i}.segmentTimes=ExFNIRS.curPreprocessedFNIR.gbyFNIRS{i}.segmentTimes+ExFNIRS.settings.block_start;
        
        end
     end
@@ -1602,8 +1606,8 @@ for i=1:max(gbyIdx)
         ExFNIRS.settings.within_sub_avg_mode_label='Hierarchy';
     end
     ExFNIRS.gby(i).gbyGrand=grandAvgFNIRS(ExFNIRS.gby(i).gbyFNIRS,false,[],false,hArg,false,false);
-    ExFNIRS.gby(i).gbyGrandBar=grandAvgFNIRS(ExFNIRS.gby(i).gbyFNIRS_blk,false, ExFNIRS.settings.barchart_resample_size,true,hArg,false,true);
-    ExFNIRS.gby(i).gbyGrandBarFlat=grandAvgFNIRS(ExFNIRS.gby(i).gbyFNIRS_blk,false, ExFNIRS.settings.barchart_resample_size,true,ExFNIRS.gby(i).gbyTables(:,'SubjectID'),false,true);
+    ExFNIRS.gby(i).gbyGrandBar=grandAvgFNIRS(ExFNIRS.gby(i).gbyFNIRS_blk,false, ExFNIRS.settings.barchart_resample_size,false,hArg,false,true);
+    ExFNIRS.gby(i).gbyGrandBarFlat=grandAvgFNIRS(ExFNIRS.gby(i).gbyFNIRS_blk,false, ExFNIRS.settings.barchart_resample_size,false,ExFNIRS.gby(i).gbyTables(:,'SubjectID'),false,true);
     try
         close(eHf);
     catch
