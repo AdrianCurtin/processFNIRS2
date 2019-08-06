@@ -4739,7 +4739,7 @@ uCounts=uCount(idxAnvG);
 pVal_corr=pVal(:).*uCounts(:);
 pVal_corr(pVal_corr>1)=1;
 
-contrastTable=table(deltaE',SD_p',F',df',df2',pVal',pVal_corr,HedgesG',GlassesDelta','VariableNames',{'deltaE','SD','F','df1','df2','pVal','pVal_corr','HedgesG','GlassesDelta'},'RowNames',cName');
+contrastTable=table(deltaE',SD_p',F',df',df2',pVal',pVal_corr,'VariableNames',{'deltaE','SD','F','df1','df2','pVal','pVal_corr'},'RowNames',cName');
 
 
 
