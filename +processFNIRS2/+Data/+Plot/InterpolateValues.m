@@ -159,21 +159,21 @@ else
     error('Haven''t accoutned for this yet');
 end
 
-if(~twosided)
-    interpBuffer=ones(size(inpX))*minVal;
-else
-    interpBuffer=zeros(size(inpX));
-end
+maxIdxX=round(dimX/OptDistX)+bufferMult+2;
+maxIdxY=round(dimY/OptDistY)+bufferMult+2;
+%inpX=inpX(1:maxIdxX,1:maxIdxY);
+%inpY=inpY(1:maxIdxX,1:maxIdxY);
 
-
-alphaBuffer=ones(size(inpX))*-1;
+interpBuffer=nan(size(inpX));
+alphaBuffer=zeros(size(inpX));
 
 if(twosided)
     alphaBufferNeg=alphaBuffer;
 end
 
 numRows=size(inpY,1);
-
+% NEed to fill in small array middle with interpolated values instead of
+% minimum
 for optIdx=1:length(data2plot)
     optNum=probeInfo.ChannelList(optIdx);
     optXidx(optIdx)=round(OptPosX(optNum)/OptDistX)+bufferMult+1;
@@ -198,6 +198,51 @@ for optIdx=1:length(data2plot)
     mrkLbl{optIdx}=num2str(optNum);
 end
 
+
+numNeighbors=~isnan(interpBuffer)*1;
+numNeighbors(numNeighbors==1)=nan; %marks all valid points as nan (so they don't add)
+numNeighbors(2:end,:)=numNeighbors(2:end,:)+~isnan(interpBuffer(1:end-1,:)); %add left shift
+numNeighbors(1:end-1,:)=numNeighbors(1:end-1,:)+~isnan(interpBuffer(2:end,:)); %add right shift
+numNeighbors(:,2:end)=numNeighbors(:,2:end)+~isnan(interpBuffer(:,1:end-1)); %add top shift
+numNeighbors(:,1:end-1)=numNeighbors(:,1:end-1)+~isnan(interpBuffer(:,2:end)); %add bottom shift
+
+neighborIdx=find(numNeighbors>1);
+
+[neighborIdxX,neighborIdxY]=ind2sub(size(numNeighbors),neighborIdx);
+for i=1:length(neighborIdxX)
+   curX=neighborIdxX(i);
+   curY=neighborIdxY(i);
+   
+   up=interpBuffer(curX,curY-1);
+   down=interpBuffer(curX,curY+1);
+   left=interpBuffer(curX-1,curY);
+   right=interpBuffer(curX+1,curY);
+   val=nanmean([up,down,left,right]);
+   
+   if(~twosided&&~isnan(val)&&((val>=minVal&&maxVal>minVal)||...
+            (val<=(minVal)&&minVal>maxVal)))
+        interpBuffer(curY,curX)=val;
+        alphaBuffer(curY,curX)=1;
+        alphaBufferNeg(curY,curX)=0;
+    elseif(twosided&&~isnan(val)&&val<=minVal(1))
+        interpBuffer(curY,curX)=val;
+        alphaBufferNeg(curY,curX)=1;
+        alphaBuffer(curY,curX)=0;
+    elseif(twosided&&~isnan(val)&&val>=minVal(2))
+        interpBuffer(curY,curX)=val;
+        alphaBuffer(curY,curX)=1;
+        alphaBufferNeg(curY,curX)=0;
+    else
+        interpBuffer(curY,curX)=val;
+    end
+end
+
+
+if(~twosided)
+    interpBuffer(isnan(interpBuffer))=minVal;
+else
+    interpBuffer(isnan(interpBuffer))=0;
+end
 
 
 %interpBuffer=interpBuffer(end:-1:1,:);
@@ -344,10 +389,12 @@ end
 
 hold on
 
-%hpt=plot(optPos2Plot(1,:)/1.01+1,optPos2Plot(2,:)/1.01+1,'O','MarkerSize',2,'LineWidth',3,'color','white', 'MarkerFaceColor', 'white');
+%hpt=plot(optPos2Plot(1,:)/1.01+1,optPos2Plot(2,:)/1.01+1,'square','MarkerSize',4,'LineWidth',3,'color','white', 'MarkerFaceColor', 'white');
 
 for optIdx=1:length(data2plot)
-    text(optPos2Plot(1,optIdx)/1.01+1,optPos2Plot(2,optIdx)/1.01+1,mrkLbl{optIdx},'FontSize',14,'VerticalAlignment','middle','HorizontalAlignment', 'center','color','white');
+    text(optPos2Plot(1,optIdx)/1.01+1,optPos2Plot(2,optIdx)/1.01+1,mrkLbl{optIdx},'FontSize',12,'VerticalAlignment','middle','HorizontalAlignment', 'center','color','white');
+    text(optPos2Plot(1,optIdx)/1.01+1,optPos2Plot(2,optIdx)/1.01+1,mrkLbl{optIdx},'FontSize',8,'VerticalAlignment','middle','HorizontalAlignment', 'center','color','white');
+    
     text(optPos2Plot(1,optIdx)/1.01+1,optPos2Plot(2,optIdx)/1.01+1,mrkLbl{optIdx},'FontSize',10,'VerticalAlignment','middle','HorizontalAlignment', 'center','color','black');
 end
 
