@@ -344,9 +344,10 @@ end
 
 hold on
 
-plot(optPos2Plot(1,:)/1.01+1,optPos2Plot(2,:)/1.01+1,'O','MarkerSize',15,'LineWidth',3,'color','black', 'MarkerFaceColor', 'k');
+%plot(optPos2Plot(1,:)/1.01+1,optPos2Plot(2,:)/1.01+1,'O','MarkerSize',15,'LineWidth',3,'color','black', 'MarkerFaceColor', 'k');
 for optIdx=1:length(data2plot)
-    text(optPos2Plot(1,optIdx)/1.01+1,optPos2Plot(2,optIdx)/1.01+1,mrkLbl{optIdx},'FontSize',10,'HorizontalAlignment', 'center','color','white');
+    text(optPos2Plot(1,optIdx)/1.01+1,optPos2Plot(2,optIdx)/1.01+1,mrkLbl{optIdx},'FontSize',14,'VerticalAlignment','middle','HorizontalAlignment', 'center','color','white');
+    text(optPos2Plot(1,optIdx)/1.01+1,optPos2Plot(2,optIdx)/1.01+1,mrkLbl{optIdx},'FontSize',10,'VerticalAlignment','middle','HorizontalAlignment', 'center','color','black');
 end
 
 
