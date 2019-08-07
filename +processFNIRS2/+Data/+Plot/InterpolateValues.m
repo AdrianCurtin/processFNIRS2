@@ -183,15 +183,15 @@ for optIdx=1:length(data2plot)
             (data2plot(optIdx)<=(minVal)&&minVal>maxVal)))
         interpBuffer(optYidx(optIdx),optXidx(optIdx))=data2plot(optIdx);
         alphaBuffer(optYidx(optIdx),optXidx(optIdx))=1;
-        alphaBufferNeg(optYidx(optIdx),optXidx(optIdx))=-1;
+        alphaBufferNeg(optYidx(optIdx),optXidx(optIdx))=0;
     elseif(twosided&&~isnan(data2plot(optIdx))&&data2plot(optIdx)<=minVal(1))
         interpBuffer(optYidx(optIdx),optXidx(optIdx))=data2plot(optIdx);
         alphaBufferNeg(optYidx(optIdx),optXidx(optIdx))=1;
-        alphaBuffer(optYidx(optIdx),optXidx(optIdx))=-1;
+        alphaBuffer(optYidx(optIdx),optXidx(optIdx))=0;
     elseif(twosided&&~isnan(data2plot(optIdx))&&data2plot(optIdx)>=minVal(2))
         interpBuffer(optYidx(optIdx),optXidx(optIdx))=data2plot(optIdx);
         alphaBuffer(optYidx(optIdx),optXidx(optIdx))=1;
-        alphaBufferNeg(optYidx(optIdx),optXidx(optIdx))=-1;
+        alphaBufferNeg(optYidx(optIdx),optXidx(optIdx))=0;
     else
         interpBuffer(optYidx(optIdx),optXidx(optIdx))=data2plot(optIdx);
     end
@@ -209,11 +209,11 @@ end
 
 
 if(twosided)
-    intArr=interp2(inpX,inpY,interpBuffer,Xq,Yq,'spline',0);%,method,extrapval)
+    intArr=interp2(inpX,inpY,interpBuffer,Xq,Yq,'makima',0);%,method,extrapval)
 elseif(minVal>maxVal)
-    intArr=interp2(inpX,inpY,interpBuffer,Xq,Yq,'spline',nanmean(maxVal));%,method,extrapval)
+    intArr=interp2(inpX,inpY,interpBuffer,Xq,Yq,'makima',nanmean(maxVal));%,method,extrapval)
 elseif(maxVal>=minVal)
-    intArr=interp2(inpX,inpY,interpBuffer,Xq,Yq,'spline',nanmean(minVal));%,method,extrapval)
+    intArr=interp2(inpX,inpY,interpBuffer,Xq,Yq,'makima',nanmean(minVal));%,method,extrapval)
 end
 
 intArrAlpha=interp2(inpX,inpY,alphaBuffer,Xq,Yq,'cubic',0);%,method,extrapval)
@@ -225,7 +225,7 @@ intArrAlpha(intArrLinear<0)=0;
 if(twosided)
     intArrAlphaNeg=interp2(inpX,inpY,alphaBufferNeg,Xq,Yq,'cubic',0);%,method,extrapval)
     intArrLinearNeg=interp2(inpX,inpY,alphaBufferNeg,Xq,Yq,'linear',0);%,method,extrapval)
-    intArrAlphaNeg(intArrLinearNeg<0)=0;
+    intArrAlpha(intArrAlpha<0)=0;
     intArrAlphaNeg(intArrLinearNeg<0)=0;
 end
 
@@ -240,11 +240,11 @@ optPos2Plot=round([inpX(1,optXidx);inpX(1,optYidx)]);
 intArr2plot=intArr(y2keep(1):y2keep(2),(x2keep(1)):x2keep(2));
 %intArr2plotNeg=intArr(y2keep(1):y2keep(2),(x2keep(1)):x2keep(2));
 intArrAlpha=intArrAlpha(y2keep(1):y2keep(2),(x2keep(1)):x2keep(2));
-intArrAlpha(intArrAlpha==0)=0;
+%intArrAlpha(intArrAlpha==0)=0;
 
 if(twosided)
     intArrAlphaNeg=intArrAlphaNeg(y2keep(1):y2keep(2),(x2keep(1)):x2keep(2));
-    intArrAlphaNeg(intArrAlphaNeg==0)=0; 
+    %intArrAlphaNeg(intArrAlphaNeg==0)=0; 
 end
 
 %imgFinal=imagesc(intArr,[minVal,maxVal]);
@@ -344,7 +344,8 @@ end
 
 hold on
 
-%plot(optPos2Plot(1,:)/1.01+1,optPos2Plot(2,:)/1.01+1,'O','MarkerSize',15,'LineWidth',3,'color','black', 'MarkerFaceColor', 'k');
+%hpt=plot(optPos2Plot(1,:)/1.01+1,optPos2Plot(2,:)/1.01+1,'O','MarkerSize',2,'LineWidth',3,'color','white', 'MarkerFaceColor', 'white');
+
 for optIdx=1:length(data2plot)
     text(optPos2Plot(1,optIdx)/1.01+1,optPos2Plot(2,optIdx)/1.01+1,mrkLbl{optIdx},'FontSize',14,'VerticalAlignment','middle','HorizontalAlignment', 'center','color','white');
     text(optPos2Plot(1,optIdx)/1.01+1,optPos2Plot(2,optIdx)/1.01+1,mrkLbl{optIdx},'FontSize',10,'VerticalAlignment','middle','HorizontalAlignment', 'center','color','black');
