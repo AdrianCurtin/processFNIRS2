@@ -208,15 +208,15 @@ numNeighbors(:,1:end-1)=numNeighbors(:,1:end-1)+~isnan(interpBuffer(:,2:end)); %
 
 neighborIdx=find(numNeighbors>1);
 
-[neighborIdxX,neighborIdxY]=ind2sub(size(numNeighbors),neighborIdx);
+[neighborIdxY,neighborIdxX]=ind2sub(size(numNeighbors),neighborIdx);
 for i=1:length(neighborIdxX)
    curX=neighborIdxX(i);
    curY=neighborIdxY(i);
    
-   up=interpBuffer(curX,curY-1);
-   down=interpBuffer(curX,curY+1);
-   left=interpBuffer(curX-1,curY);
-   right=interpBuffer(curX+1,curY);
+   up=interpBuffer(curY-1,curX);
+   down=interpBuffer(curY+1,curX);
+   left=interpBuffer(curY,curX-1);
+   right=interpBuffer(curY,curX+1);
    val=nanmean([up,down,left,right]);
    
    if(~twosided&&~isnan(val)&&((val>=minVal&&maxVal>minVal)||...
@@ -392,8 +392,10 @@ hold on
 %hpt=plot(optPos2Plot(1,:)/1.01+1,optPos2Plot(2,:)/1.01+1,'square','MarkerSize',4,'LineWidth',3,'color','white', 'MarkerFaceColor', 'white');
 
 for optIdx=1:length(data2plot)
-    text(optPos2Plot(1,optIdx)/1.01+1,optPos2Plot(2,optIdx)/1.01+1,mrkLbl{optIdx},'FontSize',12,'VerticalAlignment','middle','HorizontalAlignment', 'center','color','white');
-    text(optPos2Plot(1,optIdx)/1.01+1,optPos2Plot(2,optIdx)/1.01+1,mrkLbl{optIdx},'FontSize',8,'VerticalAlignment','middle','HorizontalAlignment', 'center','color','white');
+    t=text(optPos2Plot(1,optIdx)/1.01+1,optPos2Plot(2,optIdx)/1.01+1,mrkLbl{optIdx},'FontSize',11,'VerticalAlignment','middle','HorizontalAlignment', 'center','color','white');
+    t2=text(optPos2Plot(1,optIdx)/1.01+1,optPos2Plot(2,optIdx)/1.01+1,mrkLbl{optIdx},'FontSize',8,'VerticalAlignment','middle','HorizontalAlignment', 'center','color','white');
+    t.FontWeight='bold';
+    t2.FontWeight='bold';
     
     text(optPos2Plot(1,optIdx)/1.01+1,optPos2Plot(2,optIdx)/1.01+1,mrkLbl{optIdx},'FontSize',10,'VerticalAlignment','middle','HorizontalAlignment', 'center','color','black');
 end
