@@ -147,10 +147,14 @@ end
 
 if(centerOnT0) % foces time blocks to start from t=0
     times=(0:segLength:(maxfTime+segLength))';
+    
     if(min(fNIR.time)<0)
         newMinTime=(minfTime-segLength);
         times=[fliplr(0:-segLength:newMinTime)';times(2:end)];
     end
+    
+    times=times(times>=(min(fNIR.time)-segLength));
+    times=times(times<=(max(fNIR.time)));
 else
     times=((min(fNIR.time)):segLength:(max(fNIR.time)+segLength))';
 end
@@ -436,13 +440,19 @@ if(calcROI)
     outFNIR.ROI=fNIR.ROI;
     hbo_field_length=size(outFNIR.HbO,1);
     roi_field_length=size(HbR_roi,1);
-    field_diff=roi_field_length-hbo_field_length; %Fix for it being different?
+    field_diff=hbo_field_length-roi_field_length; %Fix for it being different?
     
-    outFNIR.ROI.HbR=HbR_roi(1:end-field_diff,:);
-    outFNIR.ROI.HbO=HbO_roi(1:end-field_diff,:);
-    outFNIR.ROI.HbDiff=HbDiff_roi(1:end-field_diff,:);
-    outFNIR.ROI.HbTotal=HbTotal_roi(1:end-field_diff,:);
-    outFNIR.ROI.CBSI=CBSI_roi(1:end-field_diff,:);
+    outFNIR.ROI.HbR=nan(hbo_field_length,size(HbR_roi,2));
+    outFNIR.ROI.HbO=outFNIR.ROI.HbR;
+    outFNIR.ROI.HbDiff=outFNIR.ROI.HbR;
+    outFNIR.ROI.HbTotal=outFNIR.ROI.HbR;
+    outFNIR.ROI.CBSI=outFNIR.ROI.HbR;
+    
+    outFNIR.ROI.HbR=HbR_roi;
+    outFNIR.ROI.HbO=HbO_roi;
+    outFNIR.ROI.HbDiff=HbDiff_roi;
+    outFNIR.ROI.HbTotal=HbTotal_roi;
+    outFNIR.ROI.CBSI=CBSI_roi;
 end
 
 validFields=pf2_base.pf2_getFNIRSfields();

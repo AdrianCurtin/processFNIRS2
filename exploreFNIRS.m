@@ -4061,14 +4061,16 @@ for sH=1:length(subplotHandles)
             curLMEGbyString=sprintf('%s+Time',curLMEGbyString);
         end
         
-        
+        dummyCodeStr='reference';
         
         if(ExFNIRS.settings.LME_use_customStr&&~isempty(ExFNIRS.settings.LME_customStr))
             lmeString=sprintf('%s%i_%s~%s',varNameStart,subplotGby{sH}.curCh,subplotGby{sH}.curBioM{1},ExFNIRS.settings.LME_customStr);
         elseif(ExFNIRS.settings.LME_use_intercept)
             lmeString=sprintf('%s%i_%s~%s+(%s)',varNameStart,subplotGby{sH}.curCh,subplotGby{sH}.curBioM{1},curLMEGbyString,ExFNIRS.settings.LME_randomFxStr);
+            
         else
             lmeString=sprintf('%s%i_%s~-1+%s+(%s)',varNameStart,subplotGby{sH}.curCh,subplotGby{sH}.curBioM{1},curLMEGbyString,ExFNIRS.settings.LME_randomFxStr);
+            dummyCodeStr='full';
             
         end
 
@@ -4079,12 +4081,12 @@ for sH=1:length(subplotHandles)
             
             
             rng(2019);
-            curChartLME{sH}=fitlme(mergedTables{sH},lmeString,'FitMethod','REML','CheckHessian',true);
+            curChartLME{sH}=fitlme(mergedTables{sH},lmeString,'FitMethod','REML','CheckHessian',true,'DummyVarCoding',dummyCodeStr);
           %   curChartLME_emm{sH}= pf2_base.external.emmeans(curChartLME{sH}, {'orig'}, 'effects');
 %             h = emmip(curChartLME_emm{sH},'orig');
             nullMdlstring=sprintf('%s%i_%s~1+(1|SubjectID)',varNameStart,subplotGby{sH}.curCh,subplotGby{sH}.curBioM{1});
-            curChartLME_ML=fitlme(mergedTables{sH},lmeString,'FitMethod','ML','CheckHessian',true);
-            nullChartLME=fitlme(mergedTables{sH},nullMdlstring,'FitMethod','ML','CheckHessian',true);
+            curChartLME_ML=fitlme(mergedTables{sH},lmeString,'FitMethod','ML','CheckHessian',true,'DummyVarCoding',dummyCodeStr);
+            nullChartLME=fitlme(mergedTables{sH},nullMdlstring,'FitMethod','ML','CheckHessian',true,'DummyVarCoding',dummyCodeStr);
             nullCompare{sH}=compare(curChartLME_ML,nullChartLME);
             pVal=nullCompare{sH}.pValue(end);
             if(pVal>0.05)
@@ -4419,10 +4421,11 @@ if(showTopo)
                                         curDf1=nan(2,8);
                                         curDf2=nan(2,8);
 
-                                        curF(:)=fNIR_f{b,a};
-                                        curP(:)=fNIR_p{b,a};
-                                        curDf1(:)=fNIR_df{b,a};
-                                        curDf2(:)=fNIR_df2{b,a};
+                                        len=length(fNIR_f{b,a});
+                                        curF(1:len)=fNIR_f{b,a};
+                                        curP(1:len)=fNIR_p{b,a};
+                                        curDf1(1:len)=fNIR_df{b,a};
+                                        curDf2(1:len)=fNIR_df2{b,a};
 
 
                                         
@@ -4686,8 +4689,8 @@ for s=1:length(sigAnvNames)
       else %compare vs 0
           nRows(end+1)=1;
           cRow=zeros(1,numCoef);
-          curCterms=coefTermIdx(basic_contrast_idx(c),:);
-          curCterms=curCterms(curCterms>0);
+          %curCterms=coefTermIdx(basic_contrast_idx(c),:);
+          %curCterms=curCterms(curCterms>0);
           cRow(basic_contrast_idx(c))=1;
           cRows(end+1,:)=cRow;
           cName{end+1}=sprintf('%s vs 0',coefNames{basic_contrast_idx(c)});
@@ -5669,23 +5672,25 @@ if(ExFNIRS.settings.LME_enable)
         curLMEGbyString(1)=[];
     end
     
-    
+    dummyCodeStr='reference';
     if(ExFNIRS.settings.LME_use_customStr&&~isempty(ExFNIRS.settings.LME_customStr))
         lmeString=sprintf('%s~%s',ExFNIRS.settings.curInfoStr,ExFNIRS.settings.LME_customStr);
     elseif(ExFNIRS.settings.LME_use_intercept)
         lmeString=sprintf('%s~%s+(%s)',ExFNIRS.settings.curInfoStr,curLMEGbyString,ExFNIRS.settings.LME_randomFxStr);
+        
     else
        lmeString=sprintf('%s~-1+%s+(%s)',ExFNIRS.settings.curInfoStr,curLMEGbyString,ExFNIRS.settings.LME_randomFxStr);
+       dummyCodeStr='full';
     end
     
 
     try
         rng(2019);
-        curInfoChartLME=fitlme(ExFNIRS.selectedTable,lmeString,'FitMethod','REML','CheckHessian',true);
+        curInfoChartLME=fitlme(ExFNIRS.selectedTable,lmeString,'FitMethod','REML','CheckHessian',true,'DummyVarCoding',dummyCodeStr);
         
         nullMdlstring=sprintf('%s~1+(1|SubjectID)',ExFNIRS.settings.curInfoStr);
-        curInfoChartLME_ML=fitlme(ExFNIRS.selectedTable,lmeString,'FitMethod','ML');
-        nullInfoChartLME=fitlme(ExFNIRS.selectedTable,nullMdlstring,'FitMethod','ML');
+        curInfoChartLME_ML=fitlme(ExFNIRS.selectedTable,lmeString,'FitMethod','ML','DummyVarCoding',dummyCodeStr);
+        nullInfoChartLME=fitlme(ExFNIRS.selectedTable,nullMdlstring,'FitMethod','ML','DummyVarCoding',dummyCodeStr);
         
 %         curInfoChartLME_emm= pf2_base.external.emmeans(curInfoChartLME, {'orig'}, 'effects');
 %         h = emmip(curInfoChartLME_emm,'orig');
