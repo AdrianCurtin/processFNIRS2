@@ -4065,6 +4065,9 @@ for sH=1:length(subplotHandles)
         
         if(ExFNIRS.settings.LME_use_customStr&&~isempty(ExFNIRS.settings.LME_customStr))
             lmeString=sprintf('%s%i_%s~%s',varNameStart,subplotGby{sH}.curCh,subplotGby{sH}.curBioM{1},ExFNIRS.settings.LME_customStr);
+            if(contains(lmeString,'-1+')||contains(lmeString,'~-1'))
+               dummyCodeStr='full';
+            end
         elseif(ExFNIRS.settings.LME_use_intercept)
             lmeString=sprintf('%s%i_%s~%s+(%s)',varNameStart,subplotGby{sH}.curCh,subplotGby{sH}.curBioM{1},curLMEGbyString,ExFNIRS.settings.LME_randomFxStr);
             
@@ -5675,6 +5678,9 @@ if(ExFNIRS.settings.LME_enable)
     dummyCodeStr='reference';
     if(ExFNIRS.settings.LME_use_customStr&&~isempty(ExFNIRS.settings.LME_customStr))
         lmeString=sprintf('%s~%s',ExFNIRS.settings.curInfoStr,ExFNIRS.settings.LME_customStr);
+        if(contains(lmeString,'-1+')||contains(lmeString,'~-1'))
+           dummyCodeStr='full';
+        end
     elseif(ExFNIRS.settings.LME_use_intercept)
         lmeString=sprintf('%s~%s+(%s)',ExFNIRS.settings.curInfoStr,curLMEGbyString,ExFNIRS.settings.LME_randomFxStr);
         
