@@ -4070,6 +4070,9 @@ for sH=1:length(subplotHandles)
             end
         elseif(ExFNIRS.settings.LME_use_intercept)
             lmeString=sprintf('%s%i_%s~%s+(%s)',varNameStart,subplotGby{sH}.curCh,subplotGby{sH}.curBioM{1},curLMEGbyString,ExFNIRS.settings.LME_randomFxStr);
+            if(isempty(curLMEGbyString))
+                lmeString=sprintf('%s%i_%s~1+(%s)',varNameStart,subplotGby{sH}.curCh,subplotGby{sH}.curBioM{1},ExFNIRS.settings.LME_randomFxStr);
+            end
             
         else
             lmeString=sprintf('%s%i_%s~-1+%s+(%s)',varNameStart,subplotGby{sH}.curCh,subplotGby{sH}.curBioM{1},curLMEGbyString,ExFNIRS.settings.LME_randomFxStr);
