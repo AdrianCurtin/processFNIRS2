@@ -2358,10 +2358,13 @@ for i=1:size(sH,1)
 end
 
     
-function addDebugAnnotation(figHandle)
+function addDebugAnnotation(figHandle,optionalstring)
 global ExFNIRS
 curTime = datetime(now,'ConvertFrom','datenum');
 debugString=sprintf('%s\n%s (%s)\n%s',ExFNIRS.curMethodName,ExFNIRS.statusGroupByStr,ExFNIRS.settings.within_sub_avg_mode_label,curTime);
+if(nargin>1)
+    debugString=sprintf('%s\n%s',debugString,optionalstring);
+end
 
 debugString(debugString==('_'))='-';
 th=annotation(figHandle,'textbox',[0 0 0.1 1],'String',debugString,'FitBoxToText','on');
@@ -3988,13 +3991,19 @@ ExFNIRS.curChartModelsANOVACoefficents_pval=table();
 ExFNIRS.curChartModelsANOVACoefficents_Fstat=table();
 ExFNIRS.curChartModelsANOVACoefficents_df1=table();
 ExFNIRS.curChartModelsANOVACoefficents_df2=table();
+ExFNIRS.curMdlFits=table();
 
 if(ExFNIRS.settings.LME_enable)
     fprintf('Generating Models...\nAccessed at ExFNIRS.curChartModels\n')
+    
 end
 
 
  LME_topo_mode='anova';
+ 
+ lmeString='None~';
+ 
+ 
 for sH=1:length(subplotHandles)
     
     if(ExFNIRS.settings.LME_enable&&isfield(subplotGby{sH},'gby'))
@@ -4112,8 +4121,10 @@ for sH=1:length(subplotHandles)
             switch (ExFNIRS.settings.ChannelMode)
                 case 'fNIR'
                          chName=sprintf('Opt%i',subplotGby{sH}.curCh);
+                         mdlChName=chName;
                 case 'ROI'     
                          chName=sprintf('ROI%i_%s',subplotGby{sH}.curCh,optStrs{subplotGby{sH}.curCh});
+                         mdlChName=sprintf('ROI%i',subplotGby{sH}.curCh);
                 case 'Aux'
             end
 
@@ -4206,13 +4217,14 @@ for sH=1:length(subplotHandles)
                 mdlTest=mdlTest(2:end,:);
             end
             [curMdlFit{1:4}]=coefTest(curChartLME{sH},mdlTest,zeros(size(mdlTest,1),1),'DFMethod','satterthwaite');
-            fprintf('\nModel Fit: p=%.5f\tF=%.2f\tdf1=%i\tdf2=%i\n\n',curMdlFit{1},curMdlFit{2},curMdlFit{3},curMdlFit{4});
+            fprintf('\nModel Fit (H0: All F=0): p=%.5f\tF=%.2f\tdf1=%i\tdf2=%i\n\n',curMdlFit{1},curMdlFit{2},curMdlFit{3},curMdlFit{4});
             if(~showTopo)
                 curChartContrast=autoContrast(curChartLME{sH});
                 if(~isempty(curChartContrast))
                     disp(curChartContrast);
                 end
             end
+            ExFNIRS.curMdlFits{curBioM,mdlChName}=curMdlFit{1};
             %curChartLME{sH}.contrastTable=autoContrast(curChartLME{sH},0.5);
         catch ME
             fprintf(2,'Could not generate model for figure %i\n',sH);
@@ -4238,7 +4250,9 @@ if(showTopo)
         
         topoH=figure(2000);
         clf(topoH);
-        addDebugAnnotation(topoH);
+        lmeString=strsplit(lmeString,'~');
+        lmeString=sprintf('[X]~%s',lmeString{2});
+        addDebugAnnotation(topoH,lmeString);
         
         chNames=ExFNIRS.curChartModelsCoefficents_tstat.Properties.RowNames;
         coefNames=ExFNIRS.curChartModelsCoefficents_tstat.Properties.VariableNames;
@@ -4265,6 +4279,38 @@ if(showTopo)
          
         if(true)%~plotGroupByBioM)
             for b=1:numBioM
+               curMdlP=ExFNIRS.curMdlFits(temp{end},:);  
+              fprintf('\n <strong>Significant Models [%s]: </strong>',temp{end});  
+              [curMdlQ,curMdlK]=performFDR(curMdlP,ExFNIRS.settings.topoSigThrehold{2});
+              [curMdlQ_rev,curMdlK_rev]=performFDR_twostep(curMdlP,ExFNIRS.settings.topoSigThrehold{2});  
+                
+              for i=1:size(curMdlP,2)
+                  varName=curMdlP.Properties.VariableNames{i};
+                  if((curMdlP{1,i}<ExFNIRS.settings.topoSigThrehold{2}&&strcmp(ExFNIRS.settings.topoSigThrehold{1},'p'))||...
+                       (curMdlP{1,i}<0.05&&~strcmp(ExFNIRS.settings.topoSigThrehold{1},'p')))   
+                      fprintf('\n%s_%s p=%.4f',varName,temp{end},curMdlP{1,i});
+                      if(curMdlP{1,i}<ExFNIRS.settings.topoSigThrehold{2}&&strcmp(ExFNIRS.settings.topoSigThrehold{1},'p'))
+                          fprintf('<strong>* </strong>');
+                      end
+                      
+                      if(strcmp(ExFNIRS.settings.topoSigThrehold{1},'q'))
+                          fprintf(', q=%.4f',curMdlQ(i));
+                      end
+                      if(curMdlQ(i)<ExFNIRS.settings.topoSigThrehold{2}&&strcmp(ExFNIRS.settings.topoSigThrehold{1},'q'))
+                          fprintf('<strong>* </strong>');
+                      end
+                      if(strcmp(ExFNIRS.settings.topoSigThrehold{1},'q-twostep'))
+                          fprintf(', q adaptive=%.4f',curMdlQ_rev(i));
+                      end
+                      if(curMdlQ_rev(i)<ExFNIRS.settings.topoSigThrehold{2}&&strcmp(ExFNIRS.settings.topoSigThrehold{1},'q-twostep'))
+                          fprintf('<strong>* </strong>');
+                      end
+                  end
+                  
+              end
+              
+              fprintf('\n');
+                
               switch(LME_topo_mode)
                     case 'coef'
                         for c=1:numCoeff
@@ -4761,6 +4807,11 @@ mdlIdx
 
 function [qvalues,k,passed]=performFDR(pvalues,pThreshold)
 % Performs FDR correction per #CITATION HERE
+
+if(istable(pvalues))
+    pvalues=table2array(pvalues);
+end
+
 if(nargin<2)
     pThreshold=0.05;
 end
@@ -4805,6 +4856,12 @@ end
 
 function [qvalues,k,passed]=performFDR_twostep(pvalues,pThreshold)
 % Performs FDR correction per #CITATION HERE
+
+if(istable(pvalues))
+    pvalues=table2array(pvalues);
+end
+
+
 if(nargin<2)
     pThreshold=0.05;
 end
@@ -4820,37 +4877,12 @@ if(sum(passed(:))>0&&sum(~passed(:))>0)  %if some things passed (but not all)
     
 end
 
-
-        
-function [qvalues,k,passed]=performFDR_reverse(pvalues,pThreshold)
-% Performs FDR correction per #CITATION HERE
-if(nargin<2)
-    pThreshold=0.05;
-end
-
-
-
-
-qvalues=nan(size(pvalues));
-
-[pSorted,pIdx]=sort(pvalues(:));       
-numP=length(pSorted);
-k=length(pvalues(:));
-numNan=sum(isnan(pvalues(:)));
-
-for i=numNan:numP-1
-    k=i+1;
-    qThreshold=pThreshold/k;
-    if(sum(pvalues(:)<=qThreshold)>=(numP-i))
-        qvalues=pvalues*k;
-        
-       break; 
-    end
-    
-end
-
+qvalues=pvalues*k;
 qvalues(qvalues>1)=1;
 passed=qvalues<=pThreshold;
+
+
+
 
     
 
@@ -5723,7 +5755,7 @@ if(ExFNIRS.settings.LME_enable)
         end
         
         [curMdlFit{1:4}]=coefTest(curInfoChartLME,mdlTest,zeros(size(mdlTest,1),1),'DFMethod','satterthwaite');
-            fprintf('\nModel Fit: p=%.5f\tF=%.2f\tdf1=%i\tdf2=%i\n\n',curMdlFit{1},curMdlFit{2},curMdlFit{3},curMdlFit{4});
+            fprintf('\nModel Fit (H0: All F=0): p=%.5f\tF=%.2f\tdf1=%i\tdf2=%i\n\n',curMdlFit{1},curMdlFit{2},curMdlFit{3},curMdlFit{4});
             tic
             curChartContrast=autoContrast(curInfoChartLME);
             toc
@@ -7020,17 +7052,29 @@ for i=1:size(sH,1)
         end
 
         addDebugAnnotation(sH{i,b}.h);
+        
+        
+        if(ExFNIRS.settings.plot_scatter_nonparametric)
+            suptStr=sprintf('Rank %s',curInfoStr);
+        else
+            suptStr=curInfoStr;
+        end
+        
         switch(figType)
             case 'bioM'
-                pf2_base.external.suptitle(sH{i,b}.h,selectedBioM{i});
+                suptStr=sprintf('%s: %s',suptStr,selectedBioM{i});
+                pf2_base.external.suptitle(sH{i,b}.h,suptStr);
             case 'channels'
-                pf2_base.external.suptitle(sH{i,b}.h,sprintf('Optode %i',selOpt(i)));
+                suptStr=sprintf('%s: Optode %i',suptStr,selOpt(i));
+                pf2_base.external.suptitle(sH{i,b}.h,suptStr);
             case 'bio,channels'
-                pf2_base.external.suptitle(sH{i,b}.h,sprintf('Optode %i [%s]',selOpt(i),selectedBioM{b}));
+                suptStr=sprintf('%s: Optode %i [%s]',suptStr,selOpt(i),selectedBioM{b});
+                pf2_base.external.suptitle(sH{i,b}.h,suptStr);
             case 'groupby,bio'
-                pf2_base.external.suptitle(sH{i,b}.h,sprintf('%s [%s]',uCurInfoG{i},selectedBioM{b}));
+                suptStr=sprintf('%s: %s [%s]',suptStr,uCurInfoG{i},selectedBioM{b});
+                pf2_base.external.suptitle(sH{i,b}.h,suptStr);
             otherwise
-
+                suptitle(suptStr);
         end
         
         if(plotTopo)
