@@ -4277,7 +4277,7 @@ if(showTopo)
         
         
          
-        if(true)%~plotGroupByBioM)
+        if(true&&~isempty(chNames))%~plotGroupByBioM)
             for b=1:numBioM
                curMdlP=ExFNIRS.curMdlFits(temp{end},:);  
               fprintf('\n <strong>Significant Models [%s]: </strong>',temp{end});  
