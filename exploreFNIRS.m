@@ -4279,8 +4279,9 @@ if(showTopo)
          
         if(true&&~isempty(chNames))%~plotGroupByBioM)
             for b=1:numBioM
-               curMdlP=ExFNIRS.curMdlFits(temp{end},:);  
-              fprintf('\n <strong>Significant Models [%s]: </strong>',temp{end});  
+                bioM=selectedBioM(b);
+               curMdlP=ExFNIRS.curMdlFits(bioM,:);  
+              fprintf('\n <strong>Significant Models [%s]: </strong>',bioM{1});  
               [curMdlQ,curMdlK]=performFDR(curMdlP,ExFNIRS.settings.topoSigThrehold{2});
               [curMdlQ_rev,curMdlK_rev]=performFDR_twostep(curMdlP,ExFNIRS.settings.topoSigThrehold{2});  
                 
@@ -4288,7 +4289,7 @@ if(showTopo)
                   varName=curMdlP.Properties.VariableNames{i};
                   if((curMdlP{1,i}<ExFNIRS.settings.topoSigThrehold{2}&&strcmp(ExFNIRS.settings.topoSigThrehold{1},'p'))||...
                        (curMdlP{1,i}<0.05&&~strcmp(ExFNIRS.settings.topoSigThrehold{1},'p')))   
-                      fprintf('\n%s_%s p=%.4f',varName,temp{end},curMdlP{1,i});
+                      fprintf('\n%s_%s p=%.4f',varName,bioM{1},curMdlP{1,i});
                       if(curMdlP{1,i}<ExFNIRS.settings.topoSigThrehold{2}&&strcmp(ExFNIRS.settings.topoSigThrehold{1},'p'))
                           fprintf('<strong>* </strong>');
                       end
