@@ -4849,9 +4849,10 @@ qvalues=pvalues*k;
 qvalues(qvalues>1)=1;
 passed=qvalues<=pThreshold;
 
-if(any(passed(:)))
-   k=min(kVals(passed(:)));
+if(any(kPass(:)))
+   k=min(kVals(kPass(:)==1));
    qvalues=pvalues*k;
+   passed=qvalues<=pThreshold;
 end
 
 
