@@ -1818,6 +1818,11 @@ else
    error('Not Yet Implemented for seperate probe data,\nAssumes concatenated datasets with unique channels in the config file'); 
 end
 
+tempWvActiveSet=tempWvSet(tempWvSet>0);
+curDPF=PF2.GUIPF2.data.stage{4}.DPF_factor;
+set(handles.text_wv1_dpf,'String',sprintf('%.0fnm %.2f',tempWvActiveSet(1),curDPF(1)));
+set(handles.text_wv2_dpf,'String',sprintf('%.0fnm %.2f',tempWvActiveSet(2),curDPF(2)));
+
 time=PF2.GUIPF2.data.time;
 
 startInd=find(PF2.GUIPF2.view.startTime<=time);
@@ -4074,6 +4079,9 @@ switch(curSelectedValue)
 end
 
 processFNIR_GUI();
+
+
+
 updatePlots(handles);
 
 
