@@ -4436,13 +4436,13 @@ if(showTopo)
                             curP=fNIR_p{b,a};
                             curDf1=fNIR_df{b,a};
                             curDf2=fNIR_df2{b,a};
-                            
+                            m=length(curP(:));
                             [curQ,curK]=performFDR(curP,ExFNIRS.settings.topoSigThrehold{2});
                             [curQ_rev,curK_rev]=performFDR_twostep(curP,ExFNIRS.settings.topoSigThrehold{2});
                             
                             estimateFPval=finv(ones(size(curF(:)))*(1-ExFNIRS.settings.topoSigThrehold{2}), curDf1(:), curDf2(:));
-                            estimateFPval_q=finv(ones(size(curF(:)))*(1-ExFNIRS.settings.topoSigThrehold{2}/curK), curDf1(:), curDf2(:));
-                            estimateFPval_qrev=finv(ones(size(curF(:)))*(1-ExFNIRS.settings.topoSigThrehold{2}/curK_rev), curDf1(:), curDf2(:));
+                            estimateFPval_q=finv(ones(size(curF(:)))*(1-ExFNIRS.settings.topoSigThrehold{2}*curK/m), curDf1(:), curDf2(:));
+                            estimateFPval_qrev=finv(ones(size(curF(:)))*(1-ExFNIRS.settings.topoSigThrehold{2}*curK_rev/m), curDf1(:), curDf2(:));
                             
                             switch(ExFNIRS.settings.topoSigThrehold{1})
                                 case 'p'
@@ -4842,17 +4842,17 @@ end
 k_ind=find(kPass==1);
 
 if(isempty(k_ind))
-    k=numP;
+    k=1;
 else
-   k=max(k); 
+   k=1; 
 end
 
-qvalues=pvalues*k;
+qvalues=pvalues*m/k;
 qvalues(qvalues>1)=1;
 passed=qvalues<=pThreshold;
 
 if(any(kPass(:)))
-   k=min(kVals(kPass(:)==1));
+   k=max(kVals(kPass(:)==1));
    qvalues=pvalues*m/k;
    passed=qvalues<=pThreshold;
 end
@@ -6668,15 +6668,15 @@ for chIdx=1:numOpt
                              end
                              
                              curDf=curData.N-2;
-                             
+                             m=length(curP);
                             [curQ,curK]=performFDR(curP,ExFNIRS.settings.topoSigThrehold{2});
                             [curQ_rev,curK_rev]=performFDR_twostep(curP,ExFNIRS.settings.topoSigThrehold{2});
                             
                             curT=(curR./sqrt((1-curR.^2)/(N-2)));
 
                             estimate_tPval=tinv(ones(size(curT(:)))*(1-ExFNIRS.settings.topoSigThrehold{2}), curDf(:));
-                            estimate_tPval_q=tinv(ones(size(curT(:)))*(1-ExFNIRS.settings.topoSigThrehold{2}/curK), curDf(:));
-                            estimate_tPval_qrev=tinv(ones(size(curT(:)))*(1-ExFNIRS.settings.topoSigThrehold{2}/curK_rev), curDf(:));
+                            estimate_tPval_q=tinv(ones(size(curT(:)))*(1-ExFNIRS.settings.topoSigThrehold{2}*curK/m), curDf(:));
+                            estimate_tPval_qrev=tinv(ones(size(curT(:)))*(1-ExFNIRS.settings.topoSigThrehold{2}*curK_rev/m), curDf(:));
                             
                             estimate_rPval=estimate_tPval(:)./(sqrt(curDf(:)+estimate_tPval(:).^2));
                             estimate_rPval_q=estimate_tPval_q(:)./(sqrt(curDf(:)+estimate_tPval_q(:).^2));
@@ -6687,10 +6687,10 @@ for chIdx=1:numOpt
                                     curpthresh=ExFNIRS.settings.topoSigThrehold{2};
                                 case 'q'
                                     estimate_rPval=estimate_rPval_q;
-                                    curpthresh=ExFNIRS.settings.topoSigThrehold{2}/curK;
+                                    curpthresh=ExFNIRS.settings.topoSigThrehold{2}*curK/m;
                                 case 'q-twostep'
                                     estimate_rPval=estimate_rPval_qrev;
-                                    curpthresh=ExFNIRS.settings.topoSigThrehold{2}/curK_rev;
+                                    curpthresh=ExFNIRS.settings.topoSigThrehold{2}*curK_rev/m;
                             end
                             
                             
