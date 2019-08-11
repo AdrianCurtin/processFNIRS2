@@ -4832,7 +4832,7 @@ for i=1:numP
     qvalues(pIdx(i))=pvalues(pIdx(i))*k;
     
     if(pvalues(pIdx(i))*k<=pThreshold)
-        kPass(k)=1;
+        kPass(pIdx(i))=1;
     end
     kVals(pIdx(i))=k;
 end
@@ -6729,7 +6729,7 @@ for chIdx=1:numOpt
                                 axis off
                                 title(sprintf('%s_N_S',titleSTR));
                                 if(curSx==1) % first column
-                                    th=annotation(gcf,'textbox',[0,axesPos(2),axesPos(3),axesPos(4)/2],'String',rowLabel,'FitBoxToText','on');
+                                    th=annotation(gcf,'textbox',[0,max(axesPos(2),0.05),axesPos(3),axesPos(4)/2],'String',rowLabel,'FitBoxToText','on');
                                 end
                             end
                          end
