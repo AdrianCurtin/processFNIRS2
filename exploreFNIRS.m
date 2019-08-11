@@ -4870,6 +4870,8 @@ if(nargin<2)
     pThreshold=0.05;
 end
 
+
+m=length(pvalues(:));
 q_prime=pThreshold/(1+pThreshold);
 [qvalues,k,passed]=performFDR(pvalues,q_prime);
 
@@ -4881,10 +4883,17 @@ if(sum(passed(:))>0&&sum(~passed(:))>0)  %if some things passed (but not all)
     
 end
 
-qvalues=pvalues*k;
-qvalues(qvalues>1)=1;
-passed=qvalues<=pThreshold;
+if(m/k<1)
 
+    qvalues=pvalues*m/k;
+    qvalues(qvalues>1)=1;
+    passed=qvalues<=pThreshold&pvalues<=0.05;
+
+else
+   qvalues=pvalues;
+   qvalues(qvalues>1)=1;
+   passed=qvalues<=pThreshold&pvalues<=0.05;
+end
 
 
 
