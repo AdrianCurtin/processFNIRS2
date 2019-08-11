@@ -4833,7 +4833,7 @@ for i=1:numP
     k=numP-i+1;
     qvalues(pIdx(i))=pvalues(pIdx(i))*m/i;
     
-    if(qvalues(pIdx(i))<=pThreshold)
+    if(qvalues(pIdx(i))<=pThreshold&&pvalues(pIdx(i))<=0.05)
         kPass(pIdx(i))=1;
     end
     kVals(pIdx(i))=i;
