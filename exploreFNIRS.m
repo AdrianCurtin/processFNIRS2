@@ -4825,16 +4825,18 @@ kVals=nan(size(pvalues(:)));
 numP=length(pSorted);
 
 kPass=zeros(1,numP);
+m=numP;
 
 for i=1:numP
-    k=numP-i+1;
-    qThreshold=pThreshold/k;
-    qvalues(pIdx(i))=pvalues(pIdx(i))*k;
     
-    if(pvalues(pIdx(i))*k<=pThreshold)
+    qThreshold=pThreshold/m*i;
+    k=numP-i+1;
+    qvalues(pIdx(i))=pvalues(pIdx(i))*m/i;
+    
+    if(qvalues(pIdx(i))<=pThreshold)
         kPass(pIdx(i))=1;
     end
-    kVals(pIdx(i))=k;
+    kVals(pIdx(i))=i;
 end
 
 k_ind=find(kPass==1);
@@ -4851,7 +4853,7 @@ passed=qvalues<=pThreshold;
 
 if(any(kPass(:)))
    k=min(kVals(kPass(:)==1));
-   qvalues=pvalues*k;
+   qvalues=pvalues*m/k;
    passed=qvalues<=pThreshold;
 end
 
