@@ -4854,7 +4854,7 @@ passed=qvalues<=pThreshold;
 if(any(kPass(:)))
    k=max(kVals(kPass(:)==1));
    qvalues=pvalues*m/k;
-   passed=qvalues<=pThreshold;
+   passed=qvalues<=pThreshold&pvalues<0.05;
 end
 
 
@@ -4872,22 +4872,25 @@ end
 
 
 m=length(pvalues(:));
-q_prime=pThreshold/(1+pThreshold);
+q_prime=pThreshold;%;/(1+pThreshold);
 [qvalues,k,passed]=performFDR(pvalues,q_prime);
 
 if(sum(passed(:))>0&&sum(~passed(:))>0)  %if some things passed (but not all)
-    q_star=q_prime*sum(~isnan(pvalues)/sum(passed(~isnan(pvalues))));
+    m=sum(~isnan(pvalues));
+    numPassed=sum(passed);
+    mo=m-numPassed;
+    q_star=q_prime*m/mo; %later divided by m in regular fdr)
     
     [qvalues,k,passed]=performFDR(pvalues,q_star);
     
     
 end
 
-if(m/k<1)
+if(m/k<m)
 
-    qvalues=pvalues*m/k;
+    %qvalues=pvalues*m/k;
     qvalues(qvalues>1)=1;
-    passed=qvalues<=pThreshold&pvalues<=0.05;
+    passed=passed&pvalues<=0.05;
 
 else
    qvalues=pvalues;
