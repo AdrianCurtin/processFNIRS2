@@ -4612,6 +4612,9 @@ numCoef=length(coefNames);
 uCoefParts=uCoefParts(idx);
 if(contains(uCoefParts{1},'(Intercept)'))
     uCoefParts{1}='Intercept';
+    posthocmode='effects';
+else
+    posthocmode='full';
 end
 anv=anova(mdl,'DFMethod','satterthwaite');
 hasIntercept=false;
@@ -4630,8 +4633,11 @@ for i=1:numAnv % Get "root' terms (non-interaction terms)
        curTerm(curTerm=='('|curTerm==')')=[];
        rootAnvTerm{i}=curTerm;
        uCoefTerms{i}=uCoefParts(contains(uCoefParts,sprintf('%s',curTerm)));
-   else
-       
+   elseif(numAnv==1&&length(curTerm)>1&&~hasIntercept)
+       rootAnvTerm=curTerm;
+       for j=1:length(curTerm)
+            uCoefTerms{j}=uCoefParts(contains(uCoefParts,sprintf('%s',curTerm{j})));
+        end
    end
 end
 
@@ -4666,7 +4672,7 @@ for i=1:numCoef %find which are the root terms in coefficients
        for t=1:length(curTerms)
            j=curRootTerm(t);
            curCoefIdx_loo=curCoefIdx;
-           curCoefIdx_loo(j)=nan;
+           curCoefIdx_loo(j)=nan; %set current term to 0
            strParts={};
            for(t2=1:length(curCoefIdx_loo))
                if(~isnan(curCoefIdx_loo(t2))&&curCoefIdx_loo(t2)>0)
@@ -4674,7 +4680,7 @@ for i=1:numCoef %find which are the root terms in coefficients
                end
            end
            
-           for r=1:i-1
+           for r=1:i
                 isStr=true;
                for s=1:length(strParts)
                     isStr=isStr&&contains(coefNames{r},strParts{s});
@@ -4728,6 +4734,8 @@ for s=1:length(sigAnvNames)
           nRows(end+1)=1;
           cIdx=interaction_contrast_idx(c,:);
           cIdx=cIdx(~isnan(cIdx));
+          [cIdx,uidx]=unique(cIdx);
+          cIdx=cIdx(uidx);
           numContrasts=length(cIdx);
           for c2=1:numContrasts % compare within matched groups
               cRow=zeros(1,numCoef);
