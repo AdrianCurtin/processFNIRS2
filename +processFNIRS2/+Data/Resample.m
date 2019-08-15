@@ -467,12 +467,17 @@ end
 
 times=times(1:size(outFNIR.HbR,1),:);
 outFNIR.segmentTimes=[times,times+segLength/2,times+segLength];
-if(strcmp(timeOutMode,'start'))
-    outFNIR.time=outFNIR.segmentTimes(1:end,1); %returns effective "sample point" at midpoint of segmentTimes
-elseif(strcmp(timeOutMode,'end'))
-    outFNIR.time=outFNIR.segmentTimes(1:end,3); %returns effective "sample point" at midpoint of segmentTimes
-else %Return midpoint
-    outFNIR.time=outFNIR.segmentTimes(1:end,2); %returns effective "sample point" at midpoint of segmentTimes
+
+if(~isempty(outFNIR.segmentTimes))
+    if(strcmp(timeOutMode,'start'))
+        outFNIR.time=outFNIR.segmentTimes(1:end,1); %returns effective "sample point" at midpoint of segmentTimes
+    elseif(strcmp(timeOutMode,'end'))
+        outFNIR.time=outFNIR.segmentTimes(1:end,3); %returns effective "sample point" at midpoint of segmentTimes
+    else %Return midpoint
+        outFNIR.time=outFNIR.segmentTimes(1:end,2); %returns effective "sample point" at midpoint of segmentTimes
+    end
+else
+   outFNIR.time=[]; 
 end
 
 if(isempty(outFNIR.time))

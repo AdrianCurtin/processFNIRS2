@@ -4076,6 +4076,7 @@ for sH=1:length(subplotHandles)
             lmeString=sprintf('%s%i_%s~%s',varNameStart,subplotGby{sH}.curCh,subplotGby{sH}.curBioM{1},ExFNIRS.settings.LME_customStr);
             if(contains(lmeString,'-1+')||contains(lmeString,'~-1'))
                dummyCodeStr='full';
+               lmeString(lmeString=='*')=':';
             end
         elseif(ExFNIRS.settings.LME_use_intercept)
             lmeString=sprintf('%s%i_%s~%s+(%s)',varNameStart,subplotGby{sH}.curCh,subplotGby{sH}.curBioM{1},curLMEGbyString,ExFNIRS.settings.LME_randomFxStr);
@@ -4086,7 +4087,7 @@ for sH=1:length(subplotHandles)
         else
             lmeString=sprintf('%s%i_%s~-1+%s+(%s)',varNameStart,subplotGby{sH}.curCh,subplotGby{sH}.curBioM{1},curLMEGbyString,ExFNIRS.settings.LME_randomFxStr);
             dummyCodeStr='full';
-            
+            lmeString(lmeString=='*')=':';
         end
 
         try

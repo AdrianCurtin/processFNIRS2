@@ -51,6 +51,7 @@ if(isempty(WAVELABPATH))
     pf2_base.toolboxes.setup_wavelab();
 end
 
+dod(isinf(dod))=nan;
 dodWavelet = dod;
 
 SignalLength = size(dod,1); % #time points of original signal
@@ -69,6 +70,8 @@ L = 4;  % Lowest wavelet scale used in the analysis
 for ii = 1:size(dod,2)
     
     idx_ch = ii;
+    
+    dod(isinf(dod))=nan;
 
     DataPadded(1:SignalLength) = dod(:,idx_ch);  % zeros pad data to have length of power of 2   
     DataPadded(SignalLength+1:end) = 0;  
@@ -79,13 +82,18 @@ for ii = 1:size(dod,2)
    
     [yn NormCoef]=NormalizationNoise(DataPadded',qmfilter);
     
-    StatWT = WT_inv(yn,L,N,'db2'); % discrete wavelet transform shift invariant
-
-    [ARSignal wcTI] = WaveletAnalysis(StatWT,L,'db2',iqr,SignalLength);  % Apply artifact removal
+    try
+        StatWT = WT_inv(yn,L,N,'db2'); % discrete wavelet transform shift invariant
+        [ARSignal wcTI] = WaveletAnalysis(StatWT,L,'db2',iqr,SignalLength);  % Apply artifact removal
        
-    ARSignal = ARSignal/NormCoef+DCVal;           
+        ARSignal = ARSignal/NormCoef+DCVal;           
 
-    dodWavelet(:,idx_ch) = ARSignal(1:length(dod));
+        dodWavelet(:,idx_ch) = ARSignal(1:length(dod));
+    catch
+        warning('Channel %i is invalid\n',ii);
+        dodWavelet(:,idx_ch) = nan;
+    end
+    
 
 end
 
