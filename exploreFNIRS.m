@@ -4708,6 +4708,9 @@ else
    sigAnvNames=anv.Term(sigAnv);
 end
 
+sigCoef=mdl.Coefficients;
+sigCoefIdx=sigCoef.pValue<=pThreshold;
+
 cRows=[];
 cAnvGrp=[];
 cName={};
@@ -4730,7 +4733,8 @@ for s=1:length(sigAnvNames)
             cName{end+1}=sprintf('%s vs %s',coefNames{basic_contrast_idx(c)},'Intercept');
           end
           cAnvGrp(end+1)=c;
-      elseif(numAnvTerms(sIdx)>1) %compare term and numterms-1 vs 0
+      elseif(numAnvTerms(sIdx)>1&&length(numAnvTerms)>1) %compare term and numterms-1 vs 0
+          
           nRows(end+1)=1;
           cIdx=interaction_contrast_idx(c,:);
           cIdx=cIdx(~isnan(cIdx));
@@ -4746,27 +4750,58 @@ for s=1:length(sigAnvNames)
               cName{end+1}=sprintf('%s vs %s',coefNames{basic_contrast_idx(c)},coefNames{cIdx(c2)});
                 cAnvGrp(end+1)=c;
           end
+           
           
        
       else %compare vs 0
-          nRows(end+1)=1;
-          cRow=zeros(1,numCoef);
-          %curCterms=coefTermIdx(basic_contrast_idx(c),:);
-          %curCterms=curCterms(curCterms>0);
-          cRow(basic_contrast_idx(c))=1;
-          cRows(end+1,:)=cRow;
-          cName{end+1}=sprintf('%s vs 0',coefNames{basic_contrast_idx(c)});
-          cAnvGrp(end+1)=c;
+          if(sigCoefIdx(c))
+              nRows(end+1)=1;
+              cRow=zeros(1,numCoef);
+              %curCterms=coefTermIdx(basic_contrast_idx(c),:);
+              %curCterms=curCterms(curCterms>0);
+              cRow(basic_contrast_idx(c))=1;
+              cRows(end+1,:)=cRow;
+              cName{end+1}=sprintf('%s vs 0',coefNames{basic_contrast_idx(c)});
+              cAnvGrp(end+1)=c;
+          end
       end
-      for c2=c+1:length(basic_contrast_idx) % compare within similar groups
-          nRows(end+1)=1;
-          cRow=zeros(1,numCoef);
-          cRow(basic_contrast_idx(c2))=-1;
-          cRow(basic_contrast_idx(c))=1;
-          cRows(end+1,:)=cRow;
-          cName{end+1}=sprintf('%s vs %s',coefNames{basic_contrast_idx(c)},coefNames{basic_contrast_idx(c2)});
-          cAnvGrp(end+1)=c;
-      end
+      if(numAnvTerms(sIdx)>1)&&length(numAnvTerms)==1&&~hasIntercept %check for full model case (and multiple terms) 
+          if(sigCoefIdx(c))
+              nRows(end+1)=1;
+              cIdx=rootCoefIdx(c,:); % now these are the model terms of all interactions
+              cmp_contrast_idx=rootCoefIdx;
+              cmp_contrast_idx(c,:)=nan;
+              %cIdx=cIdx(~isnan(cIdx));
+              numContrasts=length(cIdx);
+              for c2=1:numContrasts % compare within matched groups
+                  cmp_contrast=cmp_contrast_idx(:,c2)==cIdx(c2);
+                  cRow=zeros(1,numCoef);
+                  cRow(c)=1;
+                  cRow(cmp_contrast)=-1;
+
+                  if(any(ismember(cRows,cRow,'rows')))
+                    continue;
+                  else
+                    cRows(end+1,:)=cRow;
+                    uc=uCoefTerms{c2};
+
+                    cName{end+1}=sprintf('%s vs %s',uc{cIdx(c2)},coefNames{c});
+                    cAnvGrp(end+1)=c;
+                  end
+              end
+          end
+       else
+            for c2=c+1:length(basic_contrast_idx) % compare within similar groups
+              nRows(end+1)=1;
+              cRow=zeros(1,numCoef);
+              cRow(basic_contrast_idx(c2))=-1;
+              cRow(basic_contrast_idx(c))=1;
+
+              cRows(end+1,:)=cRow;
+              cName{end+1}=sprintf('%s vs %s',coefNames{basic_contrast_idx(c)},coefNames{basic_contrast_idx(c2)});
+              cAnvGrp(end+1)=c;
+          end
+       end
    end
 end
 
