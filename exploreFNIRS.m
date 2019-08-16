@@ -4773,20 +4773,43 @@ for s=1:length(sigAnvNames)
               cmp_contrast_idx(c,:)=nan;
               %cIdx=cIdx(~isnan(cIdx));
               numContrasts=length(cIdx);
-              for c2=1:numContrasts % compare within matched groups
+              for c2=1:numContrasts % compare with groups 1 above
                   cmp_contrast=cmp_contrast_idx(:,c2)==cIdx(c2);
                   cRow=zeros(1,numCoef);
                   cRow(c)=1;
                   cRow(cmp_contrast)=-1;
 
-                  if(any(ismember(cRows,cRow,'rows')))
+                  if(any(ismember(cRows,cRow,'rows'))...
+                        ||sum(cmp_contrast)==1) % skips when the full interaction term is a better descripter
                     continue;
                   else
                     cRows(end+1,:)=cRow;
                     uc=uCoefTerms{c2};
-
                     cName{end+1}=sprintf('%s vs %s',uc{cIdx(c2)},coefNames{c});
                     cAnvGrp(end+1)=c;
+                  end
+              end
+
+              for c2=1:numContrasts % repeat within similar groupss
+                  cmp_contrast=cmp_contrast_idx(:,c2)==cIdx(c2);
+                  
+                  cmp_contrast_vals=find(cmp_contrast==1);
+                  for cmp=1:length(cmp_contrast_vals)
+                       
+                      cRow=zeros(1,numCoef);
+                      cRow(c)=1;
+                      cRow(cmp_contrast_vals(cmp))=-1;
+
+                      if(any(ismember(cRows,cRow,'rows')))
+                        continue;
+                      else
+                        cRows(end+1,:)=cRow;
+                        uc=uCoefTerms{c2};
+
+                        cName{end+1}=sprintf('%s vs %s',coefNames{c},coefNames{cmp_contrast_vals(cmp)});
+                        cAnvGrp(end+1)=c;
+                      end
+
                   end
               end
           end
