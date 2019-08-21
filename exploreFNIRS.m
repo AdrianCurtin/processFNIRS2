@@ -4779,7 +4779,7 @@ for s=1:length(sigAnvNames)
                   cRow(c)=1;
                   cRow(cmp_contrast)=-1;
 
-                  if(any(ismember(cRows,cRow,'rows'))...
+                  if(any(ismember(cRows,cRow,'rows'))||any(ismember(cRows,cRow*-1,'rows'))...
                         ||sum(cmp_contrast)==1) % skips when the full interaction term is a better descripter
                     continue;
                   else
@@ -4800,7 +4800,7 @@ for s=1:length(sigAnvNames)
                       cRow(c)=1;
                       cRow(cmp_contrast_vals(cmp))=-1;
 
-                      if(any(ismember(cRows,cRow,'rows')))
+                      if(any(ismember(cRows,cRow,'rows'))||any(ismember(cRows,cRow*-1,'rows')))
                         continue;
                       else
                         cRows(end+1,:)=cRow;
