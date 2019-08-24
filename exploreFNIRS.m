@@ -2550,7 +2550,10 @@ end
 curTimes=unique(curTimes,'row');
 
 fprintf('Current Block Times:')
-display(curTimes)
+cTimesTable=array2table(curTimes);
+cTimesTable.Properties.VariableNames={'Start','MidPoint','End'};
+display(cTimesTable);
+
 
 
 fprintf('Current Viewing Window %.1f to %.1fs\n',ExFNIRS.settings.plot_start,ExFNIRS.settings.plot_end);
@@ -2581,8 +2584,7 @@ endIdx=curTimes(:,3)<=t_end;
 curTimes=curTimes(startIdx&endIdx,:);
 
 fprintf('Exporting Times:')
-cTimesTable=array2table(curTimes);
-cTimesTable.Properties.VariableNames={'Start','MidPoint','End'};
+cTimesTable=cTimesTable(startIdx&endIdx,:);
 display(cTimesTable);
 
 
