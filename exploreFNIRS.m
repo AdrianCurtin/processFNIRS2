@@ -7161,7 +7161,7 @@ for i=1:size(sH,1)
                 suptStr=sprintf('%s: %s [%s]',suptStr,uCurInfoG{i},selectedBioM{b});
                 pf2_base.external.suptitle(sH{i,b}.h,suptStr);
             otherwise
-                suptitle(suptStr);
+                pf2_base.external.suptitle(suptStr);
         end
         
         if(plotTopo)
