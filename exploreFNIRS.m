@@ -2581,7 +2581,9 @@ endIdx=curTimes(:,3)<=t_end;
 curTimes=curTimes(startIdx&endIdx,:);
 
 fprintf('Exporting Times:')
-display(curTimes);
+cTimesTable=array2table(curTimes);
+cTimesTable.Properties.VariableNames={'Start','MidPoint','End'};
+display(cTimesTable);
 
 
 
