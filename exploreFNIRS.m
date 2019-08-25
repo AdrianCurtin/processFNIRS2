@@ -1537,10 +1537,16 @@ if(ExFNIRS.UpdateNeeded==2||~isfield(ExFNIRS,'curPreprocessedFNIR'))
             
             ExFNIRS.curPreprocessedFNIR.gbyFNIRS_blk{i}=processFNIRS2.Data.Resample(ExFNIRS.curPreprocessedFNIR.gbyFNIRS{i}, ExFNIRS.settings.barchart_resample_size,'centerOnT0',true,'timeOutMode','start','blfNIR',ExFNIRS.curPreprocessedFNIR.baseline{i},'averageAux',true);
             ExFNIRS.curPreprocessedFNIR.gbyFNIRS_blk{i}.time=ExFNIRS.curPreprocessedFNIR.gbyFNIRS_blk{i}.time+ExFNIRS.settings.block_start; %change time so that 0 is start of block
-            ExFNIRS.curPreprocessedFNIR.gbyFNIRS_blk{i}.segmentTimes=ExFNIRS.curPreprocessedFNIR.gbyFNIRS_blk{i}.segmentTimes+ExFNIRS.settings.block_start;
+            if(isfield(ExFNIRS.curPreprocessedFNIR.gbyFNIRS_blk{i},'segmentTimes'))
+                ExFNIRS.curPreprocessedFNIR.gbyFNIRS_blk{i}.segmentTimes=ExFNIRS.curPreprocessedFNIR.gbyFNIRS_blk{i}.segmentTimes+ExFNIRS.settings.block_start;
+            else
+               z=1; 
+            end
             ExFNIRS.curPreprocessedFNIR.gbyFNIRS{i}=processFNIRS2.Data.Resample(ExFNIRS.curPreprocessedFNIR.gbyFNIRS{i}, ExFNIRS.settings.grandavg_resample_size,'centerOnT0',true,'timeOutMode','start','blfNIR',ExFNIRS.curPreprocessedFNIR.baseline{i},'averageAux',true);
             ExFNIRS.curPreprocessedFNIR.gbyFNIRS{i}.time=ExFNIRS.curPreprocessedFNIR.gbyFNIRS{i}.time+ExFNIRS.settings.block_start; %change time so that 0 is start of block
-            ExFNIRS.curPreprocessedFNIR.gbyFNIRS{i}.segmentTimes=ExFNIRS.curPreprocessedFNIR.gbyFNIRS{i}.segmentTimes+ExFNIRS.settings.block_start;
+            if(isfield(ExFNIRS.curPreprocessedFNIR.gbyFNIRS{i},'segmentTimes'))
+                ExFNIRS.curPreprocessedFNIR.gbyFNIRS{i}.segmentTimes=ExFNIRS.curPreprocessedFNIR.gbyFNIRS{i}.segmentTimes+ExFNIRS.settings.block_start;
+            end
        else
             ExFNIRS.curPreprocessedFNIR.baseline{i}=[];
             ExFNIRS.curPreprocessedFNIR.gbyFNIRS{i}.time=ExFNIRS.curPreprocessedFNIR.gbyFNIRS{i}.time-ExFNIRS.settings.block_start; %change time so that 0 is start of block
