@@ -6883,17 +6883,26 @@ for chIdx=1:numOpt
 
                         switch(yType)
                             case 'time'
-                                ylabel(curPlotHandle,{sprintf('t=%i',round(barChartTimes(t)));curInfoStr});
+                                xlabel(curPlotHandle,{sprintf('t=%i',round(barChartTimes(t)));curFeatureString});
                             case 'groupby'
-                                ylabel(curPlotHandle,{curInfoGby{g};curInfoStr});
+                                xlabel(curPlotHandle,{curInfoGby{curUgroupIdx};curFeatureString});
                             case 'channels'
-                                ylabel(curPlotHandle,{sprintf('Opt. %i',ch);curInfoStr});
+                                xlabel(curPlotHandle,{sprintf('Opt. %i',ch);curFeatureString});
                             case 'bioM'
-                                ylabel(curPlotHandle,{bioM,curInfoStr});
+                                if(numBioM>1)
+                                    xlabel(curPlotHandle,{bioM,curFeatureString});
+                                else
+                                    xlabel(curPlotHandle,curFeatureString);
+                                end
                             otherwise
-                                ylabel(curPlotHandle,curInfoStr);
+                                ylabel(curPlotHandle,{sprintf('Opt. %i',ch);curFeatureString});
                         end
-                        xlabel(curPlotHandle,curFeatureString);
+                        if(ExFNIRS.settings.plot_scatter_nonparametric)
+                            ylabel(curPlotHandle,sprintf('Rank %s',curInfoStr));
+                        else
+                            ylabel(curPlotHandle,curInfoStr);
+                        end
+                        
                     else
 
 
@@ -6911,7 +6920,7 @@ for chIdx=1:numOpt
                                     ylabel(curPlotHandle,curFeatureString);
                                 end
                             otherwise
-                                ylabel(curPlotHandle,curFeatureString);
+                                ylabel(curPlotHandle,{sprintf('Opt. %i',ch);curFeatureString});
                         end
                         if(ExFNIRS.settings.plot_scatter_nonparametric)
                             xlabel(curPlotHandle,sprintf('Rank %s',curInfoStr));
