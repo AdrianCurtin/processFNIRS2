@@ -1537,10 +1537,16 @@ if(ExFNIRS.UpdateNeeded==2||~isfield(ExFNIRS,'curPreprocessedFNIR'))
             
             ExFNIRS.curPreprocessedFNIR.gbyFNIRS_blk{i}=processFNIRS2.Data.Resample(ExFNIRS.curPreprocessedFNIR.gbyFNIRS{i}, ExFNIRS.settings.barchart_resample_size,'centerOnT0',true,'timeOutMode','start','blfNIR',ExFNIRS.curPreprocessedFNIR.baseline{i},'averageAux',true);
             ExFNIRS.curPreprocessedFNIR.gbyFNIRS_blk{i}.time=ExFNIRS.curPreprocessedFNIR.gbyFNIRS_blk{i}.time+ExFNIRS.settings.block_start; %change time so that 0 is start of block
-            ExFNIRS.curPreprocessedFNIR.gbyFNIRS_blk{i}.segmentTimes=ExFNIRS.curPreprocessedFNIR.gbyFNIRS_blk{i}.segmentTimes+ExFNIRS.settings.block_start;
+            if(isfield(ExFNIRS.curPreprocessedFNIR.gbyFNIRS_blk{i},'segmentTimes'))
+                ExFNIRS.curPreprocessedFNIR.gbyFNIRS_blk{i}.segmentTimes=ExFNIRS.curPreprocessedFNIR.gbyFNIRS_blk{i}.segmentTimes+ExFNIRS.settings.block_start;
+            else
+               z=1; 
+            end
             ExFNIRS.curPreprocessedFNIR.gbyFNIRS{i}=processFNIRS2.Data.Resample(ExFNIRS.curPreprocessedFNIR.gbyFNIRS{i}, ExFNIRS.settings.grandavg_resample_size,'centerOnT0',true,'timeOutMode','start','blfNIR',ExFNIRS.curPreprocessedFNIR.baseline{i},'averageAux',true);
             ExFNIRS.curPreprocessedFNIR.gbyFNIRS{i}.time=ExFNIRS.curPreprocessedFNIR.gbyFNIRS{i}.time+ExFNIRS.settings.block_start; %change time so that 0 is start of block
-            ExFNIRS.curPreprocessedFNIR.gbyFNIRS{i}.segmentTimes=ExFNIRS.curPreprocessedFNIR.gbyFNIRS{i}.segmentTimes+ExFNIRS.settings.block_start;
+            if(isfield(ExFNIRS.curPreprocessedFNIR.gbyFNIRS{i},'segmentTimes'))
+                ExFNIRS.curPreprocessedFNIR.gbyFNIRS{i}.segmentTimes=ExFNIRS.curPreprocessedFNIR.gbyFNIRS{i}.segmentTimes+ExFNIRS.settings.block_start;
+            end
        else
             ExFNIRS.curPreprocessedFNIR.baseline{i}=[];
             ExFNIRS.curPreprocessedFNIR.gbyFNIRS{i}.time=ExFNIRS.curPreprocessedFNIR.gbyFNIRS{i}.time-ExFNIRS.settings.block_start; %change time so that 0 is start of block
@@ -6877,17 +6883,26 @@ for chIdx=1:numOpt
 
                         switch(yType)
                             case 'time'
-                                ylabel(curPlotHandle,{sprintf('t=%i',round(barChartTimes(t)));curInfoStr});
+                                xlabel(curPlotHandle,{sprintf('t=%i',round(barChartTimes(t)));curFeatureString});
                             case 'groupby'
-                                ylabel(curPlotHandle,{curInfoGby{g};curInfoStr});
+                                xlabel(curPlotHandle,{curInfoGby{curUgroupIdx};curFeatureString});
                             case 'channels'
-                                ylabel(curPlotHandle,{sprintf('Opt. %i',ch);curInfoStr});
+                                xlabel(curPlotHandle,{sprintf('Opt. %i',ch);curFeatureString});
                             case 'bioM'
-                                ylabel(curPlotHandle,{bioM,curInfoStr});
+                                if(numBioM>1)
+                                    xlabel(curPlotHandle,{bioM,curFeatureString});
+                                else
+                                    xlabel(curPlotHandle,curFeatureString);
+                                end
                             otherwise
-                                ylabel(curPlotHandle,curInfoStr);
+                                ylabel(curPlotHandle,{sprintf('Opt. %i',ch);curFeatureString});
                         end
-                        xlabel(curPlotHandle,curFeatureString);
+                        if(ExFNIRS.settings.plot_scatter_nonparametric)
+                            ylabel(curPlotHandle,sprintf('Rank %s',curInfoStr));
+                        else
+                            ylabel(curPlotHandle,curInfoStr);
+                        end
+                        
                     else
 
 
@@ -6905,7 +6920,7 @@ for chIdx=1:numOpt
                                     ylabel(curPlotHandle,curFeatureString);
                                 end
                             otherwise
-                                ylabel(curPlotHandle,curFeatureString);
+                                ylabel(curPlotHandle,{sprintf('Opt. %i',ch);curFeatureString});
                         end
                         if(ExFNIRS.settings.plot_scatter_nonparametric)
                             xlabel(curPlotHandle,sprintf('Rank %s',curInfoStr));
