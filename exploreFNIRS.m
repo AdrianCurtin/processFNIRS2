@@ -6151,8 +6151,10 @@ end
 
 barChartTimes=[];
 for i=1:numGroups
-    curGrandTime=ExFNIRS.gby(i).gbyGrandBar.time;
-    barChartTimes=[barChartTimes;curGrandTime];
+    if(isfield(ExFNIRS.gby(i).gbyGrandBar,'time'))
+        curGrandTime=ExFNIRS.gby(i).gbyGrandBar.time;
+        barChartTimes=[barChartTimes;curGrandTime];
+    end
 end
 barChartTimes=sort(unique(round(barChartTimes)));
 

@@ -436,7 +436,7 @@ outFNIR.HbDiff=HbDiff(1:end-1,:);
 outFNIR.HbTotal=HbTotal(1:end-1,:);
 outFNIR.CBSI=CBSI(1:end-1,:);
 
-if(calcROI)
+if(calcROI&&exist('HbR_roi'))
     outFNIR.ROI=fNIR.ROI;
     hbo_field_length=size(outFNIR.HbO,1);
     roi_field_length=size(HbR_roi,1);
