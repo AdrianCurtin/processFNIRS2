@@ -1392,11 +1392,8 @@ if(ExFNIRS.settings.use_info)
     selectedStrs=get(handles.listbox_info_groupby,'Value');
     selectedInfoG=strs(selectedStrs,:);
     if(isnumeric(ExFNIRS.dataTable{1,cInfoGBYstring}))
-        tblStrs=num2str(ExFNIRS.dataTable{:,cInfoGBYstring},'%.2f');
-        if(~iscell(selectedInfoG))
-            selectedInfoG={selectedInfoG};
-        end
-        selInfoGIdx=ismember(tblStrs,selectedInfoG);
+        
+        selInfoGIdx=ismember(ExFNIRS.settings.curInfoGroupByIdx,selectedStrs);
     else
         selInfoGIdx=ismember(ExFNIRS.dataTable.(cInfoGBYstring),selectedInfoG);
     end
@@ -7380,15 +7377,19 @@ end
 idx=get(handles.popupmenu_groupby_info_field,'Value');
 ExFNIRS.settings.curInfoGroupBy=infoVars{idx};
 
+ExFNIRS.settings.curInfoGroupByNumeric=false;
+
 if(~isempty(ExFNIRS.settings.curInfoGroupBy))
-    uVars=unique(ExFNIRS.dataTable(:,ExFNIRS.settings.curInfoGroupBy));
+    [uVars,~,ExFNIRS.settings.curInfoGroupByIdx]=unique(ExFNIRS.dataTable(:,ExFNIRS.settings.curInfoGroupBy));
     
     if(isnumeric(uVars{1,1}))
-       uVars=table2array(uVars);
+       uVars=table2array(ExFNIRS.dataTable(:,ExFNIRS.settings.curInfoGroupBy));
        uVars(isnan(uVars))=-9999;
-       uVars=unique(uVars);
+       %uVars=unique(uVars);
        %uVars(uVars==-9999)=nan;
        uVars=num2str(uVars,'%.2f');
+       ExFNIRS.settings.curInfoGroupByNumeric=true;
+       [uVars,~,ExFNIRS.settings.curInfoGroupByIdx]=unique(uVars,'rows');
     elseif(isstring(uVars{1,1}))
        uVars=table2cell(uVars); 
     end
