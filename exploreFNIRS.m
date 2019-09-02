@@ -8458,6 +8458,35 @@ for g=1:numGroups
        
     end
 
+    if(plotXstr)
+       uData=[xVals,yVals];
+        [uRows,~,uRowIdx]=unique(uData,'rows');
+        bincounts = histc(uRowIdx,1:max(uRowIdx));
+        for xv=1:length(bincounts)
+            if(bincounts(xv)>1)
+               stepsize=0.8/(bincounts(xv)-1);
+               offset=(-0.4:stepsize:0.4);
+              
+               xVals(uRowIdx==xv)=[uRows(xv,1)+offset];
+            end
+           
+        end
+    end
+    
+    if(plotYstr)
+        uData=[xVals,yVals];
+        [uRows,~,uRowIdx]=unique(uData,'rows');
+        bincounts = histc(uRowIdx,1:max(uRowIdx));
+        for yv=1:length(bincounts)
+            if(bincounts(yv)>1)
+               stepsize=0.8/(bincounts(yv)-1);
+               offset=(-0.4:stepsize:0.4);
+              
+               yVals(uRowIdx==yv)=[uRows(yv,2)+offset];
+            end
+           
+        end
+    end
 
         sHdots=scatter(curPlotHandle,xVals,yVals,25,sColor,'filled');
 
