@@ -8284,6 +8284,15 @@ gAStrs=cell(num2Plot,1);
 gAerrStrs=cell(num2Plot,1);
     
 curChart=1;
+
+curUstrX="";
+curUstrX(1)=[];
+curUstrY="";
+curUstrY(1)=[];
+
+plotXstr=false;
+plotYstr=false;
+
         
 for g=1:numGroups
     curTable=ExFNIRS.gby(g).gbyTables;
@@ -8292,19 +8301,41 @@ for g=1:numGroups
     curDataY=curTable(:,curInfoVarY);
     curDataY=table2array(curDataY);
     
-    if(isstring(curDataX))
+    if(isstring(curDataX)||ischar(curDataX))
        warning('Strings return count');
-       [~,~,curDataX]=unique(curDataX);
-       plotFeature='Count';
-       % return;
+       curDataX=string(curDataX);
+       [uDataX,~,curDataIdx]=unique(curDataX);
+       if(~isempty(uDataX))
+           curUstrX(end+1:end+length(uDataX))=uDataX;
+           [curUstrX,~,curUidxX]=unique(curUstrX);
+           curDataX=nan(size(curDataIdx));
+           for udx=1:length(uDataX)
+               cdx=find(ismember(curUstrX,uDataX(udx)));
+               curDataX(curDataIdx==udx)=cdx;
+           end
+           plotFeature='String';
+           % return;
+           plotXstr=true;
+       end
     end
     curDataX(curDataX==-9999)=nan;
     
-    if(isstring(curDataY))
+    if(isstring(curDataY)||ischar(curDataY))
        warning('Strings return count');
-       [~,~,curDataY]=unique(curDataY);
-       plotFeature='Count';
-       % return;
+       curDataY=string(curDataY);
+       [uDataY,~,curDataIdxY]=unique(curDataY);
+       if(~isempty(uDataY))
+           curUstrY(end+1:end+length(uDataY))=uDataY;
+           [curUstrY,~,curUidxY]=unique(curUstrY);
+           curDataY=nan(size(curDataIdxY));
+           for udx=1:length(uDataY)
+               cdx=find(ismember(curUstrY,uDataY(udx)));
+               curDataY(curDataIdxY==udx)=cdx;
+           end
+           plotFeature='String';
+           plotYstr=true;
+           % return;
+       end
     end
     curDataY(curDataY==-9999)=nan;
             
@@ -8335,8 +8366,8 @@ for g=1:numGroups
             
             
             
-    if(strcmp(plotFeature,'Count'))
-        [curHAvgX,outH]=pf2_base.hierarchicalAverage(curDataX,curTable(:,dataH),@nnz);
+    if(strcmp(plotFeature,'String'))
+        [curHAvgX,outH]=pf2_base.hierarchicalAverage(curDataX,curTable(:,dataH),@mode);
     elseif(strcmp(plotFeature,'Mean'))
         [curHAvgX,outH]=pf2_base.hierarchicalAverage(curDataX,curTable(:,dataH),@nanmean);
     elseif(strcmp(plotFeature,'Median'))
@@ -8346,8 +8377,8 @@ for g=1:numGroups
         %curHAvg=nanmedian(hierarchicalAverage(curData,curTable(:,dataH),@nanmedian));
     end
     
-    if(strcmp(plotFeature,'Count'))
-        [curHAvgY,outH]=pf2_base.hierarchicalAverage(curDataY,curTable(:,dataH),@nnz);
+    if(strcmp(plotFeature,'String'))
+        [curHAvgY,outH]=pf2_base.hierarchicalAverage(curDataY,curTable(:,dataH),@mode);
     elseif(strcmp(plotFeature,'Mean'))
         [curHAvgY,outH]=pf2_base.hierarchicalAverage(curDataY,curTable(:,dataH),@nanmean);
     elseif(strcmp(plotFeature,'Median'))
@@ -8370,15 +8401,15 @@ for g=1:numGroups
                 
             
                 
-                if(length(curFeatureY)~=length(curHAvgX))
-                    if(length(curFeatureY)>length(curHAvgX))
-                        curFeatureY=curFeatureY(ismember(curGrand.info.Observation,outH));
-                    else
-                        temp=nan(size(curFeatureY));
-                        temp(ismember(outH,curGrand.info.Observation))=curFeatureY;
-                        curFeatureY=temp;
-                    end
-                end
+    if(length(curFeatureY)~=length(curHAvgX))
+        if(length(curFeatureY)>length(curHAvgX))
+            curFeatureY=curFeatureY(ismember(curGrand.info.Observation,outH));
+        else
+            temp=nan(size(curFeatureY));
+            temp(ismember(outH,curGrand.info.Observation))=curFeatureY;
+            curFeatureY=temp;
+        end
+    end
                 
      
      sColor=cIndex(curUgroupIdx,:);
@@ -8423,6 +8454,8 @@ for g=1:numGroups
         temp=xVals;
         xVals=yVals;
         yVals=temp;
+        
+       
     end
 
 
@@ -8449,6 +8482,8 @@ for g=1:numGroups
             case 'groupby'
                 title(curPlotHandle,curInfoGby{g});
         end
+        
+        
 
 
         if(ExFNIRS.settings.plot_scatter_flipxy)
@@ -8657,7 +8692,15 @@ for g=1:numGroups
         end
     end
            
-                
+ if(ExFNIRS.settings.plot_scatter_flipxy)
+     temp=plotXstr;
+    plotXstr=plotYstr;
+    plotYstr=temp;
+
+    temp=curUstrX;
+    curUstrX=curUstrY;
+    curUstrY=temp; 
+ end
       
 
 if(plotCount)
@@ -8676,6 +8719,20 @@ for i=1:size(sH,1)
                 if(ExFNIRS.settings.ylim_fixed)
                     ylim(sH{i,b}.subH{y,x},[ExFNIRS.settings.ylim_fixed_min,ExFNIRS.settings.ylim_fixed_max]);
                     xlim(sH{i,b}.subH{y,x},[xlim_fixed_min,xlim_fixed_max]);
+                end
+                
+                if(plotXstr)
+                    xlim(sH{i,b}.subH{y,x},[0,length(curUstrX)]+0.5);
+                    xticks(sH{i,b}.subH{y,x},1:(length(curUstrX)));
+                   xticklabels(sH{i,b}.subH{y,x},curUstrX); 
+                   
+                end
+
+                if(plotYstr)
+                    ylim(sH{i,b}.subH{y,x},[0,length(curUstrY)]+0.5);
+                    yticks(sH{i,b}.subH{y,x},1:(length(curUstrY)));
+                   yticklabels(sH{i,b}.subH{y,x},curUstrY); 
+                   
                 end
                 
                 if((ExFNIRS.settings.plot_legend_mode==3||(ExFNIRS.settings.plot_legend_mode==2&&(x==numSubX)&&y==numSubY))&&numUgroups>1)
@@ -8697,6 +8754,8 @@ for i=1:size(sH,1)
         addDebugAnnotation(sH{i,b}.h);
         
         curCorrstr=sprintf('%s vs. %s',curInfoVarX,curInfoVarY);
+        
+        
         
         
         if(ExFNIRS.settings.plot_scatter_nonparametric)
