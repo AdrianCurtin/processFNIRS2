@@ -6459,6 +6459,14 @@ curFigIdx=[1,1];
 
 curInfoStr=ExFNIRS.settings.curInfoStr;
 
+curUinfoStr="";
+curUinfoStr(1)=[];
+
+plotInfoStr=false;
+        
+    
+    
+
 if(ExFNIRS.settings.within_sub_avg_mode==3)
     dataH=ExFNIRS.dataHierarchy;
 elseif(ExFNIRS.settings.within_sub_avg_mode==2)
@@ -6531,11 +6539,22 @@ for chIdx=1:numOpt
             
             curData=table2array(curData);
     
-            if(isstring(curData))
-               warning('Strings return count');
-               [~,~,curData]=unique(curData);
-               plotFeature='Count';
-               % return;
+            if(isstring(curData)||ischar(curData))
+               %warning('Strings return count');
+               curData=string(curData);
+               [uDataX,~,curDataIdx]=unique(curData);
+               if(~isempty(uDataX))
+                   curUinfoStr(end+1:end+length(uDataX))=uDataX;
+                   [curUinfoStr,~,curUidxX]=unique(curUinfoStr);
+                   curData=nan(size(curDataIdx));
+                   for udx=1:length(uDataX)
+                       cdx=find(ismember(curUinfoStr,uDataX(udx)));
+                       curData(curDataIdx==udx)=cdx;
+                   end
+                   %plotFeature='String';
+                   % return;
+                   plotInfoStr=true;
+               end
             end
             curData(curData==-9999)=nan;
             
@@ -6570,12 +6589,15 @@ for chIdx=1:numOpt
                 curFigIdx=[curGroupInfoIdx,b];
             end
             
-            if(strcmp(plotFeature,'Count'))
+            if(plotInfoStr)
+                [curHAvg,outH]=pf2_base.hierarchicalAverage(curData,curTable(:,dataH),@mode);
+            elseif(strcmp(plotFeature,'Count'))
                 [curHAvg,outH]=pf2_base.hierarchicalAverage(curData,curTable(:,dataH),@nnz);
             elseif(strcmp(plotFeature,'Mean'))
                 [curHAvg,outH]=pf2_base.hierarchicalAverage(curData,curTable(:,dataH),@nanmean);
             elseif(strcmp(plotFeature,'Median'))
                 [curHAvg,outH]=pf2_base.hierarchicalAverage(curData,curTable(:,dataH),@nanmedian);
+            
             else
                 error('Unknown parameter');
                 %curHAvg=nanmedian(hierarchicalAverage(curData,curTable(:,dataH),@nanmedian));
@@ -6616,7 +6638,7 @@ for chIdx=1:numOpt
               end 
                 curFeatureY=permute(data2plot.data(timeIdx,ch,:),[3,1,2]);
                 
-                if(strcmp(plotFeature,'Count'))
+                if(strcmp(plotFeature,'Count')||strcmp(plotFeature,'N'))
                     [curFeatureY]=pf2_base.hierarchicalAverage(curFeatureY,curGrand.info.Hierarchy,@nnz);
                 elseif(strcmp(plotFeature,'Mean'))
                     [curFeatureY]=pf2_base.hierarchicalAverage(curFeatureY,curGrand.info.Hierarchy,@nanmean);
@@ -6631,7 +6653,7 @@ for chIdx=1:numOpt
                     if(length(curFeatureY)>length(curHAvg))
                         curFeatureY=curFeatureY(ismember(curGrand.info.Observation,outH));
                     else
-                        temp=nan(size(curFeatureY));
+                        temp=nan(size(curHAvg));
                         temp(ismember(outH,curGrand.info.Observation))=curFeatureY;
                         curFeatureY=temp;
                     end
@@ -6681,6 +6703,29 @@ for chIdx=1:numOpt
                     N=length(xVals);
                     topoMode='rcorr';
                 end
+                
+                
+                
+                 if(plotInfoStr)
+                   uData=[xVals,yVals];
+                   microvar=(nanmax(yVals)-nanmin(yVals))/100;
+                    [uRows,~,uRowIdx]=unique(uData,'rows');
+                    bincounts = histc(uRowIdx,1:max(uRowIdx));
+                    for xv=1:length(bincounts)
+                        if(bincounts(xv)>1)
+                           stepsize=0.8/(bincounts(xv)-1);
+                           offset=(-0.4:stepsize:0.4);
+                           if(bincounts(xv)<10)
+                               offset=offset/(10-bincounts(xv));
+                           else
+                                offset=(abs(offset).^1.5).*sign(offset);
+                           end
+                           xVals(uRowIdx==xv)=[uRows(xv,1)+offset];
+                           yVals(uRowIdx==xv)=[uRows(xv,2)-microvar+g/numGroups*(2*microvar)];
+                        end
+
+                    end
+                 end
                 
                 if(ExFNIRS.settings.plot_scatter_flipxy)
                     temp=xVals;
@@ -7135,6 +7180,22 @@ for i=1:size(sH,1)
                     ylim(sH{i,b}.subH{y,x},[ExFNIRS.settings.ylim_fixed_min,ExFNIRS.settings.ylim_fixed_max]);
                     xlim(sH{i,b}.subH{y,x},[xlim_fixed_min,xlim_fixed_max]);
                 end
+                
+                 
+
+                if(plotInfoStr&&ExFNIRS.settings.plot_scatter_flipxy)
+                    ylim(sH{i,b}.subH{y,x},[0,length(curUinfoStr)]+0.5);
+                    yticks(sH{i,b}.subH{y,x},1:(length(curUinfoStr)));
+                   yticklabels(sH{i,b}.subH{y,x},curUinfoStr); 
+                   
+                elseif(plotInfoStr)
+                    xlim(sH{i,b}.subH{y,x},[0,length(curUinfoStr)]+0.5);
+                    xticks(sH{i,b}.subH{y,x},1:(length(curUinfoStr)));
+                   xticklabels(sH{i,b}.subH{y,x},curUinfoStr); 
+                   
+                end
+                    
+                    
                 
                 if((ExFNIRS.settings.plot_legend_mode==3||(ExFNIRS.settings.plot_legend_mode==2&&(x==numSubX)&&y==numSubY))&&~plotTopo)
                     lgStrs=[];
@@ -8302,7 +8363,7 @@ for g=1:numGroups
     curDataY=table2array(curDataY);
     
     if(isstring(curDataX)||ischar(curDataX))
-       warning('Strings return count');
+       %warning('Strings return count');
        curDataX=string(curDataX);
        [uDataX,~,curDataIdx]=unique(curDataX);
        if(~isempty(uDataX))
@@ -8313,7 +8374,7 @@ for g=1:numGroups
                cdx=find(ismember(curUstrX,uDataX(udx)));
                curDataX(curDataIdx==udx)=cdx;
            end
-           plotFeature='String';
+           %plotFeature='String';
            % return;
            plotXstr=true;
        end
@@ -8321,7 +8382,7 @@ for g=1:numGroups
     curDataX(curDataX==-9999)=nan;
     
     if(isstring(curDataY)||ischar(curDataY))
-       warning('Strings return count');
+       %warning('Strings return count');
        curDataY=string(curDataY);
        [uDataY,~,curDataIdxY]=unique(curDataY);
        if(~isempty(uDataY))
@@ -8332,7 +8393,7 @@ for g=1:numGroups
                cdx=find(ismember(curUstrY,uDataY(udx)));
                curDataY(curDataIdxY==udx)=cdx;
            end
-           plotFeature='String';
+           %plotFeature='String';
            plotYstr=true;
            % return;
        end
@@ -8366,23 +8427,27 @@ for g=1:numGroups
             
             
             
-    if(strcmp(plotFeature,'String'))
+    if(plotXstr)
         [curHAvgX,outH]=pf2_base.hierarchicalAverage(curDataX,curTable(:,dataH),@mode);
     elseif(strcmp(plotFeature,'Mean'))
         [curHAvgX,outH]=pf2_base.hierarchicalAverage(curDataX,curTable(:,dataH),@nanmean);
     elseif(strcmp(plotFeature,'Median'))
         [curHAvgX,outH]=pf2_base.hierarchicalAverage(curDataX,curTable(:,dataH),@nanmedian);
+    elseif(strcmp(plotFeature,'Count')||strcmp(plotFeature,'N'))
+        [curHAvgX,outH]=pf2_base.hierarchicalAverage(curDataX,curTable(:,dataH),@nnz);
     else
         error('Unknown parameter');
         %curHAvg=nanmedian(hierarchicalAverage(curData,curTable(:,dataH),@nanmedian));
     end
     
-    if(strcmp(plotFeature,'String'))
+    if(plotYstr)
         [curHAvgY,outH]=pf2_base.hierarchicalAverage(curDataY,curTable(:,dataH),@mode);
     elseif(strcmp(plotFeature,'Mean'))
         [curHAvgY,outH]=pf2_base.hierarchicalAverage(curDataY,curTable(:,dataH),@nanmean);
     elseif(strcmp(plotFeature,'Median'))
         [curHAvgY,outH]=pf2_base.hierarchicalAverage(curDataY,curTable(:,dataH),@nanmedian);
+    elseif(strcmp(plotFeature,'Count')||strcmp(plotFeature,'N'))
+        [curHAvgY,outH]=pf2_base.hierarchicalAverage(curDataY,curTable(:,dataH),@nnz);
     else
         error('Unknown parameter');
         %curHAvg=nanmedian(hierarchicalAverage(curData,curTable(:,dataH),@nanmedian));
@@ -8405,7 +8470,7 @@ for g=1:numGroups
         if(length(curFeatureY)>length(curHAvgX))
             curFeatureY=curFeatureY(ismember(curGrand.info.Observation,outH));
         else
-            temp=nan(size(curFeatureY));
+            temp=nan(size(curHAvgX));
             temp(ismember(outH,curGrand.info.Observation))=curFeatureY;
             curFeatureY=temp;
         end

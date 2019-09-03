@@ -121,7 +121,11 @@ for i=numLevels:-1:1
             rows2keep(i2)=find(idx,1,'first'); %still have to keep one col from the rest to merge with the average
         end
         
-        newOut(i2,:,:)=funcAvg(outAvg(idx,:,:),1);
+        try
+            newOut(i2,:,:)=funcAvg(outAvg(idx,:,:),1);
+        catch
+            newOut(i2,:,:)=funcAvg(outAvg(idx,:,:));
+        end
     end
     
     outAvg=newOut;
