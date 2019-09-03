@@ -6535,6 +6535,11 @@ for chIdx=1:numOpt
         for g=1:numGroups
             curGrand=ExFNIRS.gby(g).gbyGrandBar;
             curTable=ExFNIRS.gby(g).gbyTables;
+            
+            if(isempty(curGrand)||isempty(curTable))
+               continue; 
+            end
+            
             curData=curTable(:,curInfoStr);
             
             curData=table2array(curData);
@@ -6622,6 +6627,10 @@ for chIdx=1:numOpt
                 [timeIdx,timeIdxRev]=ismember(round(curGrand.time),barChartTimes(t));
                 timeIdxRev=timeIdxRev(timeIdxRev>0);
                 
+                if(isempty(timeIdxRev))
+                    
+                    continue;
+                end
                 
                 
               switch(ExFNIRS.settings.ChannelMode)
