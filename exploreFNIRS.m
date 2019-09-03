@@ -8449,6 +8449,48 @@ for g=1:numGroups
         yVals=curFeatureY(validIdx);
         N=length(xVals);
     end
+    
+     if(plotXstr)
+       uData=[xVals,yVals];
+       microvar=(nanmax(yVals)-nanmin(yVals))/100;
+        [uRows,~,uRowIdx]=unique(uData,'rows');
+        bincounts = histc(uRowIdx,1:max(uRowIdx));
+        for xv=1:length(bincounts)
+            if(bincounts(xv)>1)
+               stepsize=0.8/(bincounts(xv)-1);
+               offset=(-0.4:stepsize:0.4);
+               if(bincounts(xv)<10)
+                   offset=offset/(10-bincounts(xv));
+               else
+                    offset=(abs(offset).^1.5).*sign(offset);
+               end
+               xVals(uRowIdx==xv)=[uRows(xv,1)+offset];
+               yVals(uRowIdx==xv)=[uRows(xv,2)-microvar+g/numGroups*(2*microvar)];
+            end
+           
+        end
+    end
+    
+    if(plotYstr)
+        uData=[xVals,yVals];
+        microvar=(nanmax(xVals)-nanmin(xVals))/100;
+        [uRows,~,uRowIdx]=unique(uData,'rows');
+        bincounts = histc(uRowIdx,1:max(uRowIdx));
+        for yv=1:length(bincounts)
+            if(bincounts(yv)>1)
+               stepsize=0.8/(bincounts(yv)-1);
+               offset=(-0.4:stepsize:0.4);
+               if(bincounts(yv)<10)
+                   offset=offset/(10-bincounts(yv));
+               else
+                   offset=(abs(offset).^1.5).*sign(offset);
+               end
+               yVals(uRowIdx==yv)=[uRows(yv,2)+offset];
+               xVals(uRowIdx==yv)=[uRows(yv,1)-microvar+g/numGroups*(2*microvar)];
+            end
+           
+        end
+    end
 
     if(ExFNIRS.settings.plot_scatter_flipxy)
         temp=xVals;
@@ -8458,35 +8500,7 @@ for g=1:numGroups
        
     end
 
-    if(plotXstr)
-       uData=[xVals,yVals];
-        [uRows,~,uRowIdx]=unique(uData,'rows');
-        bincounts = histc(uRowIdx,1:max(uRowIdx));
-        for xv=1:length(bincounts)
-            if(bincounts(xv)>1)
-               stepsize=0.8/(bincounts(xv)-1);
-               offset=(-0.4:stepsize:0.4);
-              
-               xVals(uRowIdx==xv)=[uRows(xv,1)+offset];
-            end
-           
-        end
-    end
-    
-    if(plotYstr)
-        uData=[xVals,yVals];
-        [uRows,~,uRowIdx]=unique(uData,'rows');
-        bincounts = histc(uRowIdx,1:max(uRowIdx));
-        for yv=1:length(bincounts)
-            if(bincounts(yv)>1)
-               stepsize=0.8/(bincounts(yv)-1);
-               offset=(-0.4:stepsize:0.4);
-              
-               yVals(uRowIdx==yv)=[uRows(yv,2)+offset];
-            end
-           
-        end
-    end
+   
 
         sHdots=scatter(curPlotHandle,xVals,yVals,25,sColor,'filled');
 
