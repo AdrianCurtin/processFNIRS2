@@ -93,6 +93,12 @@ reducedTimes=reducedMarkers(:,1);
 
 [uMarkers,~,uMrkIdx]=unique(reducedMarkers(:,2));
 
+if(isempty(uMarkers))
+    markerTimes=[];
+    cellMrkTimes={};
+    return;
+end
+
 for i=1:length(uMatchingMarkers)
    uMatchIdx(i)=find(uMatchingMarkers(i)==uMarkers);
 end

@@ -1820,8 +1820,13 @@ end
 
 tempWvActiveSet=tempWvSet(tempWvSet>0);
 curDPF=PF2.GUIPF2.data.stage{4}.DPF_factor;
-set(handles.text_wv1_dpf,'String',sprintf('%.0fnm %.2f',tempWvActiveSet(1),curDPF(1)));
-set(handles.text_wv2_dpf,'String',sprintf('%.0fnm %.2f',tempWvActiveSet(2),curDPF(2)));
+if(length(curDPF)==1)
+    set(handles.text_wv1_dpf,'String',sprintf('%.0fnm %.2f',tempWvActiveSet(1),curDPF(1)));
+    set(handles.text_wv2_dpf,'String',sprintf('%.0fnm %.2f',tempWvActiveSet(2),curDPF(1)));
+elseif(length(curDPF)==2)
+    set(handles.text_wv1_dpf,'String',sprintf('%.0fnm %.2f',tempWvActiveSet(1),curDPF(1)));
+    set(handles.text_wv2_dpf,'String',sprintf('%.0fnm %.2f',tempWvActiveSet(2),curDPF(2)));
+end
 
 time=PF2.GUIPF2.data.time;
 
