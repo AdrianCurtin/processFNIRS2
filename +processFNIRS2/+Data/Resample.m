@@ -298,21 +298,28 @@ end
 ptime=zeros(numSegs,1);
 for i=0:numSegs-1
     
-    t1=times(i+1);
-    ind_init=ind;
+    t1=times(i+1); %get the current segment start time
+    ind_init=ind;  %get the index
     ind_2=ind;
     
-    if(ind>maxFtime)
+    if(ind>maxFtime) %if the index is bigger than the max time, we're done
         continue;
     end
     
-    while(ind<=maxFtime&&fTime(ind)<t1)
+    while(ind<=maxFtime&&fTime(ind)<t1) %if the index is less than the max time and less than the start time
+        % keep increasing until ind until it marks the segment just
+        % slightly after t1
+        % and ind_2 is the one before that
         ind=ind+1;
         ind_2=ind-1;
         fTimeInd(ind_2)=i;
     end
-
-    if(i==0||(isnan(fTimeInd(ind_2))))
+    
+    if(i==0&&numSegs==1&&isnan(fTimeInd(ind_2))&&fTime(ind)<(t1+segLength))
+        blLength=nan; %way of marking segment invalid
+        ind_2=find(fTime==max(fTime(fTime<(t1+segLength))));
+        i=1;
+    elseif(i==0||(isnan(fTimeInd(ind_2)))) %TODO make this check so that it operates even if zero is slightly before
         continue;
     end
     

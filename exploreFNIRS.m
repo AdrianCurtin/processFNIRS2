@@ -1539,10 +1539,16 @@ if(ExFNIRS.UpdateNeeded==2||~isfield(ExFNIRS,'curPreprocessedFNIR'))
             else
                z=1; 
             end
+            
+            if(isnan(ExFNIRS.curPreprocessedFNIR.gbyFNIRS_blk{i}.time))
+               z=1; 
+            end
             ExFNIRS.curPreprocessedFNIR.gbyFNIRS{i}=processFNIRS2.Data.Resample(ExFNIRS.curPreprocessedFNIR.gbyFNIRS{i}, ExFNIRS.settings.grandavg_resample_size,'centerOnT0',true,'timeOutMode','start','blfNIR',ExFNIRS.curPreprocessedFNIR.baseline{i},'averageAux',true);
             ExFNIRS.curPreprocessedFNIR.gbyFNIRS{i}.time=ExFNIRS.curPreprocessedFNIR.gbyFNIRS{i}.time+ExFNIRS.settings.block_start; %change time so that 0 is start of block
             if(isfield(ExFNIRS.curPreprocessedFNIR.gbyFNIRS{i},'segmentTimes'))
                 ExFNIRS.curPreprocessedFNIR.gbyFNIRS{i}.segmentTimes=ExFNIRS.curPreprocessedFNIR.gbyFNIRS{i}.segmentTimes+ExFNIRS.settings.block_start;
+            else
+               z=1; 
             end
        else
             ExFNIRS.curPreprocessedFNIR.baseline{i}=[];
