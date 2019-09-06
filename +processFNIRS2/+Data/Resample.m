@@ -135,9 +135,10 @@ elseif(nargout<=1)
     getPolyAvg=false;
 end
 
-if(~isfield(fNIR,'HbR')||(~isfield(fNIR,'info')&&isfield(fNIR,'raw')))
+if(~isfield(fNIR,'HbR')&&isfield(fNIR,'raw'))
     error('Raw data averaging not supported');
-elseif(~isfield(fNIR,'HbR')&&~isfield(fNIR,'raw')&&isfield(fNIR,'info'))
+elseif(~isfield(fNIR,'HbR')&&~isfield(fNIR,'raw'))
+    warning('No fNIRS data');
     outFNIR=fNIR;
     pFit=[];
     return;
