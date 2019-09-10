@@ -2575,8 +2575,8 @@ answerTime = questdlg(sprintf('Choose times to export:\n\nCurrent sampling size 
 
 switch(answerTime)
     case 'All Times'
-        t_min=min(curTimes(:,1));
-        t_max=max(curTimes(:,3));
+        t_start=min(curTimes(:,1));
+        t_end=max(curTimes(:,3));
     case 'Viewing Window'
         t_start=ExFNIRS.settings.plot_start;
         t_end=ExFNIRS.settings.plot_end;
