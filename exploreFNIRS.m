@@ -1614,7 +1614,7 @@ for i=1:max(gbyIdx)
         hArg=ExFNIRS.gby(i).gbyTables(:,ExFNIRS.dataHierarchy);
         ExFNIRS.settings.within_sub_avg_mode_label='Hierarchy';
     end
-    ExFNIRS.gby(i).gbyGrand=grandAvgFNIRS(ExFNIRS.gby(i).gbyFNIRS,false,[],false,hArg,false,false);
+    ExFNIRS.gby(i).gbyGrand=grandAvgFNIRS(ExFNIRS.gby(i).gbyFNIRS,false,[],false,hArg,false,true);
     ExFNIRS.gby(i).gbyGrandBar=grandAvgFNIRS(ExFNIRS.gby(i).gbyFNIRS_blk,false, ExFNIRS.settings.barchart_resample_size,false,hArg,false,true);
     ExFNIRS.gby(i).gbyGrandBarFlat=grandAvgFNIRS(ExFNIRS.gby(i).gbyFNIRS_blk,false, ExFNIRS.settings.barchart_resample_size,false,ExFNIRS.gby(i).gbyTables(:,'SubjectID'),false,true);
     try
@@ -2059,6 +2059,7 @@ for chIdx=1:numOpt
                    switch ExFNIRS.settings.ChannelMode
                        case 'fNIR'
                            data2plot=curFNIRS{i};
+                           dataTime=curFNIRS{i}.time;
                        case 'ROI'
                            if(~pf2_base.isnestedfield(curGrand,'ROI.HbO.data'))
                               error('ROI data must be calculated using a build ROI step');
@@ -2068,14 +2069,24 @@ for chIdx=1:numOpt
                           else
                              data2plot=[]; 
                           end
+                          dataTime=curFNIRS{i}.time;
                           
                        case 'Aux'
+                           data2plot=curFNIRS{i}.Aux;
+                           if(isfield(data2plot,bioM)&&ndims(data2plot.(bioM)(:,ch))>1) %if has its own time use that
+                               dataTime=data2plot.(bioM)(:,1);
+                               data2plot.(bioM)=data2plot.(bioM)(:,2); 
+                           elseif(isfield(data2plot,'time')) %otherwise use aux time
+                               dataTime=data2plot.time;
+                           else
+                               dataTime=curFNIRS{i}.time;  %or fnirs time
+                           end
                            
                    end
                    
                   if(plotGroupByBioM)
                       if(~isempty(data2plot))
-                          h=plot(curFigH.subH{curSy,curSx},curFNIRS{i}.time,data2plot.(bioM)(:,ch),'color',cIndex(b,:));
+                          h=plot(curFigH.subH{curSy,curSx},dataTime,data2plot.(bioM)(:,ch),'color',cIndex(b,:));
                           set(h,'Tag',getFormattedTrialString(curFNIRS{i}));
                           if(ExFNIRS.settings.plot_grandaverage||~isempty(curFigH.legendHandles{curSy,curSx}.h{b}))
                             set(h.Annotation.LegendInformation,'IconDisplayStyle','off'); 
@@ -2085,15 +2096,15 @@ for chIdx=1:numOpt
                       end
                   else
                       if(~isempty(data2plot.(bioM))&&isfield(data2plot,bioM))
-                      h=plot(curFigH.subH{curSy,curSx},curFNIRS{i}.time,data2plot.(bioM)(:,ch),'color',cIndex(curUgroupIdx,:));
-                      set(h,'Tag',getFormattedTrialString(curFNIRS{i}));
-                      if(ExFNIRS.settings.plot_grandaverage||~isempty(curFigH.legendHandles{curSy,curSx}.h{curUgroupIdx}))
-                          if(~isempty(h))
-                             set(h.Annotation.LegendInformation,'IconDisplayStyle','off'); 
+                          h=plot(curFigH.subH{curSy,curSx},dataTime,data2plot.(bioM)(:,ch),'color',cIndex(curUgroupIdx,:));
+                          set(h,'Tag',getFormattedTrialString(curFNIRS{i}));
+                          if(ExFNIRS.settings.plot_grandaverage||~isempty(curFigH.legendHandles{curSy,curSx}.h{curUgroupIdx}))
+                              if(~isempty(h))
+                                 set(h.Annotation.LegendInformation,'IconDisplayStyle','off'); 
+                              end
                           end
-                      end
-                      gStrs{curUgroupIdx}=gbyStrs{g}; 
-                      curFigH.legendHandles{curSy,curSx}.h{curUgroupIdx}=h;
+                          gStrs{curUgroupIdx}=gbyStrs{g}; 
+                          curFigH.legendHandles{curSy,curSx}.h{curUgroupIdx}=h;
                       end
                   end
                   
@@ -2115,7 +2126,11 @@ for chIdx=1:numOpt
                             data2plot=curGrand.ROI.(bioM);
                           end
                       case 'Aux'
-           
+                            data2plot=curGrand.Aux.(bioM);
+                            %if(ndims(data2plot)>1)
+                            %    data2plot=data2plot(:,2);
+                            %end
+                            
                   end
                   
                   
@@ -2241,6 +2256,8 @@ for chIdx=1:numOpt
                     chNamePart=selectedOptStr{chIdx};
                     chNamePartLong=sprintf('ROI: %s',selectedOptStr{chIdx});
                 case 'Aux'
+                    chNamePart=bioM;
+                    chNamePartLong=sprintf('Aux: %s',bioM);
             end
             
             if(~plotGroupByBioM) 
@@ -7839,23 +7856,23 @@ switch (ExFNIRS.settings.ChannelMode)
         
         set(handles.pushbutton_lme_plot_topo,'Enable','on');
     case 'ROI'
-        uROI={};
-        roiNames={};
+        uAux={};
+        auxNames={};
         for i=1:length(ExFNIRS.data)
             if(pf2_base.isnestedfield(ExFNIRS.data{i},'ROI.info'))
-                curRowNames=ExFNIRS.data{i}.ROI.info.Properties.RowNames;
-                if(any(~ismember(curRowNames,roiNames)))
-                    for roinum=1:size(ExFNIRS.data{i}.ROI.info,1)
-                        if(~ismember(curRowNames{roinum},roiNames))
-                            if(isempty(ExFNIRS.data{i}.ROI.info.Properties.RowNames{roinum}))
-                                newRoiName=sprintf('ROI%i',roinum+length(rowNames));
-                                roiNames=[roiNames,{newRoiName}];
-                                ExFNIRS.data{i}.ROI.info.Properties.RowNames{roinum}=newRoiName;
+                curAuxNames=ExFNIRS.data{i}.ROI.info.Properties.RowNames;
+                if(any(~ismember(curAuxNames,auxNames)))
+                    for auxnum=1:size(ExFNIRS.data{i}.ROI.info,1)
+                        if(~ismember(curAuxNames{auxnum},auxNames))
+                            if(isempty(ExFNIRS.data{i}.ROI.info.Properties.RowNames{auxnum}))
+                                newRoiName=sprintf('ROI%i',auxnum+length(rowNames));
+                                auxNames=[auxNames,{newRoiName}];
+                                ExFNIRS.data{i}.ROI.info.Properties.RowNames{auxnum}=newRoiName;
                             else
-                                roiNames=[roiNames,ExFNIRS.data{i}.ROI.info.Properties.RowNames(roinum)];
+                                auxNames=[auxNames,ExFNIRS.data{i}.ROI.info.Properties.RowNames(auxnum)];
                             end
                             ExFNIRS.data{i}.ROI.info.DeviceCfg(:)={ExFNIRS.data{i}.info.probename};
-                            uROI=[uROI;ExFNIRS.data{i}.ROI.info(roinum,:)];
+                            uAux=[uAux;ExFNIRS.data{i}.ROI.info(auxnum,:)];
                         end
                     end
                 end
@@ -7864,15 +7881,15 @@ switch (ExFNIRS.settings.ChannelMode)
                 
             end
         end
-        if(isempty(uROI))
+        if(isempty(uAux))
             warning('No ROIs present in data');
             set(handles.popupmenu_ChannelMode,'Value',1);
         else
             %uROI=unique(uROI{:},'rows');
 
-            [uROInames,b,c]=unique(roiNames);
-            uROInames=roiNames(b);
-            uROI=uROI(b,:);
+            [uROInames,b,c]=unique(auxNames);
+            uROInames=auxNames(b);
+            uAux=uAux(b,:);
 
 
 
@@ -7880,12 +7897,12 @@ switch (ExFNIRS.settings.ChannelMode)
                 fprintf(2,'************\nStandardizing all ROI fields..\n********\n');
                 for i=1:length(ExFNIRS.data)
                     if(pf2_base.isnestedfield(ExFNIRS.data{i},'raw')&&~isempty(ExFNIRS.data{i}))
-                       ExFNIRS.data{i}.ROI.info=uROI;
+                       ExFNIRS.data{i}.ROI.info=uAux;
                     end
                 end
             end
 
-            ExFNIRS.currentROI=uROI;
+            ExFNIRS.currentROI=uAux;
 
 
             set(handles.text_optode_label,'String','ROI');
@@ -7900,14 +7917,58 @@ switch (ExFNIRS.settings.ChannelMode)
             set(handles.pushbutton_lme_plot_topo,'Enable','on');
         end
     case 'Aux'
-        set(handles.text_optode_label,'String','Aux');
-        set(handles.text_biomarker_label,'String','Aux Signal');
-        set(handles.listbox_biomarker,'Enable','off');
-        set(handles.pushbutton_biomarker_select_all,'Enable','off');
-        set(handles.pushbutton_biomarker_select_none,'Enable','off');
-        set(handles.listbox_biomarker,'String',{''});
-        set(handles.listbox_optode,'Value',[]);
-        set(handles.pushbutton_lme_plot_topo,'Enable','off');
+        
+        auxNames={};
+        for i=1:length(ExFNIRS.data)
+            if(pf2_base.isnestedfield(ExFNIRS.data{i},'Aux'))
+                curAuxNames=fields(ExFNIRS.data{i}.Aux);
+                if(any(~ismember(curAuxNames,auxNames)))
+                    for auxnum=1:size(curAuxNames,1)
+                        if(~ismember(curAuxNames{auxnum},auxNames))
+                            auxNames=[auxNames,curAuxNames{auxnum}];
+                        end
+                    end
+                end
+            end
+        end
+        
+        
+        if(isempty(auxNames))
+            warning('No Auxillary channels present in data');
+            set(handles.popupmenu_ChannelMode,'Value',1);
+        else
+            %uROI=unique(uROI{:},'rows');
+
+            [uAuxNames,b,c]=unique(auxNames);
+            uAuxNames=auxNames(b);
+      
+
+
+%             if(initROI) % standaradize all ROIs on first load
+%                 fprintf(2,'************\nStandardizing all ROI fields..\n********\n');
+%                 for i=1:length(ExFNIRS.data)
+%                     if(pf2_base.isnestedfield(ExFNIRS.data{i},'raw')&&~isempty(ExFNIRS.data{i}))
+%                        ExFNIRS.data{i}.ROI.info=uAux;
+%                     end
+%                 end
+%             end
+
+          %  ExFNIRS.currentROI=uAux;
+
+            set(handles.text_optode_label,'String','Aux');
+            set(handles.text_biomarker_label,'String','Aux Signal');
+            set(handles.listbox_optode,'Enable','off');
+            set(handles.pushbutton_optodes_select_all,'Enable','off');
+            set(handles.pushbutton_optodes_select_none,'Enable','off');
+            set(handles.listbox_biomarker,'Enable','on');
+            set(handles.pushbutton_biomarker_select_all,'Enable','on');
+            set(handles.pushbutton_biomarker_select_none,'Enable','on');
+            set(handles.listbox_optode,'String',{'Aux'});
+            set(handles.listbox_optode,'Value',1);
+            set(handles.listbox_biomarker,'Value',1);
+            set(handles.listbox_biomarker,'String',uAuxNames);
+            set(handles.pushbutton_lme_plot_topo,'Enable','off');
+        end
 end
 
 
