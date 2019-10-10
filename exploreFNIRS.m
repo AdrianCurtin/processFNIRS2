@@ -3820,7 +3820,7 @@ for chIdx=1:numOpt
                           
                           data2plot=curGrand.ROI.(bioM);
                       case 'Aux'
-           
+                          data2plot=curGrand.Aux.(bioM);
                   end
    
                   if(plotGroupByBioM)
@@ -3840,7 +3840,7 @@ for chIdx=1:numOpt
                   errMulitply=ExFNIRS.settings.plot_bar_err_mult;
                   [timeIdx,timeIdxRev]=ismember(round(curGrand.time),barChartTimes);
                   timeIdxRev=timeIdxRev(timeIdxRev>0);
-                  ga2plot=curGrand.(bioM);
+                  ga2plot=data2plot;%curGrand.(bioM);
                   if(strcmp(errorFeature,'MaxMin'))
                       if(plotGroupByBioM)
                           barChartData{curChart}(timeIdxRev+curGroupIdxOffset,b,2)=ga2plot.Max(timeIdx,ch);
@@ -3991,7 +3991,7 @@ for chIdx=1:numOpt
             case 'ROI'
                 title(sprintf('ROI: %s',optStrs{ch}));
             case 'Aux'
-                
+                title(sprintf('Aux: %s', bioM));
         end
         
         if(useCurInfoGroup&&numChartTimes==1)
@@ -4057,7 +4057,7 @@ for sH=1:length(subplotHandles)
         
             case 'Aux'
                 mergedTables{sH}=mergeGbyTablesLong(subplotGby{sH}.gby,subplotGby{sH}.curBioM,subplotGby{sH}.curCh,barChartTimes,true,false);
-                varNameStart='Aux';
+                varNameStart='aux';
         end
         x=ExFNIRS.groupByVars;
         curLMEGbyString='';
@@ -4111,20 +4111,26 @@ for sH=1:length(subplotHandles)
         
         dummyCodeStr='reference';
         
+        if(strcmp(ExFNIRS.settings.ChannelMode,'Aux'))
+            varName=sprintf('%s_%s',varNameStart,subplotGby{sH}.curBioM{1});
+        else
+            varName=sprintf('%s%i_%s',varNameStart,subplotGby{sH}.curCh,subplotGby{sH}.curBioM{1});
+        end
+        
         if(ExFNIRS.settings.LME_use_customStr&&~isempty(ExFNIRS.settings.LME_customStr))
-            lmeString=sprintf('%s%i_%s~%s',varNameStart,subplotGby{sH}.curCh,subplotGby{sH}.curBioM{1},ExFNIRS.settings.LME_customStr);
+            lmeString=sprintf('%s~%s',varName,ExFNIRS.settings.LME_customStr);
             if(contains(lmeString,'-1+')||contains(lmeString,'~-1'))
                dummyCodeStr='full';
                lmeString(lmeString=='*')=':';
             end
         elseif(ExFNIRS.settings.LME_use_intercept)
-            lmeString=sprintf('%s%i_%s~%s+(%s)',varNameStart,subplotGby{sH}.curCh,subplotGby{sH}.curBioM{1},curLMEGbyString,ExFNIRS.settings.LME_randomFxStr);
+            lmeString=sprintf('%s~%s+(%s)',varName,curLMEGbyString,ExFNIRS.settings.LME_randomFxStr);
             if(isempty(curLMEGbyString))
-                lmeString=sprintf('%s%i_%s~1+(%s)',varNameStart,subplotGby{sH}.curCh,subplotGby{sH}.curBioM{1},ExFNIRS.settings.LME_randomFxStr);
+                lmeString=sprintf('%s~1+(%s)',varName,ExFNIRS.settings.LME_randomFxStr);
             end
             
         else
-            lmeString=sprintf('%s%i_%s~-1+%s+(%s)',varNameStart,subplotGby{sH}.curCh,subplotGby{sH}.curBioM{1},curLMEGbyString,ExFNIRS.settings.LME_randomFxStr);
+            lmeString=sprintf('%s~-1+%s+(%s)',varName,curLMEGbyString,ExFNIRS.settings.LME_randomFxStr);
             dummyCodeStr='full';
             lmeString(lmeString=='*')=':';
         end
@@ -4139,7 +4145,7 @@ for sH=1:length(subplotHandles)
             curChartLME{sH}=fitlme(mergedTables{sH},lmeString,'FitMethod','REML','CheckHessian',true,'DummyVarCoding',dummyCodeStr);
           %   curChartLME_emm{sH}= pf2_base.external.emmeans(curChartLME{sH}, {'orig'}, 'effects');
 %             h = emmip(curChartLME_emm{sH},'orig');
-            nullMdlstring=sprintf('%s%i_%s~1+(1|SubjectID)',varNameStart,subplotGby{sH}.curCh,subplotGby{sH}.curBioM{1});
+            nullMdlstring=sprintf('%s~1+(1|SubjectID)',varName);
             curChartLME_ML=fitlme(mergedTables{sH},lmeString,'FitMethod','ML','CheckHessian',true,'DummyVarCoding',dummyCodeStr);
             nullChartLME=fitlme(mergedTables{sH},nullMdlstring,'FitMethod','ML','CheckHessian',true,'DummyVarCoding',dummyCodeStr);
             nullCompare{sH}=compare(curChartLME_ML,nullChartLME);
@@ -4166,6 +4172,8 @@ for sH=1:length(subplotHandles)
                          chName=sprintf('ROI%i_%s',subplotGby{sH}.curCh,optStrs{subplotGby{sH}.curCh});
                          mdlChName=sprintf('ROI%i',subplotGby{sH}.curCh);
                 case 'Aux'
+                        chName=sprintf('%s',subplotGby{sH}.curBioM{1});
+                         mdlChName=chName;
             end
 
            
@@ -6675,7 +6683,7 @@ for chIdx=1:numOpt
                           
                       data2plot=curGrand.ROI.(bioM);
                   case 'Aux'
-
+                      data2plot=curGrand.Aux.(bioM);
               end 
                 curFeatureY=permute(data2plot.data(timeIdx,ch,:),[3,1,2]);
                 
