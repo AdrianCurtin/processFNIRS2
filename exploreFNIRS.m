@@ -2192,6 +2192,7 @@ for chIdx=1:numOpt
                            data2plot=[]; 
                         end
                     case 'Aux'
+                        data2plot=curGrand.Aux.(bioM);
                 end
                 
                 if(~isempty(data2plot))
@@ -2256,12 +2257,16 @@ for chIdx=1:numOpt
                     chNamePart=selectedOptStr{chIdx};
                     chNamePartLong=sprintf('ROI: %s',selectedOptStr{chIdx});
                 case 'Aux'
-                    chNamePart=bioM;
+                    chNamePart='Aux:';
                     chNamePartLong=sprintf('Aux: %s',bioM);
             end
             
             if(~plotGroupByBioM) 
-                ylbl=sprintf('\\Delta[%s] (\\muM)',bioM);
+                if(~strcmp(ExFNIRS.settings.ChannelMode,'Aux'))
+                    ylbl=sprintf('\\Delta[%s] (\\muM)',bioM);
+                else
+                    ylbl=sprintf('%s',bioM);
+                end
                 if(plotCount)
                     ylbl=(sprintf('N %s',ylbl));
                 end
@@ -2270,7 +2275,11 @@ for chIdx=1:numOpt
                 end
                 ylbl=(sprintf('%s %s',chNamePart,ylbl));
             elseif(plotGroupByBioM)
-                ylbl=sprintf('\\Delta[X] (\\muM)');
+                if(~strcmp(ExFNIRS.settings.ChannelMode,'Aux'))
+                    ylbl=sprintf('\\Delta[X] (\\muM)');
+                else
+                    ylbl=sprintf('Multiple signals');
+                end
                 if(plotCount)
                     ylbl=(sprintf('N %s',ylbl));
                 end
@@ -7849,6 +7858,9 @@ switch (ExFNIRS.settings.ChannelMode)
         set(handles.listbox_biomarker,'Enable','on');
         set(handles.pushbutton_biomarker_select_all,'Enable','on');
         set(handles.pushbutton_biomarker_select_none,'Enable','on');
+        set(handles.listbox_optode,'Enable','on');
+            set(handles.pushbutton_optodes_select_all,'Enable','on');
+            set(handles.pushbutton_optodes_select_none,'Enable','on');
         
         set(handles.listbox_optode,'String',uOpt);
         set(handles.listbox_optode,'Value',1);
@@ -7910,6 +7922,10 @@ switch (ExFNIRS.settings.ChannelMode)
             set(handles.listbox_biomarker,'Enable','on');
             set(handles.pushbutton_biomarker_select_all,'Enable','on');
             set(handles.pushbutton_biomarker_select_none,'Enable','on');
+            
+            set(handles.listbox_optode,'Enable','on');
+            set(handles.pushbutton_optodes_select_all,'Enable','on');
+            set(handles.pushbutton_optodes_select_none,'Enable','on');
 
             set(handles.listbox_optode,'String',uROInames);
             set(handles.listbox_optode,'Value',1);
