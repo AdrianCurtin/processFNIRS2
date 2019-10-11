@@ -141,7 +141,6 @@ numCh=0;
 numROI=0;
 
 if(isnan(resampleSize)||resampleSize<=0)
-
     warning('Unable to resample data, invalid resampleFS');
 end
 
@@ -289,14 +288,18 @@ for i=1:numfSeg
         end
     end
     
-    
     if(isfield(curFNIR,'Aux')&&averageAux&&~isempty(curFNIR.Aux))
         curSegAuxFields=fields(curFNIR.Aux);
+        
         if(~isempty(curSegAuxFields))
             for aux=1:numAuxFields
                 curAuxField=char(auxFields(aux));
                 if(ismember(curAuxField,curSegAuxFields))
                         outGA.Aux.(curAuxField).data(validT==1,:,i)=curFNIR.Aux.(curAuxField)(FNIRScellArray{i}.timeIdx(validT==1,2),2:end,1);
+                        % this will only work if time indexes match between
+                        % auxtime and fnirs time. they either need to be
+                        % resampled at this point, or need to be resampled
+                        % earlier
                 end
             end
         else
