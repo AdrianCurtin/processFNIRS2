@@ -18,6 +18,13 @@ if(isfield(outFNIR,'raw'))
    %outFNIR.raw(:,1)= outFNIR.raw(:,1)-t0time;
 end
 
+if(pf2_base.isnestedfield(outFNIR,'Aux'))
+    auxFields=fields(outFNIR.Aux);
+    for f=1:length(auxFields)
+    	curFieldName=auxFields{f};
+        outFNIR.Aux.(curFieldName)(:,1) = outFNIR.Aux.(curFieldName)(:,1) -t0time; 
+    end
+end
 
 if(pf2_base.isnestedfield(outFNIR,'Aux.t'))
     outFNIR.Aux.t(:,1)= outFNIR.Aux.t(:,1)-t0time;

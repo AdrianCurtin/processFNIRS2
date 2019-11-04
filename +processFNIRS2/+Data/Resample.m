@@ -274,6 +274,7 @@ fHbO=fNIR.HbO(:,validCh);
 fHbDiff=fNIR.HbDiff(:,validCh);
 fHbTotal=fNIR.HbTotal(:,validCh);
 fCBSI=fNIR.CBSI(:,validCh);
+fraw=fNIR.raw;
 
 if(calcROI)
     fHbR_roi=fNIR.ROI.HbR(:,validCh_roi);
@@ -364,19 +365,23 @@ for i=0:numSegs-1
         HbDiff(i,nanCheckValid)=nanmean(fHbDiff(ind_init:ind_2,nanCheck),1)-blHbDiff(nanCheck);
         HbTotal(i,nanCheckValid)=nanmean(fHbTotal(ind_init:ind_2,nanCheck),1)-blHbTotal(nanCheck);
         CBSI(i,nanCheckValid)=nanmean(fCBSI(ind_init:ind_2,nanCheck),1)-blCBSI(nanCheck);
+        raw(i,:)=nanmean(fraw(ind_init:ind_2,:),1);
     elseif(isnan(blLength))
         HbR(i,nanCheckValid)=nan;
         HbO(i,nanCheckValid)=nan;
         HbDiff(i,nanCheckValid)=nan;
         HbTotal(i,nanCheckValid)=nan;
         CBSI(i,nanCheckValid)=nan;
+        raw(i,:)=nan;
     else
         HbR(i,nanCheckValid)=nanmean(fHbR(ind_init:ind_2,nanCheck),1);
         HbO(i,nanCheckValid)=nanmean(fHbO(ind_init:ind_2,nanCheck),1);
         HbDiff(i,nanCheckValid)=nanmean(fHbDiff(ind_init:ind_2,nanCheck),1);
         HbTotal(i,nanCheckValid)=nanmean(fHbTotal(ind_init:ind_2,nanCheck),1);
         CBSI(i,nanCheckValid)=nanmean(fCBSI(ind_init:ind_2,nanCheck),1);
+        raw(i,:)=nanmean(fraw(ind_init:ind_2,:),1);
     end
+    
     
     if(calcROI)
         if(blLength>0)
@@ -435,6 +440,7 @@ outFNIR.HbO=HbO(1:end-1,:);
 outFNIR.HbDiff=HbDiff(1:end-1,:);
 outFNIR.HbTotal=HbTotal(1:end-1,:);
 outFNIR.CBSI=CBSI(1:end-1,:);
+outFNIR.raw=raw(1:end,:);
 
 if(calcROI)
     outFNIR.ROI=fNIR.ROI;
