@@ -246,6 +246,9 @@ if(~isempty(showMarkers))
     end
 end
 
+printOnce=false; % flag for multiple printing
+flagOnce=false;
+
 h=cell(0);
 for(optIdx=1:length(channels))
     optNum=channels(optIdx);
@@ -317,12 +320,20 @@ for(optIdx=1:length(channels))
                 if(numMarkers(i)<tooManyLabels)
                 	pf2_base.external.vline(curMarkers(showMarkersIdx==i),'k',mrkName,yLabelHeight(i));
                 else
-                    pf2_base.external.vline(curMarkers(showMarkersIdx==i),{},{},{},'lineTags',mrkName);
-                    fprintf('Marker %i has too many instances to plot labels',showMarkers(i));
+                    pf2_base.external.vline(curMarkers(showMarkersIdx==i),'k','',yLabelHeight(i),'lineTags',mrkName);
+                    if(~printOnce)
+                        fprintf('Marker %i has too many instances to plot labels\n',showMarkers(i));
+                        flagOnce=true;
+                    end
+                    
                 end
                 
             end
         end
+        if(flagOnce)
+            printOnce=true;
+        end
+            
     end
     
     if(optIdx==length(channels))

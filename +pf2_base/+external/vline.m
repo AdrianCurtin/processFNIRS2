@@ -63,6 +63,10 @@ lineLabelHeights=p.Results.lineLabelHeights;
 ax=p.Results.ax;
 handleVisibility=p.Results.handleVisibility;
 
+if(~isempty(lineTags)&&(ischar(lineTags)||isstring(lineTags)))
+   lineTags=cellstr(lineTags); 
+end
+
 
 if isempty(x)||~isnumeric(x)
     hhh=[];

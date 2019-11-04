@@ -9,8 +9,9 @@ function hout=suptitle(figH,str)
 
 %   Copyright 2003-2014 The MathWorks, Inc.
 
-if(~ishandle(figH)&&isstring(figH)&&nargin==1)
+if((isstring(figH)||ischar(figH))&&nargin==1)
     str=figH;
+    figH=gcf;
 else
    figure(figH); 
 end

@@ -172,7 +172,11 @@ if(ShowGUI)
            varargin(l+2)={true};
        end
     end
-    varargout{1}=processFNIRS2_GUI(varargin{:});
+    if(nargout)
+        varargout{1:nargout}=processFNIRS2_GUI(varargin{:});
+    else
+        processFNIRS2_GUI(varargin{:});
+    end
     return
 end
 

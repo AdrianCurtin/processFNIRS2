@@ -181,7 +181,7 @@ switch(Mode)
                upperThreshold=lowerThreshold;
                lowerThreshold=temp;
             end
-            twosided=false;
+            twoSided=false;
         else
             twoSided=true;
             cmap=@parula;
@@ -201,7 +201,7 @@ switch(Mode)
                upperThreshold=lowerThreshold;
                lowerThreshold=temp;
             end
-            twosided=false;
+            twoSided=false;
         else
             twoSided=true;
             cmap=@parula;
@@ -372,7 +372,10 @@ else
     invertAxis=false;
 end
 
-minE=min([minVal-abs(maxVal-minVal),nanmin(fNIRarr)]);
+minE=min([minVal-abs(maxVal-minVal),nanmin(fNIRarr(:))]);
+if(minE<0&&nanmin(fNIRarr(:))>0)
+   minE=0; 
+end
 
 if(logScale)
     minE=minVal/2;
