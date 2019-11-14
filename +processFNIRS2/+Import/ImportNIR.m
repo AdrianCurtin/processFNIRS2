@@ -111,7 +111,7 @@ if(autoLoadMrk)
 end
 
 if(contains(fileroot,'_Dev'))
-    fileroot=nir_filename(1:strfind(lower(nir_filename),'_Dev')-1);
+    fileroot=nir_filename(1:strfind(lower(nir_filename),'_dev')-1);
 end
 
 %Default names for markers, manual markers, and log file
