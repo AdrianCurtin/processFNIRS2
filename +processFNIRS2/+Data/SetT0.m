@@ -18,7 +18,7 @@ if(isfield(outFNIR,'raw'))
    %outFNIR.raw(:,1)= outFNIR.raw(:,1)-t0time;
 end
 
-if(pf2_base.isnestedfield(outFNIR,'Aux'))
+if(pf2_base.isnestedfield(outFNIR,'Aux')) && ~isempty(outFNIR.Aux)
     auxFields=fields(outFNIR.Aux);
     for f=1:length(auxFields)
     	curFieldName=auxFields{f};
