@@ -1,4 +1,4 @@
-edfunction [y] = pf2_fnirs_MARA(x,fs,T,L,alpha,channelList)
+function [y] = pf2_fnirs_MARA(x,fs,T,L,alpha)
 %__________________________________________________________________________
 % Function to apply the movement artifact removal algorithm (MARA)
 % presented in Scholkmann et al. (2010). How to detect and reduce movement
@@ -54,78 +54,17 @@ edfunction [y] = pf2_fnirs_MARA(x,fs,T,L,alpha,channelList)
 
 %_________________________________________________________________________
 %%
-[~,i]=unique(channelList);
-uCh=channelList(i);
 
 numCh=size(x,2);
 y=nan(size(x));
-
-temp = ([1:length(x)]*0.5);
-idx = find(temp==50);
-%% Added choice of T and L
-for ch=1:numCh
-    curX=x(:,ch);
-    figure(55)
-    plot(temp(1:idx),curX(1:idx)','k'); 
-    axis tight
-    title ('Input signal from all Ch', 'FontSize', 14);
-    ylabel ('Intensity','FontSize', 12)
-    xlabel ('Time [sec]','FontSize', 12)
-    hold on
-    box on
-end
-hold off
-pause;
-tempL = inputdlg('Choose L');
-L = str2num(tempL{1});
-disp(['--->   MARA L changed to:' num2str(L)]);
-
-for ch=1:numCh
-    curX=x(:,ch);
-    subplot(211)
-    plot(temp,curX','k'); 
-    axis tight
-    ylim([-0.1,0.1])
-    title ('Input signal from all Ch', 'FontSize', 14);
-    ylabel ('Intensity','FontSize', 12)
-    xlabel ('Time [sec]','FontSize', 12)
-    hold on
-    box on
-    hline(0.05,'r-')
-    hline(-0.05,'r-')
-    s2 = MovStd(curX,L);
-    subplot(212)
-    plot([1:length(s2)]/(fs*60),s2,'k')
-    axis tight
-    hold on
-    ylim([0,0.01])
-    title ('Normalized moving standard deviation (MSD)','FontSize', 14);
-    ylabel ('MSD','FontSize', 12)
-    xlabel ('Time [min]','FontSize', 12)
-    box on  
-end 
-pause;
-tempT1 = inputdlg('Choose T');
-%T(ch) = str2num(tempT1{1});
-T = str2num(tempT1{1});
-disp(['--->   MARA T threshold changed to:' num2str(T)]);
-hline(T,'r-')
-hold off
-pause; 
-
-
-%T = [0.0100000000000000,0.0100000000000000,0.00400000000000000,0.00600000000000000,0.0100000000000000,0.0100000000000000,0.00400000000000000,0.00500000000000000,0.0100000000000000,0.00600000000000000,0.00400000000000000,0.00600000000000000,0.00600000000000000,0.00700000000000000,0.0100000000000000,0.0100000000000000,0.00800000000000000,0.00800000000000000,0.0100000000000000,0.0100000000000000,0.00800000000000000,0.00800000000000000,0.0100000000000000,0.0100000000000000,0.00400000000000000,0.00600000000000000]
-%%
-ch_p = [];
 for ch=1:numCh
     curX=x(:,ch);
     % % % close all
     % % % tic
     % (1) Artefact detecion
+
     k = round(L/2);
     [A_Idx,s2_1,s2_2] = MADetection(curX,k,T,fs,alpha);
-    %[A_Idx,s2_1,s2_2] = MADetection(curX,k,T(ch),fs,alpha);
-    %close all
 
     % (2) Segmentation
     [segments] = MASegmentation(curX,A_Idx);
@@ -135,60 +74,37 @@ for ch=1:numCh
 
     % (4) Signal reconstruction
     [y(:,ch)] = MAReconstruction(segments,x_n,fs)';
-    if any(cellfun(@isempty,x_n))
-        ch_p(end+1) = ch;
-%         figure(100)
-%         plot(curX);hold on; plot(y(:,ch)); 
-%         legend({'Orig','Recon'})
-%         title(['Channel:' num2str(channelList(ch))])
-%         pause;
-%         close gcf
-    end
+
+
     %__________________________________________________________________________
     a = size(x_n);
-    for i = 1:a(2)
+    for i = 1:a(2);
         s(i) = length(x_n{:,i});
     end
     S = sum(s); l = length(x);
     ASR = (S/l)*100; SAR = 100-ASR;
-%    disp(['Artifact-to-signal ratio (ASR): ' num2str(ASR) '%   |  Signal-to-artifact ratio (SAR): ' num2str(SAR) '%']);
-%    close all
-end
-% Plot the results
-figure(3)
-subplot(211)
-tempx = x(:,ch_p);
-tempy = y(:,ch_p);
-leg = string(channelList(ch_p));
-min1 = min(tempx);min2 = min(tempy); minG = min([min1,min2]);
-max1 = max(tempx);max2 = max(tempy); maxG = max([max1,max2]);
-%vline([A_Idx]/(fs*60),'r');
-plot([1:length(tempx)]/(fs*60),tempx,'k'); axis tight;
-hold on;
-hline(0.05,'r-')
-hline(-0.05,'r-')
-ylim([-0.1,0.1])
-%ylim([minG,maxG])
-ylabel ('Intensity','FontSize', 12)
-xlabel ('Time [min]','FontSize', 12)
-title ('Original Signal' ,'FontSize', 14);
-legend(leg);
-subplot(212)
-plot([1:length(tempy)]/(fs*60), tempy,'b'); axis tight;
-hold on;
-hline(0.05,'r-')
-hline(-0.05,'r-')
-ylim([-0.1,0.1])
-%ylim([minG,maxG]);
-title ('Reconstructed Signal' ,'FontSize', 14);
-ylabel ('Intensity','FontSize', 12)
-xlabel ('Time [min]','FontSize', 12)
-legend(leg);
-box on
-% disp(['---->  Duration: ' num2str(toc) ' s.']);
 
-pause;
-close all
+    % % % % Plot the results
+    % % % subplot(313);
+    % % % min1 = min(x);min2 = min(y); minG = min([min1,min2]);
+    % % % max1 = max(x);max2 = max(y); maxG = max([max1,max2]);
+    % % % ylim([minG,maxG]); hold on
+    % % % 
+    % % % vline([A_Idx]/(fs*60),'-y');
+    % % % plot([1:length(x)]/(fs*60),x,'k'); hold on
+    % % % plot([1:length(y)]/(fs*60), y,'color',[0.2,0.4,1]); axis tight;
+    % % % title (['Artifact-to-signal ratio (ASR): ' num2str(ASR) '%   |  Signal-to-artifact ratio (SAR): ' num2str(SAR) '%'] ,'FontSize', 14);
+    % % % ylabel ('Intensity','FontSize', 12)
+    % % % xlabel ('Time [min]','FontSize', 12)
+    % % % legend('Input signal','Reconstructed signal');
+    % % % box on
+    % % % 
+    % % % disp(['---->  Duration: ' num2str(toc) ' s.']);
+    
+end
+
+
+
 
 %%_Subfunctions____________________________________________________________
 
@@ -216,38 +132,34 @@ function [A_Idx,s2_1,s2_2] = MADetection(x,L,T,fs,alpha);
 [s2] = MovStd(x,L); s2_1 = s2;
 
 if nanmax(s2) < T
-    disp(['MARA T threshold ' num2str(T) ' is potentially too large, no artifacts detected. std for data is between ' num2str(min(s2)) ' and ' num2str(max(s2))])
+    disp(['--->   MARA T threshold ' num2str(T) ' is potentially too large, no artifacts detected. std for data is between ' num2str(min(s2)) ' and ' num2str(max(s2))])
     %msgbox(['--->   Please choose a propper T value! T must be < ' num2str(max(s2))], 'Error','error');
 end
 
 if nanmin(s2) > T
-    disp(['MARA T threshold ' num2str(T) ' is potentially too small, all data is seen as an artifact! std for data is between ' num2str(min(s2)) ' and ' num2str(max(s2))])
+    disp(['--->   MARA T threshold ' num2str(T) ' is potentially too small, all data is seen as an artifact! std for data is between ' num2str(min(s2)) ' and ' num2str(max(s2))])
     %msgbox(['--->   Please choose a propper T value! T must be > ' num2str(min(s2))], 'Error','error');
 end
 
-%(2) Plot the MSD time series
-% scrsz = get(0,'ScreenSize');
-% figure('Position',[0 0 scrsz(3) scrsz(4)]);
-% set(gcf, 'color', 'w')
-% set(gcf, 'renderer', 'painters');
-% figure(2)
-% subplot(211); 
-% plot([1:length(x)]/(fs*60),x,'k'); 
-% axis tight 
-% title ('Input signal', 'FontSize', 14);
-% ylabel ('Intensity','FontSize', 12)
-% xlabel ('Time [min]','FontSize', 12)
-% box on
-% 
-% subplot(212);
-% min1 = min(s2);
-% max1 = max(s2);
-% ylim([min1,max1]); 
-% hold on
-% plot([1:length(s2)]/(fs*60),s2,'k')
-% axis tight
-% hold on
-
+% % % % (2) Plot the MSD time series
+% % % scrsz = get(0,'ScreenSize');
+% % % figure('Position',[0 0 scrsz(3) scrsz(4)]);
+% % % set(gcf, 'color', 'w')
+% % % set(gcf, 'renderer', 'painters');
+% % % 
+% % % subplot(311); plot([1:length(x)]/(fs*60),x,'k'); axis tight
+% % % title ('Input signal', 'FontSize', 14);
+% % % ylabel ('Intensity','FontSize', 12)
+% % % xlabel ('Time [min]','FontSize', 12)
+% % % box on
+% % % 
+% % % subplot(312);
+% % % min1 = min(s2);
+% % % max1 = max(s2);
+% % % ylim([min1,max1]); hold on
+% % % plot([1:length(s2)]/(fs*60),s2,'k')
+% % % axis tight
+% % % hold on
 
 % (3) Threshholding the MSD time series
 s2_2 = (abs(s2_1)>T).*s2_1;
@@ -266,18 +178,16 @@ end
 
 d = find (q1>0);  
 A_Idx = q1(d);
-    
 
-% hline([T],'r-','Threshold (T)')
-% hold on
-% vline([A_Idx]/(fs*60),'-y')
-% plot([1:length(s2)]/(fs*60),s2,'k')
-% title (['Moving standard deviation (MSD). MARA paramters: L = ' num2str(L) ', T = ' num2str(T) ', \alpha = ' num2str(alpha)],'FontSize', 14);
-% ylabel ('MSD','FontSize', 12)
-% xlabel ('Time [min]','FontSize', 12)
-% box on
-% pause;
-% close all
+
+% % % hline([T],'r-','Threshold (T)')
+% % % hold on
+% % % vline([A_Idx]/(fs*60),'-y')
+% % % plot([1:length(s2)]/(fs*60),s2,'k')
+% % % title (['Moving standard deviation (MSD). MARA paramters: L = ' num2str(L) ', T = ' num2str(T) ', \alpha = ' num2str(alpha)],'FontSize', 14);
+% % % ylabel ('MSD','FontSize', 12)
+% % % xlabel ('Time [min]','FontSize', 12)
+% % % box on
 %__________________________________________________________________________
 
 

@@ -34,47 +34,11 @@ end
 
 for i=1:length(uCh)
     tempArr=rawData(:,channelList==uCh(i));
-    figure;
-    subplot(211)
-    plot(tempArr(:,1));hold on;plot(tempArr(:,2)); plot(ambientData(:,i));legend({'730','850','amb'});
     for i2=1:size(rawData(:,channelList==uCh(i)),2)
-       r_bef(i,i2) = abs(corr(tempArr(:,i2),ambientData(:,i)));
-       if r_bef(i,i2) > 0.7000  && nanmean(ambientData(:,i)) > 100
-%            tp = 1;
-%             while tp
-                [~,tempArr(:,i2),val{i,i2}]=icaClean(tempArr(:,i2),ambientData(:,i)); 
-                 r_af(i,i2) = abs(corr(tempArr(:,i2),ambientData(:,i)));
-%                 if r_af(i,i2) > 0.7
-%                     tp = 1;
-%                 else
-%                     tp = 0;
-%                  end
-%            end
-       disp(['---->  Correlation before and after for Channel: ' num2str(channelList(i)) ' using method: ' val{i,i2} ' >> ' num2str(r_bef(i,i2)) ' , ' num2str(r_af(i,i2))]);
-       else
-           val{i,i2} = 'None';
-           tempArr(:,i2) = tempArr(:,i2);
-           r_af(i,i2) = NaN;
-       end
-    
+        tempArr(:,i2)=icaClean(tempArr(:,i2),ambientData(:,uCh(i))); 
     end
     rawData(:,channelList==uCh(i))=tempArr;
-    subplot(212)
-    plot(tempArr(:,1));hold on;plot(tempArr(:,2)); plot(ambientData(:,i));legend({'730-Corr','850-Corr','amb'});
-    pause;
-    close gcf
-end
-
-clc;
-r_bef = r_bef(:);
-r_af = r_af(:);
-val = val(:);
-for i = 1:numel(channelList)
-    if ~isnan(r_af(i))
-        disp(['---->  Correlation before and after for Channel: ' num2str(channelList(i)) ' using method: ' val{i} ' >> ' num2str(r_bef(i)) ' , ' num2str(r_af(i))]);
-    end
 end
 
 
 data=rawData(icaWeight+1:end-icaWeight,:);
-

@@ -642,33 +642,18 @@ function loginfo=importCOBIlog(log_filename)
                linecount=linecount+1;
            end
            
-       elseif(contains(lineF,'Subject Info:')) || (contains(lineF,'Participants:'))
-           if (contains(lineF,'Participants:'))
-               t = 2;
-               lineF=fgetl(logfid);
-               lineF=fgetl(logfid);
-           else
-               t = 1;
-               lineF=fgetl(logfid);
-           end
+       elseif(contains(lineF,'Subject Info:'))
+           lineF=fgetl(logfid);
            linecount=linecount+1;
            if(lineF~=-1)
                loginfo.SubjectInfo=lineF;
            end
            if(~isempty(loginfo.SubjectInfo))
-               if t==1
-                    subInfoPart=strsplit(loginfo.SubjectInfo,'-');
-                    id_sex = 2;
-                    id_age = 1;
-               elseif t==2
-                    subInfoPart=strsplit(loginfo.SubjectInfo,'\t');
-                    id_sex = 4;
-                    id_age = 3;
-               end
+               subInfoPart=strsplit(loginfo.SubjectInfo,'-');
                if(length(subInfoPart)>1)
-                   if(contains(subInfoPart{id_sex},'Male'))
+                   if(contains(subInfoPart{2},'Male'))
                        loginfo.Sex='M';
-                   elseif(contains(subInfoPart{id_sex},'Female'))
+                   elseif(contains(subInfoPart{2},'Female'))
                        loginfo.Sex='F';
                    else
                       loginfo.Sex=''; 
@@ -678,7 +663,7 @@ function loginfo=importCOBIlog(log_filename)
                end
                
                if(~isempty(subInfoPart))
-                   loginfo.Age=str2double(subInfoPart{id_age});
+                   loginfo.Age=str2double(subInfoPart{1});
                end
            
            end
