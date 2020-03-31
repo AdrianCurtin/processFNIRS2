@@ -1232,7 +1232,6 @@ if(isempty(segInfoStr))
    segInfoStr='No information in segment'; 
 end
 
-
 function InitializeViewSettings(handles)
 
 updateCurrentFiltersListbox(handles);
@@ -1331,9 +1330,6 @@ set(dcm_obj,'DisplayStyle','datatip',...
     'SnapToDataVertex','off','Enable','on');
 set(dcm_obj,'UpdateFcn', @myupdatefcn);
 
-
-
-
 function updateCurrentFiltersListbox(handles)
 % Loads all available functions from processFNIRS2_GUI.cfg
 global PF2
@@ -1393,8 +1389,6 @@ else
         set(handles.listbox_oxyMethods,'Value',1);
     end
 end
-
-
 
 % --- Outputs from this function are returned to the command line.
 function varargout = processFNIRS2_GUI_OutputFcn(hObject, eventdata, handles)
@@ -2946,8 +2940,6 @@ if ispc && isequal(get(hObject,'BackgroundColor'), get(0,'defaultUicontrolBackgr
     set(hObject,'BackgroundColor','white');
 end
 
-
-
 function edit_viewLightMax_Callback(hObject, eventdata, handles)
 % hObject    handle to edit_viewLightMax (see GCBO)
 % eventdata  reserved - to be defined in a future version of MATLAB
@@ -2960,7 +2952,6 @@ global PF2
 PF2.GUIPF2.view.LightMax=str2double(get(hObject,'String'));
 updatePlots(handles)
 
-
 % --- Executes during object creation, after setting all properties.
 function edit_viewLightMax_CreateFcn(hObject, eventdata, handles)
 % hObject    handle to edit_viewLightMax (see GCBO)
@@ -2972,8 +2963,6 @@ function edit_viewLightMax_CreateFcn(hObject, eventdata, handles)
 if ispc && isequal(get(hObject,'BackgroundColor'), get(0,'defaultUicontrolBackgroundColor'))
     set(hObject,'BackgroundColor','white');
 end
-
-
 
 function edit_viewOxyMax_Callback(hObject, eventdata, handles)
 % hObject    handle to edit_viewOxyMax (see GCBO)
@@ -2998,9 +2987,8 @@ function edit_viewOxyMax_CreateFcn(hObject, eventdata, handles)
 if ispc && isequal(get(hObject,'BackgroundColor'), get(0,'defaultUicontrolBackgroundColor'))
     set(hObject,'BackgroundColor','white');
 end
-
-
 % --- Executes on button press in checkbox_viewLightAuto.
+
 function checkbox_viewLightAuto_Callback(hObject, eventdata, handles)
 % hObject    handle to checkbox_viewLightAuto (see GCBO)
 % eventdata  reserved - to be defined in a future version of MATLAB
@@ -3023,7 +3011,6 @@ global PF2
 
 PF2.GUIPF2.view.OxyAuto=get(hObject,'Value');
 updatePlots(handles);
-
 
 % --- Executes on button press in checkbox_viewLightColorAuto.
 function checkbox_viewLightColorAuto_Callback(hObject, eventdata, handles)
@@ -3099,7 +3086,6 @@ function listbox8_Callback(hObject, eventdata, handles)
 % Hints: contents = cellstr(get(hObject,'String')) returns listbox_oxyMethods contents as cell array
 %        contents{get(hObject,'Value')} returns selected item from listbox_oxyMethods
 
-
 % --- Executes during object creation, after setting all properties.
 function listbox8_CreateFcn(hObject, eventdata, handles)
 % hObject    handle to listbox_oxyMethods (see GCBO)
@@ -3111,7 +3097,6 @@ function listbox8_CreateFcn(hObject, eventdata, handles)
 if ispc && isequal(get(hObject,'BackgroundColor'), get(0,'defaultUicontrolBackgroundColor'))
     set(hObject,'BackgroundColor','white');
 end
-
 
 % --- Executes on button press in pushbutton_oxyConfigure.
 function pushbutton_oxyConfigure_Callback(hObject, eventdata, handles)
@@ -3182,9 +3167,6 @@ PF2.GUIPF2.curDPF_age=newDPFage;
 processFNIR_GUI();
 updatePlots(handles);
 
-
-
-
 % --- Executes during object creation, after setting all properties.
 function edit_DPF_age_CreateFcn(hObject, eventdata, handles)
 % hObject    handle to edit_DPF_age (see GCBO)
@@ -3197,8 +3179,6 @@ if ispc && isequal(get(hObject,'BackgroundColor'), get(0,'defaultUicontrolBackgr
     set(hObject,'BackgroundColor','white');
 end
 
-
-
 % --- Executes during object creation, after setting all properties.
 function axesStage1_CreateFcn(hObject, eventdata, handles)
 % hObject    handle to axesStage1 (see GCBO)
@@ -3206,7 +3186,6 @@ function axesStage1_CreateFcn(hObject, eventdata, handles)
 % handles    empty - handles not created until after all CreateFcns called
 
 % Hint: place code in OpeningFcn to populate axesStage1
-
 
 % --- Executes during object creation, after setting all properties.
 function listbox_rawMethods_CreateFcn(hObject, eventdata, handles)
@@ -3219,7 +3198,6 @@ function listbox_rawMethods_CreateFcn(hObject, eventdata, handles)
 if ispc && isequal(get(hObject,'BackgroundColor'), get(0,'defaultUicontrolBackgroundColor'))
     set(hObject,'BackgroundColor','white');
 end
-
 
 % --- Executes on selection change in listbox_rawMethods.
 function listbox_rawMethods_Callback(hObject, eventdata, handles)
@@ -3245,7 +3223,6 @@ PF2.GUIPF2.stageRawMethod.name=selectedMethod;
 processFNIR_GUI();
 updatePlots(handles);
 
-
 % --- Executes on button press in pushbutton_reloadMethods.
 function pushbutton_reloadMethods_Callback(hObject, eventdata, handles)
 % hObject    handle to pushbutton_reloadMethods (see GCBO)
@@ -3254,7 +3231,6 @@ function pushbutton_reloadMethods_Callback(hObject, eventdata, handles)
 updateCurrentFiltersListbox(handles);
 processFNIR_GUI();
 updatePlots(handles);
-
 
 % --- Executes during object creation, after setting all properties.
 function uipanel5_CreateFcn(hObject, eventdata, handles)
@@ -3666,8 +3642,6 @@ if ispc && isequal(get(hObject,'BackgroundColor'), get(0,'defaultUicontrolBackgr
     set(hObject,'BackgroundColor','white');
 end
 
-
-
 function edit_baseline_length_Callback(hObject, eventdata, handles)
 % hObject    handle to edit_baseline_length (see GCBO)
 % eventdata  reserved - to be defined in a future version of MATLAB
@@ -3696,7 +3670,6 @@ end
 
 processFNIR_GUI();
 updatePlots(handles);
-
 
 % --- Executes during object creation, after setting all properties.
 function edit_baseline_length_CreateFcn(hObject, eventdata, handles)
@@ -3788,8 +3761,6 @@ function pushbutton_clear_markers_Callback(hObject, eventdata, handles)
 % handles    structure with handles and user data (see GUIDATA)
 set(handles.listbox_markers,'Value',[]);
 listbox_markers_Callback(hObject, eventdata, handles);
-
-
 
 % --- Executes on button press in checkbox_plot_OD.
 function checkbox_plot_OD_Callback(hObject, eventdata, handles)
