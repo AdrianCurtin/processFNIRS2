@@ -175,7 +175,10 @@ numRows=size(inpY,1);
 % NEed to fill in small array middle with interpolated values instead of
 % minimum
 for optIdx=1:length(data2plot)
-    optNum=probeInfo.ChannelList(optIdx);
+    if optIdx > 16
+        continue
+    end
+    optNum=probeInfo.ChannelList(optIdx); 
     optXidx(optIdx)=round(OptPosX(optNum)/OptDistX)+bufferMult+1;
     optYidx(optIdx)=round(OptPosY(optNum)/OptDistY)+bufferMult+1;
     
@@ -392,6 +395,9 @@ hold on
 %hpt=plot(optPos2Plot(1,:)/1.01+1,optPos2Plot(2,:)/1.01+1,'square','MarkerSize',4,'LineWidth',3,'color','white', 'MarkerFaceColor', 'white');
 
 for optIdx=1:length(data2plot)
+    if optIdx > 16
+        continue 
+    end
     t=text(optPos2Plot(1,optIdx)/1.01+1,optPos2Plot(2,optIdx)/1.01+1,mrkLbl{optIdx},'FontSize',11,'VerticalAlignment','middle','HorizontalAlignment', 'center','color','white');
     t2=text(optPos2Plot(1,optIdx)/1.01+1,optPos2Plot(2,optIdx)/1.01+1,mrkLbl{optIdx},'FontSize',8,'VerticalAlignment','middle','HorizontalAlignment', 'center','color','white');
     t.FontWeight='bold';

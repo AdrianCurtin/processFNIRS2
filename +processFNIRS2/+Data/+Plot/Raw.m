@@ -253,10 +253,14 @@ h=cell(0);
 for(optIdx=1:length(channels))
     optNum=channels(optIdx);
     if(plotArranged)
-        optPos=probeInfo.OptLayout2D{optNum};
-        optPos([3,4])=optPos([3,4]).*[0.65,0.9];
-        optPos([1,2])=optPos([1,2])+0.03;
-        h{optIdx}= axes('Position',optPos,'Box','on');
+        if optNum > numel(probeInfo.OptLayout2D) 
+            continue
+        else
+            optPos=probeInfo.OptLayout2D{optNum};
+            optPos([3,4])=optPos([3,4]).*[0.65,0.9];
+            optPos([1,2])=optPos([1,2])+0.03;
+            h{optIdx}= axes('Position',optPos,'Box','on');
+        end
         
     else
         h{optIdx}=subplot(length(channels),1,optIdx);
