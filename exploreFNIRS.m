@@ -528,7 +528,14 @@ else
 
            curField=curFNIRseg.info.(curFieldName);
            
-           if(isempty(curField)||(isnumeric(curField)&&length(curField)==1)||ischar(curField)||(istable(curField)&&size(curField,1)==1&&size(curField,2)==1))
+           
+           
+           if(isempty(curField)|| ...
+                   (isnumeric(curField)&&length(curField)==1)||...  %numeric items of 1
+                   ischar(curField)||...        %strings or chars
+                   (islogical(curField)&&length(curField)==1)||...   %logical values
+                   (istable(curField)&&size(curField,1)==1&&size(curField,2)==1)) %singular tables
+               
               if(istable(curField)&&size(curField,1)==1&&size(curField,2)==1)
                   curField=curField{1,1};
               end
@@ -550,8 +557,8 @@ else
                       outTable.(curFieldName)=nan(size(outTable,1),1);
                       outTable.(curFieldName)(i,1)=curField;
                   elseif(islogical(curField))
-                      outTable.(curFieldName)=nan(size(outTable,1),1);
-                      outTable.(curFieldName)(i,1)=nominal(curField);
+                      outTable.(curFieldName)=strings(size(outTable,1),1);
+                      outTable.(curFieldName)(i,1)=nominal(string(curField));
                   end
                   
               end

@@ -295,8 +295,13 @@ for i=1:numfSeg
             for aux=1:numAuxFields
                 curAuxField=char(auxFields(aux));
                 if(ismember(curAuxField,curSegAuxFields))
-                        outGA.Aux.(curAuxField).data(validT==1,:,i)=curFNIR.Aux.(curAuxField)(FNIRScellArray{i}.timeIdx(validT==1,2),2:end,1);
-                        % this will only work if time indexes match between
+                        try
+                            outGA.Aux.(curAuxField).data(validT==1,:,i)=curFNIR.Aux.(curAuxField)(FNIRScellArray{i}.timeIdx(validT==1,2),2:end,1);
+                        catch
+                            warning('Mismatch between sampling of aux time and fNIRS time');
+                            outGA.Aux.(curAuxField).data(validT==1,:,i)=nan;
+                        end
+                            % this will only work if time indexes match between
                         % auxtime and fnirs time. they either need to be
                         % resampled at this point, or need to be resampled
                         % earlier

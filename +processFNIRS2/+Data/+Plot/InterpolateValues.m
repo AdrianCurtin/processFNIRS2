@@ -2,6 +2,10 @@ function [ imgOut,optPos2Plot ] = InterpolateValues(fNIR,data2plot,minVal,maxVal
 %processFNIRS2.Data.Plot.ImageValues
 %
 % Uses an imagemap to change the color of each cell based on data2plot
+% fNIR is a data structure that contains the fNIRS structure info, data2
+% plot houses the numbers themselves
+%
+% Short separation channels are not presented here and are skipped
 %
 if(nargin<7)
     clrBarTitle='';
@@ -144,7 +148,7 @@ maxDimDist=round(maxDim/OptDistX)*OptDistX;
 bufferSize=bufferMult*OptDistX;
 pixelPerCm=imgSize/max([dimX+bufferSize*2,dimY+bufferSize*2]);
 
-optDataSize=10;
+%optDataSize=10;
 
 OptPosX=OptPosX-minPosX;
 OptPosY=OptPosY-minPosY;
@@ -159,8 +163,8 @@ else
     error('Haven''t accoutned for this yet');
 end
 
-maxIdxX=round(dimX/OptDistX)+bufferMult+2;
-maxIdxY=round(dimY/OptDistY)+bufferMult+2;
+%maxIdxX=round(dimX/OptDistX)+bufferMult+2;
+%maxIdxY=round(dimY/OptDistY)+bufferMult+2;
 %inpX=inpX(1:maxIdxX,1:maxIdxY);
 %inpY=inpY(1:maxIdxX,1:maxIdxY);
 
@@ -175,9 +179,9 @@ numRows=size(inpY,1);
 % NEed to fill in small array middle with interpolated values instead of
 % minimum
 for optIdx=1:length(data2plot)
-    if optIdx > 16
-        continue
-    end
+    %if optIdx > 16
+    %    continue
+    %end
     optNum=probeInfo.ChannelList(optIdx); 
     optXidx(optIdx)=round(OptPosX(optNum)/OptDistX)+bufferMult+1;
     optYidx(optIdx)=round(OptPosY(optNum)/OptDistY)+bufferMult+1;
@@ -395,9 +399,9 @@ hold on
 %hpt=plot(optPos2Plot(1,:)/1.01+1,optPos2Plot(2,:)/1.01+1,'square','MarkerSize',4,'LineWidth',3,'color','white', 'MarkerFaceColor', 'white');
 
 for optIdx=1:length(data2plot)
-    if optIdx > 16
-        continue 
-    end
+    %if optIdx > 16
+    %    continue 
+    %end
     t=text(optPos2Plot(1,optIdx)/1.01+1,optPos2Plot(2,optIdx)/1.01+1,mrkLbl{optIdx},'FontSize',11,'VerticalAlignment','middle','HorizontalAlignment', 'center','color','white');
     t2=text(optPos2Plot(1,optIdx)/1.01+1,optPos2Plot(2,optIdx)/1.01+1,mrkLbl{optIdx},'FontSize',8,'VerticalAlignment','middle','HorizontalAlignment', 'center','color','white');
     t.FontWeight='bold';
