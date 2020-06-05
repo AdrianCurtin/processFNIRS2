@@ -1,0 +1,204 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>Migration Report for <code>exploreFNIRS</code></title>
+    <style type="text/css">
+        html body {
+            height: 100%;
+            padding: 0; margin: 0;
+            color: #474747;
+            font: 13px/1.384 Arial, Helvetica, sans-serif;
+        }
+        /*Report Title Header*/
+        h1 {
+            font-family: Futura, Arial, Helvetica, sans-serif;
+            font-size: 28px;
+            font-weight: 400;
+            color: #fff;
+            margin: 0;
+            padding: 15px;
+        }
+        /*Report Section Headers*/
+        h2 {
+            padding-bottom: 2px;
+            margin: 20px 0 17px 0;
+            border-bottom: 1px solid #cbcbcb;
+            color: #c45400;
+            font: normal normal 22px/1.136 Arial,Helvetica,sans-serif;
+        }
+        /*Report Subsection Headers*/
+        h3 {
+            margin: 20px 0 20px 0;
+            font: normal bold 17px/1.35 Arial, Helvetica, sans-serif;
+        }
+        ul.childHasIcon {
+            padding-left: 20px;
+        }
+        ul > li.success {
+            list-style: none;
+            /*Check-mark image*/
+            background: url('data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAABAAAAAQCAYAAAAf8/9hAAAACXBIWXMAAAsTAAALEwEAmpwYAAAAIGNIUk0AAHolAACAgwAA+f8AAIDpAAB1MAAA6mAAADqYAAAXb5JfxUYAAAK2SURBVHjaVJNPaFRXFMZ/b96MmUZGURMyHaoTa0QrRReD4KIlwriRRhPpoi1ddeNG4krFRbAbceOf0qJuSoWWWlooIiKlCSkp1ARksEmpi8GSQjKJUSYk/p1J5r17vi7ee609cFf3+33n3HvO8SgdJYn+oZFODw4DBxB7hYoSMzJVZBo12a2fzr9X55XwEoOBoZGyYNCDfgEyIQkMzIRkBKupYXN89svVg8OJgU+hxMDQSBk45+GVJSJQQk5IYGbIhIfrcSF78ttrC3P336wC+ANXlzqBs0A5EgtkSMJMMRxXFN11mSm/pr05sTSXX0qBDkvqj0Qx6MBC/QuVt77Pp/uvkV9bxJzhZ5r7cx2LHwGZtMQBGUhRmSaB/Zd9rb+OD98+zub1Paxbs5FjNw9GJm2NXuDLtMz2RuUC8VsVG2T9di4fGqaQ6+ZubZTvJ69goWEy/PTKTmBDykxFc0LOOLHvMu+8cQjnjDRtXDsyTiHXTaU2xpmfP6EyO4Y5Q6EgFXQBubRMM+a0zcx4t9hHb3c/j5/Ncbr3Cpva80w9HOfU7Q8IwhbmonaagQv8x0A25ZxVzAxz4tupS0jG5323eT1XZHL+DoM3+mgFLZwzEp2c0WpmqsBKypxGLb785vcLfH3vAgCT878xeKMvAp1FM5Ecg5Wn6+8Bz1Pm3K1W0xu2UFhofDf5BX8t/snFsZPxDMSZzaLOSKw2suOPHuyaAJb9v+c+bmze/aBuTnuE6wrCgJt/fMVyox6NcNwRCTARtjLV5fkt1+vTb1WAmk+hxOzUjumOrTMLkuVTXtCdgMmHJTux2nxt/Ml88Xptat+vwCzw0qdQAmCh2lPNZBsTJluU8ySsDazdhf6j1sts5cVS548P75d+qE/vrMTw8v+28ZXIAB3ABiAHZIEV4HkMLQJBIv5nAPq180UQOlmCAAAAAElFTkSuQmCC') no-repeat;
+            padding-left: 20px;
+            margin-bottom: 5px;
+        }
+        ul.verifications > li {
+            margin: 7px 0 7px 0;
+        }
+        table {
+            width: 100%;
+            border-collapse: collapse;
+        }
+        table,th,tr,td {
+            border: 1px solid #ccc;
+            text-align: left;
+            vertical-align: top;
+            padding: 8px 15px;
+        }
+        tr:nth-child(odd) {
+            background-color: #fafafa;
+        }
+        a { color: #187dbb; text-decoration: none; }
+        a:visited { color: #004b87; text-decoration: none; }
+        a:hover { color: #004b87; text-decoration: underline;}
+        code {
+            font-family: Menlo, Monaco, Consolas, "Courier New", monospace;
+        }
+        .reportTitle {
+            min-height: 52px;
+            background: #2f7eb2;
+        }
+        .reportBody {
+            padding: 0 15px 0 15px;
+        }
+        /*Classes that are used by HTML that is added dynamically by the report generator */
+        .detailsWorkaround {
+            padding: 10px 0px;
+        }
+        .detailsWorkaroundHeader {
+            padding-right: 5px;
+            font-weight: bold;
+        }
+        .hidden {
+            display: none;
+        }
+        .visible {
+            display: block;
+        }
+        .showMore {
+            margin-top: 5px;
+        }
+    </style>
+</head>
+<body>
+    <div class="reportTitle">
+        <h1>Migration Report for <code>exploreFNIRS</code></h1>
+    </div>
+    <div class="reportBody">
+        <section>
+            <h3>Your GUIDE app was migrated to App Designer and some action is required.</h3>
+            <h2>Migration Results</h2>
+            <ul class="childHasIcon">
+                <li class="success"><b>exploreFNIRS_App.mlapp</b> file created</li>
+                <li class="success"><b>8991</b> lines of code analyzed in exploreFNIRS.m</li>
+                <li class="success"><b>183</b> components created and initialized</li>
+                <li class="success"><b>160</b> callbacks and utility functions configured and enabled to function in App Designer</li>
+            </ul>
+        </section>
+        <section>
+    <h2>Issues Requiring Action</h2>
+    <table>
+        <tr>
+            <th>Functionality</th>
+            <th>GUIDE Line #</th>
+            <th>Details</th>
+        </tr>
+        <tr><td><code>clf</code></td><td><div class=""><a href="matlab:opentoline('F:\processFNIRS2\exploreFNIRS.m', 1949)">line 1949</a></div>
+<div class=""><a href="matlab:opentoline('F:\processFNIRS2\exploreFNIRS.m', 1969)">line 1969</a></div>
+<div class=""><a href="matlab:opentoline('F:\processFNIRS2\exploreFNIRS.m', 3627)">line 3627</a></div>
+<div class="hidden"><a href="matlab:opentoline('F:\processFNIRS2\exploreFNIRS.m', 4307)">line 4307</a></div>
+<div class="hidden"><a href="matlab:opentoline('F:\processFNIRS2\exploreFNIRS.m', 4583)">line 4583</a></div>
+<div class="hidden"><a href="matlab:opentoline('F:\processFNIRS2\exploreFNIRS.m', 5633)">line 5633</a></div>
+<div class="hidden"><a href="matlab:opentoline('F:\processFNIRS2\exploreFNIRS.m', 6410)">line 6410</a></div>
+<div class="hidden"><a href="matlab:opentoline('F:\processFNIRS2\exploreFNIRS.m', 6426)">line 6426</a></div>
+<div class="hidden"><a href="matlab:opentoline('F:\processFNIRS2\exploreFNIRS.m', 6446)">line 6446</a></div>
+<div class="hidden"><a href="matlab:opentoline('F:\processFNIRS2\exploreFNIRS.m', 6465)">line 6465</a></div>
+<div class="hidden"><a href="matlab:opentoline('F:\processFNIRS2\exploreFNIRS.m', 6485)">line 6485</a></div>
+<div class="hidden"><a href="matlab:opentoline('F:\processFNIRS2\exploreFNIRS.m', 8412)">line 8412</a></div>
+<div class="showMore"><a href="#" onclick="toggleShowMore(this); return false;">Show more (9)</a></div>
+<div class="showMore hidden"><a href="#" onclick="toggleShowMore(this); return false;">Show less</a></div></td><td rowspan="1"><div>This function is not supported in App Designer code.</div><div class="detailsWorkaround"><span class="detailsWorkaroundHeader">Action:</span><span class="detailsWorkaroundText">Determine if this functionality is critical to your app before continuing because there is no workaround.</span></div></tr>
+<tr><td><code>subplot</code></td><td><div class=""><a href="matlab:opentoline('F:\processFNIRS2\exploreFNIRS.m', 1957)">line 1957</a></div>
+<div class=""><a href="matlab:opentoline('F:\processFNIRS2\exploreFNIRS.m', 1977)">line 1977</a></div>
+<div class=""><a href="matlab:opentoline('F:\processFNIRS2\exploreFNIRS.m', 3918)">line 3918</a></div>
+<div class="hidden"><a href="matlab:opentoline('F:\processFNIRS2\exploreFNIRS.m', 4426)">line 4426</a></div>
+<div class="hidden"><a href="matlab:opentoline('F:\processFNIRS2\exploreFNIRS.m', 4489)">line 4489</a></div>
+<div class="hidden"><a href="matlab:opentoline('F:\processFNIRS2\exploreFNIRS.m', 4591)">line 4591</a></div>
+<div class="hidden"><a href="matlab:opentoline('F:\processFNIRS2\exploreFNIRS.m', 4619)">line 4619</a></div>
+<div class="hidden"><a href="matlab:opentoline('F:\processFNIRS2\exploreFNIRS.m', 6418)">line 6418</a></div>
+<div class="hidden"><a href="matlab:opentoline('F:\processFNIRS2\exploreFNIRS.m', 6434)">line 6434</a></div>
+<div class="hidden"><a href="matlab:opentoline('F:\processFNIRS2\exploreFNIRS.m', 6454)">line 6454</a></div>
+<div class="hidden"><a href="matlab:opentoline('F:\processFNIRS2\exploreFNIRS.m', 6473)">line 6473</a></div>
+<div class="hidden"><a href="matlab:opentoline('F:\processFNIRS2\exploreFNIRS.m', 6493)">line 6493</a></div>
+<div class="hidden"><a href="matlab:opentoline('F:\processFNIRS2\exploreFNIRS.m', 8420)">line 8420</a></div>
+<div class="showMore"><a href="#" onclick="toggleShowMore(this); return false;">Show more (10)</a></div>
+<div class="showMore hidden"><a href="#" onclick="toggleShowMore(this); return false;">Show less</a></div></td><td rowspan="1"><div>This type of plot requires additional code to configure the plot.</div><div class="detailsWorkaround"><span class="detailsWorkaroundHeader">Action:</span><span class="detailsWorkaroundText">For detailed instructions, see <a href="matlab:helpview('matlab', 'appdgrfx');">Displaying Graphics in App Designer</a>.</span></div></tr>
+<tr><td><code>nargin</code></td><td><div class=""><a href="matlab:opentoline('F:\processFNIRS2\exploreFNIRS.m', 1275)">line 1275</a></div>
+<div class=""><a href="matlab:opentoline('F:\processFNIRS2\exploreFNIRS.m', 2407)">line 2407</a></div>
+<div class=""><a href="matlab:opentoline('F:\processFNIRS2\exploreFNIRS.m', 2843)">line 2843</a></div>
+<div class="hidden"><a href="matlab:opentoline('F:\processFNIRS2\exploreFNIRS.m', 2847)">line 2847</a></div>
+<div class="hidden"><a href="matlab:opentoline('F:\processFNIRS2\exploreFNIRS.m', 2851)">line 2851</a></div>
+<div class="hidden"><a href="matlab:opentoline('F:\processFNIRS2\exploreFNIRS.m', 2856)">line 2856</a></div>
+<div class="hidden"><a href="matlab:opentoline('F:\processFNIRS2\exploreFNIRS.m', 2875)">line 2875</a></div>
+<div class="hidden"><a href="matlab:opentoline('F:\processFNIRS2\exploreFNIRS.m', 3003)">line 3003</a></div>
+<div class="hidden"><a href="matlab:opentoline('F:\processFNIRS2\exploreFNIRS.m', 3007)">line 3007</a></div>
+<div class="hidden"><a href="matlab:opentoline('F:\processFNIRS2\exploreFNIRS.m', 3011)">line 3011</a></div>
+<div class="hidden"><a href="matlab:opentoline('F:\processFNIRS2\exploreFNIRS.m', 3015)">line 3015</a></div>
+<div class="hidden"><a href="matlab:opentoline('F:\processFNIRS2\exploreFNIRS.m', 3035)">line 3035</a></div>
+<div class="hidden"><a href="matlab:opentoline('F:\processFNIRS2\exploreFNIRS.m', 4656)">line 4656</a></div>
+<div class="hidden"><a href="matlab:opentoline('F:\processFNIRS2\exploreFNIRS.m', 4937)">line 4937</a></div>
+<div class="hidden"><a href="matlab:opentoline('F:\processFNIRS2\exploreFNIRS.m', 4990)">line 4990</a></div>
+<div class="hidden"><a href="matlab:opentoline('F:\processFNIRS2\exploreFNIRS.m', 6104)">line 6104</a></div>
+<div class="hidden"><a href="matlab:opentoline('F:\processFNIRS2\exploreFNIRS.m', 7854)">line 7854</a></div>
+<div class="showMore"><a href="#" onclick="toggleShowMore(this); return false;">Show more (14)</a></div>
+<div class="showMore hidden"><a href="#" onclick="toggleShowMore(this); return false;">Show less</a></div></td><td rowspan="1"><div>Use of <code>nargin</code> or <code>narginchk</code> might result in an error or unexpected behavior because the <code>app</code> input argument has been added to each helper function.</div><div class="detailsWorkaround"><span class="detailsWorkaroundHeader">Action:</span><span class="detailsWorkaroundText">Update your <code>nargin</code> or <code>narginchk</code> code to account for the extra input argument.</span></div></tr>
+<tr><td><code>popupmenu_groupby_info_field_Callback</code></td><td><div class=""><a href="matlab:opentoline('F:\processFNIRS2\exploreFNIRS.m', 369)">line 369</a></div></td><td rowspan="3"><div>Calling a callback programmatically from another function or callback is not recommended and will error in a migrated app.</div><div class="detailsWorkaround"><span class="detailsWorkaroundHeader">Action:</span><span class="detailsWorkaroundText">In your migrated app, move the callback code to a separate app helper function and then call this helper function instead.</span></div></tr>
+<tr><td><code>pushbutton_custom_lme_Callback</code></td><td><div class=""><a href="matlab:opentoline('F:\processFNIRS2\exploreFNIRS.m', 8115)">line 8115</a></div></td></tr>
+<tr><td><code>pushbutton_plot_scatter_Callback</code></td><td><div class=""><a href="matlab:opentoline('F:\processFNIRS2\exploreFNIRS.m', 8239)">line 8239</a></div></td></tr>
+    </table>
+</section>
+        <section>
+            <h2>Validate Your Migrated App</h2>
+            <p>The migration tool enables most of your app code to execute. Now, you need to fully validate your migrated app to make sure it behaves as expected. Consider doing the following verifications:</p>
+            <ul>
+                <li>Verify Layout
+                    <ul class="verifications">
+                        <li>Run your app and verify the initial layout of all components is as expected.</li>
+                        <li>If your app dynamically shows, hides, or enables additional components or options in response to selections made within the app, confirm these behave as expected.</li>
+                    </ul>
+                </li>
+                <li>Verify Callbacks
+                    <ul class="verifications">
+                        <li>Run and close your app to confirm there are no startup or termination errors.</li>
+                        <li>Exercise the workflows specific to your app, starting with the most basic, and gradually proceeding to the more complex ones.</li>
+                    </ul>
+                </li>
+            </ul>
+            <p>If unexpected errors occur, either within the app or at the MATLAB command line, address those issues before continuing with the validation. For troubleshooting assistance and additional information, see <a href="matlab:helpview(fullfile(docroot,'matlab', 'creating_guis', 'differences-between-app-designer-and-guide.html#mw_7f306e19-74d0-4c0b-989d-74ed63e32ddd'));">GUIDE Migration Strategies</a>.</p>
+        </section>
+    </div>
+    <script type="text/javascript">
+        // Toggles showing the "Show More (10)" hyperlink with the "Show less" hyperlink
+        function toggleShowMore(selectedHyperlink) {
+            // Find the parent td for the selected hyperlink ("Show more" or "Show less")
+            var td = selectedHyperlink.parentElement.parentElement;
+
+            // Toggle the "hidden" class on all of the elements but the first 3. The first 3 we want to always be
+            // visible.
+            var tags = td.children;
+            for (var i=3; i<tags.length; i++) {
+                tags[i].classList.toggle("hidden");
+            }
+        }
+    </script>
+</body>
+</html>

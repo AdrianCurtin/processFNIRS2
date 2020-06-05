@@ -1954,7 +1954,7 @@ switch(figType)
                 if(xInd==0)
                     xInd=numSubX;
                 end
-                h=subplot(numSubY,numSubX,s);
+                h=subplot(numSubY,numSubX,s,'Parent',sH{i,1}.h);
                 if(ExFNIRS.settings.plot_temporal_y0)
                     yh=plot([ExFNIRS.settings.plot_start,ExFNIRS.settings.plot_end],[0,0],'k');
                     set(yh,'HandleVisibility','off');
