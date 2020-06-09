@@ -31,7 +31,7 @@ end
 
 if(show1020)
     c1020=load('cerebro_1020_table.mat'); %estimation of 10-20 coordinates
-    c1020=c1020.c1020;
+    c1020=c1020.cerebro_1020_table;
 end
 
 fnir1200=load('fnir1200_tal.mat');  %Estimation of fnirs talaraich coordinates
@@ -88,20 +88,20 @@ hold on;
 [X,Y] = meshgrid(1:8,1:2);
  Z = sin(X) + cos(Y);
  
-caxis([min(dataVals),max(dataVals)]); 
-cmap=colormap;
+% caxis([min(dataVals),max(dataVals)]); 
+% cmap=colormap;
+% 
+% if(size(dataVals(:))==size(X(:))) % Not a color so reshape
+% 
+% C=ind2rgb(dataVals, cmap);
+% 
+% C=reshape(C,size(X,1),size(X,2),3);
+% 
+% alphaVals=reshape(alphaVals,size(X,1),size(X,2));
+% 
+% end
 
-if(size(dataVals(:))==size(X(:))) % Not a color so reshape
-
-C=ind2rgb(dataVals, cmap);
-
-C=reshape(C,size(X,1),size(X,2),3);
-
-alphaVals=reshape(alphaVals,size(X,1),size(X,2));
-
-end
-
-%C=dataVals;
+C=dataVals;
 hSurface=surf(X,Y,Z,C);
 hSurface.FaceColor='interp';
 hSurface.FaceLighting='none';
