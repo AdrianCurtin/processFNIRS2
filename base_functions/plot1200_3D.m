@@ -87,7 +87,21 @@ camlight(lht,'headlight');
 hold on;
 [X,Y] = meshgrid(1:8,1:2);
  Z = sin(X) + cos(Y);
-C=dataVals;
+ 
+caxis([min(dataVals),max(dataVals)]); 
+cmap=colormap;
+
+if(size(dataVals(:))==size(X(:))) % Not a color so reshape
+
+C=ind2rgb(dataVals, cmap);
+
+C=reshape(C,size(X,1),size(X,2),3);
+
+alphaVals=reshape(alphaVals,size(X,1),size(X,2));
+
+end
+
+%C=dataVals;
 hSurface=surf(X,Y,Z,C);
 hSurface.FaceColor='interp';
 hSurface.FaceLighting='none';
