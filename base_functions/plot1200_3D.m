@@ -43,7 +43,7 @@ fnir1200_sd=fnir1200_sd.fnir1200_sd;
 %patch('vertices', cerebro_mdl.v, 'faces', cerebro_mdl.f.v,'FaceVertexCData',ones(size(cerebro_mdl.v)));
 %shading('interp');
 %subplot(1,1,1);
-colormap(hot(256));
+cmap = colormap(hot(256));
 %lighting('phong')
 
 camproj('perspective');
@@ -52,7 +52,7 @@ axis square
 axis equal
 axis tight
 
-plotFNIRS=true;
+plotFNIRS=false;
 plotFNIRS_SD=showSD;
 plot1020=show1020;
 plotHit52_frontal=false;
@@ -76,7 +76,6 @@ mdl.v=[x2tx(mdl.v(:,1)),y2ty(mdl.v(:,2)),z2tz(mdl.v(:,3))];
 mdl.f=cMdl.f.v(:,reorderIdx);
 %mdl.f=[x2tx(mdl.f(:,1)),y2ty(mdl.f(:,2)),z2tz(mdl.f(:,3))];
 
-h=patch('vertices', mdl.v, 'faces', mdl.f,'FaceVertexCData',repmat(ones([size(mdl.v,1),1]),[1,3]).*brainColor,'FaceColor',brainColor,'AmbientStrength',0.6);
 %set(h,'linestyle','None');
 shading interp
 cameratoolbar
@@ -102,7 +101,9 @@ hold on;
 % end
 
 C=dataVals;
+
 hSurface=surf(X,Y,Z,C);
+%set(hSurface, 'Visible', 'Off');
 hSurface.FaceColor='interp';
 hSurface.FaceLighting='none';
 hSurface.AlphaData=alphaVals;
@@ -121,7 +122,62 @@ if(plotFNIRS)
             hSurface.ZData(i)=fnir1200.tz(i);
         end
     end
+else
+    set(hSurface, 'visible', 'off');
+    for i=1:size(fnir1200,1)
+        if(~isnan(fnir1200.tx(i)))
+            hSurface.XData(i)=fnir1200.tx(i);
+            hSurface.YData(i)=fnir1200.ty(i);
+            hSurface.ZData(i)=fnir1200.tz(i);
+        end
+    end
 end
+
+num_vertices = size(mdl.v, 1);
+max_distance_2 = 300;
+Cs = zeros(num_vertices, 3);
+controlPoints = [hSurface.XData(:), hSurface.YData(:), hSurface.ZData(:)];
+num_control = size(controlPoints, 1);
+c_min = min(C,[],'all');
+c_max = max(C,[],'all');
+
+tic
+dist_array = zeros(num_vertices, num_control);
+for i=1:num_control
+    p = repmat(controlPoints(i,:), num_vertices, 1);
+    dist_array(:,i) = sum((mdl.v - p).^2, 2);
+end
+
+[d, ind] = min(dist_array, [], 2);
+ind(d > max_distance_2) = 0;
+
+c_ind = round(length(cmap)*(C(:) - c_min)/(c_max - c_min));
+
+projectmode = 'interp';
+switch(projectmode)
+    case 'nearest'
+        C_temp = [brainColor;reshape(ind2rgb(c_ind, cmap), [num_control, 3])];
+
+        counts = histcounts(ind);
+        for i=1:num_control+1
+            Cs(ind==i-1,:) = repmat(C_temp(i,:), counts(i), 1); 
+        end
+    case 'interp'
+        v_ind = nan(num_vertices, 1);
+        dist_array(dist_array >= max_distance_2) = Inf;
+
+        my_interp_fx = @(dist, val, pow, dim) sum(val.*(1./(dist.^pow + 1e-8))./sum(1./(dist.^pow + 1e-8), dim), dim);
+        C_temp = repmat(C(:)', num_vertices, 1);
+        v_ind = my_interp_fx(dist_array, C_temp, 0.5, 2);
+
+        v_ind = round(length(cmap)*(v_ind - c_min)/(c_max - c_min));
+        
+        Cs = reshape(ind2rgb(v_ind, cmap), [num_vertices, 3]);
+        Cs(ind == 0,:) = repmat(brainColor, sum(ind == 0), 1);
+end
+toc
+
+h=patch('vertices', mdl.v, 'faces', mdl.f,'FaceVertexCData',Cs,'FaceColor','interp','AmbientStrength',0.6, 'LineStyle', 'None');
 
 if(plotHit52_frontal)
     for i=1:size(hit_fp_52,1)
@@ -179,8 +235,6 @@ campos([0,1000+2.5,25]);  %Front facing
 camlight(lht,'headlight');
 
 %%
-
-
 
 %%%%%%% Old code to calculate 1020
 
