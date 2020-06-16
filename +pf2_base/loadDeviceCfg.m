@@ -147,6 +147,34 @@ for j=1:length(probeInfo.cfg.Sections)
             error('Unable to determine source detector separation, please validate detector and source positions');
         end
         
+        if(isfield(p,'DetPos3DX')&&isfield(p,'SrcPos3DX'))
+            if(isfield(p,'dI')&&isfield(p,'sI'))
+                p.SrcPos3DX=p.SrcPos3DX(p.sI);
+                p.DetPos3DX=p.DetPos3DX(p.dI);
+            end
+            
+            p.OptPos3DX=nanmean([p.DetPos3DX(:)';p.SrcPos3DX(:)'],1)';
+        end
+        
+        if(isfield(p,'DetPos3DY')&&isfield(p,'SrcPos3DY'))
+            if(isfield(p,'dI')&&isfield(p,'sI'))
+                p.SrcPos3DY=p.SrcPos3DY(p.sI);
+                p.DetPos3DY=p.DetPos3DY(p.dI);
+            end
+            
+            p.OptPos3DY=nanmean([p.DetPos3DY(:)';p.SrcPos3DY(:)'],1)';
+        end
+        
+        if(isfield(p,'DetPos3DZ')&&isfield(p,'SrcPos3DZ'))
+            if(isfield(p,'dI')&&isfield(p,'sI'))
+                p.SrcPos3DZ=p.SrcPos3DZ(p.sI);
+                p.DetPos3DZ=p.DetPos3DZ(p.dI);
+            end
+            
+            p.OptPos3DZ=nanmean([p.DetPos3DZ(:)';p.SrcPos3DZ(:)'],1)';
+        end
+        
+        
         if(buildProbeLayout) % auto generate plot layour
             if(isfield(p,'OptPosX')&&isfield(p,'OptPosY')&&~isfield(p,'OptPosZ'))
                 if(includeSSchannels)
