@@ -1,12 +1,9 @@
-function device=GetDevice()
+function probeInfo=GetDevice()
 % This function is a wrapper for the 'loadDeviceCfg' fucntion in processFNIRS2
 
-global setF
 
-if(exist(setF,'device'))
-    device=setF.device;
-else
-   device=[]; 
-end
+probeInfo=processFNIRS2.Settings.SelectDevice();
+
+
 
 end
