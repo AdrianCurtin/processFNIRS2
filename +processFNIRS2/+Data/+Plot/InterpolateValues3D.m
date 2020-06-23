@@ -1,4 +1,4 @@
-function [ imgOut,optPos2Plot ] = InterpolateValues3D(fNIR,data2plot,minVal,maxVal,bufferMult,titleString,clrBarTitle)
+function [ imgOut,optPos2Plot ] = InterpolateValues3D(fNIR,data2plot,minVal,maxVal,projectmode,titleString,clrBarTitle)
 %processFNIRS2.Data.Plot.ImageValues
 %
 % Uses an imagemap to change the color of each cell based on data2plot
@@ -12,13 +12,11 @@ if(nargin<7)
 end
 
 if(nargin<6)
-   titleString=''; 
+    titleString = '';
 end
 
 if(nargin<5)
-    bufferMult=1;
-else
-    bufferMult=round(bufferMult);
+    projectmode='nearest';
 end
 
 
@@ -187,12 +185,10 @@ hold on;
 C=data2plot;
 
 num_vertices = size(mdl.v, 1);
-max_distance_2 = 300;
+max_distance_2 = 500;
 Cs = zeros(num_vertices, 3);
 controlPoints = [OptPosX, OptPosY, OptPosZ];
 num_control = size(controlPoints, 1);
-c_min = min(C,[],'all');
-c_max = max(C,[],'all');
 
 tic
 dist_array = zeros(num_vertices, num_control);
@@ -204,17 +200,32 @@ end
 [d, ind] = min(dist_array, [], 2);
 ind(d > max_distance_2) = 0;
 
-c_ind = round(length(cmap)*(C(:) - c_min)/(c_max - c_min));
+if minVal > maxVal
+   c_ind = zeros(num_control, 1);
+   c_min = nanmin(C, [], 'all');
+   c_max = nanmax(C, [], 'all');
+   for i=1:num_control
+      if C(i) <= maxVal
+          c_ind(i) = round(length(cmap)*(C(i) - c_min)/(c_max - c_min));
+      elseif C(i) < minVal
+          c_ind(i) = 0;
+      else
+          c_ind(i) = round(length(cmap)*(C(i) - minVal + maxVal)/(c_max - c_min));
+      end
+   end
+else
+    c_ind = round(length(cmap)*(C(:) - minVal)/(maxVal - minVal));
+end
 
-projectmode = 'interp';
 switch(projectmode)
     case 'nearest'
         C_temp = [brainColor;reshape(ind2rgb(c_ind, cmap), [num_control, 3])];
 
-        counts = histcounts(ind);
+        counts = histcounts(ind, 0:num_control+1);
         for i=1:num_control+1
-            Cs(ind==i-1,:) = repmat(C_temp(i,:), counts(i), 1); 
+            Cs(ind==i-1,:) = repmat(C_temp(i,:), counts(i), 1);
         end
+        n=length(Cs(~any(Cs,2), :));
     case 'interp'
         v_ind = nan(num_vertices, 1);
         dist_array(dist_array >= max_distance_2) = Inf;
@@ -223,7 +234,7 @@ switch(projectmode)
         C_temp = repmat(C(:)', num_vertices, 1);
         v_ind = my_interp_fx(dist_array, C_temp, 0.5, 2);
 
-        v_ind = round(length(cmap)*(v_ind - c_min)/(c_max - c_min));
+        v_ind = round(length(cmap)*(v_ind - minVal)/(maxVal - minVal));
         
         Cs = reshape(ind2rgb(v_ind, cmap), [num_vertices, 3]);
         Cs(ind == 0,:) = repmat(brainColor, sum(ind == 0), 1);
@@ -232,6 +243,9 @@ toc
 
 h=patch('vertices', mdl.v, 'faces', mdl.f,'FaceVertexCData',Cs,'FaceColor','interp','AmbientStrength',0.6, 'LineStyle', 'None');
 text(probeInfo.OptPos3DX, probeInfo.OptPos3DY, probeInfo.OptPos3DZ, string(1:length(probeInfo.OptPos3DZ)), 'HorizontalAlignment', 'center');
+title(titleString);
+chPos = colorbar();
+set(get(chPos,'title'),'string',clrBarTitle);
 
 if(plotHit52_frontal)
     for i=1:size(hit_fp_52,1)
