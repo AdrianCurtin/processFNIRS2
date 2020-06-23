@@ -4,6 +4,10 @@ function probeInfo=loadDeviceCfg(deviceCfgFilename,buildProbeLayout,includeSScha
 %   use includeSSchannels disable remove short separation channels from 2D
 %   plot layouts and figures
 
+if(nargin<1)
+    deviceCfgFilename='';
+end
+
 if(nargin<2)
    buildProbeLayout=true; 
 end
