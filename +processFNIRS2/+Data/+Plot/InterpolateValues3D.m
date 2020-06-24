@@ -287,3 +287,4 @@ ylabel('y (R/C)');
 zlabel('z (U/D)');
 campos([0,1000+2.5,25]);  %Front facing
 camlight(lht,'headlight');
+camlight(180, 0);
