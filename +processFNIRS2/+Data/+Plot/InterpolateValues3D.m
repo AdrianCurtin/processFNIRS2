@@ -140,7 +140,6 @@ if(show1020)
     c1020=c1020.cerebro_1020_table;
 end
 
-cmap = colormap(hot(256));
 %lighting('phong')
 
 camproj('perspective');
@@ -189,6 +188,12 @@ max_distance_2 = 500;
 Cs = zeros(num_vertices, 3);
 controlPoints = [OptPosX, OptPosY, OptPosZ];
 num_control = size(controlPoints, 1);
+cmap = colormap(hot(256));
+cmap_low = colormap(cool(256));
+
+
+title(titleString);
+
 
 tic
 dist_array = zeros(num_vertices, num_control);
@@ -200,30 +205,41 @@ end
 [d, ind] = min(dist_array, [], 2);
 ind(d > max_distance_2) = 0;
 
-if minVal > maxVal
+alphas = zeros(num_control, 1);
+c_min = nanmin(C, [], 'all');
+c_max = nanmax(C, [], 'all');
+if length(minVal) == 2
    c_ind = zeros(num_control, 1);
-   c_min = nanmin(C, [], 'all');
-   c_max = nanmax(C, [], 'all');
+   cmap_i = zeros(num_control, 1);   
+   range = max(minVal(1) - c_min, c_max - minVal(2));
+   
    for i=1:num_control
-      if C(i) <= maxVal
-          c_ind(i) = round(length(cmap)*(C(i) - c_min)/(c_max - c_min));
-      elseif C(i) < minVal
+      if C(i) <= minVal(1)
+          c_ind(i) = round(length(cmap)*(C(i) - c_min)/range);
+          cmap_i(i) = 1;
+      elseif C(i) < minVal(2)
           c_ind(i) = 0;
+          alphas(i) = 1;
       else
-          c_ind(i) = round(length(cmap)*(C(i) - minVal + maxVal)/(c_max - c_min));
+          c_ind(i) = round(length(cmap)*(C(i) - minVal(2))/range);
       end
    end
 else
     c_ind = round(length(cmap)*(C(:) - minVal)/(maxVal - minVal));
+    cmap_i = zeros(num_control, 1);
 end
 
 switch(projectmode)
     case 'nearest'
-        C_temp = [brainColor;reshape(ind2rgb(c_ind, cmap), [num_control, 3])];
+        C_temp = zeros(num_control+1, 3);
+        C_temp(1,:) = brainColor;
+        C_temp(logical([0;cmap_i == 1]),:) = reshape(ind2rgb(c_ind(cmap_i == 1), cmap_low), [], 3);
+        C_temp(logical([0;cmap_i == 0]),:) = reshape(ind2rgb(c_ind(cmap_i == 0), cmap), [], 3);
 
         counts = histcounts(ind, 0:num_control+1);
+        alpha_ext = [0;alphas];
         for i=1:num_control+1
-            Cs(ind==i-1,:) = repmat(C_temp(i,:), counts(i), 1);
+            Cs(ind==i-1,:) = (1-alpha_ext(i))*repmat(C_temp(i,:), counts(i), 1) + alpha_ext(i)*repmat(brainColor, counts(i), 1);
         end
         n=length(Cs(~any(Cs,2), :));
     case 'interp'
@@ -231,21 +247,25 @@ switch(projectmode)
         dist_array(dist_array >= max_distance_2) = Inf;
 
         my_interp_fx = @(dist, val, pow, dim) sum(val.*(1./(dist.^pow + 1e-8))./sum(1./(dist.^pow + 1e-8), dim), dim);
-        C_temp = repmat(C(:)', num_vertices, 1);
+        C_temp = repmat(c_ind', num_vertices, 1);
         v_ind = my_interp_fx(dist_array, C_temp, 0.5, 2);
-
-        v_ind = round(length(cmap)*(v_ind - minVal)/(maxVal - minVal));
         
-        Cs = reshape(ind2rgb(v_ind, cmap), [num_vertices, 3]);
+        alpha_interp = repmat(alphas', num_vertices, 1);
+        alpha_interp = my_interp_fx(dist_array, alpha_interp, 0.5, 2);
+        
+        cmap_interp = repmat(cmap_i', num_vertices, 1);
+        cmap_interp = my_interp_fx(dist_array, cmap_interp, 0.5, 2);
+        cmap_interp = round(cmap_interp);
+        %v_ind = round(length(cmap)*(v_ind - minVal)/(maxVal - minVal));
+        
+        draw_color = (1-cmap_interp).*reshape(ind2rgb(round(v_ind), cmap), [num_vertices, 3]) + cmap_interp.*reshape(ind2rgb(round(v_ind), cmap_low), [num_vertices, 3]);
+        Cs = (1-alpha_interp).*draw_color + alpha_interp.*repmat(brainColor, num_vertices, 1);
         Cs(ind == 0,:) = repmat(brainColor, sum(ind == 0), 1);
 end
 toc
 
 h=patch('vertices', mdl.v, 'faces', mdl.f,'FaceVertexCData',Cs,'FaceColor','interp','AmbientStrength',0.6, 'LineStyle', 'None');
 text(probeInfo.OptPos3DX, probeInfo.OptPos3DY, probeInfo.OptPos3DZ, string(1:length(probeInfo.OptPos3DZ)), 'HorizontalAlignment', 'center');
-title(titleString);
-chPos = colorbar();
-set(get(chPos,'title'),'string',clrBarTitle);
 
 if(plotHit52_frontal)
     for i=1:size(hit_fp_52,1)
@@ -287,3 +307,69 @@ ylabel('y (R/C)');
 zlabel('z (U/D)');
 campos([0,1000+2.5,25]);  %Front facing
 camlight(lht,'headlight');
+camlight(180, 0);
+
+ax1=gca;
+curAxPosition=ax1.Position;
+
+if(length(minVal) == 1)
+    
+    if(maxVal>minVal)
+        colormap(ax1,cmap);
+        negColorbar=false;
+    else
+        colormap(gca,cmap_low);
+        temp=minVal;
+        minVal=maxVal;
+        maxVal=temp;
+        negColorbar=true;
+    end
+    caxis([c_min, c_max]);
+    set(gca,'xtick',[]);
+    set(gca,'ytick',[]);
+    chPos=colorbar();
+    axis off
+else
+    curAxPosition=ax1.OuterPosition;
+    
+    colormap(ax1,cmap);
+    caxis([minVal(2), c_max]);
+    
+    ax2=axes('OuterPosition',curAxPosition);
+    ax2.Position=ax1.Position;
+
+    set(gca,'xtick',[]);
+    set(gca,'ytick',[]);
+    
+    %set( chNeg, 'YDir', 'reverse' );
+    colormap(ax2,cmap_low);
+    caxis([c_min, minVal(1)]);
+    %caxis([-1*minVal(1),-1*maxVal(2)])
+  
+    axis off
+    
+    curAxInnerPosition=ax1.Position;
+    
+    linkprop([ax1, ax2],{'CameraUpVector', 'CameraPosition', 'CameraTarget', 'XLim', 'YLim', 'ZLim'});
+    %set([ax1,ax2],'Position',[.05 .11 .885 .815]);
+    chPos=colorbar(ax1);
+    %chPos_position=chPos.OuterPosition;
+    cbHeight=curAxInnerPosition(4)/2;
+    
+    set(chPos,'Position',[curAxInnerPosition(1)+curAxInnerPosition(3),curAxInnerPosition(2)+cbHeight,0.02,cbHeight]);
+    
+    
+    chNeg=colorbar(ax2,'Position',[curAxInnerPosition(1)+curAxInnerPosition(3),curAxInnerPosition(2)-cbHeight/5,0.02,cbHeight]);    
+end
+
+%ax1 = axes;
+%colormap(ax1, cmap);
+%chPos1 = colorbar(ax1);
+%set(get(chPos1,'title'),'string',clrBarTitle);
+%axis off;
+
+%ax2 = axes;
+%colormap(ax2, cmap_low);
+%linkaxes([ax1,ax2]);
+%chPos2 = colorbar(ax2);
+%ax2.Visible = 'off';
