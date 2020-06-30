@@ -126,13 +126,13 @@ for s=1:length(sigAnvNames)
       if(numAnvTerms(sIdx)==1&&hasIntercept) %compare with intercept only
           nRows(end+1)=1;
           cRow=zeros(1,numCoef);
-          cRow(1)=-1;
+          cRow(1)=0; % All groups have the interecept, this is the contrast vs 0
           cRow(basic_contrast_idx(c))=1;
           cRows(end+1,:)=cRow;
           if(contains(coefNames{basic_contrast_idx(c)},'(Intercept)'))
             cName{end+1}='Intercept vs 0';
           else
-            cName{end+1}=sprintf('%s vs %s',coefNames{basic_contrast_idx(c)},'Intercept');
+            cName{end+1}=sprintf('%s vs %s (0)',coefNames{basic_contrast_idx(c)},'Intercept');
           end
           cAnvGrp(end+1)=c;
       elseif(numAnvTerms(sIdx)>1&&length(numAnvTerms)>1) %compare term and numterms-1 vs 0
