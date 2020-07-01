@@ -532,13 +532,15 @@ else
            
            if(isempty(curField)|| ...
                    (isnumeric(curField)&&length(curField)==1)||...  %numeric items of 1
-                   ischar(curField)||...        %strings or chars
+                   ischar(curField)||isstring(curField)||...        %strings or chars
                    (islogical(curField)&&length(curField)==1)||...   %logical values
                    (istable(curField)&&size(curField,1)==1&&size(curField,2)==1)) %singular tables
                
               if(istable(curField)&&size(curField,1)==1&&size(curField,2)==1)
                   curField=curField{1,1};
               end
+              
+              
                
               if(ismember(curFieldName,outTable.Properties.VariableNames)&&~isempty(curField))
                   if(strcmpi(curField,'missing')&&isnumeric(outTable.(curFieldName)(1,1)))
@@ -4337,8 +4339,8 @@ if(showTopo)
                 bioM=selectedBioM(b);
                curMdlP=ExFNIRS.curMdlFits(bioM,:);  
               fprintf('\n <strong>Significant Models [%s]: </strong>',bioM{1});  
-              [curMdlQ,curMdlK]=performFDR(curMdlP,ExFNIRS.settings.topoSigThrehold{2});
-              [curMdlQ_rev,curMdlK_rev]=performFDR_twostep(curMdlP,ExFNIRS.settings.topoSigThrehold{2});  
+              [curMdlQ,curMdlK]=exploreFNIRS.fx.performFDR(curMdlP,ExFNIRS.settings.topoSigThrehold{2});
+              [curMdlQ_rev,curMdlK_rev]=exploreFNIRS.fx.performFDR_twostep(curMdlP,ExFNIRS.settings.topoSigThrehold{2});  
                 
               for i=1:size(curMdlP,2)
                   varName=curMdlP.Properties.VariableNames{i};
@@ -4430,7 +4432,7 @@ if(showTopo)
                             
                             
 
-                            curQ=performFDR(curP);
+                            curQ=exploreFNIRS.fx.performFDR(curP);
 
                             if(any(curQ<0.05))
                                 FDRfound=true;
@@ -4492,8 +4494,8 @@ if(showTopo)
                             curDf1=fNIR_df{b,a};
                             curDf2=fNIR_df2{b,a};
                             m=length(curP(:));
-                            [curQ,curK]=performFDR(curP,ExFNIRS.settings.topoSigThrehold{2});
-                            [curQ_rev,curK_rev]=performFDR_twostep(curP,ExFNIRS.settings.topoSigThrehold{2});
+                            [curQ,curK]=exploreFNIRS.fx.performFDR(curP,ExFNIRS.settings.topoSigThrehold{2});
+                            [curQ_rev,curK_rev]=exploreFNIRS.fx.performFDR_twostep(curP,ExFNIRS.settings.topoSigThrehold{2});
                             
                             estimateFPval=finv(ones(size(curF(:)))*(1-ExFNIRS.settings.topoSigThrehold{2}), curDf1(:), curDf2(:));
                             estimateFPval_q=finv(ones(size(curF(:)))*(1-ExFNIRS.settings.topoSigThrehold{2}*curK/m), curDf1(:), curDf2(:));
@@ -4591,7 +4593,7 @@ if(showTopo)
                             subplot(numBioM,numCoeff,c+(b-1)*numCoeff)
                             curT=fNIR_t{b,c};
                             curP=fNIR_p{b,c};
-                            curQ=performFDR(curP);
+                            curQ=exploreFNIRS.fx.performFDR(curP);
 
                             switch(ExFNIRS.settings.ChannelMode)
                                 case 'fNIR'
@@ -4619,7 +4621,7 @@ if(showTopo)
                             subplot(numBioM,numANOVA,a+(b-1)*numANOVA)
                             curT=fNIR_f{b,a};
                             curP=fNIR_p{b,a};
-                            curQ=performFDR(curP);
+                            curQ=exploreFNIRS.fx.performFDR(curP);
 
                             switch(ExFNIRS.settings.ChannelMode)
                                 case 'fNIR'
@@ -4659,97 +4661,8 @@ mdlIdx
 
 
 
-function [qvalues,k,passed]=performFDR(pvalues,pThreshold)
-% Performs FDR correction per #CITATION HERE
-
-if(istable(pvalues))
-    pvalues=table2array(pvalues);
-end
-
-if(nargin<2)
-    pThreshold=0.05;
-end
-
-qvalues=nan(size(pvalues));
-
-kVals=nan(size(pvalues(:)));
-
-[pSorted,pIdx]=sort(pvalues(:));       
-numP=length(pSorted);
-
-kPass=zeros(1,numP);
-m=numP;
-
-for i=1:numP
-    
-    qThreshold=pThreshold/m*i;
-    k=numP-i+1;
-    qvalues(pIdx(i))=pvalues(pIdx(i))*m/i;
-    
-    if(qvalues(pIdx(i))<=pThreshold&&pvalues(pIdx(i))<=0.05)
-        kPass(pIdx(i))=1;
-    end
-    kVals(pIdx(i))=i;
-end
-
-k_ind=find(kPass==1);
-
-if(isempty(k_ind))
-    k=1;
-else
-   k=1; 
-end
-
-qvalues=pvalues*m/k;
-qvalues(qvalues>1)=1;
-passed=qvalues<=pThreshold;
-
-if(any(kPass(:)))
-   k=max(kVals(kPass(:)==1));
-   qvalues=pvalues*m/k;
-   passed=qvalues<=pThreshold&pvalues<0.05;
-end
 
 
-function [qvalues,k,passed]=performFDR_twostep(pvalues,pThreshold)
-% Performs FDR correction per #CITATION HERE
-
-if(istable(pvalues))
-    pvalues=table2array(pvalues);
-end
-
-
-if(nargin<2)
-    pThreshold=0.05;
-end
-
-
-m=length(pvalues(:));
-q_prime=pThreshold;%;/(1+pThreshold);
-[qvalues,k,passed]=performFDR(pvalues,q_prime);
-
-if(sum(passed(:))>0&&sum(~passed(:))>0)  %if some things passed (but not all)
-    m=sum(~isnan(pvalues));
-    numPassed=sum(passed);
-    mo=m-numPassed;
-    q_star=q_prime*m/mo; %later divided by m in regular fdr)
-    
-    [qvalues,k,passed]=performFDR(pvalues,q_star);
-    
-    
-end
-
-if(m/k<m)
-
-    %qvalues=pvalues*m/k;
-    qvalues(qvalues>1)=1;
-    passed=passed&pvalues<=0.05;
-
-else
-   qvalues=pvalues;
-   qvalues(qvalues>1)=1;
-   passed=qvalues<=pThreshold&pvalues<=0.05;
-end
 
 
 
@@ -6581,8 +6494,8 @@ for chIdx=1:numOpt
                              
                              curDf=curData.N-2;
                              m=length(curP);
-                            [curQ,curK]=performFDR(curP,ExFNIRS.settings.topoSigThrehold{2});
-                            [curQ_rev,curK_rev]=performFDR_twostep(curP,ExFNIRS.settings.topoSigThrehold{2});
+                            [curQ,curK]=exploreFNIRS.fx.performFDR(curP,ExFNIRS.settings.topoSigThrehold{2});
+                            [curQ_rev,curK_rev]=exploreFNIRS.fx.performFDR_twostep(curP,ExFNIRS.settings.topoSigThrehold{2});
                             
                             curT=(curR./sqrt((1-curR.^2)/(N-2)));
 
