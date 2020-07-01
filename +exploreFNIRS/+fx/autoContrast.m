@@ -181,8 +181,11 @@ for s=1:length(sigAnvNames)
                   cRow(c)=1;
                   cRow(cmp_contrast)=-1;
 
-                  if(any(ismember(cRows,cRow,'rows'))||any(ismember(cRows,cRow*-1,'rows'))...
-                        ||sum(cmp_contrast)==1) % skips when the full interaction term is a better descripter
+                  if(any(ismember(cRows,cRow,'rows'))||any(ismember(cRows,cRow*-1,'rows'))... %skip if duplicated or
+                        ||sum(cmp_contrast)==1) % skips when the full interaction term (ex  a:b1 vs a:b2) is a better descripter
+                                                % Usually just because
+                                                % there is only 1 contrast
+                                                % to be made
                     continue;
                   else
                     cRows(end+1,:)=cRow;
@@ -210,6 +213,29 @@ for s=1:length(sigAnvNames)
 
                         cName{end+1}=sprintf('%s vs %s',coefNames{c},coefNames{cmp_contrast_vals(cmp)});
                         cAnvGrp(end+1)=c;
+                      end
+
+                  end
+              end
+              
+              for c2=1:numContrasts % make more general comparisons if possible
+                  cmp_contrast=rootCoefIdx(:,c2)==cIdx(c2);
+                  
+                  u_contrast_levels=unique(rootCoefIdx(rootCoefIdx(:,c2)~=cIdx(c2),c2));
+                  
+                  for cmp=1:length(u_contrast_levels)
+                      cmp_contrast_val= rootCoefIdx(:,c2)==u_contrast_levels(cmp);
+                      cRow=zeros(1,numCoef);
+                      cRow(cmp_contrast)=1;
+                      cRow(cmp_contrast_val)=-1;
+
+                      if(any(ismember(cRows,cRow,'rows'))||any(ismember(cRows,cRow*-1,'rows')))
+                        continue;
+                      else
+                         cRows(end+1,:)=cRow;
+                            uc=uCoefTerms{c2};
+                            cName{end+1}=sprintf('%s vs %s',uc{cIdx(c2)},uc{u_contrast_levels(cmp)});
+                            cAnvGrp(end+1)=c;
                       end
 
                   end
@@ -264,5 +290,5 @@ uCounts=uCount(idxAnvG);
 pVal_corr=pVal(:).*uCounts(:);
 pVal_corr(pVal_corr>1)=1;
 
-contrastTable=table(deltaE',SD_p',F',df',df2',pVal',pVal_corr,'VariableNames',{'deltaE','SD','F','df1','df2','pVal','pVal_corr'},'RowNames',cName');
+contrastTable=table(deltaE',SD_p',F',df',df2',pVal',pVal_corr,cRows,'VariableNames',{'deltaE','SD','F','df1','df2','pVal','pVal_corr','coefContrasts'},'RowNames',cName');
 
