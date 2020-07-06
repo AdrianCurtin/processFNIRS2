@@ -1,4 +1,5 @@
-function [ imgOut,optPos2Plot ] = InterpolateValues3D(fNIR,data2plot,minVal,maxVal,projectmode,titleString,clrBarTitle)
+function [ imgOut,optPos2Plot ] = InterpolateValues3D(varargin)
+
 %processFNIRS2.Data.Plot.ImageValues
 %
 % Uses an imagemap to change the color of each cell based on data2plot
@@ -7,62 +8,158 @@ function [ imgOut,optPos2Plot ] = InterpolateValues3D(fNIR,data2plot,minVal,maxV
 %
 % Short separation channels are not presented here and are skipped
 %
-if(nargin<7)
-    clrBarTitle='';
+
+validAxesHandle= @(x) isa(x,'matlab.graphics.axis.Axes')&&isvalid(x);
+validScalarPosNum = @(x) isnumeric(x) && x>0;
+validI1020Label = @(x) islogical(x) || iscellstr(x);
+validColor = @(x) (ischar(x) && length(x) == 1) || isnumeric(x) && length(x) == 3 || isempty(x);
+%validColorList = @(x) validColor(x) || all(arrayfun(validColor, x));
+
+defaultInterpolateType = 'nearest';
+validInterpolateTypes = {'nearest', 'linear', 'quadratic', 'cubic'};
+validInterpolateType = @(x) any(validatestring(x, validInterpolateTypes));
+
+defaultCamPosition = 'front';
+validCamPositions = {'front', 'back', 'top' 'left', 'right'};
+validCamPosition = @(x) any(validateString(x, validCamPositions)) || isnumeric(x) && length(x) == 3;
+
+if(isa(varargin{1},'matlab.graphics.axis.Axes')) %If first argument is axes then move to front
+   ax=varargin{1};
+   varargin=varargin(2:end);
+else
+   ax=gca;
 end
 
-if(nargin<6)
-    titleString = '';
+p=inputParser;
+
+addRequired(p,'data2plot');
+addOptional(p,'fNIR', {}, @isstruct);
+addOptional(p,'minval', [], @isnumeric);
+addOptional(p,'maxval', [], @isnumeric);
+addOptional(p,'titleString', '', @isstring);
+addOptional(p,'colorbarStr', '', @isstring);
+
+addParameter(p,'ax',ax,validAxesHandle,'PartialMatchPriority',1);
+addParameter(p,'ChannelLabels',true,@islogical);
+addParameter(p,'SDLabels',true,@islogical);
+addParameter(p,'I1020_labels',false,validI1020Label);
+addParameter(p, 'useHighRes', true, @islogical);
+addParameter(p, 'cmap', 'hot', @ischar);
+addParameter(p, 'cmap_lower', 'cool', @ischar);
+addParameter(p, 'labelfontsize', 10, validScalarPosNum);
+addParameter(p, 'labelfontcolor', 'k', validColor);
+addParameter(p, 'labelspherecolors', ["r", "y"]);
+addParameter(p, 'brainColor', [0.92, 0.68, 0.68], validColor);
+addParameter(p, 'brainLineColor', [], validColor);
+addParameter(p, 'backgroundColor', [1 1 1], validColor);
+addParameter(p, 'showColorbar', true, @islogical);
+addParameter(p, 'initCamPosition', defaultCamPosition, validCamPosition);
+addParameter(p, 'logScale', false, @islogical);
+addParameter(p, 'interpolateType', defaultInterpolateType, validInterpolateType);
+addParameter(p, 'bufferDistance', 30, validScalarPosNum);
+addParameter(p, 'includeSS', true, @islogical);
+
+parse(p,varargin{:});
+
+data2plot = p.Results.data2plot;
+if(isempty(p.Results.fNIR))
+    global setF;
+    fNIR = {};
+else
+    fNIR = p.Results.fNIR;
 end
 
-if(nargin<5)
-    projectmode='nearest';
+minVal = p.Results.minval;
+maxVal = p.Results.maxval;
+if(isempty(p.Results.minval))
+    minVal = nanmin(data2plot);
+end
+if(length(minVal)==2)
+    twosided = true;
+else
+    twosided = false;
 end
 
-
-
-if(nargin<3||isempty(minVal))
-   minVal=nanmin(data2plot); 
-end
-
-if(nargin<4)
-    if(length(minVal)==2)
-        maxVal=[];
+if(isempty(maxVal))
+    if(~twosided)
+        maxVal = nanmax(data2plot);
     else
-        maxVal=nanmax(data2plot);
+        maxVal = [nanmin(data2plot) nanmax(data2plot)];
+    end
+elseif(length(maxVal) == 1 && length(minVal) == 2)
+    if min(minVal) < maxVal && maxVal < max(minVal)
+        temp = maxVal;
+        maxVal = [minVal(1) minVal(2)];
+        minVal = [temp temp];
+    else
+        maxVal = [-abs(maxVal) abs(maxVal)];
+    end
+elseif(length(maxVal) == 2 && length(minVal) == 1)
+    minVal = min(maxVal);
+    maxVal = max(maxVal);
+elseif(length(maxVal) == 2 && length(minVal) == 2)
+    s = sort([minVal, maxVal]);
+    maxVal = s([1, 4]);
+    minVal = s([2, 3]);
+end
+
+
+titleString = p.Results.titleString;
+clrBarTitle = p.Results.colorbarStr;
+projectmode = p.Results.interpolateType;
+
+ax = p.Results.ax;
+
+numericColors = isnumeric(p.Results.labelspherecolors);
+ss = size(p.Results.labelspherecolors);
+if(numericColors)
+    numColors = ss(1);
+else
+    numColors = length(p.Results.labelspherecolors);
+end
+if(numericColors)
+   switch(numColors)
+       case 1
+           srcColor = p.Results.labelspherecolors;
+           detColor = p.Results.labelspherecolors;
+           optColor = p.Results.labelspherecolors;
+           color1020 = p.Results.labelspherecolors;
+       case 2
+           srcColor = p.Results.labelspherecolors(1,:);
+           detColor = p.Results.labelspherecolors(2,:);
+       case 3
+           srcColor = p.Results.labelspherecolors(1,:);
+           detColor = p.Results.labelspherecolors(2,:);
+           optColor = p.Results.labelspherecolors(3,:);
+       otherwise
+           srcColor = p.Results.labelspherecolors(1,:);
+           detColor = p.Results.labelspherecolors(2,:);
+           optColor = p.Results.labelspherecolors(3,:);
+           color1020 = p.Results.labelspherecolors(4,:);
+   end
+else
+    switch(numColors)
+       case 1
+           srcColor = p.Results.labelspherecolors;
+           detColor = p.Results.labelspherecolors;
+           optColor = p.Results.labelspherecolors;
+           color1020 = p.Results.labelspherecolors;
+       case 2
+           srcColor = p.Results.labelspherecolors(1);
+           detColor = p.Results.labelspherecolors(2);
+       case 3
+           srcColor = p.Results.labelspherecolors(1);
+           detColor = p.Results.labelspherecolors(2);
+           optColor = p.Results.labelspherecolors(3);
+        otherwise
+           srcColor = p.Results.labelspherecolors(1);
+           detColor = p.Results.labelspherecolors(2);
+           optColor = p.Results.labelspherecolors(3);
+           color1020 = p.Results.labelspherecolors(4);
     end
 end
 
 cla
-
-
-if(length(minVal)==2&&sum(minVal>0)==1&&isempty(maxVal))  %% expects two minimum values
-    twosided=true; 
-    minVal=sort(minVal);
-    maxVal(1)=nanmax(data2plot(:));
-    maxVal(2)=nanmin(data2plot(:));
-    
-    if(maxVal(2)>=minVal(1))
-        twosided=false;
-        minVal=minVal(2);
-        maxVal=maxVal(1);
-    elseif(maxVal(1)<=minVal(2)) % reverse plot
-        twosided=false;
-        maxVal=maxVal(2);
-        minVal=minVal(1);
-    end
-    
-elseif(isempty(maxVal))
-     maxVal=nanmax(data2plot(:));
-    
-    twosided=false;
-else
-    twosided=false; 
-end
-
-if(isempty(fNIR))
-    global setF
-end
 
 probeInfo=[];
 
@@ -89,8 +186,8 @@ elseif(isempty(cfgFilePath)||~contains(cfgFilePath,'.cfg'))
     warning('Missing or invalid configuration file path\n')
     
     disp('No device specified. Please load device configuration');
-    probeInfo=pf2_base.loadDeviceCfg([],true);
-    if(~isempty(probeInfo))
+    probeInfo=pf2_base.loadDeviceCfg('',true);
+    if(isempty(probeInfo))
         error('No valid devices selected');
     end
     
@@ -119,13 +216,14 @@ end
 
 imgSize=1000;
 
-OptPosX=probeInfo.OptPos3DX(~probeInfo.IsShortSeparation);
-OptPosY=probeInfo.OptPos3DY(~probeInfo.IsShortSeparation);
-OptPosZ=probeInfo.OptPos3DZ(~probeInfo.IsShortSeparation);
+OptPosX=probeInfo.OptPos3DX(~probeInfo.IsShortSeparation | ~p.Results.includeSS);
+OptPosY=probeInfo.OptPos3DY(~probeInfo.IsShortSeparation | ~p.Results.includeSS);
+OptPosZ=probeInfo.OptPos3DZ(~probeInfo.IsShortSeparation | ~p.Results.includeSS);
 
-useHighRes = true;
-show1020 = true;
-showSD = true;
+useHighRes = p.Results.useHighRes;
+show1020 = islogical(p.Results.I1020_labels) && p.Results.I1020_labels || ~islogical(p.Results.I1020_labels) && ~isempty(p.Results.I1020_labels);
+showSD = p.Results.SDLabels;
+showChannels = p.Results.ChannelLabels;
 % TAL EEG locations from Automated cortical projection of EEG sensors: Anatomical correlation via the international 10–10 system
 if(useHighRes)
     cerebro_mdl=load('cerebro_mdl.mat');    %high res model
@@ -138,6 +236,10 @@ end
 if(show1020)
     c1020=load('cerebro_1020_table.mat'); %estimation of 10-20 coordinates
     c1020=c1020.cerebro_1020_table;
+    if ~islogical(p.Results.I1020_labels)
+        labels = "'" + p.Results.I1020_labels + "'";
+        c1020 = c1020(ismember(c1020.Electrode, labels), :);
+    end     
 end
 
 %lighting('phong')
@@ -148,11 +250,10 @@ axis square
 axis equal
 axis tight
 
-plotFNIRS=false;
 plotFNIRS_SD=showSD;
 plot1020=show1020;
 plotHit52_frontal=false;
-brainColor=[0.92,0.68,0.68];
+brainColor=p.Results.brainColor;
 cMdl=cerebro_mdl;
 
 
@@ -184,118 +285,142 @@ hold on;
 C=data2plot;
 
 num_vertices = size(mdl.v, 1);
-max_distance_2 = 500;
+max_distance_2 = p.Results.bufferDistance^2;
 Cs = zeros(num_vertices, 3);
 controlPoints = [OptPosX, OptPosY, OptPosZ];
 num_control = size(controlPoints, 1);
-cmap = colormap(hot(256));
+
+
+cmap_high = colormap(hot(256));
 cmap_low = colormap(cool(256));
-
-
-title(titleString);
 
 
 tic
 dist_array = zeros(num_vertices, num_control);
 for i=1:num_control
-    p = repmat(controlPoints(i,:), num_vertices, 1);
-    dist_array(:,i) = sum((mdl.v - p).^2, 2);
+    q = repmat(controlPoints(i,:), num_vertices, 1);
+    dist_array(:,i) = sum((mdl.v - q).^2, 2);
 end
 
 [d, ind] = min(dist_array, [], 2);
 ind(d > max_distance_2) = 0;
 
-alphas = zeros(num_control, 1);
 c_min = nanmin(C, [], 'all');
 c_max = nanmax(C, [], 'all');
-if length(minVal) == 2
-   c_ind = zeros(num_control, 1);
-   cmap_i = zeros(num_control, 1);   
-   range = max(minVal(1) - c_min, c_max - minVal(2));
-   
-   for i=1:num_control
-      if C(i) <= minVal(1)
-          c_ind(i) = round(length(cmap)*(C(i) - c_min)/range);
-          cmap_i(i) = 1;
-      elseif C(i) < minVal(2)
-          c_ind(i) = 0;
-          alphas(i) = 1;
-      else
-          c_ind(i) = round(length(cmap)*(C(i) - minVal(2))/range);
-      end
+if twosided
+   if minVal(1) - maxVal(1) > maxVal(2) - minVal(2)
+       range = minVal(1) - maxVal(1);
+       cmap = colormap([cool(256);
+               repmat(brainColor, round(256*(minVal(2) - minVal(1))/range), 1);
+               hot(round(256*(maxVal(2) - minVal(2))/range))]);
+   else
+       range = maxVal(2) - minVal(2);
+       cmap = colormap([cool(round(256*(minVal(1) - maxVal(1))/range));
+               repmat(brainColor, round(256*(minVal(2) - minVal(1))/range), 1);
+               hot(256)]);
    end
+   c_ind = round(length(cmap)*(C(:) - maxVal(1))/(maxVal(2) - maxVal(1)));
+   %for i=1:num_control  
+      %if C(i) <= minVal(1)
+      %    c_ind(i) = round(length(cmap)*(C(i) - c_min)/range);
+      %    cmap_i(i) = 1;
+      %elseif C(i) < minVal(2)
+      %    c_ind(i) = 0;
+      %    alphas(i) = 1;
+      %else
+      %    c_ind(i) = round(length(cmap)*(C(i) - minVal(2))/range);
+   %end
 else
+    if minVal < maxVal
+        cmap = hot(256);
+    else
+        cmap = cool(256);
+    end
     c_ind = round(length(cmap)*(C(:) - minVal)/(maxVal - minVal));
-    cmap_i = zeros(num_control, 1);
 end
 
 switch(projectmode)
     case 'nearest'
-        C_temp = zeros(num_control+1, 3);
-        C_temp(1,:) = brainColor;
-        C_temp(logical([0;cmap_i == 1]),:) = reshape(ind2rgb(c_ind(cmap_i == 1), cmap_low), [], 3);
-        C_temp(logical([0;cmap_i == 0]),:) = reshape(ind2rgb(c_ind(cmap_i == 0), cmap), [], 3);
+        C_temp = [brainColor;reshape(ind2rgb(c_ind, cmap), [], 3)];
+        %C_temp = zeros(num_control+1, 3);
+        %C_temp(1,:) = brainColor;
+        %C_temp(logical([0;cmap_i == 1]),:) = reshape(ind2rgb(c_ind(cmap_i == 1), cmap_low), [], 3);
+        %C_temp(logical([0;cmap_i == 0]),:) = reshape(ind2rgb(c_ind(cmap_i == 0), cmap), [], 3);
 
         counts = histcounts(ind, 0:num_control+1);
-        alpha_ext = [0;alphas];
         for i=1:num_control+1
-            Cs(ind==i-1,:) = (1-alpha_ext(i))*repmat(C_temp(i,:), counts(i), 1) + alpha_ext(i)*repmat(brainColor, counts(i), 1);
+            Cs(ind==i-1,:) = repmat(C_temp(i,:), counts(i), 1);
         end
         n=length(Cs(~any(Cs,2), :));
-    case 'interp'
-        v_ind = nan(num_vertices, 1);
+    case {'linear', 'quadratic', 'cubic'}
+        switch(projectmode)
+            case 'linear'
+                beta = 0.5;
+            case 'quadratic'
+                beta = 1;
+            case 'cubic'
+                beta = 1.5;
+        end
         dist_array(dist_array >= max_distance_2) = Inf;
 
         my_interp_fx = @(dist, val, pow, dim) sum(val.*(1./(dist.^pow + 1e-8))./sum(1./(dist.^pow + 1e-8), dim), dim);
         C_temp = repmat(c_ind', num_vertices, 1);
-        v_ind = my_interp_fx(dist_array, C_temp, 0.5, 2);
-        
-        alpha_interp = repmat(alphas', num_vertices, 1);
-        alpha_interp = my_interp_fx(dist_array, alpha_interp, 0.5, 2);
-        
-        cmap_interp = repmat(cmap_i', num_vertices, 1);
-        cmap_interp = my_interp_fx(dist_array, cmap_interp, 0.5, 2);
-        cmap_interp = round(cmap_interp);
+        v_ind = my_interp_fx(dist_array, C_temp, beta, 2);
         %v_ind = round(length(cmap)*(v_ind - minVal)/(maxVal - minVal));
         
-        draw_color = (1-cmap_interp).*reshape(ind2rgb(round(v_ind), cmap), [num_vertices, 3]) + cmap_interp.*reshape(ind2rgb(round(v_ind), cmap_low), [num_vertices, 3]);
-        Cs = (1-alpha_interp).*draw_color + alpha_interp.*repmat(brainColor, num_vertices, 1);
+        %alpha_interp(cmap_interp > 0.1 & cmap_interp < 0.9) = 1;
+        Cs = reshape(ind2rgb(round(v_ind), cmap), [], 3);
         Cs(ind == 0,:) = repmat(brainColor, sum(ind == 0), 1);
 end
 toc
 
-h=patch('vertices', mdl.v, 'faces', mdl.f,'FaceVertexCData',Cs,'FaceColor','interp','AmbientStrength',0.6, 'LineStyle', 'None');
-text(probeInfo.OptPos3DX, probeInfo.OptPos3DY, probeInfo.OptPos3DZ, string(1:length(probeInfo.OptPos3DZ)), 'HorizontalAlignment', 'center');
+if(~isempty(p.Results.brainLineColor)&&all(~isnan(p.Results.brainLineColor)))
+    h=patch('vertices', mdl.v, 'faces', mdl.f,'FaceVertexCData',Cs,'FaceColor','interp','AmbientStrength',0.6, 'EdgeColor', p.Results.brainLineColor);
+else
+    h=patch('vertices', mdl.v, 'faces', mdl.f,'FaceVertexCData',Cs,'FaceColor','interp','AmbientStrength',0.6, 'LineStyle', 'None');
+end
 
-if(plotHit52_frontal)
-    for i=1:size(hit_fp_52,1)
-        if(~isnan(hit_fp_52.tx(i)))
-            text(tx2x(hit_fp_52.tx(i)),ty2y(hit_fp_52.ty(i)),tz2z(hit_fp_52.tz(i)),hit_fp_52.Optode(i), 'HorizontalAlignment','center')
-            hold on
-            h = scatter3(tx2x(hit_fp_52.tx(i)),ty2y(hit_fp_52.ty(i)),tz2z(hit_fp_52.tz(i)),200,'filled','g');
+if(showChannels)
+    if(numColors ~= 2)
+        if(~isempty(optColor) && (isnumeric(optColor) && ~any(isnan(optColor)) || ~ismissing(optColor)))
+            h = scatter3(OptPosX, OptPosY, OptPosZ,20*p.Results.labelfontsize,'filled',optColor);
         end
     end
+    text(OptPosX, OptPosY, OptPosZ, string(1:length(probeInfo.OptPos3DZ)), 'HorizontalAlignment', 'center', "FontSize", p.Results.labelfontsize, 'color', p.Results.labelfontcolor);
 end
-
 
 if(plotFNIRS_SD)
-    text(probeInfo.SrcPos3DX, probeInfo.SrcPos3DY, probeInfo.SrcPos3DZ, 'S'+string(1:length(probeInfo.SrcPos3DX)), 'HorizontalAlignment', 'center');
+    srcPos = [probeInfo.SrcPos3DX', probeInfo.SrcPos3DY', probeInfo.SrcPos3DZ'];
+    [srcPos, I] = unique(srcPos, 'rows');
+    srcPos = srcPos(probeInfo.sI(I),:);
+    if(~isempty(srcColor) && (isnumeric(srcColor) && ~any(isnan(srcColor)) || ~ismissing(srcColor)))
+        h = scatter3(srcPos(:,1),srcPos(:,2),srcPos(:,3),20*p.Results.labelfontsize,'filled',srcColor);
+    end
+    text(srcPos(:,1), srcPos(:,2), srcPos(:,3), 'S'+string(1:length(srcPos)), 'HorizontalAlignment', 'center', "FontSize", p.Results.labelfontsize, 'color', p.Results.labelfontcolor);
     hold on
-    h = scatter3(probeInfo.SrcPos3DX,probeInfo.SrcPos3DY,probeInfo.SrcPos3DZ,200,'filled','r');
-    text(probeInfo.DetPos3DX, probeInfo.DetPos3DY, probeInfo.DetPos3DZ, 'D'+string(1:length(probeInfo.DetPos3DX)), 'HorizontalAlignment', 'center');
-    hold on
-    h = scatter3(probeInfo.DetPos3DX,probeInfo.DetPos3DY,probeInfo.DetPos3DZ,200,'filled','y');
+    
+    detPos = [probeInfo.DetPos3DX', probeInfo.DetPos3DY', probeInfo.DetPos3DZ'];
+    [detPos, I] = unique(detPos, 'rows');
+    detPos = detPos(probeInfo.dI(I),:);
+    if(~isempty(detColor) && (isnumeric(detColor) && ~any(isnan(detColor)) || ~ismissing(detColor)))
+        h = scatter3(detPos(:,1), detPos(:,2), detPos(:,3), 20*p.Results.labelfontsize, 'filled', detColor);
+    end
+    text(detPos(:,1), detPos(:,2), detPos(:,3), 'D'+string(1:length(detPos)), 'HorizontalAlignment', 'center', "FontSize", p.Results.labelfontsize, 'color', p.Results.labelfontcolor);
 end
 
-if(~plot1020)
+if(plot1020)
 
 for i=1:size(c1020,1)
     %text(cerebro1020(i,1),cerebro1020(i,2),cerebro1020(i,3),cerebro1020_labels{i})
     if(~isnan(c1020.BA(i)))
-        h = scatter3(c1020.tx(i),c1020.ty(i),c1020.tz(i),200,'filled');
+        if(numColors == 4 || numColors == 1)
+            h = scatter3(c1020.tx(i),c1020.ty(i),c1020.tz(i),30*p.Results.labelfontsize, 'filled', color1020);
+        else
+            h = scatter3(c1020.tx(i),c1020.ty(i),c1020.tz(i),30*p.Results.labelfontsize, 'filled');
+        end
         hold on
         
-        text(c1020.tx(i),c1020.ty(i),c1020.tz(i),c1020.Electrode(i),'HorizontalAlignment','center')
+        text(c1020.tx(i),c1020.ty(i),c1020.tz(i),c1020.Electrode(i),'HorizontalAlignment','center', "FontSize", p.Results.labelfontsize, 'color', p.Results.labelfontcolor)
         %text(x2tx(c1020.x(i)),y2ty(c1020.y(i)),z2tz(c1020.z(i)),c1020.Electrode(i),'HorizontalAlignment','center')
         
     end
@@ -306,34 +431,32 @@ xlabel('x (L/R)');
 ylabel('y (R/C)');
 zlabel('z (U/D)');
 campos([0,1000+2.5,25]);  %Front facing
-camlight(lht,'headlight');
-camlight(180, 0);
+%camlight(lht,'headlight');
+%camlight(180, 0);
 
-ax1=gca;
+if(p.Results.showColorbar)
+ax1=ax;
 curAxPosition=ax1.Position;
 
-if(length(minVal) == 1)
-    
+if(~twosided)
+    title(ax, titleString);
     if(maxVal>minVal)
         colormap(ax1,cmap);
         negColorbar=false;
     else
-        colormap(gca,cmap_low);
+        colormap(ax1,cmap_low);
         temp=minVal;
         minVal=maxVal;
         maxVal=temp;
         negColorbar=true;
     end
-    caxis([c_min, c_max]);
-    set(gca,'xtick',[]);
-    set(gca,'ytick',[]);
+    caxis([minVal, maxVal]);
     chPos=colorbar();
-    axis off
 else
     curAxPosition=ax1.OuterPosition;
     
-    colormap(ax1,cmap);
-    caxis([minVal(2), c_max]);
+    colormap(ax1,cmap_high);
+    caxis([minVal(2), maxVal(2)]);
     
     ax2=axes('OuterPosition',curAxPosition);
     ax2.Position=ax1.Position;
@@ -343,7 +466,7 @@ else
     
     %set( chNeg, 'YDir', 'reverse' );
     colormap(ax2,cmap_low);
-    caxis([c_min, minVal(1)]);
+    caxis([maxVal(1), minVal(1)]);
     %caxis([-1*minVal(1),-1*maxVal(2)])
   
     axis off
@@ -361,15 +484,4 @@ else
     
     chNeg=colorbar(ax2,'Position',[curAxInnerPosition(1)+curAxInnerPosition(3),curAxInnerPosition(2)-cbHeight/5,0.02,cbHeight]);    
 end
-
-%ax1 = axes;
-%colormap(ax1, cmap);
-%chPos1 = colorbar(ax1);
-%set(get(chPos1,'title'),'string',clrBarTitle);
-%axis off;
-
-%ax2 = axes;
-%colormap(ax2, cmap_low);
-%linkaxes([ax1,ax2]);
-%chPos2 = colorbar(ax2);
-%ax2.Visible = 'off';
+end
