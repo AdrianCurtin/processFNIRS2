@@ -113,6 +113,9 @@ for j=1:length(probeInfo.cfg.Sections)
         tempChannels=unique(p.ChannelNumbers);
         p.ChannelList=tempChannels(tempChannels>0);
         p.NumOptodes=length(p.ChannelList);
+        
+        p.OptodeTable=table();
+        
         if(isfield(p,'DetPosX')&&isfield(p,'SrcPosX'))
             if(isfield(p,'dI')&&isfield(p,'sI'))
                 p.SrcPosX=p.SrcPosX(p.sI);
@@ -218,14 +221,14 @@ end
 
 function opt_2d_coords=setUpFalse2D(numCh)
 
-for i=1:numCh
-    x1=i-1;
-    x2=1;
-    y1=0;
-    y2=0.9;
-    x2=x2/numCh;
-    x1=x1/numCh;
-    
-    opt_2d_coords{i}=[x1,y1,x2,y2];
-end
+    for i=1:numCh
+        x1=i-1;
+        x2=1;
+        y1=0;
+        y2=0.9;
+        x2=x2/numCh;
+        x1=x1/numCh;
+
+        opt_2d_coords{i}=[x1,y1,x2,y2];
+    end
 end
