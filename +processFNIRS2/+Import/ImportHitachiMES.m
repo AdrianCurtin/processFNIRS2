@@ -26,12 +26,18 @@ elseif nargin<2
     fid=fopen(file);
     filename=file;
 else
-     filename=[pathname,file];
+    if(isfile(file))
+     filename=file;
      fid=fopen(filename);
+    else
+        
+        filename=[pathname,file];
+        fid=fopen(filename);
+    end
 end
 
 
-
+[filepath,fileroot,ext]=fileparts(filename);
 
 if fid==-1
   error('Data file not found or permission denied');
