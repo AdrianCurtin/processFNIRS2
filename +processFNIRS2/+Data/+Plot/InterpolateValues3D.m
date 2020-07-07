@@ -22,7 +22,7 @@ validInterpolateType = @(x) any(validatestring(x, validInterpolateTypes));
 
 defaultCamPosition = 'auto';
 validCamPositions = {'auto','front', 'back', 'top' 'left', 'right'};
-validCamPosition = @(x) any(validateString(x, validCamPositions)) || isnumeric(x) && length(x) == 3;
+validCamPosition = @(x) any(validatestring(x, validCamPositions)) || isnumeric(x) && length(x) == 3;
 
 if(isa(varargin{1},'matlab.graphics.axis.Axes')) %If first argument is axes then move to front
    ax=varargin{1};
@@ -455,10 +455,10 @@ switch(p.Results.initCamPosition)
     otherwise
         campos(OptPos3D_mean*25);  %Front facing
 end
-campos(OptPos3D_mean*25);  %Front facing
+%campos(OptPos3D_mean*25);  %Front facing
 camtarget([0,-20,0]);
-%camlight(lht,'headlight');
-%camlight(180, 0);
+camlight(lht,'headlight');
+camlight(180, 0);
 
 if(p.Results.showColorbar)
 ax1=ax;
