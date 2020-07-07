@@ -465,6 +465,7 @@ camlight(lht,'headlight');
 camlight(180, 0);
 
 if(p.Results.showColorbar)
+% clrBarTitle
 ax1=ax;
 curAxPosition=ax1.Position;
 
@@ -480,8 +481,8 @@ if(~twosided)
         maxVal=temp;
         negColorbar=true;
     end
-    caxis([minVal, maxVal]);
-    chPos=colorbar();
+    caxis(ax1, [minVal, maxVal]);
+    chPos=colorbar(ax1);
 else
     curAxPosition=ax1.OuterPosition;
     
