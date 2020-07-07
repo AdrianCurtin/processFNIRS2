@@ -118,10 +118,10 @@ data=p.Results.data;
 skipCFG=false;
 if(~isempty(p.Results.UseDeviceCFG)) % if command argument given
     cfgFilePath=p.Results.UseDeviceCFG; % command argument to load cfg file
-elseif(pf2_base.isnestedfield(data,'info.probename')&&~contains(data.info.probename,'Unkown')&&~contains(data.info.probename,'generated')) 
+elseif(pf2_base.isnestedfield(data,'info.probename')&&~contains(data.info.probename,'Unknown')&&~contains(data.info.probename,'generated')) 
     %try to load the probename cfg file
     cfgFilePath=sprintf('%s.cfg',data.info.probename);
-elseif(pf2_base.isnestedfield(data,'info.probename')&&~contains(data.info.probename,'Unkown')&&contains(data.info.probename,'generated')) 
+elseif(pf2_base.isnestedfield(data,'info.probename')&&~contains(data.info.probename,'Unknown')&&contains(data.info.probename,'generated')) 
     cfgFilePath=sprintf('%s.cfg',data.info.probename);
     skipCFG=true;
 else

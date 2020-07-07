@@ -114,31 +114,73 @@ for j=1:length(probeInfo.cfg.Sections)
         p.ChannelList=tempChannels(tempChannels>0);
         p.NumOptodes=length(p.ChannelList);
         
-        p.OptodeTable=table();
+        p.TableOpt=table();
+        p.TableOpt.OptodeNum=p.ChannelList(:);
+        
+        if(isfield(p,'ChannelLabels'))
+            p.TableOpt.Label=p.ChannelLabels(:);
+        end
+        
+        p.TableSD=table();
+        
+        if(isfield(p,'SDLabels'))
+            p.TableSD.Label=p.SDLabels(:);
+        end
         
         if(isfield(p,'DetPosX')&&isfield(p,'SrcPosX'))
             if(isfield(p,'dI')&&isfield(p,'sI'))
+                
+                Type_temp=[ones(size(p.SrcPosX(:)));ones(size(p.DetPosX(:)))*2];
+                
+                typeStr_temp={'Src','Det'};
+                
+                catType_temp=categorical(typeStr_temp(Type_temp(:)),typeStr_temp);
+                p.TableSD.Type=catType_temp(:);
+                
+                
+                
+                p.TableSD.Index=[(1:length(p.SrcPosX(:)))';(1:length(p.DetPosX(:)))'];
+                
+                
+                if(~isfield(p.TableSD,'Label'))
+                    for sd=1:length(p.TableSD.Index)
+                        p.TableSD.Label{sd}=sprintf('%s%i\n',p.TableSD.Type(sd),p.TableSD.Index(sd));
+                    end
+                end
+                
+                p.TableSD.Pos2D_x=[p.SrcPosX(:);p.DetPosX(:)];
+                
                 p.SrcPosX=p.SrcPosX(p.sI);
                 p.DetPosX=p.DetPosX(p.dI);
+                
+                p.TableOpt.SrcIdx=p.sI(:);
+                p.TableOpt.DetIdx=p.dI(:);
             end
             
             p.OptPosX=nanmean([p.DetPosX(:)';p.SrcPosX(:)'],1)';
+            
+            p.TableOpt.Pos2D_x=p.OptPosX;
         end
         
         if(isfield(p,'DetPosY')&&isfield(p,'SrcPosY'))
             if(isfield(p,'dI')&&isfield(p,'sI'))
+                 p.TableSD.Pos2D_y=[p.SrcPosY(:);p.DetPosY(:)];
+                
                 p.SrcPosY=p.SrcPosY(p.sI);
                 p.DetPosY=p.DetPosY(p.dI);
             end
             p.OptPosY=nanmean([p.DetPosY(:)';p.SrcPosY(:)'],1)';
+            p.TableOpt.Pos2D_x=p.OptPosY;
         end
         
         if(isfield(p,'DetPosZ')&&isfield(p,'SrcPosZ'))
             if(isfield(p,'dI')&&isfield(p,'sI'))
+                p.TableSD.Pos2D_z=[p.SrcPosZ(:);p.DetPosZ(:)];
                 p.SrcPosZ=p.SrcPosZ(p.sI);
                 p.DetPosZ=p.DetPosZ(p.dI);
             end
             p.OptPosZ=nanmean([p.DetPosZ(:)';p.SrcPosZ(:)'],1)';
+            p.TableOpt.Pos2D_z=p.OptPosZ;
         end
         
         if(isfield(p,'OptPosX')&&isfield(p,'OptPosY'))
@@ -146,9 +188,11 @@ for j=1:length(probeInfo.cfg.Sections)
                p.SD=sqrt((p.DetPosX-p.SrcPosX).^2+(p.DetPosY-p.SrcPosY).^2+(p.DetPosZ-p.SrcPosZ).^2);
            else % Calculate 2D SD
                p.SD=sqrt((p.DetPosX-p.SrcPosX).^2+(p.DetPosY-p.SrcPosY).^2);
+               p.TableOpt.SD=p.SD;
            end
            
            p.IsShortSeparation=p.SD<2;
+           p.TableOpt.IsShortSeparation=p.IsShortSeparation(:);
            p.NumShortSeparation=sum(p.IsShortSeparation);
         else
             error('Unable to determine source detector separation, please validate detector and source positions');
@@ -156,29 +200,35 @@ for j=1:length(probeInfo.cfg.Sections)
         
         if(isfield(p,'DetPos3DX')&&isfield(p,'SrcPos3DX'))
             if(isfield(p,'dI')&&isfield(p,'sI'))
+                p.TableSD.Pos3D_x=[p.SrcPos3DX(:);p.DetPos3DX(:)];
                 p.SrcPos3DX=p.SrcPos3DX(p.sI);
                 p.DetPos3DX=p.DetPos3DX(p.dI);
             end
             
             p.OptPos3DX=nanmean([p.DetPos3DX(:)';p.SrcPos3DX(:)'],1)';
+            p.TableOpt.Pos3D_x=p.OptPos3DX;
         end
         
         if(isfield(p,'DetPos3DY')&&isfield(p,'SrcPos3DY'))
             if(isfield(p,'dI')&&isfield(p,'sI'))
+                p.TableSD.Pos3D_y=[p.SrcPos3DY(:);p.DetPos3DY(:)];
                 p.SrcPos3DY=p.SrcPos3DY(p.sI);
                 p.DetPos3DY=p.DetPos3DY(p.dI);
             end
             
             p.OptPos3DY=nanmean([p.DetPos3DY(:)';p.SrcPos3DY(:)'],1)';
+            p.TableOpt.Pos3D_y=p.OptPos3DY;
         end
         
         if(isfield(p,'DetPos3DZ')&&isfield(p,'SrcPos3DZ'))
             if(isfield(p,'dI')&&isfield(p,'sI'))
+                p.TableSD.Pos3D_z=[p.SrcPos3DZ(:);p.DetPos3DZ(:)];
                 p.SrcPos3DZ=p.SrcPos3DZ(p.sI);
                 p.DetPos3DZ=p.DetPos3DZ(p.dI);
             end
             
             p.OptPos3DZ=nanmean([p.DetPos3DZ(:)';p.SrcPos3DZ(:)'],1)';
+            p.TableOpt.Pos3D_z=p.OptPos3DX;
         end
         
         
@@ -203,6 +253,20 @@ for j=1:length(probeInfo.cfg.Sections)
         else
             %p.OptLayout2D=setUpFalse2D(p.NumOptodes);  % generate false channels if not requested
         end
+        
+        hasLabel=isfield(p.TableOpt,'Label');
+            
+        
+        for c=1:length(p.ChannelList)
+            p.TableOpt.Ch(c,:)=(find(p.ChannelNumbers==p.ChannelList(c)));
+            p.TableOpt.wv(c,:)=p.Wavelength(p.TableOpt.Ch(c,:));
+            if(~hasLabel)
+               p.TableOpt.Label{c}=sprintf('Opt%i', p.ChannelList(c));
+            end
+        end
+        
+        
+            
         
         if(saveOptLayout2&&isfield(p,'OptLayout2D'))
             setF.device.Probe{probeCount}=p;
