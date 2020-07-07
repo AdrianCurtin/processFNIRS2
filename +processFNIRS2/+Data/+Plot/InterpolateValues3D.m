@@ -1,4 +1,4 @@
-function [ imgOut,optPos2Plot ] = InterpolateValues3D(varargin)
+function [ imgOut ] = InterpolateValues3D(varargin)
 
 %processFNIRS2.Data.Plot.ImageValues
 %
