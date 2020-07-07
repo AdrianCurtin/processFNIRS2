@@ -52,7 +52,7 @@ addParameter(p, 'labelfontcolor', 'k', validColor);
 addParameter(p, 'labelspherecolors', ["r", "y"]);
 addParameter(p, 'brainColor', [0.92, 0.68, 0.68], validColor);
 addParameter(p, 'brainLineColor', [], validColor);
-addParameter(p, 'backgroundColor', [1 1 1], validColor);
+addParameter(p, 'backgroundColor', [], validColor);
 addParameter(p, 'showColorbar', true, @islogical);
 addParameter(p, 'initCamPosition', defaultCamPosition, validCamPosition);
 addParameter(p, 'logScale', false, @islogical);
@@ -110,6 +110,10 @@ clrBarTitle = p.Results.colorbarStr;
 projectmode = p.Results.interpolateType;
 
 ax = p.Results.ax;
+bgc = p.Results.backgroundColor;
+if(~any(ismissing(bgc)) && ~isempty(bgc))
+    set(ax, 'color', bgc);
+end
 
 numericColors = isnumeric(p.Results.labelspherecolors);
 ss = size(p.Results.labelspherecolors);
