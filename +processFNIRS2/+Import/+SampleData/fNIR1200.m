@@ -1,4 +1,4 @@
-function fNIR=ImportSampleData()
+function fNIR=fNIR1200()
 
 [filepath]=mfilename('fullpath');
 
