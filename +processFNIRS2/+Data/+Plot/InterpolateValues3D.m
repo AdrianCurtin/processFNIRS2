@@ -302,8 +302,8 @@ controlPoints = [OptPosX(:), OptPosY(:), OptPosZ(:)];
 num_control = size(controlPoints, 1);
 
 
-cmap_high = colormap(hot(256));
-cmap_low = colormap(cool(256));
+cmap_high = hot(256);
+cmap_low = cool(256);
 
 
 tic
@@ -488,7 +488,7 @@ else
     curAxPosition=ax1.OuterPosition;
     
     colormap(ax1,cmap_high);
-    caxis([minVal(2), maxVal(2)]);
+    caxis(ax1, [minVal(2), maxVal(2)]);
     
     ax2=axes('OuterPosition',curAxPosition);
     ax2.Position=ax1.Position;
@@ -498,7 +498,7 @@ else
     
     %set( chNeg, 'YDir', 'reverse' );
     colormap(ax2,cmap_low);
-    caxis([maxVal(1), minVal(1)]);
+    caxis(ax2, [maxVal(1), minVal(1)]);
     %caxis([-1*minVal(1),-1*maxVal(2)])
   
     axis off
