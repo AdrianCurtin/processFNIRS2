@@ -3,14 +3,15 @@ function [ imgOut,optPos2Plot ] = InterpolateValues3D(varargin)
 %processFNIRS2.Data.Plot.ImageValues
 %
 % Uses an imagemap to change the color of each cell based on data2plot
-% fNIR is a data structure that contains the fNIRS structure info, data2
-% plot houses the numbers themselves
+% fNIR is a data structure that contains the fNIRS structure info, 
+% data2plot houses the numbers themselves
 %
 % Short separation channels are not presented here and are skipped
 %
 
 validAxesHandle= @(x) isa(x,'matlab.graphics.axis.Axes')&&isvalid(x);
 validScalarPosNum = @(x) isnumeric(x) && x>0;
+validScalarPosNumOrNan = @(x) isnumeric(x) && (x>0||isnan(x));
 validI1020Label = @(x) islogical(x) || iscellstr(x);
 validColor = @(x) (ischar(x) && length(x) == 1) || isnumeric(x) && length(x) == 3 || isempty(x);
 %validColorList = @(x) validColor(x) || all(arrayfun(validColor, x));
@@ -56,7 +57,7 @@ addParameter(p, 'showColorbar', true, @islogical);
 addParameter(p, 'initCamPosition', defaultCamPosition, validCamPosition);
 addParameter(p, 'logScale', false, @islogical);
 addParameter(p, 'interpolateType', defaultInterpolateType, validInterpolateType);
-addParameter(p, 'bufferDistance', 30, validScalarPosNum);
+addParameter(p, 'bufferDistance', nan, validScalarPosNumOrNan); %In a grid, this may equal to sqrt(sd distance^2/2)
 addParameter(p, 'includeSS', true, @islogical);
 
 parse(p,varargin{:});
@@ -220,6 +221,11 @@ OptPosX=probeInfo.OptPos3DX(~probeInfo.IsShortSeparation | ~p.Results.includeSS)
 OptPosY=probeInfo.OptPos3DY(~probeInfo.IsShortSeparation | ~p.Results.includeSS);
 OptPosZ=probeInfo.OptPos3DZ(~probeInfo.IsShortSeparation | ~p.Results.includeSS);
 
+bufferDistance=p.Results.bufferDistance;
+if(isnan(bufferDistance))
+   bufferDistance=median(probeInfo.SD(~probeInfo.IsShortSeparation)*10)/sqrt(2);
+end
+
 useHighRes = p.Results.useHighRes;
 show1020 = islogical(p.Results.I1020_labels) && p.Results.I1020_labels || ~islogical(p.Results.I1020_labels) && ~isempty(p.Results.I1020_labels);
 showSD = p.Results.SDLabels;
@@ -252,7 +258,6 @@ axis tight
 
 plotFNIRS_SD=showSD;
 plot1020=show1020;
-plotHit52_frontal=false;
 brainColor=p.Results.brainColor;
 cMdl=cerebro_mdl;
 
@@ -285,7 +290,7 @@ hold on;
 C=data2plot;
 
 num_vertices = size(mdl.v, 1);
-max_distance_2 = p.Results.bufferDistance^2;
+max_distance_2 = bufferDistance^2;
 Cs = zeros(num_vertices, 3);
 controlPoints = [OptPosX, OptPosY, OptPosZ];
 num_control = size(controlPoints, 1);
