@@ -1,4 +1,4 @@
-function [ imgOut,optPos2Plot ] = InterpolateValues3D(varargin)
+function [ imgOut ] = InterpolateValues3D(varargin)
 
 %processFNIRS2.Data.Plot.ImageValues
 %
@@ -172,7 +172,7 @@ if(isempty(fNIR)&&isfield(setF,'device'))
     
     cfgFilePath=setF.device.cfg.File;
     if(~isfield(setF.device.Probe{1},'OptLayout2D'))
-        probeInfo=pf2_base.loadDeviceCfg(cfgFilePath,true);
+        probeInfo=pf2_base.loadDeviceCfg(cfgFilePath,false);
         setF.device=probeInfo;
     else
        probeInfo=setF.device; 
@@ -191,13 +191,13 @@ elseif(isempty(cfgFilePath)||~contains(cfgFilePath,'.cfg'))
     warning('Missing or invalid configuration file path\n')
     
     disp('No device specified. Please load device configuration');
-    probeInfo=pf2_base.loadDeviceCfg('',true);
+    probeInfo=pf2_base.loadDeviceCfg('',false);
     if(isempty(probeInfo))
         error('No valid devices selected');
     end
     
 elseif(~isempty(cfgFilePath)) % If we're not looking at the GUI, doesn't matter
-    probeInfo=pf2_base.loadDeviceCfg(cfgFilePath,true);
+    probeInfo=pf2_base.loadDeviceCfg(cfgFilePath,false);
 end
 
 if(pf2_base.isnestedfield(probeInfo,'Probe'))
@@ -464,8 +464,9 @@ camtarget([0,-20,0]);
 camlight(lht,'headlight');
 camlight(180, 0);
 
+
+
 if(p.Results.showColorbar)
-% clrBarTitle
 ax1=ax;
 curAxPosition=ax1.Position;
 
