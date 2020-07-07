@@ -20,8 +20,8 @@ defaultInterpolateType = 'nearest';
 validInterpolateTypes = {'nearest', 'linear', 'quadratic', 'cubic'};
 validInterpolateType = @(x) any(validatestring(x, validInterpolateTypes));
 
-defaultCamPosition = 'front';
-validCamPositions = {'front', 'back', 'top' 'left', 'right'};
+defaultCamPosition = 'auto';
+validCamPositions = {'auto','front', 'back', 'top' 'left', 'right'};
 validCamPosition = @(x) any(validateString(x, validCamPositions)) || isnumeric(x) && length(x) == 3;
 
 if(isa(varargin{1},'matlab.graphics.axis.Axes')) %If first argument is axes then move to front
@@ -215,11 +215,12 @@ end
 
 %h{1}= axes('Position',[0.05,0.05,0.9,0.9],'Box','on');
 
-imgSize=1000;
 
 OptPosX=probeInfo.OptPos3DX(~probeInfo.IsShortSeparation | ~p.Results.includeSS);
 OptPosY=probeInfo.OptPos3DY(~probeInfo.IsShortSeparation | ~p.Results.includeSS);
 OptPosZ=probeInfo.OptPos3DZ(~probeInfo.IsShortSeparation | ~p.Results.includeSS);
+
+OptPos3D_mean=probeInfo.OptPos3D_mean;
 
 bufferDistance=p.Results.bufferDistance;
 if(isnan(bufferDistance))
@@ -230,6 +231,7 @@ useHighRes = p.Results.useHighRes;
 show1020 = islogical(p.Results.I1020_labels) && p.Results.I1020_labels || ~islogical(p.Results.I1020_labels) && ~isempty(p.Results.I1020_labels);
 showSD = p.Results.SDLabels;
 showChannels = p.Results.ChannelLabels;
+
 % TAL EEG locations from Automated cortical projection of EEG sensors: Anatomical correlation via the international 10–10 system
 if(useHighRes)
     cerebro_mdl=load('cerebro_mdl.mat');    %high res model
@@ -435,7 +437,26 @@ end
 xlabel('x (L/R)');
 ylabel('y (R/C)');
 zlabel('z (U/D)');
-campos([0,1000+2.5,25]);  %Front facing
+
+
+switch(p.Results.initCamPosition)
+    case 'auto'
+        campos(OptPos3D_mean*25);  %Front facing
+    case 'front'
+        campos([0,1000,0]);
+    case 'back'
+        campos([0,-1000,0]);
+    case 'top'
+        campos([0,0,1500]);
+    case 'left'
+        campos([-1000,0,0]);  
+    case 'right'
+        campos([1000,0,0]);
+    otherwise
+        campos(OptPos3D_mean*25);  %Front facing
+end
+campos(OptPos3D_mean*25);  %Front facing
+camtarget([0,-20,0]);
 %camlight(lht,'headlight');
 %camlight(180, 0);
 

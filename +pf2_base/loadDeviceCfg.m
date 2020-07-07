@@ -142,7 +142,7 @@ for j=1:length(probeInfo.cfg.Sections)
                 p.TableSD.Index=[(1:length(p.SrcPosX(:)))';(1:length(p.DetPosX(:)))'];
                 
                 
-                if(~isfield(p.TableSD,'Label'))
+                if(~ismember('Label',p.TableSD.Properties.VariableNames))
                     for sd=1:length(p.TableSD.Index)
                         p.TableSD.Label{sd}=sprintf('%s%i\n',p.TableSD.Type(sd),p.TableSD.Index(sd));
                     end
@@ -170,7 +170,7 @@ for j=1:length(probeInfo.cfg.Sections)
                 p.DetPosY=p.DetPosY(p.dI);
             end
             p.OptPosY=nanmean([p.DetPosY(:)';p.SrcPosY(:)'],1)';
-            p.TableOpt.Pos2D_x=p.OptPosY;
+            p.TableOpt.Pos2D_y=p.OptPosY;
         end
         
         if(isfield(p,'DetPosZ')&&isfield(p,'SrcPosZ'))
@@ -228,7 +228,7 @@ for j=1:length(probeInfo.cfg.Sections)
             end
             
             p.OptPos3DZ=nanmean([p.DetPos3DZ(:)';p.SrcPos3DZ(:)'],1)';
-            p.TableOpt.Pos3D_z=p.OptPos3DX;
+            p.TableOpt.Pos3D_z=p.OptPos3DZ;
         end
         
         
@@ -254,8 +254,40 @@ for j=1:length(probeInfo.cfg.Sections)
             %p.OptLayout2D=setUpFalse2D(p.NumOptodes);  % generate false channels if not requested
         end
         
-        hasLabel=isfield(p.TableOpt,'Label');
+        hasLabel=ismember('Label',p.TableOpt.Properties.VariableNames);
+        
+        xyzPresent=ismember({'Pos3D_x','Pos3D_y','Pos3D_z'},p.TableOpt.Properties.VariableNames);
+        
+        if(all(xyzPresent))
+            xyz=[p.TableOpt.Pos3D_x,p.TableOpt.Pos3D_y,p.TableOpt.Pos3D_z];
+            xyzSD=[p.TableSD.Pos3D_x,p.TableSD.Pos3D_y,p.TableSD.Pos3D_z];
+        elseif(sum(xyzPresent)==2)
+            xyzStrs={'Pos3D_x','Pos3D_y','Pos3D_z'};
+            xyzPresent=find(xyzPresent);
+            xyz=[p.TableOpt.(xyzStrs{xyzPresent(1)}),p.TableOpt.(xyzStrs{xyzPresent(2)}),zeros(length(p.ChannelList),1)];
+            xyzSD=[p.TableSD.(xyzStrs{xyzPresent(1)}),p.TableSD.(xyzStrs{xyzPresent(2)}),zeros(length(p.ChannelList),1)];
+        elseif(sum(xyzPresent)==1)
+            xyzStrs={'Pos3D_x','Pos3D_y','Pos3D_z'};
+            xyzPresent=find(xyzPresent);
+            xyz=[p.TableOpt.(xyzStrs{xyzPresent(1)}),zeros(length(p.ChannelList),2)];
+            xyzSD=[p.TableSD.(xyzStrs{xyzPresent(1)}),zeros(length(p.ChannelList),2)];
+        else
+            xyz=[(1:length(p.ChannelList))',zeros(length(p.ChannelList),2)];
+            xyz=xyz*30; %Default spacing 30mm
+            xyzSD=[]; %Don't know what to do for this
+        end
             
+        l1=size(xyz,1);
+        l2=size(xyzSD,1);
+        plane2D=affine_fit([xyz;xyzSD]);
+        
+        plane2D_opt=plane2D(1:l1,:);
+        plane2D_sd=plane2D(end-l2+1:1:end,:);
+        
+        zeroCoordIndex=sum(round(abs(plane2D)),1)==0;
+        
+         p.TableOpt.proj2D=plane2D_opt(:,zeroCoordIndex);
+         p.TableSD.proj2D=plane2D_sd(:,zeroCoordIndex);
         
         for c=1:length(p.ChannelList)
             p.TableOpt.Ch(c,:)=(find(p.ChannelNumbers==p.ChannelList(c)));
@@ -265,7 +297,7 @@ for j=1:length(probeInfo.cfg.Sections)
             end
         end
         
-        
+        p.OptPos3D_mean=nanmean(xyz,1);
             
         
         if(saveOptLayout2&&isfield(p,'OptLayout2D'))
@@ -296,3 +328,52 @@ function opt_2d_coords=setUpFalse2D(numCh)
         opt_2d_coords{i}=[x1,y1,x2,y2];
     end
 end
+
+function [proj2d,n,V,p] = affine_fit(XYZ)
+    %Computes the plane that fits best (lest square of the normal distance
+    %to the plane) a set of sample points.
+    %INPUTS:
+    %
+    %X: a N by 3 matrix where each line is a sample point
+    %
+    %OUTPUTS:
+    %
+    %n : a unit (column) vector normal to the plane
+    %V : a 3 by 2 matrix. The columns of V form an orthonormal basis of the
+    %plane
+    %p : a point belonging to the plane
+    %
+    %NB: this code actually works in any dimension (2,3,4,...)
+    %Author: Adrien Leygue
+    %Date: August 30 2013
+    
+    %the mean of the samples belongs to the plane
+    p = mean(XYZ,1);
+    
+    %The samples are reduced:
+    R = bsxfun(@minus,XYZ,p);
+    %Computation of the principal directions if the samples cloud
+    [V,D] = eig(R'*R);
+    %Extract the output from the eigenvectors
+    n = V(:,1);
+    V = V(:,2:end);
+    
+    proj2d=project(XYZ,n,V,p);
+end
+
+function proj2d=project(XYZ,n,V,p)
+
+    XYZ_p=XYZ-p; %move points onto plane
+    
+    A=[1 0 0 -n(1); 0 1 0 -n(2); 0 0 1 -n(3); n' 0];
+    
+    B=(A\[XYZ_p';zeros(size(XYZ(:,1)'))])';
+    
+    r=vrrotvec([0,0,1],n);
+    RM=vrrotvec2mat(r);
+    
+    proj2d=B(:,1:3)*RM;
+   
+
+end
+
