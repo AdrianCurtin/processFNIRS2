@@ -206,7 +206,10 @@ for j=1:length(probeInfo.cfg.Sections)
             end
             
             p.OptPos3DX=nanmean([p.DetPos3DX(:)';p.SrcPos3DX(:)'],1)';
-            p.TableOpt.Pos3D_x=p.OptPos3DX;
+            p.TableOpt.Pos3D_x=p.OptPos3DX(:);
+        elseif(isfield(p,'OptPos3DX'))
+            
+            p.TableOpt.Pos3D_x=p.OptPos3DX(:);
         end
         
         if(isfield(p,'DetPos3DY')&&isfield(p,'SrcPos3DY'))
@@ -217,7 +220,9 @@ for j=1:length(probeInfo.cfg.Sections)
             end
             
             p.OptPos3DY=nanmean([p.DetPos3DY(:)';p.SrcPos3DY(:)'],1)';
-            p.TableOpt.Pos3D_y=p.OptPos3DY;
+            p.TableOpt.Pos3D_y=p.OptPos3DY(:);
+        elseif(isfield(p,'OptPos3DY'))
+            p.TableOpt.Pos3D_y=p.OptPos3DY(:);
         end
         
         if(isfield(p,'DetPos3DZ')&&isfield(p,'SrcPos3DZ'))
@@ -228,7 +233,9 @@ for j=1:length(probeInfo.cfg.Sections)
             end
             
             p.OptPos3DZ=nanmean([p.DetPos3DZ(:)';p.SrcPos3DZ(:)'],1)';
-            p.TableOpt.Pos3D_z=p.OptPos3DZ;
+            p.TableOpt.Pos3D_z=p.OptPos3DZ(:);
+        elseif(isfield(p,'OptPos3DZ'))
+            p.TableOpt.Pos3D_z=p.OptPos3DZ(:);
         end
         
         
@@ -257,20 +264,31 @@ for j=1:length(probeInfo.cfg.Sections)
         hasLabel=ismember('Label',p.TableOpt.Properties.VariableNames);
         
         xyzPresent=ismember({'Pos3D_x','Pos3D_y','Pos3D_z'},p.TableOpt.Properties.VariableNames);
+        xyzPresentSD=ismember({'Pos3D_x','Pos3D_y','Pos3D_z'},p.TableSD.Properties.VariableNames);
+        xyzSD=[];
         
         if(all(xyzPresent))
             xyz=[p.TableOpt.Pos3D_x,p.TableOpt.Pos3D_y,p.TableOpt.Pos3D_z];
-            xyzSD=[p.TableSD.Pos3D_x,p.TableSD.Pos3D_y,p.TableSD.Pos3D_z];
+            
+            if(all(xyzPresentSD))
+                xyzSD=[p.TableSD.Pos3D_x,p.TableSD.Pos3D_y,p.TableSD.Pos3D_z];
+            end
         elseif(sum(xyzPresent)==2)
             xyzStrs={'Pos3D_x','Pos3D_y','Pos3D_z'};
             xyzPresent=find(xyzPresent);
             xyz=[p.TableOpt.(xyzStrs{xyzPresent(1)}),p.TableOpt.(xyzStrs{xyzPresent(2)}),zeros(length(p.ChannelList),1)];
             xyzSD=[p.TableSD.(xyzStrs{xyzPresent(1)}),p.TableSD.(xyzStrs{xyzPresent(2)}),zeros(length(p.ChannelList),1)];
+            if(any(xyzPresentSD))
+                xyzSD=[p.TableSD.Pos3D_x,p.TableSD.Pos3D_y,p.TableSD.Pos3D_z];
+            end
         elseif(sum(xyzPresent)==1)
             xyzStrs={'Pos3D_x','Pos3D_y','Pos3D_z'};
             xyzPresent=find(xyzPresent);
             xyz=[p.TableOpt.(xyzStrs{xyzPresent(1)}),zeros(length(p.ChannelList),2)];
             xyzSD=[p.TableSD.(xyzStrs{xyzPresent(1)}),zeros(length(p.ChannelList),2)];
+            if(any(xyzPresentSD))
+                xyzSD=[p.TableSD.Pos3D_x,p.TableSD.Pos3D_y,p.TableSD.Pos3D_z];
+            end
         else
             xyz=[(1:length(p.ChannelList))',zeros(length(p.ChannelList),2)];
             xyz=xyz*30; %Default spacing 30mm

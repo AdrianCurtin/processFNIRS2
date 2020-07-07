@@ -298,7 +298,7 @@ C=data2plot;
 num_vertices = size(mdl.v, 1);
 max_distance_2 = bufferDistance^2;
 Cs = zeros(num_vertices, 3);
-controlPoints = [OptPosX, OptPosY, OptPosZ];
+controlPoints = [OptPosX(:), OptPosY(:), OptPosZ(:)];
 num_control = size(controlPoints, 1);
 
 
@@ -400,7 +400,7 @@ if(showChannels)
     text(OptPosX, OptPosY, OptPosZ, string(1:length(probeInfo.OptPos3DZ)), 'HorizontalAlignment', 'center', "FontSize", p.Results.labelfontsize, 'color', p.Results.labelfontcolor);
 end
 
-if(plotFNIRS_SD)
+if(plotFNIRS_SD&&isfield(probeInfo,'SrcPos3DX'))
     srcPos = [probeInfo.SrcPos3DX', probeInfo.SrcPos3DY', probeInfo.SrcPos3DZ'];
     [srcPos, I] = unique(srcPos, 'rows');
     srcPos = srcPos(probeInfo.sI(I),:);
@@ -445,7 +445,7 @@ zlabel('z (U/D)');
 
 switch(p.Results.initCamPosition)
     case 'auto'
-        campos(OptPos3D_mean*25);  %Front facing
+        campos(OptPos3D_mean*35);  %Front facing
     case 'front'
         campos([0,1000,0]);
     case 'back'
