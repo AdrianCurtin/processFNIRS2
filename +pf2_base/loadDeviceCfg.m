@@ -287,8 +287,11 @@ for j=1:length(probeInfo.cfg.Sections)
         zeroCoordIndex=sum(round(abs(plane2D)),1)==0;
         
          p.TableOpt.proj2D=plane2D_opt(:,zeroCoordIndex);
-         p.TableSD.proj2D=plane2D_sd(:,zeroCoordIndex);
-        
+         
+         if(~isempty(plane2D_sd))
+            p.TableSD.proj2D=plane2D_sd(:,zeroCoordIndex);
+         end
+         
         for c=1:length(p.ChannelList)
             p.TableOpt.Ch(c,:)=(find(p.ChannelNumbers==p.ChannelList(c)));
             p.TableOpt.wv(c,:)=p.Wavelength(p.TableOpt.Ch(c,:));
