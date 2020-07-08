@@ -205,7 +205,9 @@ for j=1:length(probeInfo.cfg.Sections)
                 p.DetPos3DX=p.DetPos3DX(p.dI);
             end
             
-            p.OptPos3DX=nanmean([p.DetPos3DX(:)';p.SrcPos3DX(:)'],1)';
+            if(~isfield(p,'OptPos3DX'))
+                p.OptPos3DX=nanmean([p.DetPos3DX(:)';p.SrcPos3DX(:)'],1)';
+            end
             p.TableOpt.Pos3D_x=p.OptPos3DX(:);
         elseif(isfield(p,'OptPos3DX'))
             
@@ -219,7 +221,9 @@ for j=1:length(probeInfo.cfg.Sections)
                 p.DetPos3DY=p.DetPos3DY(p.dI);
             end
             
-            p.OptPos3DY=nanmean([p.DetPos3DY(:)';p.SrcPos3DY(:)'],1)';
+            if(~isfield(p,'OptPos3DY'))
+                p.OptPos3DY=nanmean([p.DetPos3DY(:)';p.SrcPos3DY(:)'],1)';
+            end
             p.TableOpt.Pos3D_y=p.OptPos3DY(:);
         elseif(isfield(p,'OptPos3DY'))
             p.TableOpt.Pos3D_y=p.OptPos3DY(:);
@@ -232,7 +236,9 @@ for j=1:length(probeInfo.cfg.Sections)
                 p.DetPos3DZ=p.DetPos3DZ(p.dI);
             end
             
-            p.OptPos3DZ=nanmean([p.DetPos3DZ(:)';p.SrcPos3DZ(:)'],1)';
+            if(~isfield(p,'OptPos3DZ'))
+                p.OptPos3DZ=nanmean([p.DetPos3DZ(:)';p.SrcPos3DZ(:)'],1)';
+            end
             p.TableOpt.Pos3D_z=p.OptPos3DZ(:);
         elseif(isfield(p,'OptPos3DZ'))
             p.TableOpt.Pos3D_z=p.OptPos3DZ(:);
