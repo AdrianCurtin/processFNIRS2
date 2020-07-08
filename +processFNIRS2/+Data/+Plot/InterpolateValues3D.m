@@ -271,15 +271,15 @@ cMdl=cerebro_mdl;
 
 
 
-tx2x=@(x) x;%/50*1.73;  %L/R scaling
-ty2y=@(y) y;%/140*4.76+0.5; %rostral/caudal scaling
-tz2z=@(z) z;%/80*2.5+2.3;  %up down scaling
+tx2x=@(x) x;%/49*1.73;  %L/R scaling
+ty2y=@(y) y;%/143*4.76+0.5; %rostral/caudal scaling
+tz2z=@(z) z;%/79*2.5+2.3;  %up down scaling
 
 brainResizeFactor=1.2;
 
 x2tx=@(x) x*49/1.73/brainResizeFactor;  %L/R scaling
-y2ty=@(y) (y-0.57)*143.5/4.76/brainResizeFactor; %rostral/caudal scaling
-z2tz=@(z) (z-2.32)*79/2.5/brainResizeFactor;  %up down scaling
+y2ty=@(y) (y-0.57)*143.5/4.35/brainResizeFactor; %rostral/caudal scaling
+z2tz=@(z) (z-2.32)*79/2.4/brainResizeFactor;  %up down scaling
 
 
 reorderIdx=[3,1,2];
@@ -395,13 +395,15 @@ else
     h=patch('vertices', mdl.v, 'faces', mdl.f,'FaceVertexCData',Cs,'FaceColor','interp','AmbientStrength',0.6, 'LineStyle', 'None','FaceAlpha', p.Results.brainAlpha);
 end
 
+mrkScaleFactor=22;
+
 if(showChannels)
     if(numColors ~= 2)
         if(~isempty(optColor) && (isnumeric(optColor) && ~any(isnan(optColor)) || ~ismissing(optColor)))
-            h = scatter3(OptPosX, OptPosY, OptPosZ,20*p.Results.labelfontsize,'filled',optColor);
+            h = scatter3(OptPosX, OptPosY, OptPosZ,20*p.Results.labelfontsize,'filled',optColor,'MarkerEdgeColor' ,'k');
         end
     end
-    text(OptPosX, OptPosY, OptPosZ, string(1:length(probeInfo.OptPos3DZ)), 'HorizontalAlignment', 'center', "FontSize", p.Results.labelfontsize, 'color', p.Results.labelfontcolor);
+    text(OptPosX, OptPosY, OptPosZ, string(1:length(probeInfo.OptPos3DZ)), 'HorizontalAlignment', 'center','VerticalAlignment', 'middle', "FontSize", p.Results.labelfontsize, 'color', p.Results.labelfontcolor);
 end
 
 if(plotFNIRS_SD&&isfield(probeInfo,'SrcPos3DX'))
@@ -411,15 +413,15 @@ if(plotFNIRS_SD&&isfield(probeInfo,'SrcPos3DX'))
     srcPos = [probeInfo.TableSD.Pos3D_x(srcIdx), probeInfo.TableSD.Pos3D_y(srcIdx), probeInfo.TableSD.Pos3D_z(srcIdx)];
     
     if(~isempty(srcColor) && (isnumeric(srcColor) && ~any(isnan(srcColor)) || ~ismissing(srcColor)))
-        h = scatter3(srcPos(:,1),srcPos(:,2),srcPos(:,3),20*p.Results.labelfontsize,'filled',srcColor);
+        h = scatter3(srcPos(:,1),srcPos(:,2),srcPos(:,3),mrkScaleFactor*p.Results.labelfontsize,'filled',srcColor);
     end
-    text(srcPos(:,1), srcPos(:,2), srcPos(:,3), probeInfo.TableSD.Label(srcIdx), 'HorizontalAlignment', 'center', "FontSize", p.Results.labelfontsize, 'color', p.Results.labelfontcolor);
+    text(srcPos(:,1), srcPos(:,2), srcPos(:,3), probeInfo.TableSD.Label(srcIdx), 'HorizontalAlignment', 'center','VerticalAlignment', 'middle', "FontSize", p.Results.labelfontsize, 'color', p.Results.labelfontcolor);
     hold on
     
     detPos = [probeInfo.TableSD.Pos3D_x(detIdx), probeInfo.TableSD.Pos3D_y(detIdx), probeInfo.TableSD.Pos3D_z(detIdx)];
    
     if(~isempty(detColor) && (isnumeric(detColor) && ~any(isnan(detColor)) || ~ismissing(detColor)))
-        h = scatter3(detPos(:,1), detPos(:,2), detPos(:,3), 20*p.Results.labelfontsize, 'filled', detColor);
+        h = scatter3(detPos(:,1), detPos(:,2), detPos(:,3), mrkScaleFactor*p.Results.labelfontsize, 'filled', detColor);
     end
     text(detPos(:,1), detPos(:,2), detPos(:,3), probeInfo.TableSD.Label(detIdx), 'HorizontalAlignment', 'center','VerticalAlignment', 'middle', "FontSize", p.Results.labelfontsize, 'color', p.Results.labelfontcolor);
 end
@@ -430,13 +432,13 @@ for i=1:size(c1020,1)
     %text(cerebro1020(i,1),cerebro1020(i,2),cerebro1020(i,3),cerebro1020_labels{i})
     if(~isnan(c1020.BA(i)))
         if(numColors == 4 || numColors == 1)
-            h = scatter3(c1020.tx(i),c1020.ty(i),c1020.tz(i),30*p.Results.labelfontsize, 'filled', color1020);
+            h = scatter3(c1020.tx(i),c1020.ty(i),c1020.tz(i),mrkScaleFactor*1.5*p.Results.labelfontsize, 'filled', color1020);
         else
-            h = scatter3(c1020.tx(i),c1020.ty(i),c1020.tz(i),30*p.Results.labelfontsize, 'filled');
+            h = scatter3(c1020.tx(i),c1020.ty(i),c1020.tz(i),mrkScaleFactor*1.5*p.Results.labelfontsize, 'filled');
         end
         hold on
         
-        text(c1020.tx(i),c1020.ty(i),c1020.tz(i),c1020.Electrode(i),'HorizontalAlignment','center', "FontSize", p.Results.labelfontsize, 'color', p.Results.labelfontcolor)
+        text(c1020.tx(i),c1020.ty(i),c1020.tz(i),c1020.Electrode(i),'HorizontalAlignment', 'center','VerticalAlignment', 'middle', "FontSize", p.Results.labelfontsize, 'color', p.Results.labelfontcolor)
         %text(x2tx(c1020.x(i)),y2ty(c1020.y(i)),z2tz(c1020.z(i)),c1020.Electrode(i),'HorizontalAlignment','center')
         
     end
@@ -450,7 +452,7 @@ zlabel('z (U/D)');
 
 switch(p.Results.initCamPosition)
     case 'auto'
-        campos(OptPos3D_mean*35);  %Front facing
+        campos(OptPos3D_mean/norm(OptPos3D_mean)*1500);   %Front facing
     case 'front'
         campos([0,1000,0]);
     case 'back'
@@ -462,7 +464,7 @@ switch(p.Results.initCamPosition)
     case 'right'
         campos([1000,0,0]);
     otherwise
-        campos(OptPos3D_mean*25);  %Front facing
+        campos(OptPos3D_mean/norm(OptPos3D_mean)*1500);  %Front facing
 end
 %campos(OptPos3D_mean*25);  %Front facing
 camtarget([0,-20,0]);
@@ -531,66 +533,97 @@ if(p.Results.showReference)
     
     path4debug=sprintf('%s/../../../',path4debug);
     
-    img = imread(sprintf('%s%s',path4debug,'sideprofile_mid.png'));     % Load a sample image
+    [img,map,alpha] = imread(sprintf('%s%s',path4debug,'sideprofile_mid.png'));     % Load a sample image
     
     %https://www.openanatomy.org/atlases/nac/brain-2017-01/viewer/#!/view/33316a96-32f2-47f4-b5e0-a6225be09803/state/9dc9a3eb-7805-4b2b-943f-0b6e63ba488f
 
     imgXY=size(img);
     imgRes=1/5.25;
+    
+    rotx = @(t) [1 0 0; 0 cos(t) -sin(t) ; 0 sin(t) cos(t)] ;
+    roty = @(t) [cos(t) 0 sin(t) ; 0 1 0 ; -sin(t) 0  cos(t)] ;
+    rotz = @(t) [cos(t) -sin(t) 0 ; sin(t) cos(t) 0 ; 0 0 1] ;
+    
 
     xMid=0;
     yMid=-10;
-    zMid=0;
+    zMid=5;
+    
+    rotX=rotx(10*pi/180);
 
+    
+    imgCoord1=[0,imgXY(1)*imgRes,imgXY(2)*imgRes]*rotX;
+    imgCoord2=[0,-imgXY(1)*imgRes,imgXY(2)*imgRes]*rotX;
+    imgCoord3=[0,imgXY(1)*imgRes,-imgXY(2)*imgRes]*rotX;
+    imgCoord4=[0,-imgXY(1)*imgRes,-imgXY(2)*imgRes]*rotX;
 
-
-    xImage = [xMid xMid; xMid xMid];       % The x data for the image corners
-    yImage = [yMid+imgXY(1)*imgRes yMid-imgXY(1)*imgRes; yMid+imgXY(1)*imgRes yMid-imgXY(1)*imgRes];             % The y data for the image corners
-    zImage = [zMid+imgXY(2)*imgRes zMid+imgXY(2)*imgRes; zMid-imgXY(2)*imgRes zMid-imgXY(2)*imgRes];   % The z data for the image corners
+    xImage = [imgCoord1(1)+xMid imgCoord2(1)+xMid; imgCoord3(1)+xMid imgCoord4(1)+xMid];       % The x data for the image corners
+    yImage = [imgCoord1(2)+yMid imgCoord2(2)+yMid; imgCoord3(2)+yMid imgCoord4(2)+yMid];            % The y data for the image corners
+    zImage = [imgCoord1(3)+zMid imgCoord2(3)+zMid; imgCoord3(3)+zMid imgCoord4(3)+zMid];   % The z data for the image corners
+    
+    
+    
+    
     hold on
     surf(xImage,yImage,zImage,...    % Plot the surface
          'CData',img,...
-         'FaceColor','texturemap');
+        'FaceColor','texturemap','FaceLighting','none','AlphaData',alpha,'FaceAlpha','texture');
     hold off
 
-    img = imread(sprintf('%s%s',path4debug,'rcSlice.png'));     % Load a sample image
+    [img,map,alpha] = imread(sprintf('%s%s',path4debug,'rcSlice.png'));     % Load a sample image
 
 
     imgXY=size(img);
 
     xMid=0;
     yMid=-7;
-    zMid=-3;
+    zMid=2;
 
 
+    rotX=rotx(10*pi/180);
 
-    xImage = [xMid+imgXY(1)*imgRes xMid-imgXY(1)*imgRes; xMid+imgXY(1)*imgRes xMid-imgXY(1)*imgRes];   % The x data for the image corners
-    yImage = [yMid yMid; yMid yMid];             % The y data for the image corners
-    zImage = [zMid+imgXY(2)*imgRes zMid+imgXY(2)*imgRes; zMid-imgXY(2)*imgRes zMid-imgXY(2)*imgRes];   % The z data for the image corners
+    
+    imgCoord1=[imgXY(1)*imgRes,0,imgXY(2)*imgRes]*rotX;
+    imgCoord2=[-imgXY(1)*imgRes,0,imgXY(2)*imgRes]*rotX;
+    imgCoord3=[imgXY(1)*imgRes,0,-imgXY(2)*imgRes]*rotX;
+    imgCoord4=[-imgXY(1)*imgRes,0,-imgXY(2)*imgRes]*rotX;
+
+    xImage = [imgCoord1(1)+xMid imgCoord2(1)+xMid; imgCoord3(1)+xMid imgCoord4(1)+xMid];       % The x data for the image corners
+    yImage = [imgCoord1(2)+yMid imgCoord2(2)+yMid; imgCoord3(2)+yMid imgCoord4(2)+yMid];            % The y data for the image corners
+    zImage = [imgCoord1(3)+zMid imgCoord2(3)+zMid; imgCoord3(3)+zMid imgCoord4(3)+zMid];   % The z data for the image corners
+
+  
     hold on
     surf(xImage,yImage,zImage,...    % Plot the surface
          'CData',img,...
-         'FaceColor','texturemap');
+         'FaceColor','texturemap','FaceLighting','none','AlphaData',alpha,'FaceAlpha','texture');
     hold off
 
 
 
-    img = imread(sprintf('%s%s',path4debug,'topprofile.png'));     % Load a sample image
+    [img,map,alpha]  = imread(sprintf('%s%s',path4debug,'topprofile.png'));     % Load a sample image
 
 
     imgXY=size(img);
 
-    xMid=0;
-    yMid=-8;
-    zMid=-25;
+    xMid=1;
+    yMid=-14;
+    zMid=-18;
+    
+    imgCoord1=[imgXY(1)*imgRes,imgXY(2)*imgRes,0]*rotX;
+    imgCoord2=[-imgXY(1)*imgRes,imgXY(2)*imgRes,0]*rotX;
+    imgCoord3=[imgXY(1)*imgRes,-imgXY(2)*imgRes,0]*rotX;
+    imgCoord4=[-imgXY(1)*imgRes,-imgXY(2)*imgRes,0]*rotX;
+    
+   xImage = [imgCoord1(1)+xMid imgCoord2(1)+xMid; imgCoord3(1)+xMid imgCoord4(1)+xMid];       % The x data for the image corners
+    yImage = [imgCoord1(2)+yMid imgCoord2(2)+yMid; imgCoord3(2)+yMid imgCoord4(2)+yMid];            % The y data for the image corners
+    zImage = [imgCoord1(3)+zMid imgCoord2(3)+zMid; imgCoord3(3)+zMid imgCoord4(3)+zMid];   % The z data for the image corners
 
-    xImage = [xMid+imgXY(1)*imgRes xMid-imgXY(1)*imgRes; xMid+imgXY(1)*imgRes xMid-imgXY(1)*imgRes];   % The x data for the image corners
-    yImage = [yMid+imgXY(2)*imgRes yMid+imgXY(2)*imgRes; yMid-imgXY(2)*imgRes yMid-imgXY(2)*imgRes];             % The y data for the image corners
-    zImage = [zMid zMid; zMid zMid];   % The z data for the image corners
+  
     hold on
     surf(xImage,yImage,zImage,...    % Plot the surface
          'CData',img,...
-         'FaceColor','texturemap');
+         'FaceColor','texturemap','FaceLighting','none','AlphaData',alpha,'FaceAlpha','texture');
     hold off
 
 end
