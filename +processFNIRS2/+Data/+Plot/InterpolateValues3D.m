@@ -60,6 +60,7 @@ addParameter(p, 'logScale', false, @islogical);
 addParameter(p, 'interpolateType', defaultInterpolateType, validInterpolateType);
 addParameter(p, 'bufferDistance', nan, validScalarPosNumOrNan); %In a grid, this may equal to sqrt(sd distance^2/2)
 addParameter(p, 'includeSS', true, @islogical);
+addParameter(p, 'showReference', false, @islogical);
 
 parse(p,varargin{:});
 
@@ -404,22 +405,23 @@ if(showChannels)
 end
 
 if(plotFNIRS_SD&&isfield(probeInfo,'SrcPos3DX'))
-    srcPos = [probeInfo.SrcPos3DX', probeInfo.SrcPos3DY', probeInfo.SrcPos3DZ'];
-    [srcPos, I] = unique(srcPos, 'rows');
-    srcPos = srcPos(probeInfo.sI(I),:);
+    srcIdx=probeInfo.TableSD.Type=='Src';
+    detIdx=~srcIdx;
+    
+    srcPos = [probeInfo.TableSD.Pos3D_x(srcIdx), probeInfo.TableSD.Pos3D_y(srcIdx), probeInfo.TableSD.Pos3D_z(srcIdx)];
+    
     if(~isempty(srcColor) && (isnumeric(srcColor) && ~any(isnan(srcColor)) || ~ismissing(srcColor)))
         h = scatter3(srcPos(:,1),srcPos(:,2),srcPos(:,3),20*p.Results.labelfontsize,'filled',srcColor);
     end
-    text(srcPos(:,1), srcPos(:,2), srcPos(:,3), 'S'+string(1:length(srcPos)), 'HorizontalAlignment', 'center', "FontSize", p.Results.labelfontsize, 'color', p.Results.labelfontcolor);
+    text(srcPos(:,1), srcPos(:,2), srcPos(:,3), probeInfo.TableSD.Label(srcIdx), 'HorizontalAlignment', 'center', "FontSize", p.Results.labelfontsize, 'color', p.Results.labelfontcolor);
     hold on
     
-    detPos = [probeInfo.DetPos3DX', probeInfo.DetPos3DY', probeInfo.DetPos3DZ'];
-    [detPos, I] = unique(detPos, 'rows');
-    detPos = detPos(probeInfo.dI(I),:);
+    detPos = [probeInfo.TableSD.Pos3D_x(detIdx), probeInfo.TableSD.Pos3D_y(detIdx), probeInfo.TableSD.Pos3D_z(detIdx)];
+   
     if(~isempty(detColor) && (isnumeric(detColor) && ~any(isnan(detColor)) || ~ismissing(detColor)))
         h = scatter3(detPos(:,1), detPos(:,2), detPos(:,3), 20*p.Results.labelfontsize, 'filled', detColor);
     end
-    text(detPos(:,1), detPos(:,2), detPos(:,3), 'D'+string(1:length(detPos)), 'HorizontalAlignment', 'center', "FontSize", p.Results.labelfontsize, 'color', p.Results.labelfontcolor);
+    text(detPos(:,1), detPos(:,2), detPos(:,3), probeInfo.TableSD.Label(detIdx), 'HorizontalAlignment', 'center','VerticalAlignment', 'middle', "FontSize", p.Results.labelfontsize, 'color', p.Results.labelfontcolor);
 end
 
 if(plot1020)
@@ -521,7 +523,7 @@ if(p.Results.showColorbar)
     end
 end
 
-if(false)
+if(p.Results.showReference)
     %% Test code for calibration
     path4debug=mfilename('fullpath');
     
@@ -530,6 +532,8 @@ if(false)
     path4debug=sprintf('%s/../../../',path4debug);
     
     img = imread(sprintf('%s%s',path4debug,'sideprofile_mid.png'));     % Load a sample image
+    
+    %https://www.openanatomy.org/atlases/nac/brain-2017-01/viewer/#!/view/33316a96-32f2-47f4-b5e0-a6225be09803/state/9dc9a3eb-7805-4b2b-943f-0b6e63ba488f
 
     imgXY=size(img);
     imgRes=1/5.25;
@@ -553,7 +557,6 @@ if(false)
 
 
     imgXY=size(img);
-    imgRes=1/5.25;
 
     xMid=0;
     yMid=-7;
@@ -576,7 +579,6 @@ if(false)
 
 
     imgXY=size(img);
-    imgRes=1/5.25;
 
     xMid=0;
     yMid=-8;

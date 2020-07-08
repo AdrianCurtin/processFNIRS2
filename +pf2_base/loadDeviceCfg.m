@@ -144,7 +144,8 @@ for j=1:length(probeInfo.cfg.Sections)
                 
                 if(~ismember('Label',p.TableSD.Properties.VariableNames))
                     for sd=1:length(p.TableSD.Index)
-                        p.TableSD.Label{sd}=sprintf('%s%i\n',p.TableSD.Type(sd),p.TableSD.Index(sd));
+                        typeLabel=sprintf('%s',p.TableSD.Type(sd));
+                        p.TableSD.Label{sd}=sprintf('%s%i',typeLabel(1),p.TableSD.Index(sd));
                     end
                 end
                 
