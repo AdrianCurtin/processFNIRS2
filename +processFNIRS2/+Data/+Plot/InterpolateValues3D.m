@@ -49,8 +49,9 @@ addParameter(p, 'cmap', 'hot', @ischar);
 addParameter(p, 'cmap_lower', 'cool', @ischar);
 addParameter(p, 'labelfontsize', 10, validScalarPosNum);
 addParameter(p, 'labelfontcolor', 'k', validColor);
-addParameter(p, 'labelspherecolors', ["r", "y"]);
+addParameter(p, 'labelspherecolors', ["r", "y","w"]);
 addParameter(p, 'brainColor', [0.92, 0.68, 0.68], validColor);
+addParameter(p, 'brainAlpha', 1, validScalarPosNum);
 addParameter(p, 'brainLineColor', [], validColor);
 addParameter(p, 'backgroundColor', [], validColor);
 addParameter(p, 'showColorbar', true, @islogical);
@@ -273,9 +274,11 @@ tx2x=@(x) x;%/50*1.73;  %L/R scaling
 ty2y=@(y) y;%/140*4.76+0.5; %rostral/caudal scaling
 tz2z=@(z) z;%/80*2.5+2.3;  %up down scaling
 
-x2tx=@(x) x*49/1.73;  %L/R scaling
-y2ty=@(y) (y-0.57)*143.5/4.76; %rostral/caudal scaling
-z2tz=@(z) (z-2.32)*79/2.5;  %up down scaling
+brainResizeFactor=1.2;
+
+x2tx=@(x) x*49/1.73/brainResizeFactor;  %L/R scaling
+y2ty=@(y) (y-0.57)*143.5/4.76/brainResizeFactor; %rostral/caudal scaling
+z2tz=@(z) (z-2.32)*79/2.5/brainResizeFactor;  %up down scaling
 
 
 reorderIdx=[3,1,2];
@@ -386,9 +389,9 @@ end
 toc
 
 if(~isempty(p.Results.brainLineColor)&&all(~isnan(p.Results.brainLineColor)))
-    h=patch('vertices', mdl.v, 'faces', mdl.f,'FaceVertexCData',Cs,'FaceColor','interp','AmbientStrength',0.6, 'EdgeColor', p.Results.brainLineColor);
+    h=patch('vertices', mdl.v, 'faces', mdl.f,'FaceVertexCData',Cs,'FaceColor','interp','AmbientStrength',0.6, 'EdgeColor', p.Results.brainLineColor,'FaceAlpha', p.Results.brainAlpha);
 else
-    h=patch('vertices', mdl.v, 'faces', mdl.f,'FaceVertexCData',Cs,'FaceColor','interp','AmbientStrength',0.6, 'LineStyle', 'None');
+    h=patch('vertices', mdl.v, 'faces', mdl.f,'FaceVertexCData',Cs,'FaceColor','interp','AmbientStrength',0.6, 'LineStyle', 'None','FaceAlpha', p.Results.brainAlpha);
 end
 
 if(showChannels)
@@ -467,53 +470,125 @@ camlight(180, 0);
 
 
 if(p.Results.showColorbar)
-ax1=ax;
-curAxPosition=ax1.Position;
+    ax1=ax;
+    curAxPosition=ax1.Position;
 
-if(~twosided)
-    title(ax, titleString);
-    if(maxVal>minVal)
-        colormap(ax1,cmap);
-        negColorbar=false;
+    if(~twosided)
+        title(ax, titleString);
+        if(maxVal>minVal)
+            colormap(ax1,cmap);
+            negColorbar=false;
+        else
+            colormap(ax1,cmap_low);
+            temp=minVal;
+            minVal=maxVal;
+            maxVal=temp;
+            negColorbar=true;
+        end
+        caxis(ax1, [minVal, maxVal]);
+        chPos=colorbar(ax1);
     else
-        colormap(ax1,cmap_low);
-        temp=minVal;
-        minVal=maxVal;
-        maxVal=temp;
-        negColorbar=true;
-    end
-    caxis(ax1, [minVal, maxVal]);
-    chPos=colorbar(ax1);
-else
-    curAxPosition=ax1.OuterPosition;
-    
-    colormap(ax1,cmap_high);
-    caxis(ax1, [minVal(2), maxVal(2)]);
-    
-    ax2=axes('OuterPosition',curAxPosition);
-    ax2.Position=ax1.Position;
+        curAxPosition=ax1.OuterPosition;
 
-    set(gca,'xtick',[]);
-    set(gca,'ytick',[]);
-    
-    %set( chNeg, 'YDir', 'reverse' );
-    colormap(ax2,cmap_low);
-    caxis(ax2, [maxVal(1), minVal(1)]);
-    %caxis([-1*minVal(1),-1*maxVal(2)])
-  
-    axis off
-    
-    curAxInnerPosition=ax1.Position;
-    
-    linkprop([ax1, ax2],{'CameraUpVector', 'CameraPosition', 'CameraTarget', 'XLim', 'YLim', 'ZLim'});
-    %set([ax1,ax2],'Position',[.05 .11 .885 .815]);
-    chPos=colorbar(ax1);
-    %chPos_position=chPos.OuterPosition;
-    cbHeight=curAxInnerPosition(4)/2;
-    
-    set(chPos,'Position',[curAxInnerPosition(1)+curAxInnerPosition(3),curAxInnerPosition(2)+cbHeight,0.02,cbHeight]);
-    
-    
-    chNeg=colorbar(ax2,'Position',[curAxInnerPosition(1)+curAxInnerPosition(3),curAxInnerPosition(2)-cbHeight/5,0.02,cbHeight]);    
+        colormap(ax1,cmap_high);
+        caxis(ax1, [minVal(2), maxVal(2)]);
+
+        ax2=axes('OuterPosition',curAxPosition);
+        ax2.Position=ax1.Position;
+
+        set(gca,'xtick',[]);
+        set(gca,'ytick',[]);
+
+        %set( chNeg, 'YDir', 'reverse' );
+        colormap(ax2,cmap_low);
+        caxis(ax2, [maxVal(1), minVal(1)]);
+        %caxis([-1*minVal(1),-1*maxVal(2)])
+
+        axis off
+
+        curAxInnerPosition=ax1.Position;
+
+        linkprop([ax1, ax2],{'CameraUpVector', 'CameraPosition', 'CameraTarget', 'XLim', 'YLim', 'ZLim'});
+        %set([ax1,ax2],'Position',[.05 .11 .885 .815]);
+        chPos=colorbar(ax1);
+        %chPos_position=chPos.OuterPosition;
+        cbHeight=curAxInnerPosition(4)/2;
+
+        set(chPos,'Position',[curAxInnerPosition(1)+curAxInnerPosition(3),curAxInnerPosition(2)+cbHeight,0.02,cbHeight]);
+
+
+        chNeg=colorbar(ax2,'Position',[curAxInnerPosition(1)+curAxInnerPosition(3),curAxInnerPosition(2)-cbHeight/5,0.02,cbHeight]);    
+    end
 end
+
+if(false)
+    %% Test code for calibration
+    path4debug=mfilename('fullpath');
+    
+    [path4debug]=fileparts(path4debug);
+    
+    path4debug=sprintf('%s/../../../',path4debug);
+    
+    img = imread(sprintf('%s%s',path4debug,'sideprofile_mid.png'));     % Load a sample image
+
+    imgXY=size(img);
+    imgRes=1/5.25;
+
+    xMid=0;
+    yMid=-10;
+    zMid=0;
+
+
+
+    xImage = [xMid xMid; xMid xMid];       % The x data for the image corners
+    yImage = [yMid+imgXY(1)*imgRes yMid-imgXY(1)*imgRes; yMid+imgXY(1)*imgRes yMid-imgXY(1)*imgRes];             % The y data for the image corners
+    zImage = [zMid+imgXY(2)*imgRes zMid+imgXY(2)*imgRes; zMid-imgXY(2)*imgRes zMid-imgXY(2)*imgRes];   % The z data for the image corners
+    hold on
+    surf(xImage,yImage,zImage,...    % Plot the surface
+         'CData',img,...
+         'FaceColor','texturemap');
+    hold off
+
+    img = imread(sprintf('%s%s',path4debug,'rcSlice.png'));     % Load a sample image
+
+
+    imgXY=size(img);
+    imgRes=1/5.25;
+
+    xMid=0;
+    yMid=-7;
+    zMid=-3;
+
+
+
+    xImage = [xMid+imgXY(1)*imgRes xMid-imgXY(1)*imgRes; xMid+imgXY(1)*imgRes xMid-imgXY(1)*imgRes];   % The x data for the image corners
+    yImage = [yMid yMid; yMid yMid];             % The y data for the image corners
+    zImage = [zMid+imgXY(2)*imgRes zMid+imgXY(2)*imgRes; zMid-imgXY(2)*imgRes zMid-imgXY(2)*imgRes];   % The z data for the image corners
+    hold on
+    surf(xImage,yImage,zImage,...    % Plot the surface
+         'CData',img,...
+         'FaceColor','texturemap');
+    hold off
+
+
+
+    img = imread(sprintf('%s%s',path4debug,'topprofile.png'));     % Load a sample image
+
+
+    imgXY=size(img);
+    imgRes=1/5.25;
+
+    xMid=0;
+    yMid=-8;
+    zMid=-25;
+
+    xImage = [xMid+imgXY(1)*imgRes xMid-imgXY(1)*imgRes; xMid+imgXY(1)*imgRes xMid-imgXY(1)*imgRes];   % The x data for the image corners
+    yImage = [yMid+imgXY(2)*imgRes yMid+imgXY(2)*imgRes; yMid-imgXY(2)*imgRes yMid-imgXY(2)*imgRes];             % The y data for the image corners
+    zImage = [zMid zMid; zMid zMid];   % The z data for the image corners
+    hold on
+    surf(xImage,yImage,zImage,...    % Plot the surface
+         'CData',img,...
+         'FaceColor','texturemap');
+    hold off
+
 end
