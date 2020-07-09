@@ -24,6 +24,11 @@ defaultCamPosition = 'auto';
 validCamPositions = {'auto','front', 'back', 'top' 'left', 'right'};
 validCamPosition = @(x) any(validatestring(x, validCamPositions)) || isnumeric(x) && length(x) == 3;
 
+defaultColormap = 'hot';
+defaultColormapLow = 'cool';
+validColormapLabels = {'hot', 'autumn', 'jet', 'gray', 'copper', 'bone', 'cool', 'winter', 'pink'};
+validColormap = @(x) any(validatestring(x, validColormapLabels)) || ishandle(x);
+
 if(isa(varargin{1},'matlab.graphics.axis.Axes')) %If first argument is axes then move to front
    ax=varargin{1};
    varargin=varargin(2:end);
@@ -45,8 +50,8 @@ addParameter(p,'ChannelLabels',true,@islogical);
 addParameter(p,'SDLabels',true,@islogical);
 addParameter(p,'I1020_labels',false,validI1020Label);
 addParameter(p, 'useHighRes', true, @islogical);
-addParameter(p, 'cmap', 'hot', @ischar);
-addParameter(p, 'cmap_lower', 'cool', @ischar);
+addParameter(p, 'cmap', defaultColormap, validColormap);
+addParameter(p, 'cmap_lower', defaultColormapLow, validColormap);
 addParameter(p, 'labelfontsize', 10, validScalarPosNum);
 addParameter(p, 'labelfontcolor', 'k', validColor);
 addParameter(p, 'labelspherecolors', ["r", "y","w"]);
@@ -61,6 +66,7 @@ addParameter(p, 'interpolateType', defaultInterpolateType, validInterpolateType)
 addParameter(p, 'bufferDistance', nan, validScalarPosNumOrNan); %In a grid, this may equal to sqrt(sd distance^2/2)
 addParameter(p, 'includeSS', true, @islogical);
 addParameter(p, 'showReference', false, @islogical);
+addParameter(p, 'useLogscale', false, @islogical);
 
 parse(p,varargin{:});
 
@@ -110,6 +116,17 @@ end
 titleString = p.Results.titleString;
 clrBarTitle = p.Results.colorbarStr;
 projectmode = p.Results.interpolateType;
+
+cmap_high = p.Results.cmap;
+if(~ishandle(cmap_high))
+   cmap_high = str2func(cmap_high);
+end
+
+cmap_low_t = p.Results.cmap_lower;
+if(~ishandle(cmap_low_t))
+    cmap_low_t = str2func(cmap_low_t);
+end
+cmap_low = @(n) flip(cmap_low_t(n));
 
 ax = p.Results.ax;
 bgc = p.Results.backgroundColor;
@@ -305,11 +322,6 @@ Cs = zeros(num_vertices, 3);
 controlPoints = [OptPosX(:), OptPosY(:), OptPosZ(:)];
 num_control = size(controlPoints, 1);
 
-
-cmap_high = hot(256);
-cmap_low = cool(256);
-
-
 tic
 dist_array = zeros(num_vertices, num_control);
 for i=1:num_control
@@ -325,14 +337,14 @@ c_max = nanmax(C, [], 'all');
 if twosided
    if minVal(1) - maxVal(1) > maxVal(2) - minVal(2)
        range = minVal(1) - maxVal(1);
-       cmap = colormap([cool(256);
+       cmap = colormap([cmap_low(256);
                repmat(brainColor, round(256*(minVal(2) - minVal(1))/range), 1);
-               hot(round(256*(maxVal(2) - minVal(2))/range))]);
+               cmap_high(round(256*(maxVal(2) - minVal(2))/range))]);
    else
        range = maxVal(2) - minVal(2);
-       cmap = colormap([cool(round(256*(minVal(1) - maxVal(1))/range));
+       cmap = colormap([cmap_low(round(256*(minVal(1) - maxVal(1))/range));
                repmat(brainColor, round(256*(minVal(2) - minVal(1))/range), 1);
-               hot(256)]);
+               cmap_high(256)]);
    end
    c_ind = round(length(cmap)*(C(:) - maxVal(1))/(maxVal(2) - maxVal(1)));
    %for i=1:num_control  
@@ -347,9 +359,9 @@ if twosided
    %end
 else
     if minVal < maxVal
-        cmap = hot(256);
+        cmap = cmap_high(256);
     else
-        cmap = cool(256);
+        cmap = cmap_low(256);
     end
     c_ind = round(length(cmap)*(C(:) - minVal)/(maxVal - minVal));
 end
@@ -480,10 +492,10 @@ if(p.Results.showColorbar)
     if(~twosided)
         
         if(maxVal>minVal)
-            colormap(ax1,cmap);
+            colormap(ax1,cmap_high(256));
             negColorbar=false;
         else
-            colormap(ax1,cmap_low);
+            colormap(ax1,cmap_low(256));
             temp=minVal;
             minVal=maxVal;
             maxVal=temp;
@@ -495,7 +507,7 @@ if(p.Results.showColorbar)
     else
         curAxPosition=ax1.OuterPosition;
 
-        colormap(ax1,cmap_high);
+        colormap(ax1,cmap_high(256));
         caxis(ax1, [minVal(2), maxVal(2)]);
 
         ax2=axes('OuterPosition',curAxPosition);
@@ -505,7 +517,7 @@ if(p.Results.showColorbar)
         set(gca,'ytick',[]);
 
         %set( chNeg, 'YDir', 'reverse' );
-        colormap(ax2,cmap_low);
+        colormap(ax2,cmap_low(256));
         caxis(ax2, [maxVal(1), minVal(1)]);
         %caxis([-1*minVal(1),-1*maxVal(2)])
 
