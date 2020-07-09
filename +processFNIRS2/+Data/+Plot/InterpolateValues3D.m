@@ -471,14 +471,14 @@ camtarget([0,-20,0]);
 camlight(lht,'headlight');
 camlight(180, 0);
 
-
-
+title(ax, titleString);
 if(p.Results.showColorbar)
     ax1=ax;
     curAxPosition=ax1.Position;
 
+    
     if(~twosided)
-        title(ax, titleString);
+        
         if(maxVal>minVal)
             colormap(ax1,cmap);
             negColorbar=false;
@@ -491,6 +491,7 @@ if(p.Results.showColorbar)
         end
         caxis(ax1, [minVal, maxVal]);
         chPos=colorbar(ax1);
+        set(get(chPos, 'title'), 'string', clrBarTitle);
     else
         curAxPosition=ax1.OuterPosition;
 
@@ -515,6 +516,7 @@ if(p.Results.showColorbar)
         linkprop([ax1, ax2],{'CameraUpVector', 'CameraPosition', 'CameraTarget', 'XLim', 'YLim', 'ZLim'});
         %set([ax1,ax2],'Position',[.05 .11 .885 .815]);
         chPos=colorbar(ax1);
+        set(get(chPos, 'title'), 'string', clrBarTitle);
         %chPos_position=chPos.OuterPosition;
         cbHeight=curAxInnerPosition(4)/2;
 
