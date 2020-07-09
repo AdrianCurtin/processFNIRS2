@@ -5,8 +5,8 @@ function fNIR=fNIR1200()
 slashes=find(filepath'=='/'|filepath'=='\');
 filepath=filepath(1:slashes(end)); %strip filename
 
-nirfilepath=sprintf('%s../../sampledata/sampleNIR.nir',filepath);
-mrkfilepath=sprintf('%s../../sampledata/sampleNIR.mrk',filepath);
+nirfilepath=sprintf('%s../../../sampledata/sampleNIR.nir',filepath);
+mrkfilepath=sprintf('%s../../../sampledata/sampleNIR.mrk',filepath);
 
 if(nargout>0)
 	fNIR=processFNIRS2.Import.ImportNIR(nirfilepath,mrkfilepath,false); % just load data

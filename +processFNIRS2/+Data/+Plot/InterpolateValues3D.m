@@ -14,6 +14,7 @@ validScalarPosNum = @(x) isnumeric(x) && x>0;
 validScalarPosNumOrNan = @(x) isnumeric(x) && (x>0||isnan(x));
 validI1020Label = @(x) islogical(x) || iscellstr(x);
 validColor = @(x) (ischar(x) && length(x) == 1) || isnumeric(x) && length(x) == 3 || isempty(x);
+validFnirs = @(x) (iscell(x) || isstruct(x));
 %validColorList = @(x) validColor(x) || all(arrayfun(validColor, x));
 
 defaultInterpolateType = 'nearest';
@@ -39,7 +40,7 @@ end
 p=inputParser;
 
 addRequired(p,'data2plot');
-addOptional(p,'fNIR', {}, @isstruct);
+addOptional(p,'fNIR', {}, validFnirs);
 addOptional(p,'minval', [], @isnumeric);
 addOptional(p,'maxval', [], @isnumeric);
 addOptional(p,'titleString', '', @isstring);
@@ -66,14 +67,32 @@ addParameter(p, 'interpolateType', defaultInterpolateType, validInterpolateType)
 addParameter(p, 'bufferDistance', nan, validScalarPosNumOrNan); %In a grid, this may equal to sqrt(sd distance^2/2)
 addParameter(p, 'includeSS', true, @islogical);
 addParameter(p, 'showReference', false, @islogical);
-addParameter(p, 'useLogscale', false, @islogical);
 
 parse(p,varargin{:});
 
 data2plot = p.Results.data2plot;
+multiprobe = iscell(data2plot);
+if(multiprobe)
+    data2plot_cell = data2plot;
+    concat_data = [];
+    for i=1:numel(data2plot)
+        concat_data = [concat_data, data2plot{i}];
+    end
+    data2plot = concat_data;
+end
+
+if(p.Results.logScale)
+   if(any(data2plot<=0))
+        error("Cannot use logscale when data contains negative values")    
+   end
+   data2plot = log(data2plot);
+end
 if(isempty(p.Results.fNIR))
     global setF;
     fNIR = {};
+    if(multiprobe)
+        error("Must specify FNIRS devices when using Multi-probe plotting")
+    end
 else
     fNIR = p.Results.fNIR;
 end
@@ -187,6 +206,56 @@ cla
 
 probeInfo=[];
 
+if(multiprobe);
+    num_devices = length(fNIR);
+    probeInfos = {};
+    for i=1:num_devices
+        if(pf2_base.isnestedfield(fNIR{i}, 'info.probename')&&isfield(fNIR{i}.info, 'probename')&&~contains(fNIR{i}.info.probename,'Unknown')) 
+            cfgFilePath = sprintf('%s.cfg', fNIR{i}.info.probename); 
+        else
+            cfgFilePath = '';
+        end
+        probeInfos{i} = pf2_base.loadDeviceCfg(cfgFilePath);
+        
+        if(pf2_base.isnestedfield(probeInfos{i},'Probe'))
+            deviceInfo=probeInfos{i}.Info;
+            if(~isfield(deviceInfo,'numberProbes')||deviceInfo.numberProbes==1)
+                probeNum=1;
+            end
+            probeInfos{i}=probeInfos{i}.Probe{probeNum};
+        else
+            error('Unable to identify probe'); 
+        end
+        
+        if(length(data2plot_cell{i})~=probeInfos{i}.NumOptodes)
+            error('Must have a value for all optodes');
+        end
+    end
+    probeInfo = {};
+    fields = fieldnames(probeInfos{1});
+    for i=1:numel(fields)
+        value = probeInfos{1}.(fields{i});
+        if size(value, 1) == 1 && size(value, 2) == 1
+            continue;
+        elseif size(value, 1) == 1
+            result = [];
+            for j=1:num_devices
+                result = [result, probeInfos{j}.(fields{i})];
+            end
+            probeInfo.(fields{i}) = result;
+        elseif size(value, 2) == 1
+            result = [];
+            for j=1:num_devices
+                result = [result; probeInfos{j}.(fields{i})];
+            end
+            probeInfo.(fields{i}) = result;
+        end
+    end
+    
+    probeInfo.OptPos3D_mean = [nanmean(probeInfo.OptPos3DX) nanmean(probeInfo.OptPos3DY) nanmean(probeInfo.OptPos3DZ)];
+    probeInfo.NumShortSeparation = sum(probeInfo.IsShortSeparation);
+    probeInfo.NumOptodes = length(probeInfo.OptPosX);
+else
 if(isempty(fNIR)&&isfield(setF,'device'))
     
     cfgFilePath=setF.device.cfg.File;
@@ -227,6 +296,7 @@ if(pf2_base.isnestedfield(probeInfo,'Probe'))
     probeInfo=probeInfo.Probe{probeNum};
 else
    error('Unable to identify probe'); 
+end
 end
 
 if(length(data2plot)~=probeInfo.NumOptodes)
@@ -501,8 +571,14 @@ if(p.Results.showColorbar)
             maxVal=temp;
             negColorbar=true;
         end
-        caxis(ax1, [minVal, maxVal]);
         chPos=colorbar(ax1);
+        if(p.Results.logScale)
+            set(ax1, 'ColorScale', 'log');
+            caxis(ax1, [exp(minVal), exp(maxVal)]);
+        else
+            caxis(ax1, [minVal, maxVal]);
+        end
+        
         set(get(chPos, 'title'), 'string', clrBarTitle);
     else
         curAxPosition=ax1.OuterPosition;
