@@ -493,7 +493,7 @@ end
 mrkScaleFactor=22;
 
 if(showChannels&&isfield(probeInfo, 'TableOpt'))
-    optPos = [probeInfo.TableOpt.Pos3D_x probeInfo.TableOpt.Pos3D_y probeInfo.TableOpt.Pos3D_z]
+    optPos = [probeInfo.TableOpt.Pos3D_x probeInfo.TableOpt.Pos3D_y probeInfo.TableOpt.Pos3D_z];
     if(numColors ~= 2)
         if(~isempty(optColor) && (isnumeric(optColor) && ~any(isnan(optColor)) || ~ismissing(optColor)))
             h = scatter3(optPos(:,1), optPos(:,2), optPos(:,3),20*p.Results.labelfontsize,'filled',optColor,'MarkerEdgeColor' ,'k');
@@ -729,5 +729,8 @@ if(p.Results.showReference)
          'CData',img,...
          'FaceColor','texturemap','FaceLighting','none','AlphaData',alpha,'FaceAlpha','texture');
     hold off
+end
 
+if (nargout > 0)
+    imgOut = getframe(ax).cdata;
 end
