@@ -1,8 +1,28 @@
-function [ imgOut ] = InterpolateROIvalues(fNIR,data2plot,minVal,maxVal,bufferMult,titleString,clrBarTitle)
+function [ imgOut ] = InterpolateROIvalues(varargin)
 %processFNIRS2.Data.Plot.ImageValues
 %
 % Uses an imagemap to change the color of each cell based on data2plot
-%
+% InterpolateROIvalues(fNIR,data2plot,minVal,maxVal,bufferMult,titleString,clrBarTitle)
+
+p = inputParser;
+
+addRequired(p, 'data2plot');
+addOptional(p, 'fNIR', {}, @isstruct);
+addOptional(p, 'minVal', [], @isnumeric);
+addOptional(p, 'maxVal', [], @isnumeric);
+addOptional(p, 'bufferMult', 1, @isnumeric);
+addOptional(p, 'titleString', '', @isstring);
+addOptional(p, 'clrBarTitle', '', @isstring);
+
+parse(p, varargin{:});
+
+clrBarTitle = p.Results.clrBarTitle;
+titleString = p.Results.titleString;
+bufferMult = round(p.Results.bufferMult);
+minVal = p.Results.minVal;
+maxVal = p.Results.maxVal;
+fNIR = p.Results.fNIR;
+data2plot = p.Results.data2plot;
 
 if(~isempty(fNIR)&&istable(fNIR)&&any(ismember(fNIR.Properties.VariableNames,'DeviceCfg')))%%is struct for ROI info?
     ROIinfo=fNIR;
@@ -22,26 +42,11 @@ elseif(isempty(ROIinfo))
     end
 end
 
-
-if(nargin<7)
-    clrBarTitle='';
-end
-
-if(nargin<6)
-   titleString=''; 
-end
-
-if(nargin<5)
-    bufferMult=1;
-else
-    bufferMult=round(bufferMult);
-end
-
-if(nargin<4||isempty(maxVal))
+if(isempty(maxVal))
     maxVal=nanmax(data2plot);
 end
 
-if(nargin<3||isempty(minVal))
+if(isempty(minVal))
    minVal=nanmin(data2plot); 
 end
 
