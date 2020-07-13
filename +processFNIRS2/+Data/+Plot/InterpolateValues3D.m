@@ -206,7 +206,7 @@ cla
 
 probeInfo=[];
 
-if(multiprobe);
+if(multiprobe)
     num_devices = length(fNIR);
     probeInfos = {};
     for i=1:num_devices
@@ -247,6 +247,19 @@ if(multiprobe);
             result = [];
             for j=1:num_devices
                 result = [result; probeInfos{j}.(fields{i})];
+            end
+            probeInfo.(fields{i}) = result;
+        elseif istable(value)
+            result = probeInfos{1}.(fields{i});
+            if strcmp(fields{i}, "TableOpt")
+                result = removevars(result, {'Ch', 'wv'});
+            end
+            for j = 2:num_devices
+                temp = probeInfos{j}.(fields{i});
+                if strcmp(fields{i}, 'TableOpt')
+                    temp = removevars(temp, {'Ch', 'wv'});
+                end
+                result = [result; temp];
             end
             probeInfo.(fields{i}) = result;
         end
@@ -479,13 +492,14 @@ end
 
 mrkScaleFactor=22;
 
-if(showChannels)
+if(showChannels&&isfield(probeInfo, 'TableOpt'))
+    optPos = [probeInfo.TableOpt.Pos3D_x probeInfo.TableOpt.Pos3D_y probeInfo.TableOpt.Pos3D_z]
     if(numColors ~= 2)
         if(~isempty(optColor) && (isnumeric(optColor) && ~any(isnan(optColor)) || ~ismissing(optColor)))
-            h = scatter3(OptPosX, OptPosY, OptPosZ,20*p.Results.labelfontsize,'filled',optColor,'MarkerEdgeColor' ,'k');
+            h = scatter3(optPos(:,1), optPos(:,2), optPos(:,3),20*p.Results.labelfontsize,'filled',optColor,'MarkerEdgeColor' ,'k');
         end
     end
-    text(OptPosX, OptPosY, OptPosZ, string(1:length(probeInfo.OptPos3DZ)), 'HorizontalAlignment', 'center','VerticalAlignment', 'middle', "FontSize", p.Results.labelfontsize, 'color', p.Results.labelfontcolor);
+    text(optPos(:,1), optPos(:,2), optPos(:,3), string(probeInfo.TableOpt.OptodeNum), 'HorizontalAlignment', 'center','VerticalAlignment', 'middle', "FontSize", p.Results.labelfontsize, 'color', p.Results.labelfontcolor);
 end
 
 if(plotFNIRS_SD&&isfield(probeInfo,'SrcPos3DX'))
