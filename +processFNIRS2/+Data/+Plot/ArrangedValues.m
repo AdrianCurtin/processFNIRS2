@@ -1,21 +1,33 @@
-function [ figHandle ] = ArrangedValues(fNIR,data2plot,minVal,maxVal,suptitleString,clrBarTitle)
+function [ figHandle ] = ArrangedValues(varargin)
 %processFNIRS2.Data.Plot.ArrangedValues
 %
 % Uses an imagemap to change the color of each cell based on data2plot
 %
-if(nargin<6)
-    clrBarTitle='';
-end
+% ArrangedValues(fNIR,data2plot,minVal,maxVal,suptitleString,clrBarTitle)
 
-if(nargin<5)
-   supTitleString=''; 
-end
+p = inputParser;
 
-if(nargin<4||isempty(maxVal))
+addRequired(p, 'data2plot');
+addOptional(p, 'fNIR', {}, @isstruct);
+addOptional(p, 'minVal', [], @isnumeric);
+addOptional(p, 'maxVal', [], @isnumeric);
+addOptional(p, 'suptitleString', '', @isstring);
+addOptional(p, 'clrBarTitle', '', @isstring);
+
+parse(p, varargin{:});
+
+clrBarTitle = p.Results.clrBarTitle;
+suptitleString = p.Results.titleString;
+minVal = p.Results.minVal;
+maxVal = p.Results.maxVal;
+fNIR = p.Results.fNIR;
+data2plot = p.Results.data2plot;
+
+if(isempty(maxVal))
     maxVal=nanmax(data2plot);
 end
 
-if(nargin<3||isempty(minVal))
+if(isempty(minVal))
    minVal=nanmin(data2plot); 
 end
 

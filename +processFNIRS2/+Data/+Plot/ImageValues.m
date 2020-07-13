@@ -1,21 +1,34 @@
-function [ imgOut ] = ImageValues(fNIR,data2plot,minVal,maxVal,titleString,clrBarTitle)
+function [ imgOut ] = ImageValues(varargin)
 %processFNIRS2.Data.Plot.ImageValues
 %
 % Uses an imagemap to change the color of each cell based on data2plot
 %
-if(nargin<6)
-    clrBarTitle='';
-end
+% ImageValues(fNIR,data2plot,minVal,maxVal,titleString,clrBarTitle)
 
-if(nargin<5)
-   titleString=''; 
-end
+p = inputParser;
 
-if(nargin<4||isempty(maxVal))
+addRequired(p, 'data2plot');
+addOptional(p, 'fNIR', {}, @isstruct);
+addOptional(p, 'minVal', [], @isnumeric);
+addOptional(p, 'maxVal', [], @isnumeric);
+addOptional(p, 'titleString', '', @isstring);
+addOptional(p, 'clrBarTitle', '', @isstring);
+
+parse(p, varargin{:});
+
+clrBarTitle = p.Results.clrBarTitle;
+titleString = p.Results.titleString;
+minVal = p.Results.minVal;
+maxVal = p.Results.maxVal;
+fNIR = p.Results.fNIR;
+data2plot = p.Results.data2plot;
+
+
+if(isempty(maxVal))
     maxVal=nanmax(data2plot);
 end
 
-if(nargin<3||isempty(minVal))
+if(isempty(minVal))
    minVal=nanmin(data2plot); 
 end
 probeInfo=[];
@@ -113,10 +126,6 @@ axis off
 if(nargout>0)
     imgOut=imgFinal;
 end
-
-
-
-
 
 if(~isempty(titleString))
     title(titleString);
