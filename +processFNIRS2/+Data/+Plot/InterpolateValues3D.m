@@ -403,6 +403,9 @@ if(isempty(lht))
     lht=camlight('headlight');
     lht.Tag='headlight';
     lht.Color=[0.68,0.68,0.68];
+    camlight(lht,0, 0);
+else
+   camlight(lht,0,0); 
 end
 
 %camlight(lht,'headlight');
@@ -611,11 +614,13 @@ end
 %campos(OptPos3D_mean*25);  %Front facing
 camtarget([0,-20,0]);
 
-lht=findobj(gca,'Type','Light','Tag','scenelight');
-if(isempty(lht))
-    lht=camlight('left');
-    lht.Tag='scenelight';
-    %camlight(180, 0);
+lht2=findobj(gca,'Type','Light','Tag','left');
+if(isempty(lht2))
+    lht2=camlight('left');
+    lht2.Tag='left';
+    camlight(lht2,180, 0);
+else
+    camlight(lht2,180, 0);
 end
 
 
