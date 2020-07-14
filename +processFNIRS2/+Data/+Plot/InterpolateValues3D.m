@@ -170,6 +170,7 @@ if(numericColors)
        case 2
            srcColor = p.Results.labelspherecolors(1,:);
            detColor = p.Results.labelspherecolors(2,:);
+           optColor=[];
        case 3
            srcColor = p.Results.labelspherecolors(1,:);
            detColor = p.Results.labelspherecolors(2,:);
@@ -190,6 +191,7 @@ else
        case 2
            srcColor = p.Results.labelspherecolors(1);
            detColor = p.Results.labelspherecolors(2);
+           optColor=[];
        case 3
            srcColor = p.Results.labelspherecolors(1);
            detColor = p.Results.labelspherecolors(2);
@@ -509,7 +511,7 @@ if(showChannels&&isfield(probeInfo, 'TableOpt'))
             probe_string=cell(0);
             for i=1:num_devices
                 selOpt=probeInfo.TableOpt.ProbeNum(:,1)==uDevices(i);
-                h(i) = scatter3(optPos(selOpt,1), optPos(selOpt,2), optPos(selOpt,3),20*p.Results.labelfontsize,'filled',optColor,'MarkerEdgeColor' ,probe_colors(i,:),'LineWidth',2);
+                h(i) = scatter3(optPos(selOpt,1), optPos(selOpt,2), optPos(selOpt,3),20*p.Results.labelfontsize,'filled',optColor,'MarkerEdgeColor' ,probe_colors(i,:),'LineWidth',1.5);
                 probe_string{i}=sprintf('Probe %i',uDevices(i));
             end
             legend(h,probe_string);
