@@ -8,7 +8,7 @@ function [ imgOut ] = InterpolateValues3D(varargin)
 %
 % Short separation channels are not presented here and are skipped
 %
-
+tic
 validAxesHandle= @(x) isa(x,'matlab.graphics.axis.Axes')&&isvalid(x);
 validScalarPosNum = @(x) isnumeric(x) && x>0;
 validScalarPosNumOrNan = @(x) isnumeric(x) && (x>0||isnan(x));
@@ -417,7 +417,7 @@ Cs = zeros(num_vertices, 3);
 controlPoints = [OptPosX(:), OptPosY(:), OptPosZ(:)];
 num_control = size(controlPoints, 1);
 
-tic
+
 dist_array = zeros(num_vertices, num_control);
 for i=1:num_control
     q = repmat(controlPoints(i,:), num_vertices, 1);
@@ -494,7 +494,7 @@ switch(projectmode)
         Cs = reshape(ind2rgb(round(v_ind), cmap), [], 3);
         Cs(ind == 0,:) = repmat(brainColor, sum(ind == 0), 1);
 end
-toc
+
 
 if(~isempty(p.Results.brainLineColor)&&all(~isnan(p.Results.brainLineColor)))
     h=patch('vertices', mdl.v, 'faces', mdl.f,'FaceVertexCData',Cs,'FaceColor','interp','AmbientStrength',0.6, 'EdgeColor', p.Results.brainLineColor,'FaceAlpha', p.Results.brainAlpha);
@@ -597,7 +597,7 @@ lht=findobj(gca,'Type','Light','Tag','scenelight');
 if(isempty(lht))
     lht=camlight('left');
     lht.Tag='scenelight';
-    camlight(180, 0);
+    %camlight(180, 0);
 end
 
 
@@ -768,3 +768,5 @@ end
 if (nargout > 0)
     imgOut = getframe(ax).cdata;
 end
+
+toc
