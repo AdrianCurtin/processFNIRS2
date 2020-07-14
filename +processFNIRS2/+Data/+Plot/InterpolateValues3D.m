@@ -500,6 +500,7 @@ brainHndl=findobj(gca,'Type','Patch','Tag','Brain');
 
 if(isempty(brainHndl))
    brainHndl=gca; 
+   cameratoolbar
 
     if(~isempty(p.Results.brainLineColor)&&all(~isnan(p.Results.brainLineColor)))
         brainHndl=patch(brainHndl,'vertices', mdl.v, 'faces', mdl.f,'FaceVertexCData',Cs,'FaceColor','interp','AmbientStrength',0.6, 'EdgeColor', p.Results.brainLineColor,'FaceAlpha', p.Results.brainAlpha);
