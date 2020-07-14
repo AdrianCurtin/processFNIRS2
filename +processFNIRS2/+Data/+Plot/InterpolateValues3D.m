@@ -398,7 +398,12 @@ mdl.f=cMdl.f.v(:,reorderIdx);
 shading interp
 %cameratoolbar
 
-camColor=[0.68,0.68,0.68];
+camIntensity=0.8;
+camColor=[1,1,1]*camIntensity;
+
+ka=0.825;
+kd=0.4;
+ks=0.2;
 
 hold on;
 
@@ -528,10 +533,6 @@ end
 
 
 brainHndl=findobj(gca,'Type','Patch','Tag','Brain');
-
-ka=0.825;
-kd=0.4;
-ks=0.25;
 
 if(isempty(brainHndl))
    brainHndl=gca; 
