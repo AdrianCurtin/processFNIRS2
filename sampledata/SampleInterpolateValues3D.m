@@ -15,7 +15,7 @@ processFNIRS2.Data.Plot.InterpolateValues3D({1:16, 1:22}, {fnir1200, hitachi35},
 
 %% Show 10-20 data
 pf2_base.loadDeviceCfg('Hitachi_ETG4000_3x5.cfg');
-processFNIRS2.Data.Plot.InterpolateValues3D(1:22, 'I1020_labels', {'TP7'});
+processFNIRS2.Data.Plot.InterpolateValues3D(1:22, 'I1020_labels', {'T7'});
 %% Change sphere label colors
 pf2_base.loadDeviceCfg('fNIR_Devices_fNIR1000.cfg');
 processFNIRS2.Data.Plot.InterpolateValues3D(1:16, 'labelspherecolors', ["k", "b"], 'labelfontcolor', 'g');
@@ -29,7 +29,7 @@ processFNIRS2.Data.Plot.InterpolateValues3D(-7:8, 'minVal', [-2, 2], 'maxVal', 6
 %% Log scale
 pf2_base.loadDeviceCfg('Hitachi_ETG4000_3x5.cfg');
 data = [ones(1, 9) 1e-6 1e-5 1e-2 ones(1, 10)];
-processFNIRS2.Data.Plot.InterpolateValues3D(data, 'logScale', true, 'interpolateType', 'quadratic');
+processFNIRS2.Data.Plot.InterpolateValues3D(data, 'logScale', true, 'interpolateType', 'quadratic','minVal', 1e-8, 'maxVal', 0.9);
 
 %% Buffer distance
 subplot(1, 2, 1);
@@ -49,4 +49,20 @@ processFNIRS2.Data.Plot.InterpolateValues3D({1:16, 1:22}, {fnir1200, hitachi35},
 
 %% Colobar title
 pf2_base.loadDeviceCfg('Hitachi_ETG4000_3x5.cfg');
-processFNIRS2.Data.Plot.InterpolateValues3D(1:22, 'interpolateType', 'quadratic', 'colorbarStr', "H
+processFNIRS2.Data.Plot.InterpolateValues3D(1:22, 'interpolateType', 'quadratic', 'colorbarStr', "HbO");
+
+%% Animation test
+
+
+figure(10);
+ax=gca();
+
+fnir1200 = processFNIRS2.Import.SampleData.fNIR1200();
+
+optData=[(1:16)/16];
+
+for i=1:100
+    processFNIRS2.Data.Plot.InterpolateValues3D(optData.*sin(optData*i/20*pi), fnir1200,'ax',ax, 'initCamPosition', 'front', 'ChannelLabels', false, 'SDLabels', false,'minVal',0.4,'maxVal',1);
+    pause(0.1);
+end
+>>>>>>> 483435649e2c8a1e8d801fb44a48b0d7cf285b5e

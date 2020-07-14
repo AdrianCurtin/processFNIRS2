@@ -170,6 +170,7 @@ if(numericColors)
        case 2
            srcColor = p.Results.labelspherecolors(1,:);
            detColor = p.Results.labelspherecolors(2,:);
+           optColor=[];
        case 3
            srcColor = p.Results.labelspherecolors(1,:);
            detColor = p.Results.labelspherecolors(2,:);
@@ -190,6 +191,7 @@ else
        case 2
            srcColor = p.Results.labelspherecolors(1);
            detColor = p.Results.labelspherecolors(2);
+           optColor=[];
        case 3
            srcColor = p.Results.labelspherecolors(1);
            detColor = p.Results.labelspherecolors(2);
@@ -202,7 +204,8 @@ else
     end
 end
 
-cla
+%cla
+hold off
 
 probeInfo=[];
 
@@ -394,9 +397,15 @@ mdl.f=cMdl.f.v(:,reorderIdx);
 %set(h,'linestyle','None');
 shading interp
 cameratoolbar
-lht=camlight('headlight');
-lht.Color=[0.68,0.68,0.68];
-camlight(lht,'headlight');
+
+lht=findobj(gca,'Type','Light','Tag','headlight');
+if(isempty(lht))
+    lht=camlight('headlight');
+    lht.Tag='headlight';
+    lht.Color=[0.68,0.68,0.68];
+end
+
+%camlight(lht,'headlight');
 
 hold on;
 
@@ -493,6 +502,7 @@ else
     h=patch('vertices', mdl.v, 'faces', mdl.f,'FaceVertexCData',Cs,'FaceColor','interp','AmbientStrength',0.6, 'LineStyle', 'None','FaceAlpha', p.Results.brainAlpha);
 end
 
+
 if(multiprobe)
    probe_colors=lines(num_devices); 
 end
@@ -509,7 +519,7 @@ if(showChannels&&isfield(probeInfo, 'TableOpt'))
             probe_string=cell(0);
             for i=1:num_devices
                 selOpt=probeInfo.TableOpt.ProbeNum(:,1)==uDevices(i);
-                h(i) = scatter3(optPos(selOpt,1), optPos(selOpt,2), optPos(selOpt,3),20*p.Results.labelfontsize,'filled',optColor,'MarkerEdgeColor' ,probe_colors(i,:),'LineWidth',2);
+                h(i) = scatter3(optPos(selOpt,1), optPos(selOpt,2), optPos(selOpt,3),20*p.Results.labelfontsize,'filled',optColor,'MarkerEdgeColor' ,probe_colors(i,:),'LineWidth',1.5);
                 probe_string{i}=sprintf('Probe %i',uDevices(i));
             end
             legend(h,probe_string);
@@ -582,8 +592,14 @@ switch(p.Results.initCamPosition)
 end
 %campos(OptPos3D_mean*25);  %Front facing
 camtarget([0,-20,0]);
-camlight(lht,'headlight');
-camlight(180, 0);
+
+lht=findobj(gca,'Type','Light','Tag','scenelight');
+if(isempty(lht))
+    lht=camlight('left');
+    lht.Tag='scenelight';
+    camlight(180, 0);
+end
+
 
 title(ax, titleString);
 if(p.Results.showColorbar)
