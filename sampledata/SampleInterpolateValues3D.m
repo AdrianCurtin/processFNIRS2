@@ -1,14 +1,18 @@
 %% Interpolate Types
+% Faux data with 'linear' and 'interpolate' modes
 subplot(1, 2, 1);
 pf2_base.loadDeviceCfg('fNIR_Devices_fNIR1000.cfg');
 fnirData = [1, 2, 1, 2, 2, 3, 3, 3, 4, 3, 4, 2, 3, 3, 1, 1];
 processFNIRS2.Data.Plot.InterpolateValues3D(fnirData, 'ChannelLabels', false, 'SDLabels', false);
 subplot(1, 2, 2);
 processFNIRS2.Data.Plot.InterpolateValues3D(fnirData, 'ChannelLabels', false, 'SDLabels', false, 'InterpolateType', 'linear');
+
+
 %% Multiple Probes
 hitachi35 = processFNIRS2.Import.SampleData.Hitachi_ETG4000_3x5();
 fnir1200 = processFNIRS2.Import.SampleData.fNIR1200();
-processFNIRS2.Data.Plot.InterpolateValues3D({1:16, 1:22}, {fnir1200, hitachi35});
+processFNIRS2.Data.Plot.InterpolateValues3D({1:16, 1:22}, {fnir1200, hitachi35},'SDLabels', false);
+
 %% Show 10-20 data
 pf2_base.loadDeviceCfg('Hitachi_ETG4000_3x5.cfg');
 processFNIRS2.Data.Plot.InterpolateValues3D(1:22, 'I1020_labels', {'TP7'});

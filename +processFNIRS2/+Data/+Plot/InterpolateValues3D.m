@@ -223,6 +223,8 @@ if(multiprobe)
                 probeNum=1;
             end
             probeInfos{i}=probeInfos{i}.Probe{probeNum};
+            probeInfos{i}.TableOpt.ProbeNum(:,1)=i;
+            probeInfos{i}.TableSD.ProbeNum(:,1)=i;
         else
             error('Unable to identify probe'); 
         end
@@ -259,6 +261,7 @@ if(multiprobe)
                 if strcmp(fields{i}, 'TableOpt')
                     temp = removevars(temp, {'Ch', 'wv'});
                 end
+                
                 result = [result; temp];
             end
             probeInfo.(fields{i}) = result;
@@ -490,12 +493,27 @@ else
     h=patch('vertices', mdl.v, 'faces', mdl.f,'FaceVertexCData',Cs,'FaceColor','interp','AmbientStrength',0.6, 'LineStyle', 'None','FaceAlpha', p.Results.brainAlpha);
 end
 
+if(multiprobe)
+   probe_colors=lines(num_devices); 
+end
+
 mrkScaleFactor=22;
 
 if(showChannels&&isfield(probeInfo, 'TableOpt'))
     optPos = [probeInfo.TableOpt.Pos3D_x probeInfo.TableOpt.Pos3D_y probeInfo.TableOpt.Pos3D_z];
-    if(numColors ~= 2)
-        if(~isempty(optColor) && (isnumeric(optColor) && ~any(isnan(optColor)) || ~ismissing(optColor)))
+    
+    if(~isempty(optColor) && (isnumeric(optColor) && ~any(isnan(optColor)) || ~ismissing(optColor)))
+        if(multiprobe)
+            uDevices=unique(probeInfo.TableOpt.ProbeNum);
+            
+            probe_string=cell(0);
+            for i=1:num_devices
+                selOpt=probeInfo.TableOpt.ProbeNum(:,1)==uDevices(i);
+                h(i) = scatter3(optPos(selOpt,1), optPos(selOpt,2), optPos(selOpt,3),20*p.Results.labelfontsize,'filled',optColor,'MarkerEdgeColor' ,probe_colors(i,:),'LineWidth',2);
+                probe_string{i}=sprintf('Probe %i',uDevices(i));
+            end
+            legend(h,probe_string);
+        else
             h = scatter3(optPos(:,1), optPos(:,2), optPos(:,3),20*p.Results.labelfontsize,'filled',optColor,'MarkerEdgeColor' ,'k');
         end
     end
