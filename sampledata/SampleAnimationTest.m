@@ -9,5 +9,5 @@ optData=[(1:16)/16];
 
 for i=1:100
     processFNIRS2.Data.Plot.InterpolateValues3D(optData.*sin(optData*i/20*pi), fnir1200,'ax',ax, 'initCamPosition', 'front', 'ChannelLabels', false, 'SDLabels', false,'minVal',0.4,'maxVal',1);
-    %pause(0.05);
+    pause(0.00001);
 end

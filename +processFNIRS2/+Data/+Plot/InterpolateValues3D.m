@@ -396,7 +396,7 @@ mdl.f=cMdl.f.v(:,reorderIdx);
 
 %set(h,'linestyle','None');
 shading interp
-cameratoolbar
+%cameratoolbar
 
 lht=findobj(gca,'Type','Light','Tag','headlight');
 if(isempty(lht))
