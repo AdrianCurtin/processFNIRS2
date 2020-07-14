@@ -496,10 +496,27 @@ switch(projectmode)
 end
 
 
-if(~isempty(p.Results.brainLineColor)&&all(~isnan(p.Results.brainLineColor)))
-    h=patch('vertices', mdl.v, 'faces', mdl.f,'FaceVertexCData',Cs,'FaceColor','interp','AmbientStrength',0.6, 'EdgeColor', p.Results.brainLineColor,'FaceAlpha', p.Results.brainAlpha);
+brainHndl=findobj(gca,'Type','Patch','Tag','Brain');
+
+if(isempty(brainHndl))
+   brainHndl=gca; 
+
+    if(~isempty(p.Results.brainLineColor)&&all(~isnan(p.Results.brainLineColor)))
+        brainHndl=patch(brainHndl,'vertices', mdl.v, 'faces', mdl.f,'FaceVertexCData',Cs,'FaceColor','interp','AmbientStrength',0.6, 'EdgeColor', p.Results.brainLineColor,'FaceAlpha', p.Results.brainAlpha);
+    else
+        brainHndl=patch(brainHndl,'vertices', mdl.v, 'faces', mdl.f,'FaceVertexCData',Cs,'FaceColor','interp','AmbientStrength',0.6, 'LineStyle', 'None','FaceAlpha', p.Results.brainAlpha);
+    end
+
+        brainHndl.Tag='Brain';
+
 else
-    h=patch('vertices', mdl.v, 'faces', mdl.f,'FaceVertexCData',Cs,'FaceColor','interp','AmbientStrength',0.6, 'LineStyle', 'None','FaceAlpha', p.Results.brainAlpha);
+        
+    if(~isempty(p.Results.brainLineColor)&&all(~isnan(p.Results.brainLineColor)))
+        set(brainHndl,'vertices', mdl.v, 'faces', mdl.f,'FaceVertexCData',Cs,'FaceColor','interp','AmbientStrength',0.6, 'EdgeColor', p.Results.brainLineColor,'FaceAlpha', p.Results.brainAlpha);
+    else
+       set(brainHndl,'vertices', mdl.v, 'faces', mdl.f,'FaceVertexCData',Cs,'FaceColor','interp','AmbientStrength',0.6, 'LineStyle', 'None','FaceAlpha', p.Results.brainAlpha);
+    end
+    
 end
 
 
