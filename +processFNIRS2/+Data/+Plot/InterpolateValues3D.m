@@ -204,7 +204,8 @@ else
     end
 end
 
-cla
+%cla
+hold off
 
 probeInfo=[];
 
@@ -396,9 +397,15 @@ mdl.f=cMdl.f.v(:,reorderIdx);
 %set(h,'linestyle','None');
 shading interp
 cameratoolbar
-lht=camlight('headlight');
-lht.Color=[0.68,0.68,0.68];
-camlight(lht,'headlight');
+
+lht=findobj(gca,'Type','Light','Tag','headlight');
+if(isempty(lht))
+    lht=camlight('headlight');
+    lht.Tag='headlight';
+    lht.Color=[0.68,0.68,0.68];
+end
+
+%camlight(lht,'headlight');
 
 hold on;
 
@@ -495,6 +502,7 @@ else
     h=patch('vertices', mdl.v, 'faces', mdl.f,'FaceVertexCData',Cs,'FaceColor','interp','AmbientStrength',0.6, 'LineStyle', 'None','FaceAlpha', p.Results.brainAlpha);
 end
 
+
 if(multiprobe)
    probe_colors=lines(num_devices); 
 end
@@ -584,8 +592,14 @@ switch(p.Results.initCamPosition)
 end
 %campos(OptPos3D_mean*25);  %Front facing
 camtarget([0,-20,0]);
-camlight(lht,'headlight');
-camlight(180, 0);
+
+lht=findobj(gca,'Type','Light','Tag','scenelight');
+if(isempty(lht))
+    lht=camlight('left');
+    lht.Tag='scenelight';
+    camlight(180, 0);
+end
+
 
 title(ax, titleString);
 if(p.Results.showColorbar)
