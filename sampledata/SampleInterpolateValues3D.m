@@ -46,3 +46,7 @@ subplot(2, 1, 1);
 processFNIRS2.Data.Plot.InterpolateValues3D({1:16, 1:22}, {fnir1200, hitachi35}, 'initCamPosition', 'front', 'ChannelLabels', false, 'SDLabels', false);
 subplot(2, 1, 2);
 processFNIRS2.Data.Plot.InterpolateValues3D({1:16, 1:22}, {fnir1200, hitachi35}, 'initCamPosition', 'left', 'ChannelLabels', false, 'SDLabels', false);
+
+%% Colobar title
+pf2_base.loadDeviceCfg('Hitachi_ETG4000_3x5.cfg');
+processFNIRS2.Data.Plot.InterpolateValues3D(1:22, 'interpolateType', 'quadratic', 'colorbarStr', "H
