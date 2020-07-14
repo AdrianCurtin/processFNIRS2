@@ -47,7 +47,7 @@ processFNIRS2.Data.Plot.InterpolateValues3D({1:16, 1:22}, {fnir1200, hitachi35},
 subplot(2, 1, 2);
 processFNIRS2.Data.Plot.InterpolateValues3D({1:16, 1:22}, {fnir1200, hitachi35}, 'initCamPosition', 'left', 'ChannelLabels', false, 'SDLabels', false);
 
-%% Colobar title
+%% Colorbar title
 pf2_base.loadDeviceCfg('Hitachi_ETG4000_3x5.cfg');
 processFNIRS2.Data.Plot.InterpolateValues3D(1:22, 'interpolateType', 'quadratic', 'colorbarStr', "HbO");
 
@@ -65,4 +65,3 @@ for i=1:100
     processFNIRS2.Data.Plot.InterpolateValues3D(optData.*sin(optData*i/20*pi), fnir1200,'ax',ax, 'initCamPosition', 'front', 'ChannelLabels', false, 'SDLabels', false,'minVal',0.4,'maxVal',1);
     pause(0.1);
 end
->>>>>>> 483435649e2c8a1e8d801fb44a48b0d7cf285b5e
