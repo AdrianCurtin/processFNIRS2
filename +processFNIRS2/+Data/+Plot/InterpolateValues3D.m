@@ -1,4 +1,4 @@
-function [ imgOut ] = InterpolateValues3D(varargin)
+function [ h, imgOut ] = InterpolateValues3D(varargin)
 
 %processFNIRS2.Data.Plot.ImageValues
 %
@@ -789,6 +789,8 @@ if(p.Results.showReference)
 end
 
 if (nargout > 0)
+    h=gca;
+    
     imgOut = getframe(ax).cdata;
 end
 
