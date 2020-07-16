@@ -9,13 +9,14 @@ processFNIRS2.Data.Plot.InterpolateValues3D(fnirData, 'ChannelLabels', false, 'S
 
 
 %% Multiple Probes
+subplot(1,1,1)
 hitachi35 = processFNIRS2.Import.SampleData.Hitachi_ETG4000_3x5();
 fnir1200 = processFNIRS2.Import.SampleData.fNIR1200();
-processFNIRS2.Data.Plot.InterpolateValues3D({1:16, 1:22}, {fnir1200, hitachi35},'SDLabels', false);
+processFNIRS2.Data.Plot.InterpolateValues3D({1:16, 1:22}, {fnir1200, hitachi35},'SDLabels', true,'showReference',false,'bufferDistance', 20,'cmap','cool');
 
 %% Show 10-20 data
 pf2_base.loadDeviceCfg('Hitachi_ETG4000_3x5.cfg');
-processFNIRS2.Data.Plot.InterpolateValues3D(1:22, 'I1020_labels', {'T7'});
+processFNIRS2.Data.Plot.InterpolateValues3D(1:22, 'I1020_labels', {'T7','CPz'});
 %% Change sphere label colors
 pf2_base.loadDeviceCfg('fNIR_Devices_fNIR1000.cfg');
 processFNIRS2.Data.Plot.InterpolateValues3D(1:16, 'labelspherecolors', ["k", "b"], 'labelfontcolor', 'g');
