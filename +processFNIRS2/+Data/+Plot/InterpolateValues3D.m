@@ -1,4 +1,4 @@
-function [ imgOut ] = InterpolateValues3D(varargin)
+function [ h, imgOut ] = InterpolateValues3D(varargin)
 
 %processFNIRS2.Data.Plot.ImageValues
 %
@@ -398,16 +398,52 @@ mdl.f=cMdl.f.v(:,reorderIdx);
 shading interp
 %cameratoolbar
 
-lht=findobj(gca,'Type','Light','Tag','headlight');
+camIntensity=0.8;
+camColor=[1,1,1]*camIntensity;
+
+ka=0.825;
+kd=0.4;
+ks=0.2;
+
+hold on;
+
+lht=findobj(gca,'Type','Light','Tag','Front');
 if(isempty(lht))
-    lht=camlight('headlight');
-    lht.Tag='headlight';
-    lht.Color=[0.68,0.68,0.68];
+    lht=camlight('right');
+    lht.Tag='Front';
+    lht.Color=camColor;
+    lht.Position=[0,100,0];
+   
+    %camlight(lht,0, 180);
+else
+   %camlight(lht,0,180); 
 end
 
 %camlight(lht,'headlight');
-
-hold on;
+% 
+% lht=findobj(gca,'Type','Light','Tag','Left');
+% if(isempty(lht))
+%     lht=camlight('right');
+%     lht.Tag='Left';
+%     lht.Color=camColor;
+%     lht.Position=[-100,10,60];
+%    
+%     %camlight(lht,0, 180);
+% else
+%    %camlight(lht,0,180); 
+% end
+% 
+% lht=findobj(gca,'Type','Light','Tag','Right');
+% if(isempty(lht))
+%     lht=camlight('right');
+%     lht.Tag='Right';
+%     lht.Color=camColor;
+%     lht.Position=[100,-10,60];
+%    
+%     %camlight(lht,0, 180);
+% else
+%    %camlight(lht,0,180); 
+% end
 
 C=data2plot;
 
@@ -503,19 +539,29 @@ if(isempty(brainHndl))
    cameratoolbar
 
     if(~isempty(p.Results.brainLineColor)&&all(~isnan(p.Results.brainLineColor)))
-        brainHndl=patch(brainHndl,'vertices', mdl.v, 'faces', mdl.f,'FaceVertexCData',Cs,'FaceColor','interp','AmbientStrength',0.6, 'EdgeColor', p.Results.brainLineColor,'FaceAlpha', p.Results.brainAlpha);
+        brainHndl=patch(brainHndl,'vertices', mdl.v, 'faces', mdl.f,'FaceVertexCData',Cs,'FaceColor','interp',...
+            'AmbientStrength',ka, 'DiffuseStrength', kd, 'SpecularStrength',ks, ...
+            'EdgeColor', p.Results.brainLineColor,'FaceAlpha', p.Results.brainAlpha,'LineStyle', '-');
     else
-        brainHndl=patch(brainHndl,'vertices', mdl.v, 'faces', mdl.f,'FaceVertexCData',Cs,'FaceColor','interp','AmbientStrength',0.6, 'LineStyle', 'None','FaceAlpha', p.Results.brainAlpha);
+        brainHndl=patch(brainHndl,'vertices', mdl.v, 'faces', mdl.f,'FaceVertexCData',Cs,'FaceColor','interp',...
+            'AmbientStrength',ka, 'DiffuseStrength', kd, 'SpecularStrength',ks, ...
+            'LineStyle', 'None','FaceAlpha', p.Results.brainAlpha);
     end
 
         brainHndl.Tag='Brain';
+        
+        
 
 else
         
     if(~isempty(p.Results.brainLineColor)&&all(~isnan(p.Results.brainLineColor)))
-        set(brainHndl,'vertices', mdl.v, 'faces', mdl.f,'FaceVertexCData',Cs,'FaceColor','interp','AmbientStrength',0.6, 'EdgeColor', p.Results.brainLineColor,'FaceAlpha', p.Results.brainAlpha);
+        set(brainHndl,'vertices', mdl.v, 'faces', mdl.f,'FaceVertexCData',Cs,'FaceColor','interp',...
+            'AmbientStrength',ka, 'DiffuseStrength', kd, 'SpecularStrength',ks, ...
+            'EdgeColor', p.Results.brainLineColor,'FaceAlpha', p.Results.brainAlpha,'LineStyle', '-');
     else
-       set(brainHndl,'vertices', mdl.v, 'faces', mdl.f,'FaceVertexCData',Cs,'FaceColor','interp','AmbientStrength',0.6, 'LineStyle', 'None','FaceAlpha', p.Results.brainAlpha);
+       set(brainHndl,'vertices', mdl.v, 'faces', mdl.f,'FaceVertexCData',Cs,'FaceColor','interp',...
+           'AmbientStrength',ka, 'DiffuseStrength', kd, 'SpecularStrength',ks, ...
+           'LineStyle', 'None','FaceAlpha', p.Results.brainAlpha);
     end
     
 end
@@ -611,11 +657,14 @@ end
 %campos(OptPos3D_mean*25);  %Front facing
 camtarget([0,-20,0]);
 
-lht=findobj(gca,'Type','Light','Tag','scenelight');
-if(isempty(lht))
-    lht=camlight('left');
-    lht.Tag='scenelight';
-    %camlight(180, 0);
+lht2=findobj(gca,'Type','Light','Tag','Rear');
+if(isempty(lht2))
+    lht2=camlight('left');
+    lht2.Tag='Rear';
+    lht2.Position=[0,-100,90];
+    lht2.Color=camColor;
+else
+    
 end
 
 
@@ -784,6 +833,8 @@ if(p.Results.showReference)
 end
 
 if (nargout > 0)
+    h=gca;
+    
     imgOut = getframe(ax).cdata;
 end
 
