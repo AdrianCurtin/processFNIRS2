@@ -84,12 +84,6 @@ if(multiprobe && ~dataEmpty)
     data2plot = concat_data;
 end
 
-if(p.Results.logScale)
-   if(any(data2plot<=0))
-        error("Cannot use logscale when data contains negative values")    
-   end
-   data2plot = log(data2plot);
-end
 if(isempty(p.Results.fNIR))
     global setF;
     fNIR = {};
@@ -134,6 +128,14 @@ elseif(length(maxVal) == 2 && length(minVal) == 2)
     minVal = s([2, 3]);
 end
 
+if(p.Results.logScale)
+   if(any(data2plot<=0))
+        error("Cannot use logscale when data contains negative values")    
+   end
+   data2plot = log(data2plot);
+   minVal = log(minVal);
+   maxVal = log(maxVal);
+end
 
 titleString = p.Results.titleString;
 clrBarTitle = p.Results.colorbarStr;
@@ -494,9 +496,17 @@ if twosided
    %end
 else
     if minVal < maxVal
-        cmap = [brainColor; cmap_high(256)];
+        if(p.Results.logScale)
+            cmap = [cmap_high(256); brainColor];
+        else
+            cmap = [brainColor; cmap_high(256)];
+        end
     else
-        cmap = [brainColor; flip(cmap_low(256))];
+        if(p.Results.logScale)
+            cmap = [flip(cmap_low(256)); brainColor];
+        else
+            cmap = [brainColor; flip(cmap_low(256))];
+        end
     end
     
     c_ind = round(length(cmap)*(C(:) - minVal)/(maxVal - minVal));
