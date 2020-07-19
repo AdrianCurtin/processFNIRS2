@@ -67,6 +67,8 @@ addParameter(p, 'interpolateType', defaultInterpolateType, validInterpolateType)
 addParameter(p, 'bufferDistance', nan, validScalarPosNumOrNan); %In a grid, this may equal to sqrt(sd distance^2/2)
 addParameter(p, 'includeSS', true, @islogical);
 addParameter(p, 'showReference', false, @islogical);
+addParameter(p, 'showScattering', false, @islogical);
+addParameter(p, 'scatterFactor', 1, validScalarPosNumOrNan);
 
 parse(p,varargin{:});
 
@@ -727,6 +729,34 @@ if(p.Results.showColorbar)
 
 
         chNeg=colorbar(ax2,'Position',[curAxInnerPosition(1)+curAxInnerPosition(3),curAxInnerPosition(2)-cbHeight/5,0.02,cbHeight]);    
+    end
+end
+
+if(p.Results.ShowScattering)
+    srcIdx=probeInfo.TableSD.Type=='Src';
+    detIdx=~srcIdx;
+    
+    srcPos = [probeInfo.TableSD.Pos3D_x(srcIdx), probeInfo.TableSD.Pos3D_y(srcIdx), probeInfo.TableSD.Pos3D_z(srcIdx)];   
+    detPos = [probeInfo.TableSD.Pos3D_x(detIdx), probeInfo.TableSD.Pos3D_y(detIdx), probeInfo.TableSD.Pos3D_z(detIdx)];
+    
+    optPos = [probeInfo.TableOpt.Pos3D_x, probeInfo.TableOpt.Pos3D_y, probeInfo.TableOpt.Pos3D_z];
+    optSrcPos = srcPos(probeInfo.TableOpt.SrcIdx, :);
+    optDetPos = detPos(probeInfo.TableOpt.DetIdx, :);
+    for i=1:length(optSrcPos)
+       s = optSrcPos(i,:);
+       d = optDetPos(i,:);
+       o = optPos(i,:);
+       t = linspace(0, pi, 16);
+       
+       % formula for ellipse: C + a cos(theta) U + b sin(theta) V
+       b = norm(s - d)/2;
+       a = p.Results.scatteringFactor * b;
+       U = s - d;
+       U = U / norm(U);
+       V = camtarget-o;
+       V = V / norm(V);
+       points = o + b*cos(t)' .* U + a*sin(t)' .* V; 
+       plot3(points(:,1), points(:,2), points(:,3), 'k', 'LineWidth', 1);
     end
 end
 
