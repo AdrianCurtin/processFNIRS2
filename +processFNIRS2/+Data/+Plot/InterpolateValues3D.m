@@ -30,7 +30,7 @@ defaultColormapLow = 'cool';
 validColormapLabels = {'hot', 'autumn', 'jet', 'gray', 'copper', 'bone', 'cool', 'winter', 'pink'};
 validColormap = @(x) any(validatestring(x, validColormapLabels)) || ishandle(x);
 
-if(isa(varargin{1},'matlab.graphics.axis.Axes')) %If first argument is axes then move to front
+if(numel(varargin) > 0 && isa(varargin{1},'matlab.graphics.axis.Axes')) %If first argument is axes then move to front
    ax=varargin{1};
    varargin=varargin(2:end);
 else
@@ -39,7 +39,7 @@ end
 
 p=inputParser;
 
-addRequired(p,'data2plot');
+addOptional(p,'data2plot', []);
 addOptional(p,'fNIR', {}, validFnirs);
 addOptional(p,'minval', [], @isnumeric);
 addOptional(p,'maxval', [], @isnumeric);
@@ -68,13 +68,14 @@ addParameter(p, 'bufferDistance', nan, validScalarPosNumOrNan); %In a grid, this
 addParameter(p, 'includeSS', true, @islogical);
 addParameter(p, 'showReference', false, @islogical);
 addParameter(p, 'showScattering', false, @islogical);
-addParameter(p, 'scatterFactor', 1, validScalarPosNumOrNan);
+addParameter(p, 'scatterFactor', 2, validScalarPosNumOrNan);
 
 parse(p,varargin{:});
 
 data2plot = p.Results.data2plot;
+dataEmpty = isempty(p.Results.data2plot);
 multiprobe = iscell(data2plot);
-if(multiprobe)
+if(multiprobe && ~dataEmpty)
     data2plot_cell = data2plot;
     concat_data = [];
     for i=1:numel(data2plot)
@@ -234,7 +235,7 @@ if(multiprobe)
             error('Unable to identify probe'); 
         end
         
-        if(length(data2plot_cell{i})~=probeInfos{i}.NumOptodes)
+        if(~dataEmpty && length(data2plot_cell{i})~=probeInfos{i}.NumOptodes)
             error('Must have a value for all optodes');
         end
     end
@@ -320,7 +321,7 @@ else
 end
 end
 
-if(length(data2plot)~=probeInfo.NumOptodes)
+if(~dataEmpty && length(data2plot)~=probeInfo.NumOptodes)
     error('Must have a value for all optodes');
 end
 
@@ -447,6 +448,7 @@ end
 %    %camlight(lht,0,180); 
 % end
 
+if(~dataEmpty)
 C=data2plot;
 
 num_vertices = size(mdl.v, 1);
@@ -492,10 +494,11 @@ if twosided
    %end
 else
     if minVal < maxVal
-        cmap = cmap_high(256);
+        cmap = [brainColor; cmap_high(256)];
     else
-        cmap = cmap_low(256);
+        cmap = [brainColor; flip(cmap_low(256))];
     end
+    
     c_ind = round(length(cmap)*(C(:) - minVal)/(maxVal - minVal));
 end
 
@@ -530,7 +533,10 @@ switch(projectmode)
         
         %alpha_interp(cmap_interp > 0.1 & cmap_interp < 0.9) = 1;
         Cs = reshape(ind2rgb(round(v_ind), cmap), [], 3);
-        Cs(ind == 0,:) = repmat(brainColor, sum(ind == 0), 1);
+        Cs(ind == 0,:) = repmat(brainColor, sum(ind == 0), 1);    
+end
+else
+    Cs = repmat(brainColor, size(mdl.v, 1), 1);
 end
 
 
@@ -671,7 +677,7 @@ end
 
 
 title(ax, titleString);
-if(p.Results.showColorbar)
+if(p.Results.showColorbar && ~dataEmpty)
     ax1=ax;
     curAxPosition=ax1.Position;
 
@@ -732,7 +738,7 @@ if(p.Results.showColorbar)
     end
 end
 
-if(p.Results.ShowScattering)
+if(p.Results.showScattering)
     srcIdx=probeInfo.TableSD.Type=='Src';
     detIdx=~srcIdx;
     
