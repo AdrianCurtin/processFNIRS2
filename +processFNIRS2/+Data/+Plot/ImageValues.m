@@ -14,6 +14,8 @@ addOptional(p, 'maxVal', [], @isnumeric);
 addOptional(p, 'titleString', '', @isstring);
 addOptional(p, 'clrBarTitle', '', @isstring);
 
+addParameter(p, 'includeSS', true, @islogical);
+
 parse(p, varargin{:});
 
 clrBarTitle = p.Results.clrBarTitle;
@@ -22,6 +24,8 @@ minVal = p.Results.minVal;
 maxVal = p.Results.maxVal;
 fNIR = p.Results.fNIR;
 data2plot = p.Results.data2plot;
+
+include_ss=p.Results.includeSS;
 
 
 if(isempty(maxVal))
@@ -79,22 +83,44 @@ else
    error('Unable to identify probe'); 
 end
 
-if(length(data2plot)~=probeInfo.NumOptodes)
+if(include_ss&&length(probeInfo.OptLayout2D_ss)>length(data2plot)&&length(probeInfo.OptLayout2D)==length(data2plot))
+   include_ss=false;
+   warning('Not enough data for all channels, ignoring short separation channels');
+end
+
+if(include_ss)
+    numOptodes=probeInfo.NumOptodes;
+    channelList=probeInfo.ChannelList;
+    optLayout=probeInfo.OptLayout2D_ss;
+else
+    numOptodes=probeInfo.NumOptodes-probeInfo.NumShortSeparation;
+    channelList=probeInfo.ChannelList(~probeInfo.IsShortSeparation);
+    optLayout=probeInfo.OptLayout2D;
+end
+
+
+if(length(data2plot)~=numOptodes)
     error('Must have a value for all optodes');
 end
 % 
 % clf(gcf);
 % 
 % h{1}= axes('Position',[0.05,0.05,0.9,0.9],'Box','on');
-cla
+
+g=gcf;
+clf(gcf);
+
 
 imgSize=1000;
 imgData=nan(imgSize,imgSize);
 
-for(optIdx=1:length(data2plot))
-    optNum=probeInfo.ChannelList(optIdx);
 
-    optPos=probeInfo.OptLayout2D{optNum};
+
+
+for(optIdx=1:length(data2plot))
+    optNum=channelList(optIdx);
+
+    optPos=optLayout{optNum};
 
     x1=round(optPos(1)*imgSize);
     y1=round(optPos(2)*imgSize);

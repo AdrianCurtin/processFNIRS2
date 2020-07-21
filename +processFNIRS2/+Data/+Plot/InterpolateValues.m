@@ -31,7 +31,7 @@ if(isempty(minVal))
    minVal=nanmin(data2plot); 
 end
 
-if(isempty(maxVal)
+if(isempty(maxVal))
     if(length(minVal)==2)
         maxVal=[];
     else
@@ -114,7 +114,15 @@ else
    error('Unable to identify probe'); 
 end
 
-if(length(data2plot)~=probeInfo.NumOptodes)
+include_ss=false;
+if(~include_ss)
+    numOptodes=probeInfo.NumOptodes-probeInfo.NumShortSeparation;
+    channelList=probeInfo.ChannelList(~probeInfo.IsShortSeparation);
+    optLayout=probeInfo.OptLayout2D;
+end
+
+
+if(length(data2plot)~=numOptodes)
     error('Must have a value for all optodes');
 end
 
@@ -164,7 +172,7 @@ if(OptDistX==OptDistY)
     [inpX,inpY]=meshgrid(0:OptDistX*pixelPerCm:(maxDimDist+bufferSize*2)*pixelPerCm);
 else
     
-    error('Haven''t accoutned for this yet');
+    error('Haven''t accounted for this yet');
 end
 
 %maxIdxX=round(dimX/OptDistX)+bufferMult+2;
@@ -406,12 +414,13 @@ for optIdx=1:length(data2plot)
     %if optIdx > 16
     %    continue 
     %end
-    t=text(optPos2Plot(1,optIdx)/1.01+1,optPos2Plot(2,optIdx)/1.01+1,mrkLbl{optIdx},'FontSize',11,'VerticalAlignment','middle','HorizontalAlignment', 'center','color','white');
-    t2=text(optPos2Plot(1,optIdx)/1.01+1,optPos2Plot(2,optIdx)/1.01+1,mrkLbl{optIdx},'FontSize',8,'VerticalAlignment','middle','HorizontalAlignment', 'center','color','white');
-    t.FontWeight='bold';
-    t2.FontWeight='bold';
+    %t=text(optPos2Plot(1,optIdx)/1.01+1,optPos2Plot(2,optIdx)/1.01+1,mrkLbl{optIdx},'FontSize',11,'VerticalAlignment','middle','HorizontalAlignment', 'left','color','white');
+    %t2=text(optPos2Plot(1,optIdx)/1.01+1,optPos2Plot(2,optIdx)/1.01+1,mrkLbl{optIdx},'FontSize',8,'VerticalAlignment','middle','HorizontalAlignment', 'right','color','white');
+    %t.FontWeight='bold';
+    t=text(optPos2Plot(1,optIdx)/1.01+1,optPos2Plot(2,optIdx)/1.01+1,mrkLbl{optIdx},'BackgroundColor','Black','margin',0.25,'FontSize',10,'VerticalAlignment','middle','HorizontalAlignment', 'center','color','white');
     
-    text(optPos2Plot(1,optIdx)/1.01+1,optPos2Plot(2,optIdx)/1.01+1,mrkLbl{optIdx},'FontSize',10,'VerticalAlignment','middle','HorizontalAlignment', 'center','color','black');
+    t.FontWeight='bold';
+    
 end
 
 
@@ -433,3 +442,5 @@ if(~isempty(titleString))
 end
 
 end
+
+
