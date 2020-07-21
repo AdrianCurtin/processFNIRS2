@@ -69,6 +69,7 @@ addParameter(p, 'includeSS', true, @islogical);
 addParameter(p, 'showReference', false, @islogical);
 addParameter(p, 'showScattering', false, @islogical);
 addParameter(p, 'scatterFactor', 2, validScalarPosNumOrNan);
+addParameter(p, 'useEEG', false, @islogical);
 
 parse(p,varargin{:});
 
@@ -84,7 +85,7 @@ if(multiprobe && ~dataEmpty)
     data2plot = concat_data;
 end
 
-if(isempty(p.Results.fNIR))
+if(isempty(p.Results.fNIR) && ~p.Results.useEEG)
     global setF;
     fNIR = {};
     if(multiprobe)
@@ -140,6 +141,7 @@ end
 titleString = p.Results.titleString;
 clrBarTitle = p.Results.colorbarStr;
 projectmode = p.Results.interpolateType;
+bufferDistance=p.Results.bufferDistance;
 
 cmap_high = p.Results.cmap;
 if(~ishandle(cmap_high))
@@ -208,11 +210,40 @@ else
            color1020 = p.Results.labelspherecolors(4);
     end
 end
+useHighRes = p.Results.useHighRes;
+show1020 = p.Results.useEEG || islogical(p.Results.I1020_labels) && p.Results.I1020_labels || ~islogical(p.Results.I1020_labels) && ~isempty(p.Results.I1020_labels);
+showSD = p.Results.SDLabels && ~p.Results.useEEG;
+showChannels = p.Results.ChannelLabels;
 
 %cla
 hold off
 
 probeInfo=[];
+
+if(show1020)
+    c1020=load('cerebro_1020_table.mat'); %estimation of 10-20 coordinates
+    c1020=c1020.cerebro_1020_table;
+    c1020 = c1020(~isnan(c1020.tx), :);
+    if ~islogical(p.Results.I1020_labels)
+        labels = "'" + p.Results.I1020_labels + "'";
+        c1020 = c1020(ismember(c1020.Electrode, labels), :);
+    end   
+    
+    if(p.Results.useEEG)
+       probeInfo = {};
+       idx = arrayfun(@(x) find(strcmp(c1020.Electrode, x)), labels);
+       data2plot = data2plot(idx);
+       probeInfo.OptPos3DX = c1020.tx;
+       probeInfo.OptPos3DY = c1020.ty;
+       probeInfo.OptPos3DZ = c1020.tz;
+       probeInfo.NumOptodes = height(c1020);
+       probeInfo.IsShortSeparation = zeros(1, probeInfo.NumOptodes);
+       probeInfo.OptPos3D_mean = nanmean([c1020.tx c1020.ty c1020.tz]);
+       if(isnan(p.Results.bufferDistance))
+          bufferDistance = 40/sqrt(2); 
+       end
+    end
+end
 
 if(multiprobe)
     num_devices = length(fNIR);
@@ -280,8 +311,9 @@ if(multiprobe)
     probeInfo.NumShortSeparation = sum(probeInfo.IsShortSeparation);
     probeInfo.NumOptodes = length(probeInfo.OptPosX);
 else
-if(isempty(fNIR)&&isfield(setF,'device'))
-    
+if(p.Results.useEEG)
+   %pass
+elseif(isempty(fNIR)&&isfield(setF,'device'))
     cfgFilePath=setF.device.cfg.File;
     if(~isfield(setF.device.Probe{1},'OptLayout2D'))
         probeInfo=pf2_base.loadDeviceCfg(cfgFilePath,false);
@@ -296,7 +328,7 @@ else
     cfgFilePath='';
 end
 
-if(~isempty(probeInfo))
+if(~isempty(probeInfo) || p.Results.useEEG)
 
 elseif(isempty(cfgFilePath)||~contains(cfgFilePath,'.cfg'))
     
@@ -318,7 +350,7 @@ if(pf2_base.isnestedfield(probeInfo,'Probe'))
         probeNum=1;
     end
     probeInfo=probeInfo.Probe{probeNum};
-else
+elseif(~p.Results.useEEG)
    error('Unable to identify probe'); 
 end
 end
@@ -339,15 +371,11 @@ OptPosZ=probeInfo.OptPos3DZ(~probeInfo.IsShortSeparation | ~p.Results.includeSS)
 
 OptPos3D_mean=probeInfo.OptPos3D_mean;
 
-bufferDistance=p.Results.bufferDistance;
 if(isnan(bufferDistance))
    bufferDistance=median(probeInfo.SD(~probeInfo.IsShortSeparation)*10)/sqrt(2);
 end
 
-useHighRes = p.Results.useHighRes;
-show1020 = islogical(p.Results.I1020_labels) && p.Results.I1020_labels || ~islogical(p.Results.I1020_labels) && ~isempty(p.Results.I1020_labels);
-showSD = p.Results.SDLabels;
-showChannels = p.Results.ChannelLabels;
+
 
 % TAL EEG locations from Automated cortical projection of EEG sensors: Anatomical correlation via the international 10–10 system
 if(useHighRes)
@@ -356,15 +384,6 @@ if(useHighRes)
 else
     cerebro_mdl=load('cerebro_mdl_05.mat');  %Low-res model
     cerebro_mdl=cerebro_mdl.cerebro_mdl_05;
-end
-
-if(show1020)
-    c1020=load('cerebro_1020_table.mat'); %estimation of 10-20 coordinates
-    c1020=c1020.cerebro_1020_table;
-    if ~islogical(p.Results.I1020_labels)
-        labels = "'" + p.Results.I1020_labels + "'";
-        c1020 = c1020(ismember(c1020.Electrode, labels), :);
-    end     
 end
 
 %lighting('phong')
@@ -497,15 +516,15 @@ if twosided
 else
     if minVal < maxVal
         if(p.Results.logScale)
-            cmap = [cmap_high(256); brainColor];
+            cmap = [cmap_high(256)];
         else
-            cmap = [brainColor; cmap_high(256)];
+            cmap = [cmap_high(256)];
         end
     else
         if(p.Results.logScale)
-            cmap = [flip(cmap_low(256)); brainColor];
+            cmap = [flip(cmap_low(256))];
         else
-            cmap = [brainColor; flip(cmap_low(256))];
+            cmap = [flip(cmap_low(256))];
         end
     end
     
@@ -515,6 +534,7 @@ end
 switch(projectmode)
     case 'nearest'
         C_temp = [brainColor;reshape(ind2rgb(c_ind, cmap), [], 3)];
+        C_temp([-1; c_ind] < 0, :) = repmat(brainColor, sum(c_ind < 0)+1, 1);
         %C_temp = zeros(num_control+1, 3);
         %C_temp(1,:) = brainColor;
         %C_temp(logical([0;cmap_i == 1]),:) = reshape(ind2rgb(c_ind(cmap_i == 1), cmap_low), [], 3);
@@ -543,6 +563,7 @@ switch(projectmode)
         
         %alpha_interp(cmap_interp > 0.1 & cmap_interp < 0.9) = 1;
         Cs = reshape(ind2rgb(round(v_ind), cmap), [], 3);
+        Cs(v_ind < 0, :) = repmat(brainColor, sum(v_ind < 0), 1);
         Cs(ind == 0,:) = repmat(brainColor, sum(ind == 0), 1);    
 end
 else
@@ -688,9 +709,10 @@ end
 
 title(ax, titleString);
 if(p.Results.showColorbar && ~dataEmpty)
+    cbars = findobj(gcf, "Type", "ColorBar");
+    delete(cbars);
     ax1=ax;
     curAxPosition=ax1.Position;
-
     
     if(~twosided)
         
@@ -704,7 +726,9 @@ if(p.Results.showColorbar && ~dataEmpty)
             maxVal=temp;
             negColorbar=true;
         end
+        
         chPos=colorbar(ax1);
+        
         if(p.Results.logScale)
             set(ax1, 'ColorScale', 'log');
             caxis(ax1, [exp(minVal), exp(maxVal)]);
@@ -737,6 +761,8 @@ if(p.Results.showColorbar && ~dataEmpty)
         linkprop([ax1, ax2],{'CameraUpVector', 'CameraPosition', 'CameraTarget', 'XLim', 'YLim', 'ZLim'});
         %set([ax1,ax2],'Position',[.05 .11 .885 .815]);
         chPos=colorbar(ax1);
+        chPos.Tag = "Main";
+        
         set(get(chPos, 'title'), 'string', clrBarTitle);
         %chPos_position=chPos.OuterPosition;
         cbHeight=curAxInnerPosition(4)/2;
@@ -744,7 +770,8 @@ if(p.Results.showColorbar && ~dataEmpty)
         set(chPos,'Position',[curAxInnerPosition(1)+curAxInnerPosition(3),curAxInnerPosition(2)+cbHeight,0.02,cbHeight]);
 
 
-        chNeg=colorbar(ax2,'Position',[curAxInnerPosition(1)+curAxInnerPosition(3),curAxInnerPosition(2)-cbHeight/5,0.02,cbHeight]);    
+        chNeg=colorbar(ax2,'Position',[curAxInnerPosition(1)+curAxInnerPosition(3),curAxInnerPosition(2)-cbHeight/5,0.02,cbHeight]); 
+        chNeg.Tag = "Lower";
     end
 end
 
