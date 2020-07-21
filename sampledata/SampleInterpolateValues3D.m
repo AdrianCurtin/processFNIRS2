@@ -9,6 +9,7 @@ processFNIRS2.Data.Plot.InterpolateValues3D(fnirData, 'ChannelLabels', false, 'S
 
 
 %% Multiple Probes
+% Combine sample data on two different probes on the same graph
 subplot(1,1,1)
 hitachi35 = processFNIRS2.Import.SampleData.Hitachi_ETG4000_3x5();
 fnir1200 = processFNIRS2.Import.SampleData.fNIR1200();
@@ -51,6 +52,13 @@ processFNIRS2.Data.Plot.InterpolateValues3D({1:16, 1:22}, {fnir1200, hitachi35},
 %% Colorbar title
 pf2_base.loadDeviceCfg('Hitachi_ETG4000_3x5.cfg');
 processFNIRS2.Data.Plot.InterpolateValues3D(1:22, 'interpolateType', 'quadratic', 'colorbarStr', "HbO");
+
+%% EEG Probe plotting
+processFNIRS2.Data.Plot.InterpolateValues3D(1:4, 'useEEG', true, 'I1020_labels', {'TP7', 'O1', 'Oz', 'O2'});
+
+%% Plot optical pathways
+pf2_base.loadDeviceCfg('fNIR_Devices_fNIR1000.cfg');
+processFNIRS2.Data.Plot.InterpolateValues3D(1:16, 'showScattering', true, "brainAlpha", 0.25);
 
 %% Animation test
 

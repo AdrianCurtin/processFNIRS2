@@ -68,7 +68,7 @@ addParameter(p, 'bufferDistance', nan, validScalarPosNumOrNan); %In a grid, this
 addParameter(p, 'includeSS', true, @islogical);
 addParameter(p, 'showReference', false, @islogical);
 addParameter(p, 'showScattering', false, @islogical);
-addParameter(p, 'scatterFactor', 2, validScalarPosNumOrNan);
+addParameter(p, 'scatteringFactor', 2, validScalarPosNumOrNan);
 addParameter(p, 'useEEG', false, @islogical);
 
 parse(p,varargin{:});
