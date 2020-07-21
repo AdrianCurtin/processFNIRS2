@@ -249,14 +249,22 @@ end
 printOnce=false; % flag for multiple printing
 flagOnce=false;
 
+if(isfield(probeInfo,'OptLayout2D_ss'))
+	optLayout=probeInfo.OptLayout2D_ss;
+elseif(isfield(probeInfo,'OptLayout2D'))
+	optLayout=probeInfo.OptLayout2D;
+else
+   plotArranged=false; 
+end
+
 h=cell(0);
 for(optIdx=1:length(channels))
     optNum=channels(optIdx);
     if(plotArranged)
-        if optNum > numel(probeInfo.OptLayout2D) 
+        if optNum > numel(optLayout) 
             continue
         else
-            optPos=probeInfo.OptLayout2D{optNum};
+            optPos=optLayout{optNum};
             optPos([3,4])=optPos([3,4]).*[0.65,0.9];
             optPos([1,2])=optPos([1,2])+0.03;
             h{optIdx}= axes('Position',optPos,'Box','on');
