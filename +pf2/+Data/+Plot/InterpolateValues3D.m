@@ -68,8 +68,11 @@ addParameter(p, 'bufferDistance', nan, validScalarPosNumOrNan); %In a grid, this
 addParameter(p, 'includeSS', true, @islogical);
 addParameter(p, 'showReference', false, @islogical);
 addParameter(p, 'showScattering', false, @islogical);
-addParameter(p, 'scatteringFactor', 2, validScalarPosNumOrNan);
+addParameter(p, 'scatteringFactor', 1, validScalarPosNumOrNan);
 addParameter(p, 'useEEG', false, @islogical);
+addParameter(p, 'optodeLine', false, @islogical);
+
+addParameter(p, 'useTalairach', true, @islogical); % Otherwise will default to MNI
 
 parse(p,varargin{:});
 
@@ -219,11 +222,14 @@ showChannels = p.Results.ChannelLabels;
 hold off
 
 probeInfo=[];
-%show1020=true;
 if(show1020)
     c1020=load('cerebro_1020_table.mat'); %estimation of 10-20 coordinates
     c1020=c1020.c1020;
     c1020 = c1020(~isnan(c1020.tx), :);
+           c1020.z = c1020.mz;
+    end
+    
+    c1020 = c1020(~isnan(c1020.x), :);
     if ~islogical(p.Results.I1020_labels)
         labels = "'" + p.Results.I1020_labels + "'";
         c1020 = c1020(ismember(c1020.Electrode, labels), :);
@@ -233,12 +239,16 @@ if(show1020)
        probeInfo = {};
        idx = arrayfun(@(x) find(strcmp(c1020.Electrode, x)), labels);
        data2plot = data2plot(idx);
-       probeInfo.OptPos3DX = c1020.tx;
-       probeInfo.OptPos3DY = c1020.ty;
-       probeInfo.OptPos3DZ = c1020.tz;
+       
+       
+       
+       probeInfo.OptPos3DX = c1020.x;
+       probeInfo.OptPos3DY = c1020.y;
+       probeInfo.OptPos3DZ = c1020.z;
+       
        probeInfo.NumOptodes = height(c1020);
        probeInfo.IsShortSeparation = zeros(1, probeInfo.NumOptodes);
-       probeInfo.OptPos3D_mean = nanmean([c1020.tx c1020.ty c1020.tz]);
+       probeInfo.OptPos3D_mean = nanmean([probeInfo.OptPos3DX probeInfo.OptPos3DY probeInfo.OptPos3DZ]);
        if(isnan(p.Results.bufferDistance))
           bufferDistance = 40/sqrt(2); 
        end
@@ -306,6 +316,8 @@ if(multiprobe)
             probeInfo.(fields{i}) = result;
         end
     end
+    
+
     
     probeInfo.OptPos3D_mean = [nanmean(probeInfo.OptPos3DX) nanmean(probeInfo.OptPos3DY) nanmean(probeInfo.OptPos3DZ)];
     probeInfo.NumShortSeparation = sum(probeInfo.IsShortSeparation);
@@ -383,6 +395,7 @@ OptPosX=probeInfo.OptPos3DX(~probeInfo.IsShortSeparation | ~p.Results.includeSS)
 OptPosY=probeInfo.OptPos3DY(~probeInfo.IsShortSeparation | ~p.Results.includeSS);
 OptPosZ=probeInfo.OptPos3DZ(~probeInfo.IsShortSeparation | ~p.Results.includeSS);
 
+
 OptPos3D_mean=probeInfo.OptPos3D_mean;
 
 if(isnan(bufferDistance))
@@ -421,14 +434,44 @@ tz2z=@(z) z;%/79*2.5+2.3;  %up down scaling
 
 brainResizeFactor=1.2;
 
-x2tx=@(x) x*49/1.73/brainResizeFactor;  %L/R scaling
-y2ty=@(y) (y-0.57)*143.5/4.35/brainResizeFactor; %rostral/caudal scaling
-z2tz=@(z) (z-2.32)*79/2.4/brainResizeFactor;  %up down scaling
+TAL_RosCaud=[68,-103];
+TAL_RL=[67, -65];
+TAL_UD=[76, -50-13.5];
 
+MNI_RosCaud=[73,-107];
+MNI_RL=[73, -71];
+MNI_UD=[79, -62-13.5];
+
+x2tx=@(x) (x-min(x))/(max(x)-min(x))*(TAL_RL(1)-TAL_RL(2))+TAL_RL(2);%*49/1.73/brainResizeFactor;  %L/R scaling
+y2ty=@(y) (y-min(y))/(max(y)-min(y))*(TAL_RosCaud(1)-TAL_RosCaud(2))+TAL_RosCaud(2);%(y-0.57)*143.5/4.35/brainResizeFactor; %rostral/caudal scaling
+z2tz=@(z) (z-min(z))/(max(z)-min(z))*(TAL_UD(1)-TAL_UD(2))+TAL_UD(2);%(z-2.32)*79/2.4/brainResizeFactor;  %up down scaling
+
+x2mx=@(x) (x-min(x))/(max(x)-min(x))*(MNI_RL(1)-MNI_RL(2))+MNI_RL(2);  %L/R scaling
+y2my=@(y) (y-min(y))/(max(y)-min(y))*(MNI_RosCaud(1)-MNI_RosCaud(2))+MNI_RosCaud(2); %rostral/caudal scaling
+z2mz=@(z) (z-min(z))/(max(z)-min(z))*(MNI_UD(1)-MNI_UD(2))+MNI_UD(2);  %up down scaling
+
+rotx = @(t) [1 0 0; 0 cos(t) -sin(t) ; 0 sin(t) cos(t)] ;
+roty = @(t) [cos(t) 0 sin(t) ; 0 1 0 ; -sin(t) 0  cos(t)] ;
+rotz = @(t) [cos(t) -sin(t) 0 ; sin(t) cos(t) 0 ; 0 0 1] ;
 
 reorderIdx=[3,1,2];
 mdl.v=cMdl.v(:,reorderIdx);
-mdl.v=[x2tx(mdl.v(:,1)),y2ty(mdl.v(:,2)),z2tz(mdl.v(:,3))];
+
+if(p.Results.useTalairach)
+    mdl.v=mdl.v*rotx(4/180*pi);
+    mdl.v=[x2tx(mdl.v(:,1)),y2ty(mdl.v(:,2)),z2tz(mdl.v(:,3))];
+else
+    %mdl.v=mdl.v*rotx(0/180*pi);
+    mdl.v=[x2mx(mdl.v(:,1)),y2my(mdl.v(:,2)),z2mz(mdl.v(:,3))];
+    
+    
+    
+end
+
+fprintf('Min X: %.3f Max X %.3f\n',min(mdl.v(:,1)),max(mdl.v(:,1)));
+fprintf('Min Y: %.3f Max Y %.3f\n',min(mdl.v(:,2)),max(mdl.v(:,2)));
+fprintf('Min Z: %.3f Max Z %.3f\n',min(mdl.v(mdl.v(:,2)<-60,3)),max(mdl.v(:,3)));
+
 mdl.f=cMdl.f.v(:,reorderIdx);
 %mdl.f=[x2tx(mdl.f(:,1)),y2ty(mdl.f(:,2)),z2tz(mdl.f(:,3))];
 
@@ -457,31 +500,6 @@ else
    %camlight(lht,0,180); 
 end
 
-%camlight(lht,'headlight');
-% 
-% lht=findobj(gca,'Type','Light','Tag','Left');
-% if(isempty(lht))
-%     lht=camlight('right');
-%     lht.Tag='Left';
-%     lht.Color=camColor;
-%     lht.Position=[-100,10,60];
-%    
-%     %camlight(lht,0, 180);
-% else
-%    %camlight(lht,0,180); 
-% end
-% 
-% lht=findobj(gca,'Type','Light','Tag','Right');
-% if(isempty(lht))
-%     lht=camlight('right');
-%     lht.Tag='Right';
-%     lht.Color=camColor;
-%     lht.Position=[100,-10,60];
-%    
-%     %camlight(lht,0, 180);
-% else
-%    %camlight(lht,0,180); 
-% end
 
 if(~dataEmpty)
 C=data2plot;
@@ -673,13 +691,13 @@ for i=1:size(c1020,1)
     %text(cerebro1020(i,1),cerebro1020(i,2),cerebro1020(i,3),cerebro1020_labels{i})
     if(~isnan(c1020.BA(i)))
         if(numColors == 4 || numColors == 1)
-            h = scatter3(c1020.tx(i),c1020.ty(i),c1020.tz(i),mrkScaleFactor*1.5*p.Results.labelfontsize, 'filled', color1020);
+            h = scatter3(c1020.x(i),c1020.y(i),c1020.z(i),mrkScaleFactor*1.5*p.Results.labelfontsize, 'filled', color1020);
         else
-            h = scatter3(c1020.tx(i),c1020.ty(i),c1020.tz(i),mrkScaleFactor*1.5*p.Results.labelfontsize, 'filled');
+            h = scatter3(c1020.x(i),c1020.y(i),c1020.z(i),mrkScaleFactor*1.5*p.Results.labelfontsize, 'filled');
         end
         hold on
         
-        text(c1020.tx(i),c1020.ty(i),c1020.tz(i),c1020.Electrode(i),'HorizontalAlignment', 'center','VerticalAlignment', 'middle', "FontSize", p.Results.labelfontsize, 'color', p.Results.labelfontcolor)
+        text(c1020.x(i),c1020.y(i),c1020.z(i),c1020.Electrode(i),'HorizontalAlignment', 'center','VerticalAlignment', 'middle', "FontSize", p.Results.labelfontsize, 'color', p.Results.labelfontcolor)
         %text(x2tx(c1020.x(i)),y2ty(c1020.y(i)),z2tz(c1020.z(i)),c1020.Electrode(i),'HorizontalAlignment','center')
         
     end
@@ -789,7 +807,7 @@ if(p.Results.showColorbar && ~dataEmpty)
     end
 end
 
-if(p.Results.showScattering)
+if(p.Results.showScattering||p.Results.optodeLine)
     srcIdx=probeInfo.TableSD.Type=='Src';
     detIdx=~srcIdx;
     
@@ -813,7 +831,15 @@ if(p.Results.showScattering)
        V = camtarget-o;
        V = V / norm(V);
        points = o + b*cos(t)' .* U + a*sin(t)' .* V; 
-       plot3(points(:,1), points(:,2), points(:,3), 'k', 'LineWidth', 1);
+       
+       if(p.Results.optodeLine)
+            vectorDir=o+V*b;
+            plot3([o(1),vectorDir(1)], [o(2),vectorDir(2)],[o(3),vectorDir(3)], '--k', 'LineWidth', 2);
+       end
+       
+       if(p.Results.showScattering)
+           plot3(points(:,1), points(:,2), points(:,3), 'k', 'LineWidth', 1);
+       end
     end
 end
 
@@ -830,18 +856,42 @@ if(p.Results.showReference)
     %https://www.openanatomy.org/atlases/nac/brain-2017-01/viewer/#!/view/33316a96-32f2-47f4-b5e0-a6225be09803/state/9dc9a3eb-7805-4b2b-943f-0b6e63ba488f
 
     imgXY=size(img);
-    imgRes=1/5.25;
-    
-    rotx = @(t) [1 0 0; 0 cos(t) -sin(t) ; 0 sin(t) cos(t)] ;
-    roty = @(t) [cos(t) 0 sin(t) ; 0 1 0 ; -sin(t) 0  cos(t)] ;
-    rotz = @(t) [cos(t) -sin(t) 0 ; sin(t) cos(t) 0 ; 0 0 1] ;
     
 
-    xMid=0;
-    yMid=-10;
-    zMid=5;
     
-    rotX=rotx(10*pi/180);
+    if(p.Results.useTalairach)
+         zStretch=1.05;
+        xStretch=1.05;
+        yStretch=0.95;
+        
+        xOffset=0;
+        yOffset=0;
+        zOffset=0;
+        
+        
+        xMid=0;
+        yMid=-10;
+        zMid=9;
+
+        rotX=rotx(10*pi/180);
+        
+        imgRes=1/4.3;
+    else
+         zStretch=1.1;
+        xStretch=1.16;
+        yStretch=1;
+        
+        xOffset=0;
+        yOffset=0;
+        zOffset=-8;
+        
+        xMid=0;
+        yMid=-10;
+        zMid=17;
+        
+        imgRes=1/4.25;
+        rotX=rotx(10*pi/180);
+    end
 
     
     imgCoord1=[0,imgXY(1)*imgRes,imgXY(2)*imgRes]*rotX;
@@ -849,9 +899,9 @@ if(p.Results.showReference)
     imgCoord3=[0,imgXY(1)*imgRes,-imgXY(2)*imgRes]*rotX;
     imgCoord4=[0,-imgXY(1)*imgRes,-imgXY(2)*imgRes]*rotX;
 
-    xImage = [imgCoord1(1)+xMid imgCoord2(1)+xMid; imgCoord3(1)+xMid imgCoord4(1)+xMid];       % The x data for the image corners
-    yImage = [imgCoord1(2)+yMid imgCoord2(2)+yMid; imgCoord3(2)+yMid imgCoord4(2)+yMid];            % The y data for the image corners
-    zImage = [imgCoord1(3)+zMid imgCoord2(3)+zMid; imgCoord3(3)+zMid imgCoord4(3)+zMid];   % The z data for the image corners
+    xImage = [imgCoord1(1)+xMid imgCoord2(1)+xMid; imgCoord3(1)+xMid imgCoord4(1)+xMid]*xStretch+xOffset;       % The x data for the image corners
+    yImage = [imgCoord1(2)+yMid imgCoord2(2)+yMid; imgCoord3(2)+yMid imgCoord4(2)+yMid]*yStretch+yOffset;            % The y data for the image corners
+    zImage = [imgCoord1(3)+zMid imgCoord2(3)+zMid; imgCoord3(3)+zMid imgCoord4(3)+zMid]*zStretch+zOffset;   % The z data for the image corners
     
     
     
@@ -867,22 +917,32 @@ if(p.Results.showReference)
 
     imgXY=size(img);
 
-    xMid=0;
-    yMid=-7;
-    zMid=2;
+    if(p.Results.useTalairach)
+        xMid=0;
+        yMid=-7;
+        zMid=6;
 
 
-    rotX=rotx(10*pi/180);
+        rotX=rotx(10*pi/180);
+    else
+        xMid=0;
+        yMid=-7;
+        zMid=19;
 
+
+        rotX=rotx(0*pi/180);
+    end
     
+
+    imgRes=1/4.45;
     imgCoord1=[imgXY(1)*imgRes,0,imgXY(2)*imgRes]*rotX;
     imgCoord2=[-imgXY(1)*imgRes,0,imgXY(2)*imgRes]*rotX;
     imgCoord3=[imgXY(1)*imgRes,0,-imgXY(2)*imgRes]*rotX;
     imgCoord4=[-imgXY(1)*imgRes,0,-imgXY(2)*imgRes]*rotX;
 
-    xImage = [imgCoord1(1)+xMid imgCoord2(1)+xMid; imgCoord3(1)+xMid imgCoord4(1)+xMid];       % The x data for the image corners
-    yImage = [imgCoord1(2)+yMid imgCoord2(2)+yMid; imgCoord3(2)+yMid imgCoord4(2)+yMid];            % The y data for the image corners
-    zImage = [imgCoord1(3)+zMid imgCoord2(3)+zMid; imgCoord3(3)+zMid imgCoord4(3)+zMid];   % The z data for the image corners
+    xImage = [imgCoord1(1)+xMid imgCoord2(1)+xMid; imgCoord3(1)+xMid imgCoord4(1)+xMid]*xStretch+xOffset;       % The x data for the image corners
+    yImage = [imgCoord1(2)+yMid imgCoord2(2)+yMid; imgCoord3(2)+yMid imgCoord4(2)+yMid]*yStretch+yOffset;            % The y data for the image corners
+    zImage = [imgCoord1(3)+zMid imgCoord2(3)+zMid; imgCoord3(3)+zMid imgCoord4(3)+zMid]*zStretch+zOffset;   % The z data for the image corners
 
   
     hold on
@@ -897,19 +957,31 @@ if(p.Results.showReference)
 
 
     imgXY=size(img);
+    
 
-    xMid=1;
-    yMid=-14;
-    zMid=-18;
+        if(p.Results.useTalairach)
+            xMid=1;
+            yMid=-14;
+            zMid=-14;
+
+            rotX=rotx(5*pi/180);
+        else
+            xMid=1;
+            yMid=-14;
+            zMid=-14;
+
+            rotX=rotx(0*pi/180);
+        end
+   
     
     imgCoord1=[imgXY(1)*imgRes,imgXY(2)*imgRes,0]*rotX;
     imgCoord2=[-imgXY(1)*imgRes,imgXY(2)*imgRes,0]*rotX;
     imgCoord3=[imgXY(1)*imgRes,-imgXY(2)*imgRes,0]*rotX;
     imgCoord4=[-imgXY(1)*imgRes,-imgXY(2)*imgRes,0]*rotX;
     
-   xImage = [imgCoord1(1)+xMid imgCoord2(1)+xMid; imgCoord3(1)+xMid imgCoord4(1)+xMid];       % The x data for the image corners
-    yImage = [imgCoord1(2)+yMid imgCoord2(2)+yMid; imgCoord3(2)+yMid imgCoord4(2)+yMid];            % The y data for the image corners
-    zImage = [imgCoord1(3)+zMid imgCoord2(3)+zMid; imgCoord3(3)+zMid imgCoord4(3)+zMid];   % The z data for the image corners
+   xImage = [imgCoord1(1)+xMid imgCoord2(1)+xMid; imgCoord3(1)+xMid imgCoord4(1)+xMid]*xStretch+xOffset;       % The x data for the image corners
+    yImage = [imgCoord1(2)+yMid imgCoord2(2)+yMid; imgCoord3(2)+yMid imgCoord4(2)+yMid]*yStretch+yOffset;            % The y data for the image corners
+    zImage = [imgCoord1(3)+zMid imgCoord2(3)+zMid; imgCoord3(3)+zMid imgCoord4(3)+zMid]*zStretch+zOffset;   % The z data for the image corners
 
   
     hold on
