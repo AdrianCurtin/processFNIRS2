@@ -222,7 +222,7 @@ if(~isempty(showMarkers))
     for i=1:length(showMarkers)
         numMarkers(i)=sum(showMarkersIdx==i);
         if(numMarkers(i)>tooManyMarkers&&isempty(plotTonsOfMarkers))
-            fprintf(2,'Warning: Over %i markers for marker %i\n',tooManyMarkers,i);
+            fprintf(2,'Warning: ~ %.0f markers for marker %i\n',tooManyMarkers,i);
             user_entry = input(sprintf('Enable TonsOfMarkers Mode?\n(Can be VERY slow)\ny/n: '), 's');
             user_entry=lower(user_entry);
             switch user_entry
