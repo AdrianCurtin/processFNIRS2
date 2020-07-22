@@ -917,6 +917,10 @@ if(p.Results.showReference)
          'CData',img,...
          'FaceColor','texturemap','FaceLighting','none','AlphaData',alpha,'FaceAlpha','texture');
     hold off
+    
+    text(-85,55,-50,'L');
+    text(85,55,-50,'R');
+    
 end
 
 if (nargout > 0)
