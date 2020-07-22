@@ -222,10 +222,18 @@ showChannels = p.Results.ChannelLabels;
 hold off
 
 probeInfo=[];
+
 if(show1020)
     c1020=load('cerebro_1020_table.mat'); %estimation of 10-20 coordinates
     c1020=c1020.c1020;
-    c1020 = c1020(~isnan(c1020.tx), :);
+    
+    if(p.Results.useTalairach)
+           c1020.x = c1020.tx;
+           c1020.y = c1020.ty;
+           c1020.z = c1020.tz;
+       else
+           c1020.x = c1020.mx;
+           c1020.y = c1020.my;
            c1020.z = c1020.mz;
     end
     
