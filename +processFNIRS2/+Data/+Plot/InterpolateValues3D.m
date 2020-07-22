@@ -686,7 +686,7 @@ for i=1:size(c1020,1)
 end
 end
 
-xlabel('x (L/R)');
+xlabel('x (R/L)');
 ylabel('y (R/C)');
 zlabel('z (U/D)');
 
