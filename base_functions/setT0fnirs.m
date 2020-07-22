@@ -4,8 +4,8 @@ function varargout=setT0fnirs(varargin)
 %warning('Please replace with processFNIRS2.Data.SetT0()\n');
 
 if(nargout>0)
-    varargout{1:nargout}=processFNIRS2.Data.SetT0(varargin{:});
+    varargout{1:nargout}=pf2.Data.SetT0(varargin{:});
 else
-   processFNIRS2.Data.SetT0(varargin{:}); 
+   pf2.Data.SetT0(varargin{:}); 
 end
 

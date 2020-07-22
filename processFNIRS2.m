@@ -165,7 +165,7 @@ if(ShowGUI)
     if(any(strcmp(p.UsingDefaults,'ShowGUI')))
        l=length(varargin);
        if(l==0)
-           processFNIRS2.GUI();
+           pf2.GUI();
            return;
        elseif(~isempty(data))
            varargin(l+1)={'ShowGUI'};
@@ -221,11 +221,11 @@ cfgRawImportPath=p.Results.ImportRawMethods;
 cfgOxyImportPath=p.Results.ImportOxyMethods;
 
 if(~strcmp(cfgRawImportPath,'NA'))
-    processFNIRS2.Methods.Raw.ImportMethods(cfgRawImportPath);
+    pf2.Methods.Raw.ImportMethods(cfgRawImportPath);
 end
 
 if(~strcmp(cfgOxyImportPath,'NA'))
-    processFNIRS2.Methods.Oxy.ImportMethods(cfgOxyImportPath);
+    pf2.Methods.Oxy.ImportMethods(cfgOxyImportPath);
 end
 
 if(isempty(data)||(isstruct(data)&&isfield(data,'info')&&~isfield(data,'raw')&&~isfield(data,'HbO')))

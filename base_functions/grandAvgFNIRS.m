@@ -152,9 +152,9 @@ auxFieldSizes=[];
 for i=1:numfSeg % Resample and find max/min and num channels
     if(resample)
         if(centerOnT0)
-            FNIRScellArray{i}=processFNIRS2.Data.Resample(FNIRScellArray{i},resampleSize,'centerOnT0',centerOnT0,'timeOutMode','start','averageAux',true);
+            FNIRScellArray{i}=pf2.Data.Resample(FNIRScellArray{i},resampleSize,'centerOnT0',centerOnT0,'timeOutMode','start','averageAux',true);
         else
-            FNIRScellArray{i}=processFNIRS2.Data.Resample(FNIRScellArray{i},resampleSize,'centerOnT0',centerOnT0,'averageAux',true);
+            FNIRScellArray{i}=pf2.Data.Resample(FNIRScellArray{i},resampleSize,'centerOnT0',centerOnT0,'averageAux',true);
         end
         segmentTimesArr=[segmentTimesArr;FNIRScellArray{i}.segmentTimes];
     elseif(isfield(FNIRScellArray{i},'segmentTimes'))

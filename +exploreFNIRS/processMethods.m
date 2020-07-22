@@ -8,8 +8,8 @@ else
    processOxyOnly=false; 
 end
 
-strsOxy=processFNIRS2.Methods.Oxy();
-strsRaw=processFNIRS2.Methods.Raw();
+strsOxy=pf2.Methods.Oxy();
+strsRaw=pf2.Methods.Raw();
 
 if(~isfield(ExFNIRS,'processedData')||(size(ExFNIRS.processedData,1)~=length(strsOxy)*length(strsRaw))) 
     ExFNIRS.processedData=cell(length(strsOxy)*length(strsRaw),3);
@@ -39,8 +39,8 @@ if(~any(curRawMatchIdx&curOxyMatchIdx))
     ExFNIRS.processedData{ExFNIRS.numProcessed+1,2}=oxyMethodStr;
     data=ExFNIRS.data;
     
-    processFNIRS2('blLength',0);
-    processFNIRS2('Raw_Method',rawMethodStr,'Oxy_Method',oxyMethodStr); 
+    pf2('blLength',0);
+    pf2('Raw_Method',rawMethodStr,'Oxy_Method',oxyMethodStr); 
     numData=length(data);
     rawMethodStr_label=rawMethodStr;
     oxyMethodStr_label=oxyMethodStr;
@@ -55,16 +55,16 @@ if(~any(curRawMatchIdx&curOxyMatchIdx))
        if(~isempty(data{i})&&length(data{i}.time)>1)
            if(processOxyOnly)
                if(isfield(data{i},'HbO'))
-                   data{i}=processFNIRS2.Process.ProcessOxy(data{i});
+                   data{i}=pf2.Process.ProcessOxy(data{i});
                else
                    warning('Data file for item %i has no Oxy Data, attempting to process with ''None''\n',data{i});
-                   data{i}=processFNIRS2(data{i});
+                   data{i}=pf2(data{i});
                end
            else
-               data{i}=processFNIRS2(data{i});
+               data{i}=pf2(data{i});
            end
-           data{i}=processFNIRS2.Data.ApplyChannelMask(data{i});
-           data{i}=processFNIRS2.Data.Resample(data{i},ExFNIRS.settings.grandavg_resample_size,'centerOnT0',true,'timeOutMode','end','averageAux',false);
+           data{i}=pf2.Data.ApplyChannelMask(data{i});
+           data{i}=pf2.Data.Resample(data{i},ExFNIRS.settings.grandavg_resample_size,'centerOnT0',true,'timeOutMode','end','averageAux',false);
        end
     end
     try
@@ -77,8 +77,8 @@ if(~any(curRawMatchIdx&curOxyMatchIdx))
     ExFNIRS.numProcessed=ExFNIRS.numProcessed+1;
     ExFNIRS.curProcessedData= data;
 else
-    processFNIRS2('blLength',0);
-    processFNIRS2('Raw_Method',rawMethodStr,'Oxy_Method',oxyMethodStr); 
+    pf2('blLength',0);
+    pf2('Raw_Method',rawMethodStr,'Oxy_Method',oxyMethodStr); 
    ExFNIRS.curProcessedData= ExFNIRS.processedData{curRawMatchIdx&curOxyMatchIdx,3};
 end
 

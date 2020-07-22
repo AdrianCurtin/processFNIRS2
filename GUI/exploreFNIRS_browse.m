@@ -124,9 +124,9 @@ if(isfield(BrowseFNIRS,'curIndex')&&BrowseFNIRS.curIndex>0&&isfield(ExFNIRS,'dat
        if(isfield(ExFNIRS.settings,'baseline_start'))
            bStart=ExFNIRS.settings.baseline_start-nanmin(ExFNIRS.data{BrowseFNIRS.curIndex}.time);
            bEnd=ExFNIRS.settings.baseline_end-nanmin(ExFNIRS.data{BrowseFNIRS.curIndex}.time);
-           processFNIRS2.Data.Plot.Oxy(ExFNIRS.data{BrowseFNIRS.curIndex},[],[],{'HbO','HbR','CBSI'},[bStart,bEnd]);
+           pf2.Data.Plot.Oxy(ExFNIRS.data{BrowseFNIRS.curIndex},[],[],{'HbO','HbR','CBSI'},[bStart,bEnd]);
        else
-           processFNIRS2.Data.Plot.Oxy(ExFNIRS.data{BrowseFNIRS.curIndex},[],[],{'HbO','HbR','CBSI'},[]);
+           pf2.Data.Plot.Oxy(ExFNIRS.data{BrowseFNIRS.curIndex},[],[],{'HbO','HbR','CBSI'},[]);
        end
     end
 end
@@ -284,7 +284,7 @@ else
 end
 
 if(~isempty(data))
-    newData=processFNIRS2.Data.EditChannelMaskGUI(ExFNIRS.data{curIdx});
+    newData=pf2.Data.EditChannelMaskGUI(ExFNIRS.data{curIdx});
     if(~isempty(newData))
         ExFNIRS.data{curIdx}.fchMask=newData.fchMask;
     end
@@ -363,7 +363,7 @@ else
 end
 
 if(~isempty(data))
-    newData=processFNIRS2.Data.EditChannelMaskGUI(ExFNIRS.data{curIdx}.info.filename);
+    newData=pf2.Data.EditChannelMaskGUI(ExFNIRS.data{curIdx}.info.filename);
     if(~isempty(newData))
         ExFNIRS.data{curIdx}.fchMask=newData.fchMask;
     end

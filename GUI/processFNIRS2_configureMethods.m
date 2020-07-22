@@ -85,8 +85,8 @@ guidata(hObject, handles);
 global PF2
 global setF
 
-PF2.defaultOxyMethodsPath=sprintf('%s/pf2_oxy_methods_stored_processFNIRS2.cfg',prefdir);
-PF2.defaultRawMethodsPath=sprintf('%s/pf2_raw_methods_stored_processFNIRS2.cfg',prefdir);
+PF2.defaultOxyMethodsPath=sprintf('%s/pf2_oxy_methods_stored_pf2.cfg',prefdir);
+PF2.defaultRawMethodsPath=sprintf('%s/pf2_raw_methods_stored_pf2.cfg',prefdir);
 
 if(~isfield(PF2,'myRawMethods'))
    PF2.myRawMethods=loadMethods(PF2.defaultRawMethodsPath,true);
@@ -104,7 +104,7 @@ end
 
 updateCurrentMethods(handles);
 
-PF2.availableFunctionsPath=sprintf('%s/pf2_functions_stored_processFNIRS2.cfg',prefdir);
+PF2.availableFunctionsPath=sprintf('%s/pf2_functions_stored_pf2.cfg',prefdir);
 if(~isfield(PF2,'myFunctions'))
    PF2.myFunctions=loadFunctions(PF2.availableFunctionsPath,true);
    

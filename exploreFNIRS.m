@@ -296,7 +296,7 @@ for i=length(ExFNIRS.data):-1:1
     end
     
     if( ExFNIRS.settings.timeShiftTo0)
-        ExFNIRS.data{i}=processFNIRS2.Data.SetT0(ExFNIRS.data{i},min(ExFNIRS.data{i}.time));
+        ExFNIRS.data{i}=pf2.Data.SetT0(ExFNIRS.data{i},min(ExFNIRS.data{i}.time));
     end
     
     if(isfield(ExFNIRS.data{i},'info'))
@@ -390,8 +390,8 @@ for v =1:length(segInfoVars)
 end
 
 
-%processFNIRS2('UseDeviceCFG','device_fNIR1200.cfg');
-processFNIRS2('blLength',0); %use global mean for import
+%pf2('UseDeviceCFG','device_fNIR1200.cfg');
+pf2('blLength',0); %use global mean for import
 
 %ExFNIRS.settings=[];
 
@@ -1538,10 +1538,10 @@ if(ExFNIRS.UpdateNeeded==2||~isfield(ExFNIRS,'curPreprocessedFNIR'))
 
        end
        if(ExFNIRS.settings.use_baseline)
-            ExFNIRS.curPreprocessedFNIR.baseline{i}=processFNIRS2.Data.Split(ExFNIRS.curPreprocessedFNIR.fNIR{i},ExFNIRS.settings.baseline_start,ExFNIRS.settings.baseline_end); %baselineining is handled in processing section
+            ExFNIRS.curPreprocessedFNIR.baseline{i}=pf2.Data.Split(ExFNIRS.curPreprocessedFNIR.fNIR{i},ExFNIRS.settings.baseline_start,ExFNIRS.settings.baseline_end); %baselineining is handled in processing section
             ExFNIRS.curPreprocessedFNIR.gbyFNIRS{i}.time=ExFNIRS.curPreprocessedFNIR.gbyFNIRS{i}.time-ExFNIRS.settings.block_start; %change time so that 0 is start of block
             
-            ExFNIRS.curPreprocessedFNIR.gbyFNIRS_blk{i}=processFNIRS2.Data.Resample(ExFNIRS.curPreprocessedFNIR.gbyFNIRS{i}, ExFNIRS.settings.barchart_resample_size,'centerOnT0',true,'timeOutMode','start','blfNIR',ExFNIRS.curPreprocessedFNIR.baseline{i},'averageAux',true);
+            ExFNIRS.curPreprocessedFNIR.gbyFNIRS_blk{i}=pf2.Data.Resample(ExFNIRS.curPreprocessedFNIR.gbyFNIRS{i}, ExFNIRS.settings.barchart_resample_size,'centerOnT0',true,'timeOutMode','start','blfNIR',ExFNIRS.curPreprocessedFNIR.baseline{i},'averageAux',true);
             ExFNIRS.curPreprocessedFNIR.gbyFNIRS_blk{i}.time=ExFNIRS.curPreprocessedFNIR.gbyFNIRS_blk{i}.time+ExFNIRS.settings.block_start; %change time so that 0 is start of block
             if(isfield(ExFNIRS.curPreprocessedFNIR.gbyFNIRS_blk{i},'segmentTimes'))
                 ExFNIRS.curPreprocessedFNIR.gbyFNIRS_blk{i}.segmentTimes=ExFNIRS.curPreprocessedFNIR.gbyFNIRS_blk{i}.segmentTimes+ExFNIRS.settings.block_start;
@@ -1552,7 +1552,7 @@ if(ExFNIRS.UpdateNeeded==2||~isfield(ExFNIRS,'curPreprocessedFNIR'))
             if(isnan(ExFNIRS.curPreprocessedFNIR.gbyFNIRS_blk{i}.time))
                z=1; 
             end
-            ExFNIRS.curPreprocessedFNIR.gbyFNIRS{i}=processFNIRS2.Data.Resample(ExFNIRS.curPreprocessedFNIR.gbyFNIRS{i}, ExFNIRS.settings.grandavg_resample_size,'centerOnT0',true,'timeOutMode','start','blfNIR',ExFNIRS.curPreprocessedFNIR.baseline{i},'averageAux',true);
+            ExFNIRS.curPreprocessedFNIR.gbyFNIRS{i}=pf2.Data.Resample(ExFNIRS.curPreprocessedFNIR.gbyFNIRS{i}, ExFNIRS.settings.grandavg_resample_size,'centerOnT0',true,'timeOutMode','start','blfNIR',ExFNIRS.curPreprocessedFNIR.baseline{i},'averageAux',true);
             ExFNIRS.curPreprocessedFNIR.gbyFNIRS{i}.time=ExFNIRS.curPreprocessedFNIR.gbyFNIRS{i}.time+ExFNIRS.settings.block_start; %change time so that 0 is start of block
             if(isfield(ExFNIRS.curPreprocessedFNIR.gbyFNIRS{i},'segmentTimes'))
                 ExFNIRS.curPreprocessedFNIR.gbyFNIRS{i}.segmentTimes=ExFNIRS.curPreprocessedFNIR.gbyFNIRS{i}.segmentTimes+ExFNIRS.settings.block_start;
@@ -1562,11 +1562,11 @@ if(ExFNIRS.UpdateNeeded==2||~isfield(ExFNIRS,'curPreprocessedFNIR'))
        else
             ExFNIRS.curPreprocessedFNIR.baseline{i}=[];
             ExFNIRS.curPreprocessedFNIR.gbyFNIRS{i}.time=ExFNIRS.curPreprocessedFNIR.gbyFNIRS{i}.time-ExFNIRS.settings.block_start; %change time so that 0 is start of block
-            ExFNIRS.curPreprocessedFNIR.gbyFNIRS_blk{i}=processFNIRS2.Data.Resample(ExFNIRS.curPreprocessedFNIR.gbyFNIRS{i}, ExFNIRS.settings.barchart_resample_size,'centerOnT0',true,'timeOutMode','start','averageAux',true);
+            ExFNIRS.curPreprocessedFNIR.gbyFNIRS_blk{i}=pf2.Data.Resample(ExFNIRS.curPreprocessedFNIR.gbyFNIRS{i}, ExFNIRS.settings.barchart_resample_size,'centerOnT0',true,'timeOutMode','start','averageAux',true);
             ExFNIRS.curPreprocessedFNIR.gbyFNIRS_blk{i}.time=ExFNIRS.curPreprocessedFNIR.gbyFNIRS_blk{i}.time+ExFNIRS.settings.block_start; %change time so that 0 is start of block
             ExFNIRS.curPreprocessedFNIR.gbyFNIRS_blk{i}.segmentTimes=ExFNIRS.curPreprocessedFNIR.gbyFNIRS_blk{i}.segmentTimes+ExFNIRS.settings.block_start;
             
-            ExFNIRS.curPreprocessedFNIR.gbyFNIRS{i}=processFNIRS2.Data.Resample(ExFNIRS.curPreprocessedFNIR.gbyFNIRS{i}, ExFNIRS.settings.grandavg_resample_size,'centerOnT0',true,'timeOutMode','start','averageAux',true);
+            ExFNIRS.curPreprocessedFNIR.gbyFNIRS{i}=pf2.Data.Resample(ExFNIRS.curPreprocessedFNIR.gbyFNIRS{i}, ExFNIRS.settings.grandavg_resample_size,'centerOnT0',true,'timeOutMode','start','averageAux',true);
             ExFNIRS.curPreprocessedFNIR.gbyFNIRS{i}.time=ExFNIRS.curPreprocessedFNIR.gbyFNIRS{i}.time+ExFNIRS.settings.block_start; %change time so that 0 is start of block
             ExFNIRS.curPreprocessedFNIR.gbyFNIRS{i}.segmentTimes=ExFNIRS.curPreprocessedFNIR.gbyFNIRS{i}.segmentTimes+ExFNIRS.settings.block_start;
        
@@ -1689,8 +1689,8 @@ else
     exploreFNIRS.processMethods([],cur_oxy_method);
 end
 
-[strsOxy,iOxy]=processFNIRS2.Methods.Oxy();
-[strsRaw,iRaw]=processFNIRS2.Methods.Raw();
+[strsOxy,iOxy]=pf2.Methods.Oxy();
+[strsRaw,iRaw]=pf2.Methods.Raw();
 
 set(handles.listbox_oxy_methods,'String',strsOxy);
 set(handles.listbox_oxy_methods,'Value',find(iOxy));
@@ -2688,9 +2688,9 @@ fprintf(fileID,'Feature: %s\n',settings.plot_bar_feature);
 
 fprintf(fileID,'\n');
 
-rawMethodDescrip=processFNIRS2.Methods.Raw.DescribeMethod();
+rawMethodDescrip=pf2.Methods.Raw.DescribeMethod();
 fprintf(fileID,'%s\n',rawMethodDescrip);
-oxyMethodDescrip=processFNIRS2.Methods.Oxy.DescribeMethod();
+oxyMethodDescrip=pf2.Methods.Oxy.DescribeMethod();
 fprintf(fileID,'%s\n',oxyMethodDescrip);
 
 
@@ -4466,10 +4466,10 @@ if(showTopo)
                                         minVal(2)=-1*min(abs(passingVals));
                                         switch(ExFNIRS.settings.ChannelMode)
                                             case 'fNIR'
-                                                processFNIRS2.Data.Plot.ImageValues([],curT,minVal,[],coefNames{c},'t-Stat');%,7,11,2,1,false,'[Hb-Oxy] Natural High Vs. Low',12,'hot',true)
+                                                pf2.Data.Plot.ImageValues([],curT,minVal,[],coefNames{c},'t-Stat');%,7,11,2,1,false,'[Hb-Oxy] Natural High Vs. Low',12,'hot',true)
                                             case 'ROI'
                                                 roiInfo=ExFNIRS.currentROI;
-                                                processFNIRS2.Data.Plot.ImageValues([],mapROIvaluesToCh(roiInfo,curT),minVal,[],coefNames{c},'t-Stat');%,7,11,2,1,false,'[Hb-Oxy] Natural High Vs. Low',12,'hot',true)
+                                                pf2.Data.Plot.ImageValues([],mapROIvaluesToCh(roiInfo,curT),minVal,[],coefNames{c},'t-Stat');%,7,11,2,1,false,'[Hb-Oxy] Natural High Vs. Low',12,'hot',true)
                                         end
                                     else
                                         plot(0,0);
@@ -4551,10 +4551,10 @@ if(showTopo)
                                                                                
                                         switch(ExFNIRS.settings.ChannelMode)
                                             case 'fNIR'
-                                                processFNIRS2.Data.Plot.InterpolateValues([],curF,estimatedPval_min,[],1,titleSTR,'F-val');%InterpolateValues(fNIR,data2plot,minVal,maxVal,bufferMult,titleString,clrBarTitle)
+                                                pf2.Data.Plot.InterpolateValues([],curF,estimatedPval_min,[],1,titleSTR,'F-val');%InterpolateValues(fNIR,data2plot,minVal,maxVal,bufferMult,titleString,clrBarTitle)
                                             case 'ROI'
                                                 roiInfo=ExFNIRS.currentROI;
-                                                processFNIRS2.Data.Plot.InterpolateValues([],mapROIvaluesToCh(roiInfo,curF),estimatedPval_min,[],1,titleSTR,'F-val');%,7,11,2,1,false,'[Hb-Oxy] Natural High Vs. Low',12,'hot',true)
+                                                pf2.Data.Plot.InterpolateValues([],mapROIvaluesToCh(roiInfo,curF),estimatedPval_min,[],1,titleSTR,'F-val');%,7,11,2,1,false,'[Hb-Oxy] Natural High Vs. Low',12,'hot',true)
                                         end
                                 end
 
@@ -4610,7 +4610,7 @@ if(showTopo)
         %                             
         %                             numROI=size(ExFNIRS.currentROI,1);
         %                             vals=abs(curT(1:numROI));
-        %                             processFNIRS2.Data.Plot.InterpolateROIvalues(roiInfo,vals,minVal,maxVal,1,coefNames{c},'tstat');%,7,11,2,1,false,'[Hb-Oxy] Natural High Vs. Low',12,'hot',true)
+        %                             pf2.Data.Plot.InterpolateROIvalues(roiInfo,vals,minVal,maxVal,1,coefNames{c},'tstat');%,7,11,2,1,false,'[Hb-Oxy] Natural High Vs. Low',12,'hot',true)
                             end
                             if(c==1) % first column
                                 ylabel(selectedBioM(b));
@@ -4638,7 +4638,7 @@ if(showTopo)
         %                             
         %                             numROI=size(ExFNIRS.currentROI,1);
         %                             vals=abs(curT(1:numROI));
-        %                             processFNIRS2.Data.Plot.InterpolateROIvalues(roiInfo,vals,minVal,maxVal,1,coefNames{c},'tstat');%,7,11,2,1,false,'[Hb-Oxy] Natural High Vs. Low',12,'hot',true)
+        %                             pf2.Data.Plot.InterpolateROIvalues(roiInfo,vals,minVal,maxVal,1,coefNames{c},'tstat');%,7,11,2,1,false,'[Hb-Oxy] Natural High Vs. Low',12,'hot',true)
                             end
                             if(a==1) % first column
                                 ylabel(selectedBioM(b));
@@ -6547,7 +6547,7 @@ for chIdx=1:numOpt
                                 switch(ExFNIRS.settings.ChannelMode)
                                     case 'fNIR'
                                          axes(curPlotHandle);
-                                         processFNIRS2.Data.Plot.InterpolateValues([],curR,[minR1,minR2],[],1,titleSTR,clrBtitle);
+                                         pf2.Data.Plot.InterpolateValues([],curR,[minR1,minR2],[],1,titleSTR,clrBtitle);
                                         %interpolateNIR(abs(curR),'Mode',topoMode,'fontSize',12,'transparent',true,'lowerThreshold',min([abs(minR2),minR1]),'TitleText',titleSTR,'ChannelLabels',true)%,7,11,2,1,false,'[Hb-Oxy] Natural High Vs. Low',12,'hot',true)
                                     case 'ROI'
                                         roiInfo=ExFNIRS.currentROI;

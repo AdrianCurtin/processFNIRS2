@@ -133,7 +133,7 @@ elseif(isstruct(varargin{1}))
         pf2ChannelCheck.overwriteExisting=varargin{3};
     end
 elseif((isstring(varargin{1})||ischar(varargin{1}))&&length(varargin)>1)
-    pf2ChannelCheck.nirsData=processFNIRS2.Import.ImportNIR(varargin{2},true,false);
+    pf2ChannelCheck.nirsData=pf2.Import.ImportNIR(varargin{2},true,false);
     
      if(isempty(pf2ChannelCheck.nirsData)||~isfield(pf2ChannelCheck.nirsData,'raw'))
        error('Empty dataset'); 

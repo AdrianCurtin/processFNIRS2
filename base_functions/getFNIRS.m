@@ -4,9 +4,9 @@ function varargout=getFNIRS(varargin)
 %warning('Please replace with processFNIRS2.Data.Split()\n');
 
 if(nargout>0)
-    varargout{1:nargout}=processFNIRS2.Data.Split(varargin{:});
+    varargout{1:nargout}=pf2.Data.Split(varargin{:});
 else
-   processFNIRS2.Data.Split(varargin{:}); 
+   pf2.Data.Split(varargin{:}); 
 
 end
 
