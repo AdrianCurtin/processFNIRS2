@@ -355,7 +355,21 @@ elseif(~p.Results.useEEG)
 end
 end
 
-if(~dataEmpty && length(data2plot)~=probeInfo.NumOptodes)
+include_ss=p.Results.includeSS;
+if(include_ss&&probeInfo.NumOptodes>length(data2plot)&&probeInfo.NumOptodes-probeInfo.NumShortSeparation==length(data2plot))
+   include_ss=false;
+   warning('Not enough data for all channels, ignoring short separation channels');
+end
+
+if(include_ss)
+    numOptodes=probeInfo.NumOptodes;
+    channelList=probeInfo.ChannelList;
+else
+    numOptodes=probeInfo.NumOptodes-probeInfo.NumShortSeparation;
+    channelList=probeInfo.ChannelList(~probeInfo.IsShortSeparation);
+end
+
+if(~dataEmpty && length(data2plot)~=numOptodes)
     error('Must have a value for all optodes');
 end
 
