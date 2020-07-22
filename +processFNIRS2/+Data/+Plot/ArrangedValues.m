@@ -138,7 +138,9 @@ for(optIdx=1:length(data2plot))
 
 	optPos=optLayout{optNum};
     
+    optPos([2])=1-optPos([2])-optPos([4]); %flips y vertical axis
     optPos([3,4])=optPos([3,4]).*[0.8,0.9];
+    
     optPos([1])=optPos([1])+0.01;
     optPos([1])=optPos([1])/1.15;
     h{optIdx}= axes('Position',optPos,'Box','on');

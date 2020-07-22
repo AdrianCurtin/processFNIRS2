@@ -168,7 +168,7 @@ OptPosY=OptPosY-minPosY;
 
 buffer=bufferSize*pixelPerCm/2;
 
-if(OptDistX==OptDistY)
+if(round(OptDistX,1)==(round(OptDistY,1)))
     [inpX,inpY]=meshgrid(0:OptDistX*pixelPerCm:(maxDimDist+bufferSize*2)*pixelPerCm);
 else
     

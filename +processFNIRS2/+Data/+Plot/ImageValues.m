@@ -122,6 +122,8 @@ for(optIdx=1:length(data2plot))
 
     optPos=optLayout{optNum};
 
+    optPos([2])=1-optPos([2])-optPos([4]); %flips y vertical axis
+    
     x1=round(optPos(1)*imgSize);
     y1=round(optPos(2)*imgSize);
     x2=round(optPos(3)*imgSize+x1);

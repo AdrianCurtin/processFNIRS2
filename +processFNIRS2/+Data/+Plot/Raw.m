@@ -265,6 +265,7 @@ for(optIdx=1:length(channels))
             continue
         else
             optPos=optLayout{optNum};
+            optPos([2])=1-optPos([2])-optPos([4]); %flips y vertical axis
             optPos([3,4])=optPos([3,4]).*[0.65,0.9];
             optPos([1,2])=optPos([1,2])+0.03;
             h{optIdx}= axes('Position',optPos,'Box','on');
