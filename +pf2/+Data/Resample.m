@@ -110,6 +110,8 @@ if(~isfield(fNIR,'time')&&isfield(fNIR,'raw'))
     fNIR.time=fNIR.raw(:,1);
 end
 
+fNIR.time=round(fNIR.time,5);
+
 minfTime=min(fNIR.time);
 maxfTime=max(fNIR.time);
 

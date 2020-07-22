@@ -321,7 +321,7 @@ for i=1:length(ExFNIRS.data)
        
        if(~isfield(ExFNIRS.data{i}.info,'SubjectID')||isempty(ExFNIRS.data{i}.info.SubjectID))
            ExFNIRS.data{i}.info.SubjectID=sprintf('Missing%i',subIdAuto);
-           subIdAuto=subIdAutp+1;
+           subIdAuto=subIdAuto+1;
        end
        
        if(~isfield(ExFNIRS.data{i}.info,'Subgroup')||isempty(ExFNIRS.data{i}.info.Subgroup))

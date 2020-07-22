@@ -299,10 +299,18 @@ end
 printOnce=false; % flag for multiple printing
 flagOnce=false;
 
+if(isfield(probeInfo,'OptLayout2D_ss'))
+	optLayout=probeInfo.OptLayout2D_ss;
+elseif(isfield(probeInfo,'OptLayout2D'))
+	optLayout=probeInfo.OptLayout2D;
+else
+   plotArranged=false; 
+end
+
 for(optIdx=1:length(channels))
     optNum=channels(optIdx);
     if(plotArranged)
-        optPos=probeInfo.OptLayout2D{optNum};
+        optPos=optLayout{optNum};
         optPos([2])=1-optPos([2])-optPos([4]); %flips y vertical axis
         optPos([3,4])=optPos([3,4]).*[0.65,0.9];
         optPos([1,2])=optPos([1,2])+0.03;

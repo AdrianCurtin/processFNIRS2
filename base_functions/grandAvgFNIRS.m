@@ -16,6 +16,8 @@ function outGA = grandAvgFNIRS(FNIRScellArray,timeAlign,resampleSize,centerOnT0,
 % frequencies are identical already, no resampling will occur unless
 % resampleFS is specified
 
+% Uses precision of 0.01ms
+
 %
 if(nargin<7)
     averageAux=false;
@@ -46,14 +48,15 @@ segSampleTimes=nan(size(FNIRScellArray));
 segSampleCount=nan(size(FNIRScellArray));
 segROIpresent=false(size(FNIRScellArray));
 for i=length(FNIRScellArray):-1:1 
-    if(isempty(FNIRScellArray{i})||sum(~isnan(FNIRScellArray{i}.time))==0)
+    if(isempty(FNIRScellArray{i})||sum(~isnan(FNIRScellArray{i}.time))==0) % Empty Case
         FNIRScellArray(i)=[];
         segSampleTimes(i)=[];
         segSampleCount(i)=[];
         hierarchyVars(i,:)=[];
         segROIpresent(i)=[];
         segUnits(i)=[];
-    elseif(~isfield(FNIRScellArray{i},'fs')&&isfield(FNIRScellArray{i},'time'))
+    elseif(~isfield(FNIRScellArray{i},'fs')&&isfield(FNIRScellArray{i},'time')) % Missing sampling frequency
+        FNIRScellArray{i}.time=round(FNIRScellArray{i}.time,5);
         if(timeAlign)
             FNIRScellArray{i}.time=FNIRScellArray{i}.time-min(FNIRScellArray{i}.time);
         end
@@ -64,7 +67,7 @@ for i=length(FNIRScellArray):-1:1
         FNIRScellArray{i}.fs=round(FNIRScellArray{i}.fs,3);
         segROIpresent(i)=pf2_base.isnestedfield(FNIRScellArray{i},'ROI.HbO');
         
-    elseif(~isfield(FNIRScellArray{i},'time'))
+    elseif(~isfield(FNIRScellArray{i},'time'))  % No Time information
         FNIRScellArray(i)=[];
         hierarchyVars(i,:)=[];
         segSampleTimes(i)=[];
@@ -72,7 +75,8 @@ for i=length(FNIRScellArray):-1:1
         segROIpresent(i)=[];
         segUnits(i)=[];
         warning('Cannot use groups which have no time info');
-    elseif(timeAlign)
+    elseif(timeAlign)   % Force time alignment
+        FNIRScellArray{i}.time=round(FNIRScellArray{i}.time,5);
         FNIRScellArray{i}.time=FNIRScellArray{i}.time-min(FNIRScellArray{i}.time);
         segSampleTimes(i)=median(diff(FNIRScellArray{i}.time));
         segSampleCount(i)=length(FNIRScellArray{i}.time);
@@ -80,7 +84,8 @@ for i=length(FNIRScellArray):-1:1
         FNIRScellArray{i}.fs=1/segSampleTimes(i);
         FNIRScellArray{i}.fs=round(FNIRScellArray{i}.fs,3);
         segROIpresent(i)=pf2_base.isnestedfield(FNIRScellArray{i},'ROI.HbO');
-    else
+    else   %Nicely aligned
+        FNIRScellArray{i}.time=round(FNIRScellArray{i}.time,5);
         segSampleTimes(i)=median(diff(FNIRScellArray{i}.time));
         segSampleCount(i)=length(FNIRScellArray{i}.time);
         segUnits{i}=FNIRScellArray{i}.units;
@@ -200,7 +205,9 @@ auxFields(1)=[]; %remove initial value
 auxFieldSizes=auxFieldSizes(idx);
 numAuxFields=length(auxFields);
 
-outGA.time=[minTime:resampleSize:maxTime]';
+maxTime=rem(maxTime-minTime,resampleSize)+maxTime;
+
+outGA.time=round([minTime:resampleSize:maxTime]',5);
 
 if(~isempty(segmentTimesArr))
     outGA.segmentTimes=unique(segmentTimesArr,'rows');
@@ -211,11 +218,11 @@ if(showProgress)
     hF=waitbar(0,sprintf('grandAvgFNIRS\nAligning segment %i of %i',1,numfSeg));
 end
 
-for i=1:numfSeg %find matching times in outGA.time, add to cell time indes and sort by time
+for i=1:numfSeg %find matching times in outGA.time, add to cell time indicies and sort by time
     if(showProgress)
         waitbar(i/numfSeg,hF,sprintf('grandAvgFNIRS\nAligning segment %i of %i',i,numfSeg));
     end
-	curT_idx=FNIRScellArray{i}.timeIdx;
+	curT_idx=FNIRScellArray{i}.timeIdx;  % 3xN [Time, TimeIndex,..]
     [curT_idx(:,3),outIdx]=ismember(curT_idx(:,1),outGA.time);
     outTimeIdx=outGA.time(outIdx==0);
     
