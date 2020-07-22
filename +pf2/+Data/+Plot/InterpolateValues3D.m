@@ -219,10 +219,10 @@ showChannels = p.Results.ChannelLabels;
 hold off
 
 probeInfo=[];
-
+%show1020=true;
 if(show1020)
     c1020=load('cerebro_1020_table.mat'); %estimation of 10-20 coordinates
-    c1020=c1020.cerebro_1020_table;
+    c1020=c1020.c1020;
     c1020 = c1020(~isnan(c1020.tx), :);
     if ~islogical(p.Results.I1020_labels)
         labels = "'" + p.Results.I1020_labels + "'";
