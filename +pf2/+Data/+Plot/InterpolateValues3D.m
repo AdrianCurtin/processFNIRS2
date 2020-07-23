@@ -221,6 +221,17 @@ showChannels = p.Results.ChannelLabels;
 %cla
 hold off
 
+
+itemsToDelete={'ProbeOpt','OptLabel','ProbeSrc','ProbeSrcLabel','ProbeDet','ProbeDetLabel','Scatter1020','Label1020','ScatterCurve','OptLines'};
+
+
+for i=1:length(itemsToDelete)
+    item = findobj(gcf, "Tag", itemsToDelete{i});
+    if(~isempty(item))
+        delete(item);
+    end
+end
+
 probeInfo=[];
 
 if(show1020)
@@ -228,9 +239,11 @@ if(show1020)
     c1020=c1020.c1020;
     
     if(p.Results.useTalairach)
-           c1020.x = c1020.tx;
-           c1020.y = c1020.ty;
-           c1020.z = c1020.tz;
+            txyz=pf2_base.external.icbm_fsl2tal([c1020.mx,c1020.my,c1020.mz]);
+        
+           c1020.x = txyz(:,1);
+           c1020.y = txyz(:,2);
+           c1020.z = txyz(:,3);
        else
            c1020.x = c1020.mx;
            c1020.y = c1020.my;
@@ -399,12 +412,14 @@ end
 %h{1}= axes('Position',[0.05,0.05,0.9,0.9],'Box','on');
 
 
-OptPosX=probeInfo.OptPos3DX(~probeInfo.IsShortSeparation | ~p.Results.includeSS);
-OptPosY=probeInfo.OptPos3DY(~probeInfo.IsShortSeparation | ~p.Results.includeSS);
-OptPosZ=probeInfo.OptPos3DZ(~probeInfo.IsShortSeparation | ~p.Results.includeSS);
+optPos=[probeInfo.OptPos3DX(~probeInfo.IsShortSeparation | ~p.Results.includeSS),probeInfo.OptPos3DY(~probeInfo.IsShortSeparation | ~p.Results.includeSS),probeInfo.OptPos3DZ(~probeInfo.IsShortSeparation | ~p.Results.includeSS)];
 
+if(p.Results.useTalairach)
+     optPos=pf2_base.external.icbm_fsl2tal(optPos);
+end
+     
+OptPos3D_mean=nanmean(optPos,1);
 
-OptPos3D_mean=probeInfo.OptPos3D_mean;
 
 if(isnan(bufferDistance))
    bufferDistance=median(probeInfo.SD(~probeInfo.IsShortSeparation)*10)/sqrt(2);
@@ -436,19 +451,13 @@ cMdl=cerebro_mdl;
 
 
 
-tx2x=@(x) x;%/49*1.73;  %L/R scaling
-ty2y=@(y) y;%/143*4.76+0.5; %rostral/caudal scaling
-tz2z=@(z) z;%/79*2.5+2.3;  %up down scaling
-
-brainResizeFactor=1.2;
-
-TAL_RosCaud=[68,-103];
-TAL_RL=[67, -65];
+TAL_RosCaud=[64,-110];
+TAL_RL=[68, -65];
 TAL_UD=[76, -50-13.5];
 
-MNI_RosCaud=[73,-107];
+MNI_RosCaud=[68,-114];
 MNI_RL=[73, -71];
-MNI_UD=[79, -62-13.5];
+MNI_UD=[83, -60-13.5];
 
 x2tx=@(x) (x-min(x))/(max(x)-min(x))*(TAL_RL(1)-TAL_RL(2))+TAL_RL(2);%*49/1.73/brainResizeFactor;  %L/R scaling
 y2ty=@(y) (y-min(y))/(max(y)-min(y))*(TAL_RosCaud(1)-TAL_RosCaud(2))+TAL_RosCaud(2);%(y-0.57)*143.5/4.35/brainResizeFactor; %rostral/caudal scaling
@@ -469,7 +478,7 @@ if(p.Results.useTalairach)
     mdl.v=mdl.v*rotx(4/180*pi);
     mdl.v=[x2tx(mdl.v(:,1)),y2ty(mdl.v(:,2)),z2tz(mdl.v(:,3))];
 else
-    %mdl.v=mdl.v*rotx(0/180*pi);
+    mdl.v=mdl.v*rotx(5/180*pi);
     mdl.v=[x2mx(mdl.v(:,1)),y2my(mdl.v(:,2)),z2mz(mdl.v(:,3))];
     
     
@@ -484,7 +493,7 @@ mdl.f=cMdl.f.v(:,reorderIdx);
 %mdl.f=[x2tx(mdl.f(:,1)),y2ty(mdl.f(:,2)),z2tz(mdl.f(:,3))];
 
 %set(h,'linestyle','None');
-shading interp
+%shading interp
 %cameratoolbar
 
 camIntensity=0.8;
@@ -502,6 +511,8 @@ if(isempty(lht))
     lht.Tag='Front';
     lht.Color=camColor;
     lht.Position=[0,100,0];
+    
+    shading interp
    
     %camlight(lht,0, 180);
 else
@@ -515,7 +526,7 @@ C=data2plot;
 num_vertices = size(mdl.v, 1);
 max_distance_2 = bufferDistance^2;
 Cs = zeros(num_vertices, 3);
-controlPoints = [OptPosX(:), OptPosY(:), OptPosZ(:)];
+controlPoints = optPos;
 num_control = size(controlPoints, 1);
 
 
@@ -655,6 +666,10 @@ mrkScaleFactor=22;
 if(showChannels&&isfield(probeInfo, 'TableOpt'))
     optPos = [probeInfo.TableOpt.Pos3D_x probeInfo.TableOpt.Pos3D_y probeInfo.TableOpt.Pos3D_z];
     
+    if(p.Results.useTalairach)
+         optPos=pf2_base.external.icbm_fsl2tal(optPos);
+     end
+    
     if(~isempty(optColor) && (isnumeric(optColor) && ~any(isnan(optColor)) || ~ismissing(optColor)))
         if(multiprobe)
             uDevices=unique(probeInfo.TableOpt.ProbeNum);
@@ -663,34 +678,59 @@ if(showChannels&&isfield(probeInfo, 'TableOpt'))
             for i=1:num_devices
                 selOpt=probeInfo.TableOpt.ProbeNum(:,1)==uDevices(i);
                 h(i) = scatter3(optPos(selOpt,1), optPos(selOpt,2), optPos(selOpt,3),20*p.Results.labelfontsize,'filled',optColor,'MarkerEdgeColor' ,probe_colors(i,:),'LineWidth',1.5);
+                
                 probe_string{i}=sprintf('Probe %i',uDevices(i));
+                
+                h(i).Tag='ProbeOpt';
             end
             legend(h,probe_string);
         else
             h = scatter3(optPos(:,1), optPos(:,2), optPos(:,3),20*p.Results.labelfontsize,'filled',optColor,'MarkerEdgeColor' ,'k');
+            h.Tag='ProbeOpt';
         end
     end
-    text(optPos(:,1), optPos(:,2), optPos(:,3), string(probeInfo.TableOpt.OptodeNum), 'HorizontalAlignment', 'center','VerticalAlignment', 'middle', "FontSize", p.Results.labelfontsize, 'color', p.Results.labelfontcolor);
+    
+    h=text(optPos(:,1), optPos(:,2), optPos(:,3), string(probeInfo.TableOpt.OptodeNum), 'HorizontalAlignment', 'center','VerticalAlignment', 'middle', "FontSize", p.Results.labelfontsize, 'color', p.Results.labelfontcolor);
+    for i=1:length(h)
+        h(i).Tag='OptLabel';
+    end
 end
 
 if(plotFNIRS_SD&&isfield(probeInfo,'SrcPos3DX'))
     srcIdx=probeInfo.TableSD.Type=='Src';
     detIdx=~srcIdx;
     
+    
     srcPos = [probeInfo.TableSD.Pos3D_x(srcIdx), probeInfo.TableSD.Pos3D_y(srcIdx), probeInfo.TableSD.Pos3D_z(srcIdx)];
+    
+     if(p.Results.useTalairach)
+         srcPos=pf2_base.external.icbm_fsl2tal(srcPos);
+     end
     
     if(~isempty(srcColor) && (isnumeric(srcColor) && ~any(isnan(srcColor)) || ~ismissing(srcColor)))
         h = scatter3(srcPos(:,1),srcPos(:,2),srcPos(:,3),mrkScaleFactor*p.Results.labelfontsize,'filled',srcColor);
+        h.Tag=sprintf('ProbeSrc');
     end
-    text(srcPos(:,1), srcPos(:,2), srcPos(:,3), probeInfo.TableSD.Label(srcIdx), 'HorizontalAlignment', 'center','VerticalAlignment', 'middle', "FontSize", p.Results.labelfontsize, 'color', p.Results.labelfontcolor);
+    h=text(srcPos(:,1), srcPos(:,2), srcPos(:,3), probeInfo.TableSD.Label(srcIdx), 'HorizontalAlignment', 'center','VerticalAlignment', 'middle', "FontSize", p.Results.labelfontsize, 'color', p.Results.labelfontcolor);
+    for i=1:length(h)
+        h(i).Tag='ProbeSrcLabel';
+    end
     hold on
     
     detPos = [probeInfo.TableSD.Pos3D_x(detIdx), probeInfo.TableSD.Pos3D_y(detIdx), probeInfo.TableSD.Pos3D_z(detIdx)];
+    
+    if(p.Results.useTalairach)
+        detPos=pf2_base.external.icbm_fsl2tal(detPos);
+    end
    
     if(~isempty(detColor) && (isnumeric(detColor) && ~any(isnan(detColor)) || ~ismissing(detColor)))
         h = scatter3(detPos(:,1), detPos(:,2), detPos(:,3), mrkScaleFactor*p.Results.labelfontsize, 'filled', detColor);
+        h.Tag=sprintf('ProbeDet');
     end
-    text(detPos(:,1), detPos(:,2), detPos(:,3), probeInfo.TableSD.Label(detIdx), 'HorizontalAlignment', 'center','VerticalAlignment', 'middle', "FontSize", p.Results.labelfontsize, 'color', p.Results.labelfontcolor);
+    h=text(detPos(:,1), detPos(:,2), detPos(:,3), probeInfo.TableSD.Label(detIdx), 'HorizontalAlignment', 'center','VerticalAlignment', 'middle', "FontSize", p.Results.labelfontsize, 'color', p.Results.labelfontcolor);
+    for i=1:length(h)
+        h(i).Tag='ProbeDetLabel';
+    end
 end
 
 if(plot1020)
@@ -700,12 +740,17 @@ for i=1:size(c1020,1)
     if(~isnan(c1020.BA(i)))
         if(numColors == 4 || numColors == 1)
             h = scatter3(c1020.x(i),c1020.y(i),c1020.z(i),mrkScaleFactor*1.5*p.Results.labelfontsize, 'filled', color1020);
+            
         else
             h = scatter3(c1020.x(i),c1020.y(i),c1020.z(i),mrkScaleFactor*1.5*p.Results.labelfontsize, 'filled');
         end
+        h.Tag=sprintf('Scatter1020');
         hold on
         
-        text(c1020.x(i),c1020.y(i),c1020.z(i),c1020.Electrode(i),'HorizontalAlignment', 'center','VerticalAlignment', 'middle', "FontSize", p.Results.labelfontsize, 'color', p.Results.labelfontcolor)
+        h=text(c1020.x(i),c1020.y(i),c1020.z(i),c1020.Electrode(i),'HorizontalAlignment', 'center','VerticalAlignment', 'middle', "FontSize", p.Results.labelfontsize, 'color', p.Results.labelfontcolor);
+        for i=1:length(h)
+            h(i).Tag='Label1020';
+         end
         %text(x2tx(c1020.x(i)),y2ty(c1020.y(i)),z2tz(c1020.z(i)),c1020.Electrode(i),'HorizontalAlignment','center')
         
     end
@@ -823,6 +868,14 @@ if(p.Results.showScattering||p.Results.optodeLine)
     detPos = [probeInfo.TableSD.Pos3D_x(detIdx), probeInfo.TableSD.Pos3D_y(detIdx), probeInfo.TableSD.Pos3D_z(detIdx)];
     
     optPos = [probeInfo.TableOpt.Pos3D_x, probeInfo.TableOpt.Pos3D_y, probeInfo.TableOpt.Pos3D_z];
+    
+    if(p.Results.useTalairach)
+         optPos=pf2_base.external.icbm_fsl2tal(optPos);
+         detPos=pf2_base.external.icbm_fsl2tal(detPos);
+         srcPos=pf2_base.external.icbm_fsl2tal(srcPos);
+     end
+    
+    
     optSrcPos = srcPos(probeInfo.TableOpt.SrcIdx, :);
     optDetPos = detPos(probeInfo.TableOpt.DetIdx, :);
     for i=1:length(optSrcPos)
@@ -842,11 +895,13 @@ if(p.Results.showScattering||p.Results.optodeLine)
        
        if(p.Results.optodeLine)
             vectorDir=o+V*b;
-            plot3([o(1),vectorDir(1)], [o(2),vectorDir(2)],[o(3),vectorDir(3)], '--k', 'LineWidth', 2);
+            h=plot3([o(1),vectorDir(1)], [o(2),vectorDir(2)],[o(3),vectorDir(3)], '--k', 'LineWidth', 2);
+            h.Tag='OptLines';
        end
        
        if(p.Results.showScattering)
-           plot3(points(:,1), points(:,2), points(:,3), 'k', 'LineWidth', 1);
+           h=plot3(points(:,1), points(:,2), points(:,3), 'k', 'LineWidth', 1);
+           h.Tag='ScatterCurve';
        end
     end
 end
@@ -868,13 +923,13 @@ if(p.Results.showReference)
 
     
     if(p.Results.useTalairach)
-         zStretch=1.05;
-        xStretch=1.05;
-        yStretch=0.95;
+         zStretch=1;
+        xStretch=1.15;
+        yStretch=1;
         
         xOffset=0;
-        yOffset=0;
-        zOffset=0;
+        yOffset=-5;
+        zOffset=-1;
         
         
         xMid=0;
@@ -890,15 +945,15 @@ if(p.Results.showReference)
         yStretch=1;
         
         xOffset=0;
-        yOffset=0;
-        zOffset=-8;
+        yOffset=-3;
+        zOffset=-10;
         
         xMid=0;
         yMid=-10;
         zMid=17;
         
         imgRes=1/4.25;
-        rotX=rotx(10*pi/180);
+        rotX=rotx(15*pi/180);
     end
 
     
@@ -915,7 +970,7 @@ if(p.Results.showReference)
     
     
     hold on
-    surf(xImage,yImage,zImage,...    % Plot the surface
+    h=surf(xImage,yImage,zImage,...    % Plot the surface
          'CData',img,...
         'FaceColor','texturemap','FaceLighting','none','AlphaData',alpha,'FaceAlpha','texture');
     hold off
@@ -926,19 +981,19 @@ if(p.Results.showReference)
     imgXY=size(img);
 
     if(p.Results.useTalairach)
-        xMid=0;
+        xMid=-1;
         yMid=-7;
         zMid=6;
 
 
-        rotX=rotx(10*pi/180);
+        %rotX=rotx(10*pi/180);
     else
         xMid=0;
-        yMid=-7;
-        zMid=19;
+        yMid=-11;
+        zMid=17;
 
 
-        rotX=rotx(0*pi/180);
+        %rotX=rotx(15*pi/180);
     end
     
 
@@ -969,16 +1024,16 @@ if(p.Results.showReference)
 
         if(p.Results.useTalairach)
             xMid=1;
-            yMid=-14;
-            zMid=-14;
+            yMid=-16;
+            zMid=-16;
 
-            rotX=rotx(5*pi/180);
+            %rotX=rotx(10*pi/180);
         else
             xMid=1;
-            yMid=-14;
-            zMid=-14;
+            yMid=-20;
+            zMid=-4;
 
-            rotX=rotx(0*pi/180);
+            %rotX=rotx(15*pi/180);
         end
    
     
@@ -1002,6 +1057,8 @@ if(p.Results.showReference)
     text(85,55,-50,'R');
     
 end
+
+h=gca;
 
 if (nargout > 0)
     h=gca;
