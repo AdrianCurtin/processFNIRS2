@@ -222,7 +222,7 @@ showChannels = p.Results.ChannelLabels;
 hold off
 
 
-itemsToDelete={'ProbeOpt','OptLabel','ProbeSrc','ProbeSrcLabel','ProbeDet','ProbeDetLabel','Scatter1020','Label1020','ScatterCurve','OptLines'};
+itemsToDelete={'ProbeOpt','OptLabel','ProbeSrc','ProbeSrcLabel','ProbeDet','ProbeDetLabel','Scatter1020','Label1020','ScatterCurve','OptLines','BrainRef'};
 
 
 for i=1:length(itemsToDelete)
@@ -252,7 +252,7 @@ if(show1020)
     
     c1020 = c1020(~isnan(c1020.x), :);
     if ~islogical(p.Results.I1020_labels)
-        labels = "'" + p.Results.I1020_labels + "'";
+        labels = p.Results.I1020_labels;
         c1020 = c1020(ismember(c1020.Electrode, labels), :);
     end   
     
@@ -485,9 +485,11 @@ else
     
 end
 
-fprintf('Min X: %.3f Max X %.3f\n',min(mdl.v(:,1)),max(mdl.v(:,1)));
-fprintf('Min Y: %.3f Max Y %.3f\n',min(mdl.v(:,2)),max(mdl.v(:,2)));
-fprintf('Min Z: %.3f Max Z %.3f\n',min(mdl.v(mdl.v(:,2)<-60,3)),max(mdl.v(:,3)));
+if(p.Results.showReference)
+    fprintf('Min X: %.3f Max X %.3f\n',min(mdl.v(:,1)),max(mdl.v(:,1)));
+    fprintf('Min Y: %.3f Max Y %.3f\n',min(mdl.v(:,2)),max(mdl.v(:,2)));
+    fprintf('Min Z: %.3f Max Z %.3f\n',min(mdl.v(mdl.v(:,2)<-60,3)),max(mdl.v(:,3)));
+end
 
 mdl.f=cMdl.f.v(:,reorderIdx);
 %mdl.f=[x2tx(mdl.f(:,1)),y2ty(mdl.f(:,2)),z2tz(mdl.f(:,3))];
@@ -975,6 +977,8 @@ if(p.Results.showReference)
         'FaceColor','texturemap','FaceLighting','none','AlphaData',alpha,'FaceAlpha','texture');
     hold off
 
+    
+    h.Tag='BrainRef';
     [img,map,alpha] = imread(sprintf('%s%s',path4debug,'rcSlice.png'));     % Load a sample image
 
 
@@ -1009,11 +1013,11 @@ if(p.Results.showReference)
 
   
     hold on
-    surf(xImage,yImage,zImage,...    % Plot the surface
+    h=surf(xImage,yImage,zImage,...    % Plot the surface
          'CData',img,...
          'FaceColor','texturemap','FaceLighting','none','AlphaData',alpha,'FaceAlpha','texture');
     hold off
-
+    h.Tag='BrainRef';
 
 
     [img,map,alpha]  = imread(sprintf('%s%s',path4debug,'topprofile.png'));     % Load a sample image
@@ -1048,10 +1052,12 @@ if(p.Results.showReference)
 
   
     hold on
-    surf(xImage,yImage,zImage,...    % Plot the surface
+    h=surf(xImage,yImage,zImage,...    % Plot the surface
          'CData',img,...
          'FaceColor','texturemap','FaceLighting','none','AlphaData',alpha,'FaceAlpha','texture');
     hold off
+    
+    h.Tag='BrainRef';
     
     text(-85,55,-50,'L');
     text(85,55,-50,'R');
