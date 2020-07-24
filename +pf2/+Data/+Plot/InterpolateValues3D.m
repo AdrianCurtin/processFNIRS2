@@ -900,12 +900,12 @@ if(p.Results.showScattering||p.Results.optodeLine)
        
        if(p.Results.optodeLine)
             vectorDir=o+V*b;
-            h=plot3([o(1),vectorDir(1)], [o(2),vectorDir(2)],[o(3),vectorDir(3)], '--k', 'LineWidth', 2);
+            h=plot3([o(1),vectorDir(1)], [o(2),vectorDir(2)],[o(3),vectorDir(3)], '--k', 'LineWidth', 2,'HandleVisibility','off');
             h.Tag='OptLines';
        end
        
        if(p.Results.showScattering)
-           h=plot3(points(:,1), points(:,2), points(:,3), 'k', 'LineWidth', 1);
+           h=plot3(points(:,1), points(:,2), points(:,3), 'k', 'LineWidth', 1,'HandleVisibility','off');
            h.Tag='ScatterCurve';
        end
     end
