@@ -21,12 +21,15 @@ pF2_folder=pf2_base.pf2_defaultRootPath();
 
 
 
-if(nargin>0||isempty(deviceCfgFilename)) % If file name is specified, try to load it
+if(nargin>0&&~isempty(deviceCfgFilename)) % If file name is specified, try to load it
     
     global setF
     
-    [devCfg_folder,name,ext] = fileparts(deviceCfgFilename);
     
+   [devCfg_folder,name,ext] = fileparts(deviceCfgFilename); 
+
+
+
     saveOptLayout2=false;
     if(pf2_base.isnestedfield(setF,'device.Info.CfgName')&&(strcmpi(setF.device.Info.CfgName,name)))
         if(~isfield(setF.device.Probe{1},'OptLayout2D')&&buildProbeLayout)
@@ -36,11 +39,11 @@ if(nargin>0||isempty(deviceCfgFilename)) % If file name is specified, try to loa
             return;
         end
     end
-    
-    
+
+
     fid = fopen(deviceCfgFilename);
     
-    
+ 
     
     
     if fid==-1 && isempty(devCfg_folder) % if the file wasn't immediately accessible...

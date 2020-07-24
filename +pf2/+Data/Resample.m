@@ -170,6 +170,7 @@ HbO=HbR;
 HbDiff=HbR;
 HbTotal=HbR;
 CBSI=HbR;
+%raw=nan(size(numSegs,size(fNIR.raw,2)));
 
 if(getPolyAvg)
     phbr=nan(numSegs,numCh,polyDegree+1);
