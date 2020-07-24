@@ -77,15 +77,28 @@ addParameter(p, 'useTalairach', false, @islogical); % Otherwise will default to 
 parse(p,varargin{:});
 
 data2plot = p.Results.data2plot;
-dataEmpty = isempty(p.Results.data2plot);
 multiprobe = iscell(data2plot);
-if(multiprobe && ~dataEmpty)
+
+
+if(~multiprobe&&isnumeric(data2plot))
+   data2plot={data2plot};
+end
+
+numProbes=length(data2plot);
+
+for i=1:numProbes
+   dataEmpty(i)=isempty(data2plot{i}); 
+end
+
+if(multiprobe && ~all(dataEmpty))
     data2plot_cell = data2plot;
     concat_data = [];
     for i=1:numel(data2plot)
         concat_data = [concat_data, data2plot{i}];
     end
-    data2plot = concat_data;
+    data2plot_concat = concat_data;
+else
+    data2plot_concat=data2plot{1};
 end
 
 if(isempty(p.Results.fNIR) && ~p.Results.useEEG)
@@ -98,10 +111,17 @@ else
     fNIR = p.Results.fNIR;
 end
 
+if(iscell(fNIR)&&all(dataEmpty))
+    if(length(fNIR)>1)
+       multiprobe=true;
+       dataEmpty=true(size(fNIR));
+    end
+end
+
 minVal = p.Results.minval;
 maxVal = p.Results.maxval;
 if(isempty(p.Results.minval))
-    minVal = nanmin(data2plot);
+    minVal = nanmin(data2plot_concat);
 end
 if(length(minVal)==2)
     twosided = true;
@@ -111,9 +131,9 @@ end
 
 if(isempty(maxVal))
     if(~twosided)
-        maxVal = nanmax(data2plot);
+        maxVal = nanmax(data2plot_concat);
     else
-        maxVal = [nanmin(data2plot) nanmax(data2plot)];
+        maxVal = [nanmin(data2plot_concat) nanmax(data2plot_concat)];
     end
 elseif(length(maxVal) == 1 && length(minVal) == 2)
     if min(minVal) < maxVal && maxVal < max(minVal)
@@ -133,10 +153,10 @@ elseif(length(maxVal) == 2 && length(minVal) == 2)
 end
 
 if(p.Results.logScale)
-   if(any(data2plot<=0))
+   if(any(data2plot_concat<=0))
         error("Cannot use logscale when data contains negative values")    
    end
-   data2plot = log(data2plot);
+   data2plot_concat = log(data2plot_concat);
    minVal = log(minVal);
    maxVal = log(maxVal);
 end
@@ -259,7 +279,7 @@ if(show1020)
     if(p.Results.useEEG)
        probeInfo = {};
        idx = arrayfun(@(x) find(strcmp(c1020.Electrode, x)), labels);
-       data2plot = data2plot(idx);
+       data2plot_concat = data2plot_concat(idx);
        
        
        
@@ -295,11 +315,12 @@ if(multiprobe)
             probeInfos{i}=probeInfos{i}.Probe{probeNum};
             probeInfos{i}.TableOpt.ProbeNum(:,1)=i;
             probeInfos{i}.TableSD.ProbeNum(:,1)=i;
+            probeInfos{i}.TableOpt.HasData(:,1)=~dataEmpty(i);
         else
             error('Unable to identify probe'); 
         end
         
-        if(~dataEmpty && length(data2plot_cell{i})~=probeInfos{i}.NumOptodes)
+        if(~dataEmpty(i) && length(data2plot{i})~=probeInfos{i}.NumOptodes)
             error('Must have a value for all optodes');
         end
     end
@@ -344,65 +365,65 @@ if(multiprobe)
     probeInfo.NumShortSeparation = sum(probeInfo.IsShortSeparation);
     probeInfo.NumOptodes = length(probeInfo.OptPosX);
 else
-if(p.Results.useEEG)
-   %pass
-elseif(isempty(fNIR)&&isfield(setF,'device'))
-    cfgFilePath=setF.device.cfg.File;
-    if(~isfield(setF.device.Probe{1},'OptLayout2D'))
-        probeInfo=pf2_base.loadDeviceCfg(cfgFilePath,false);
-        setF.device=probeInfo;
+    if(p.Results.useEEG)
+       %pass
+    elseif(isempty(fNIR)&&isfield(setF,'device'))
+        cfgFilePath=setF.device.cfg.File;
+        if(~isfield(setF.device.Probe{1},'OptLayout2D'))
+            probeInfo=pf2_base.loadDeviceCfg(cfgFilePath,false);
+            setF.device=probeInfo;
+        else
+           probeInfo=setF.device; 
+        end
+    elseif(pf2_base.isnestedfield(fNIR,'info.probename')&&isfield(fNIR.info,'probename')&&~contains(fNIR.info.probename,'Unknown')) 
+        %try to load the probename cfg file
+        cfgFilePath=sprintf('%s.cfg',fNIR.info.probename);
     else
-       probeInfo=setF.device; 
+        cfgFilePath='';
     end
-elseif(pf2_base.isnestedfield(fNIR,'info.probename')&&isfield(fNIR.info,'probename')&&~contains(fNIR.info.probename,'Unknown')) 
-    %try to load the probename cfg file
-    cfgFilePath=sprintf('%s.cfg',fNIR.info.probename);
-else
-    cfgFilePath='';
-end
 
-if(~isempty(probeInfo) || p.Results.useEEG)
+    if(~isempty(probeInfo) || p.Results.useEEG)
 
-elseif(isempty(cfgFilePath)||~contains(cfgFilePath,'.cfg'))
-    
-    warning('Missing or invalid configuration file path\n')
-    
-    disp('No device specified. Please load device configuration');
-    probeInfo=pf2_base.loadDeviceCfg('',false);
-    if(isempty(probeInfo))
-        error('No valid devices selected');
+    elseif(isempty(cfgFilePath)||~contains(cfgFilePath,'.cfg'))
+
+        warning('Missing or invalid configuration file path\n')
+
+        disp('No device specified. Please load device configuration');
+        probeInfo=pf2_base.loadDeviceCfg('',false);
+        if(isempty(probeInfo))
+            error('No valid devices selected');
+        end
+
+    elseif(~isempty(cfgFilePath)) % If we're not looking at the GUI, doesn't matter
+        probeInfo=pf2_base.loadDeviceCfg(cfgFilePath,false);
     end
-    
-elseif(~isempty(cfgFilePath)) % If we're not looking at the GUI, doesn't matter
-    probeInfo=pf2_base.loadDeviceCfg(cfgFilePath,false);
-end
 
-if(pf2_base.isnestedfield(probeInfo,'Probe'))
-    deviceInfo=probeInfo.Info;
-    if(~isfield(deviceInfo,'numberProbes')||deviceInfo.numberProbes==1)
-        probeNum=1;
+    if(pf2_base.isnestedfield(probeInfo,'Probe'))
+        deviceInfo=probeInfo.Info;
+        if(~isfield(deviceInfo,'numberProbes')||deviceInfo.numberProbes==1)
+            probeNum=1;
+        end
+        probeInfo=probeInfo.Probe{probeNum};
+        
+        probeInfo.TableOpt.HasData(:,1)=~dataEmpty;
+        
+    elseif(~p.Results.useEEG)
+       error('Unable to identify probe'); 
     end
-    probeInfo=probeInfo.Probe{probeNum};
-elseif(~p.Results.useEEG)
-   error('Unable to identify probe'); 
-end
 end
 
 include_ss=p.Results.includeSS;
-if(include_ss&&probeInfo.NumOptodes>length(data2plot)&&probeInfo.NumOptodes-probeInfo.NumShortSeparation==length(data2plot))
+if(include_ss&&probeInfo.NumOptodes>length(data2plot_concat)&&probeInfo.NumOptodes-probeInfo.NumShortSeparation==length(data2plot_concat))
    include_ss=false;
    warning('Not enough data for all channels, ignoring short separation channels');
 end
 
-if(include_ss)
-    numOptodes=probeInfo.NumOptodes;
-    channelList=probeInfo.ChannelList;
-else
-    numOptodes=probeInfo.NumOptodes-probeInfo.NumShortSeparation;
-    channelList=probeInfo.ChannelList(~probeInfo.IsShortSeparation);
-end
+includeChannels=probeInfo.TableOpt.HasData&(include_ss||~probeInfo.IsShortSeparation);
 
-if(~dataEmpty && length(data2plot)~=numOptodes)
+channelList=probeInfo.ChannelList(includeChannels);
+numOptodes=length(channelList);
+
+if(~all(dataEmpty) && length(data2plot_concat)~=numOptodes)
     error('Must have a value for all optodes');
 end
 
@@ -412,7 +433,7 @@ end
 %h{1}= axes('Position',[0.05,0.05,0.9,0.9],'Box','on');
 
 
-optPos=[probeInfo.OptPos3DX(~probeInfo.IsShortSeparation | ~p.Results.includeSS),probeInfo.OptPos3DY(~probeInfo.IsShortSeparation | ~p.Results.includeSS),probeInfo.OptPos3DZ(~probeInfo.IsShortSeparation | ~p.Results.includeSS)];
+optPos=[probeInfo.OptPos3DX(includeChannels),probeInfo.OptPos3DY(includeChannels),probeInfo.OptPos3DZ(includeChannels)];
 
 if(p.Results.useTalairach)
      optPos=pf2_base.external.icbm_fsl2tal(optPos);
@@ -422,7 +443,7 @@ OptPos3D_mean=nanmean(optPos,1);
 
 
 if(isnan(bufferDistance))
-   bufferDistance=median(probeInfo.SD(~probeInfo.IsShortSeparation))*10/sqrt(2);
+   bufferDistance=median(probeInfo.SD(includeChannels))*10/sqrt(2);
 end
 
 
@@ -522,8 +543,8 @@ else
 end
 
 
-if(~dataEmpty)
-C=data2plot;
+if(~all(dataEmpty))
+C=data2plot_concat;
 
 num_vertices = size(mdl.v, 1);
 max_distance_2 = bufferDistance^2;
@@ -712,6 +733,7 @@ if(plotFNIRS_SD&&isfield(probeInfo,'SrcPos3DX'))
     if(~isempty(srcColor) && (isnumeric(srcColor) && ~any(isnan(srcColor)) || ~ismissing(srcColor)))
         h = scatter3(srcPos(:,1),srcPos(:,2),srcPos(:,3),mrkScaleFactor*p.Results.labelfontsize,'filled',srcColor);
         h.Tag=sprintf('ProbeSrc');
+        h.DisplayName='Source';
     end
     h=text(srcPos(:,1), srcPos(:,2), srcPos(:,3), probeInfo.TableSD.Label(srcIdx), 'HorizontalAlignment', 'center','VerticalAlignment', 'middle', "FontSize", p.Results.labelfontsize, 'color', p.Results.labelfontcolor);
     for i=1:length(h)
@@ -728,6 +750,7 @@ if(plotFNIRS_SD&&isfield(probeInfo,'SrcPos3DX'))
     if(~isempty(detColor) && (isnumeric(detColor) && ~any(isnan(detColor)) || ~ismissing(detColor)))
         h = scatter3(detPos(:,1), detPos(:,2), detPos(:,3), mrkScaleFactor*p.Results.labelfontsize, 'filled', detColor);
         h.Tag=sprintf('ProbeDet');
+        h.DisplayName='Detector';
     end
     h=text(detPos(:,1), detPos(:,2), detPos(:,3), probeInfo.TableSD.Label(detIdx), 'HorizontalAlignment', 'center','VerticalAlignment', 'middle', "FontSize", p.Results.labelfontsize, 'color', p.Results.labelfontcolor);
     for i=1:length(h)
@@ -798,7 +821,7 @@ end
 
 
 title(ax, titleString);
-if(p.Results.showColorbar && ~dataEmpty)
+if(p.Results.showColorbar && ~all(dataEmpty))
     cbars = findobj(gcf, "Type", "ColorBar");
     delete(cbars);
     ax1=ax;
