@@ -70,8 +70,8 @@ addParameter(p, 'showReference', false, @islogical);
 addParameter(p, 'showScattering', false, @islogical);
 addParameter(p, 'scatteringFactor', 1, validScalarPosNumOrNan);
 addParameter(p, 'useEEG', false, @islogical);
-addParameter(p, 'optodeLine', false, @islogical);
-
+addParameter(p, 'optodeLines', false, @islogical);
+addParameter(p, 'useProjectedOptodeLocations', false,@islogical);
 addParameter(p, 'useTalairach', false, @islogical); % Otherwise will default to MNI
 
 parse(p,varargin{:});
@@ -423,6 +423,34 @@ includeChannels=probeInfo.TableOpt.HasData&(include_ss||~probeInfo.IsShortSepara
 channelList=probeInfo.ChannelList(includeChannels);
 numOptodes=length(channelList);
 
+srcIdx=probeInfo.TableSD.Type=='Src';
+detIdx=~srcIdx;
+srcPos = [probeInfo.TableSD.Pos3D_x(srcIdx), probeInfo.TableSD.Pos3D_y(srcIdx), probeInfo.TableSD.Pos3D_z(srcIdx)];   
+detPos = [probeInfo.TableSD.Pos3D_x(detIdx), probeInfo.TableSD.Pos3D_y(detIdx), probeInfo.TableSD.Pos3D_z(detIdx)];
+optPos = [probeInfo.TableOpt.Pos3D_x, probeInfo.TableOpt.Pos3D_y, probeInfo.TableOpt.Pos3D_z];
+
+if(p.Results.useTalairach)
+     optPos=pf2_base.external.icbm_fsl2tal(optPos);
+     detPos=pf2_base.external.icbm_fsl2tal(detPos);
+     srcPos=pf2_base.external.icbm_fsl2tal(srcPos);
+end
+ 
+probeInfo.TableOpt.OptPos=optPos;
+probeInfo.TableOpt.SrcPos=srcPos(probeInfo.TableOpt.SrcIdx, :);
+probeInfo.TableOpt.DetPos=detPos(probeInfo.TableOpt.DetIdx, :);
+probeInfo.TableOpt.sd=probeInfo.TableOpt.SrcPos-probeInfo.TableOpt.DetPos;
+probeInfo.TableOpt.sdDist=sqrt(sum(probeInfo.TableOpt.sd.^2,2));
+
+% formula for ellipse: C + a cos(theta) U + b sin(theta) V
+probeInfo.TableOpt.b(:,1)=probeInfo.TableOpt.sdDist/2;
+probeInfo.TableOpt.a(:,1)=probeInfo.TableOpt.b*p.Results.scatteringFactor*2;
+probeInfo.TableOpt.U=probeInfo.TableOpt.sd./vecnorm(probeInfo.TableOpt.sd')';
+probeInfo.TableOpt.V=camtarget-probeInfo.TableOpt.OptPos;
+probeInfo.TableOpt.V=probeInfo.TableOpt.V./vecnorm(probeInfo.TableOpt.V')';
+probeInfo.TableOpt.VectorDir=probeInfo.TableOpt.OptPos+probeInfo.TableOpt.V.*probeInfo.TableOpt.sdDist/3;
+
+
+
 if(~all(dataEmpty) && length(data2plot_concat)~=numOptodes)
     error('Must have a value for all optodes');
 end
@@ -547,10 +575,19 @@ if(~all(dataEmpty))
 C=data2plot_concat;
 
 num_vertices = size(mdl.v, 1);
-max_distance_2 = bufferDistance^2;
+
 Cs = zeros(num_vertices, 3);
-controlPoints = optPos;
+
+if(p.Results.useProjectedOptodeLocations)
+    controlPoints=probeInfo.TableOpt.VectorDir(includeChannels,:);
+    max_distance_2 = bufferDistance^1.2;
+else
+    controlPoints = optPos;
+    max_distance_2 = bufferDistance^2/sqrt(2);
+end
+
 num_control = size(controlPoints, 1);
+
 
 
 dist_array = zeros(num_vertices, num_control);
@@ -888,51 +925,43 @@ if(p.Results.showColorbar && ~all(dataEmpty))
     end
 end
 
-if(p.Results.showScattering||p.Results.optodeLine)
-    srcIdx=probeInfo.TableSD.Type=='Src';
-    detIdx=~srcIdx;
+if(p.Results.showScattering||p.Results.optodeLines)
+   t = linspace(0, pi, 16);
     
-    srcPos = [probeInfo.TableSD.Pos3D_x(srcIdx), probeInfo.TableSD.Pos3D_y(srcIdx), probeInfo.TableSD.Pos3D_z(srcIdx)];   
-    detPos = [probeInfo.TableSD.Pos3D_x(detIdx), probeInfo.TableSD.Pos3D_y(detIdx), probeInfo.TableSD.Pos3D_z(detIdx)];
+   s = probeInfo.TableOpt.SrcPos;
+   d = probeInfo.TableOpt.DetPos;
+   o = probeInfo.TableOpt.OptPos;
+
+
+   % formula for ellipse: C + a cos(theta) U + b sin(theta) V
+   b = probeInfo.TableOpt.b;%norm(s - d)/2;
+   a = probeInfo.TableOpt.a;%p.Results.scatteringFactor * b;
+   %U = s - d;
+   U = probeInfo.TableOpt.U;%U / norm(U);
+   %V = camtarget-o;
+   V = probeInfo.TableOpt.V;%V / norm(V);
     
-    optPos = [probeInfo.TableOpt.Pos3D_x, probeInfo.TableOpt.Pos3D_y, probeInfo.TableOpt.Pos3D_z];
-    
-    if(p.Results.useTalairach)
-         optPos=pf2_base.external.icbm_fsl2tal(optPos);
-         detPos=pf2_base.external.icbm_fsl2tal(detPos);
-         srcPos=pf2_base.external.icbm_fsl2tal(srcPos);
-     end
-    
-    
-    optSrcPos = srcPos(probeInfo.TableOpt.SrcIdx, :);
-    optDetPos = detPos(probeInfo.TableOpt.DetIdx, :);
-    for i=1:length(optSrcPos)
-       s = optSrcPos(i,:);
-       d = optDetPos(i,:);
-       o = optPos(i,:);
-       t = linspace(0, pi, 16);
+    for i=1:length(probeInfo.TableOpt.OptPos)
        
-       % formula for ellipse: C + a cos(theta) U + b sin(theta) V
-       b = norm(s - d)/2;
-       a = p.Results.scatteringFactor * b;
-       U = s - d;
-       U = U / norm(U);
-       V = camtarget-o;
-       V = V / norm(V);
-       points = o + b*cos(t)' .* U + a*sin(t)' .* V; 
+       points = o(i,:) + b(i)*cos(t)' .* U(i,:) + a(i)*sin(t)' .* V(i,:); 
        
-       if(p.Results.optodeLine)
-            vectorDir=o+V*b;
-            h=plot3([o(1),vectorDir(1)], [o(2),vectorDir(2)],[o(3),vectorDir(3)], '--k', 'LineWidth', 2,'HandleVisibility','off');
+       if(p.Results.optodeLines)
+           hold on 
+           vectorDir=probeInfo.TableOpt.VectorDir(i,:);
+            h=plot3([o(i,1),vectorDir(1)], [o(i,2),vectorDir(2)],[o(i,3),vectorDir(3)], '--k', 'LineWidth', 2,'HandleVisibility','off');
             h.Tag='OptLines';
+            
        end
        
        if(p.Results.showScattering)
+           hold on
            h=plot3(points(:,1), points(:,2), points(:,3), 'k', 'LineWidth', 1,'HandleVisibility','off');
            h.Tag='ScatterCurve';
        end
     end
 end
+
+
 
 if(p.Results.showReference)
     %% Test code for calibration
