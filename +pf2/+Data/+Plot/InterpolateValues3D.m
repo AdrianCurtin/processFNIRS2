@@ -22,7 +22,7 @@ validInterpolateTypes = {'nearest', 'linear', 'quadratic', 'cubic'};
 validInterpolateType = @(x) any(validatestring(x, validInterpolateTypes));
 
 defaultCamPosition = 'auto';
-validCamPositions = {'auto','front', 'back', 'top' 'left', 'right'};
+validCamPositions = {'auto','front', 'back', 'top' 'left', 'right','face'};
 validCamPosition = @(x) any(validatestring(x, validCamPositions)) || isnumeric(x) && length(x) == 3;
 
 defaultColormap = 'hot';
@@ -72,7 +72,7 @@ addParameter(p, 'scatteringFactor', 1, validScalarPosNumOrNan);
 addParameter(p, 'useEEG', false, @islogical);
 addParameter(p, 'optodeLine', false, @islogical);
 
-addParameter(p, 'useTalairach', true, @islogical); % Otherwise will default to MNI
+addParameter(p, 'useTalairach', false, @islogical); % Otherwise will default to MNI
 
 parse(p,varargin{:});
 
@@ -222,7 +222,7 @@ showChannels = p.Results.ChannelLabels;
 hold off
 
 
-itemsToDelete={'ProbeOpt','OptLabel','ProbeSrc','ProbeSrcLabel','ProbeDet','ProbeDetLabel','Scatter1020','Label1020','ScatterCurve','OptLines','BrainRef'};
+itemsToDelete={'Eye','ProbeOpt','OptLabel','ProbeSrc','ProbeSrcLabel','ProbeDet','ProbeDetLabel','Scatter1020','Label1020','ScatterCurve','OptLines','BrainRef'};
 
 
 for i=1:length(itemsToDelete)
@@ -422,7 +422,7 @@ OptPos3D_mean=nanmean(optPos,1);
 
 
 if(isnan(bufferDistance))
-   bufferDistance=median(probeInfo.SD(~probeInfo.IsShortSeparation)*10)/sqrt(2);
+   bufferDistance=median(probeInfo.SD(~probeInfo.IsShortSeparation))*10*0.8;
 end
 
 
@@ -764,6 +764,7 @@ ylabel('y (R/C)');
 zlabel('z (U/D)');
 
 
+
 switch(p.Results.initCamPosition)
     case 'auto'
         campos(OptPos3D_mean/norm(OptPos3D_mean)*1500);   %Front facing
@@ -777,6 +778,8 @@ switch(p.Results.initCamPosition)
         campos([-1000,0,0]);  
     case 'right'
         campos([1000,0,0]);
+    case 'face'
+        campos([0,1000,-360]);
     otherwise
         campos(OptPos3D_mean/norm(OptPos3D_mean)*1500);  %Front facing
 end
@@ -921,8 +924,30 @@ if(p.Results.showReference)
     %https://www.openanatomy.org/atlases/nac/brain-2017-01/viewer/#!/view/33316a96-32f2-47f4-b5e0-a6225be09803/state/9dc9a3eb-7805-4b2b-943f-0b6e63ba488f
 
     imgXY=size(img);
-    
+    if(p.Results.useTalairach)
+         [lEyeX,lEyeY,lEyeZ]=sphere(10);
+        lEyeX=lEyeX*14-32;
+        lEyeY=lEyeY*14+45;
+        lEyeZ=lEyeZ*14-30;
 
+        h=surf(lEyeX,lEyeY,lEyeZ,'FaceColor','white');
+        h.Tag='Eye';
+
+        h=surf(-1*lEyeX,lEyeY,lEyeZ,'FaceColor','white');
+        h.Tag='Eye';
+    else
+        [lEyeX,lEyeY,lEyeZ]=sphere(10);
+        lEyeX=lEyeX*14-32;
+        lEyeY=lEyeY*14+45;
+        lEyeZ=lEyeZ*14-40;
+
+        h=surf(lEyeX,lEyeY,lEyeZ,'FaceColor','white');
+        h.Tag='Eye';
+
+        h=surf(-1*lEyeX,lEyeY,lEyeZ,'FaceColor','white');
+        h.Tag='Eye';
+
+    end
     
     if(p.Results.useTalairach)
          zStretch=1;
@@ -1069,7 +1094,8 @@ h=gca;
 if (nargout > 0)
     h=gca;
     
-    imgOut = getframe(ax).cdata;
+    frame=getframe(ax);
+    imgOut = frame.cdata;
 end
 
 toc
