@@ -422,7 +422,7 @@ OptPos3D_mean=nanmean(optPos,1);
 
 
 if(isnan(bufferDistance))
-   bufferDistance=median(probeInfo.SD(~probeInfo.IsShortSeparation))*10*0.8;
+   bufferDistance=median(probeInfo.SD(~probeInfo.IsShortSeparation))*10/sqrt(2);
 end
 
 
@@ -451,11 +451,11 @@ cMdl=cerebro_mdl;
 
 
 
-TAL_RosCaud=[64,-110];
+TAL_RosCaud=[70,-110];
 TAL_RL=[68, -65];
 TAL_UD=[76, -50-13.5];
 
-MNI_RosCaud=[68,-114];
+MNI_RosCaud=[75,-114];
 MNI_RL=[73, -71];
 MNI_UD=[83, -60-13.5];
 
@@ -779,7 +779,7 @@ switch(p.Results.initCamPosition)
     case 'right'
         campos([1000,0,0]);
     case 'face'
-        campos([0,1000,-360]);
+        campos([0,1000,-300]);
     otherwise
         campos(OptPos3D_mean/norm(OptPos3D_mean)*1500);  %Front facing
 end
