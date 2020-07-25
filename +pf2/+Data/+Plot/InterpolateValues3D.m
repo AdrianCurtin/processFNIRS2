@@ -73,6 +73,7 @@ addParameter(p, 'useEEG', false, @islogical);
 addParameter(p, 'optodeLines', false, @islogical);
 addParameter(p, 'useProjectedOptodeLocations', false,@islogical);
 addParameter(p, 'useTalairach', false, @islogical); % Otherwise will default to MNI
+addParameter(p, 'showBrodmann', false, @islogical); % Colors in Brodmann areas
 
 parse(p,varargin{:});
 
@@ -256,6 +257,28 @@ for i=1:length(itemsToDelete)
 end
 
 probeInfo=[];
+
+if(p.Results.showBrodmann)
+    brdm=load('brodmann.mat');
+    brdm=brdm.brodmann;
+    bd_Areas=[1:55];
+
+    center=[90,126,72];
+    szB=size(brdm);
+
+    brodmannRes=1;
+
+    hold off
+    cols=lines(length(bd_Areas));
+    for i=1:length(bd_Areas)
+         bdI=find(brdm==bd_Areas(i));
+         [bdx,bdz,bdy] = ind2sub(size(brdm),bdI);
+         bdxyz=unique(round([bdx,bdz,bdy]/brodmannRes)*brodmannRes,'rows');
+        hold on
+            scatter3(szB(1)-center(1)-bdxyz(:,1),szB(2)-center(2)-bdxyz(:,2),bdxyz(:,3)-center(3),50*brodmannRes,'MarkerFaceColor',cols(i,:),'MarkerEdgeColor','none');
+    end
+    
+end
 
 if(show1020)
     c1020=load('cerebro_1020_table.mat'); %estimation of 10-20 coordinates
