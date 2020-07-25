@@ -13,6 +13,7 @@ validAxesHandle= @(x) isa(x,'matlab.graphics.axis.Axes')&&isvalid(x);
 validScalarPosNum = @(x) isnumeric(x) && x>0;
 validScalarPosNumOrNan = @(x) isnumeric(x) && (x>0||isnan(x));
 validI1020Label = @(x) islogical(x) || iscellstr(x);
+validBrodmann = @(x) islogical(x) || isnumeric(x)&&all(x<=55)&&all(x>0);
 validColor = @(x) (ischar(x) && length(x) == 1) || isnumeric(x) && length(x) == 3 || isempty(x);
 validFnirs = @(x) (iscell(x) || isstruct(x));
 %validColorList = @(x) validColor(x) || all(arrayfun(validColor, x));
@@ -73,7 +74,8 @@ addParameter(p, 'useEEG', false, @islogical);
 addParameter(p, 'optodeLines', false, @islogical);
 addParameter(p, 'useProjectedOptodeLocations', false,@islogical);
 addParameter(p, 'useTalairach', false, @islogical); % Otherwise will default to MNI
-addParameter(p, 'showBrodmann', false, @islogical); % Colors in Brodmann areas
+addParameter(p, 'BrodmannAreas', false, validBrodmann); % Colors in Brodmann areas
+addParameter(p, 'BA_cmp', lines, validColormap); % Colors in Brodmann areas
 
 parse(p,varargin{:});
 
@@ -246,7 +248,7 @@ showChannels = p.Results.ChannelLabels;
 hold off
 
 
-itemsToDelete={'Eye','ProbeOpt','OptLabel','ProbeSrc','ProbeSrcLabel','ProbeDet','ProbeDetLabel','Scatter1020','Label1020','ScatterCurve','OptLines','BrainRef'};
+itemsToDelete={'BA_area_mrk','Eye','ProbeOpt','OptLabel','ProbeSrc','ProbeSrcLabel','ProbeDet','ProbeDetLabel','Scatter1020','Label1020','ScatterCurve','OptLines','BrainRef'};
 
 
 for i=1:length(itemsToDelete)
@@ -488,7 +490,7 @@ if(useHighRes)
     cerebro_mdl=cerebro_mdl.cerebro_mdl;
 else
     cerebro_mdl=load('cerebro_mdl_05.mat');  %Low-res model
-    cerebro_mdl=cerebro_mdl.cerebro_mdl_05;
+    cerebro_mdl=cerebro_mdl.cerebro_mdl;
 end
 
 %lighting('phong')
@@ -576,39 +578,49 @@ else
    %camlight(lht,0,180); 
 end
 
-if(p.Results.showBrodmann)
-    brdm=load('brodmann.mat');
-    brdm=brdm.brodmann;
-    bd_Areas=[1:55];
-
-    center=[90,126,72];
-    szB=size(brdm);
-
-    brodmannRes=1;
-
-    hold off
-    cols=lines(length(bd_Areas));
-    
-    bigbd=[];
-    bigbdidx=[];
-    legendStr={};
-    for i=1:length(bd_Areas)
-         bdI=find(brdm==bd_Areas(i));
-         [bdx,bdz,bdy] = ind2sub(size(brdm),bdI);
-         bdx=(szB(1)-center(1)-bdx);
-         bdz=szB(2)-center(2)-bdz;
-          bdy=bdy-center(3);
-         bdxyz=unique(round([bdx,bdz,bdy]/brodmannRes)*brodmannRes,'rows');
-         bigbd=[bigbd;bdxyz];
-         bigbdidx=[bigbdidx;ones(length(bdx),1)*bd_Areas(i)];
-        %hold on
-         %scatter3(bdxyz(:,1),bdxyz(:,2),bdxyz(:,3),50*brodmannRes,'MarkerFaceColor',cols(i,:),'MarkerEdgeColor','none');
-       % legendStr{i}=sprintf('BA%i',i);
+if(islogical(p.Results.BrodmannAreas)&&p.Results.BrodmannAreas||isnumeric(p.Results.BrodmannAreas))
+    showBrodmann=true;
+    if(islogical(p.Results.BrodmannAreas))
+        BA_areas=1:55;
+    else
+        BA_areas=p.Results.BrodmannAreas;
     end
-    
-   % legend(legendStr);
-
+else
+    showBrodmann=false;
 end
+% 
+% if(showBrodmann)
+%     brdm=load('brodmann.mat');
+%     brdm=brdm.brodmann;
+% 
+%     center=[90,126,72];
+%     szB=size(brdm);
+% 
+%     brodmannRes=1;
+% 
+%     hold off
+%     cols=lines(length(bd_Areas));
+%     
+%     bigbd=[];
+%     bigbdidx=[];
+%     legendStr={};
+%     for i=1:length(bd_Areas)
+%          bdI=find(brdm==BA_areas(i));
+%          [bdx,bdz,bdy] = ind2sub(size(brdm),bdI);
+%          bdx=(szB(1)-center(1)-bdx);
+%          bdz=szB(2)-center(2)-bdz;
+%           bdy=bdy-center(3);
+%          bdxyz=unique(round([bdx,bdz,bdy]/brodmannRes)*brodmannRes,'rows');
+%          bigbd=[bigbd;bdxyz];
+%          bigbdidx=[bigbdidx;ones(length(bdx),1)*BA_areas(i)];
+%         %hold on
+%          %scatter3(bdxyz(:,1),bdxyz(:,2),bdxyz(:,3),50*brodmannRes,'MarkerFaceColor',cols(i,:),'MarkerEdgeColor','none');
+%        % legendStr{i}=sprintf('BA%i',i);
+%     end
+%     
+%    % legend(legendStr);
+% 
+% end
 
 
 if(~all(dataEmpty))
@@ -625,9 +637,14 @@ if(~all(dataEmpty))
         controlPoints = optPos;
         max_distance_2 = bufferDistance^2/sqrt(2);
     end
-
+    
     num_control = size(controlPoints, 1);
-
+    
+%     
+%     controlPoints=bigbd;
+%     
+%     num_control = size(controlPoints, 1);
+% 
 %     d=nan(num_vertices,1);
 %     ind=nan(num_vertices,1);
 %     for i=1:num_vertices
@@ -733,19 +750,43 @@ if(~all(dataEmpty))
 else
     Cs = repmat(brainColor, size(mdl.v, 1), 1);
     
-    if(p.Results.showBrodmann)
-       
-        BA_areas=[1:55];
+    if(showBrodmann)
+      
         
-        brainColmap=[brainColor;lines(length(BA_areas));];
+        brainColmap=[brainColor;BA_cmp(length(BA_areas));];
         
         cerebro_mdl.b_area(~ismember(cerebro_mdl.b_area,BA_areas))=0;
-        cerebro_mdl.b_area(cerebro_mdl.b_dist>100)=0;
+        cerebro_mdl.b_area(cerebro_mdl.b_dist>150)=0;
         
-       % [a,b,c]=unique(cerebro_mdl.b_area);
+        brainstembox=[-15,15;-40,15;-80,5];
         
-        cerebro_mdl.Cs=brainColmap(cerebro_mdl.b_area+1,:);
+        inBox=@(xyz,xminmax,yminmax,zminmax) xyz(:,1)>min(xminmax)&xyz(:,1)<max(xminmax)& ...
+            xyz(:,2)>min(yminmax)&xyz(:,2)<max(yminmax)& ...
+            xyz(:,3)>min(zminmax)&xyz(:,3)<max(zminmax);
+        
+        cerebro_mdl.b_area(inBox(mdl.v,brainstembox(1,:),brainstembox(2,:),brainstembox(3,:)))=0;
+        
+        cerstembox=[-55,55;-120,-40;-80,-25];
+        
+        cerebro_mdl.b_area(inBox(mdl.v,cerstembox(1,:),cerstembox(2,:),cerstembox(3,:)))=0;
+        
+       [a,b,c]=unique(cerebro_mdl.b_area);
+        
+        cerebro_mdl.Cs=brainColmap(c,:);
         Cs=cerebro_mdl.Cs;
+        
+        legendStr=cell(size(c));
+        
+        for i=2:length(a)
+            legendStr{i}=sprintf('BA%i',a(i));
+            
+            h=scatter3(0,0,0,0.1,'square','MarkerFaceColor',brainColmap(i,:));
+            h.Tag='BA_area_mrk';
+            h.DisplayName=legendStr{i};
+            hold on
+        end
+        
+        legend();
     end
 end
 
@@ -767,7 +808,8 @@ if(isempty(brainHndl))
     end
 
         brainHndl.Tag='Brain';
-        
+        brainHndl.DisplayName='Brain';
+        brainHndl.HandleVisibility='off';
         hold on;
         
 
@@ -811,11 +853,13 @@ if(showChannels&&isfield(probeInfo, 'TableOpt'))
                 probe_string{i}=sprintf('Probe %i',uDevices(i));
                 
                 h(i).Tag='ProbeOpt';
+                h(i).DisplayName=probe_string{i};
             end
             legend(h,probe_string);
         else
             h = scatter3(optPos(:,1), optPos(:,2), optPos(:,3),20*p.Results.labelfontsize,'filled',optColor,'MarkerEdgeColor' ,'k');
             h.Tag='ProbeOpt';
+            h.DisplayName='Optode';
         end
     end
     
