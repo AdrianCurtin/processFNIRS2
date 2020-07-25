@@ -29,7 +29,7 @@ validCamPosition = @(x) any(validatestring(x, validCamPositions)) || isnumeric(x
 defaultColormap = 'hot';
 defaultColormapLow = 'cool';
 validColormapLabels = {'hot', 'autumn', 'jet', 'gray', 'copper', 'bone', 'cool', 'winter', 'pink'};
-validColormap = @(x) any(validatestring(x, validColormapLabels)) || ishandle(x);
+validColormap = @(x) isa(x,'function_handle')||ishandle(x)||any(validatestring(x, validColormapLabels));
 
 if(numel(varargin) > 0 && isa(varargin{1},'matlab.graphics.axis.Axes')) %If first argument is axes then move to front
    ax=varargin{1};
@@ -75,7 +75,7 @@ addParameter(p, 'optodeLines', false, @islogical);
 addParameter(p, 'useProjectedOptodeLocations', false,@islogical);
 addParameter(p, 'useTalairach', false, @islogical); % Otherwise will default to MNI
 addParameter(p, 'BrodmannAreas', false, validBrodmann); % Colors in Brodmann areas
-addParameter(p, 'BA_cmp', lines, validColormap); % Colors in Brodmann areas
+addParameter(p, 'BA_cmp', @lines, validColormap); % Colors in Brodmann areas
 
 parse(p,varargin{:});
 
@@ -753,7 +753,7 @@ else
     if(showBrodmann)
       
         
-        brainColmap=[brainColor;BA_cmp(length(BA_areas));];
+        brainColmap=[brainColor;p.Results.BA_cmp(length(BA_areas));];
         
         cerebro_mdl.b_area(~ismember(cerebro_mdl.b_area,BA_areas))=0;
         cerebro_mdl.b_area(cerebro_mdl.b_dist>150)=0;
