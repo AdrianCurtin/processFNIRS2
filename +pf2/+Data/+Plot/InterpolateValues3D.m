@@ -258,27 +258,7 @@ end
 
 probeInfo=[];
 
-if(p.Results.showBrodmann)
-    brdm=load('brodmann.mat');
-    brdm=brdm.brodmann;
-    bd_Areas=[1:55];
 
-    center=[90,126,72];
-    szB=size(brdm);
-
-    brodmannRes=1;
-
-    hold off
-    cols=lines(length(bd_Areas));
-    for i=1:length(bd_Areas)
-         bdI=find(brdm==bd_Areas(i));
-         [bdx,bdz,bdy] = ind2sub(size(brdm),bdI);
-         bdxyz=unique(round([bdx,bdz,bdy]/brodmannRes)*brodmannRes,'rows');
-        hold on
-            scatter3(szB(1)-center(1)-bdxyz(:,1),szB(2)-center(2)-bdxyz(:,2),bdxyz(:,3)-center(3),50*brodmannRes,'MarkerFaceColor',cols(i,:),'MarkerEdgeColor','none');
-    end
-    
-end
 
 if(show1020)
     c1020=load('cerebro_1020_table.mat'); %estimation of 10-20 coordinates
@@ -596,115 +576,177 @@ else
    %camlight(lht,0,180); 
 end
 
+if(p.Results.showBrodmann)
+    brdm=load('brodmann.mat');
+    brdm=brdm.brodmann;
+    bd_Areas=[1:55];
 
-if(~all(dataEmpty))
-C=data2plot_concat;
+    center=[90,126,72];
+    szB=size(brdm);
 
-num_vertices = size(mdl.v, 1);
+    brodmannRes=1;
 
-Cs = zeros(num_vertices, 3);
-
-if(p.Results.useProjectedOptodeLocations)
-    controlPoints=probeInfo.TableOpt.VectorDir(includeChannels,:);
-    max_distance_2 = bufferDistance^1.2;
-else
-    controlPoints = optPos;
-    max_distance_2 = bufferDistance^2/sqrt(2);
-end
-
-num_control = size(controlPoints, 1);
-
-
-
-dist_array = zeros(num_vertices, num_control);
-for i=1:num_control
-    q = repmat(controlPoints(i,:), num_vertices, 1);
-    dist_array(:,i) = sum((mdl.v - q).^2, 2);
-end
-
-[d, ind] = min(dist_array, [], 2);
-ind(d > max_distance_2) = 0;
-
-c_min = nanmin(C, [], 'all');
-c_max = nanmax(C, [], 'all');
-if twosided
-   if minVal(1) - maxVal(1) > maxVal(2) - minVal(2)
-       range = minVal(1) - maxVal(1);
-       cmap = colormap([cmap_low(256);
-               repmat(brainColor, round(256*(minVal(2) - minVal(1))/range), 1);
-               cmap_high(round(256*(maxVal(2) - minVal(2))/range))]);
-   else
-       range = maxVal(2) - minVal(2);
-       cmap = colormap([cmap_low(round(256*(minVal(1) - maxVal(1))/range));
-               repmat(brainColor, round(256*(minVal(2) - minVal(1))/range), 1);
-               cmap_high(256)]);
-   end
-   c_ind = round(length(cmap)*(C(:) - maxVal(1))/(maxVal(2) - maxVal(1)));
-   %for i=1:num_control  
-      %if C(i) <= minVal(1)
-      %    c_ind(i) = round(length(cmap)*(C(i) - c_min)/range);
-      %    cmap_i(i) = 1;
-      %elseif C(i) < minVal(2)
-      %    c_ind(i) = 0;
-      %    alphas(i) = 1;
-      %else
-      %    c_ind(i) = round(length(cmap)*(C(i) - minVal(2))/range);
-   %end
-else
-    if minVal < maxVal
-        if(p.Results.logScale)
-            cmap = [cmap_high(256)];
-        else
-            cmap = [cmap_high(256)];
-        end
-    else
-        if(p.Results.logScale)
-            cmap = [flip(cmap_low(256))];
-        else
-            cmap = [flip(cmap_low(256))];
-        end
+    hold off
+    cols=lines(length(bd_Areas));
+    
+    bigbd=[];
+    bigbdidx=[];
+    legendStr={};
+    for i=1:length(bd_Areas)
+         bdI=find(brdm==bd_Areas(i));
+         [bdx,bdz,bdy] = ind2sub(size(brdm),bdI);
+         bdx=(szB(1)-center(1)-bdx);
+         bdz=szB(2)-center(2)-bdz;
+          bdy=bdy-center(3);
+         bdxyz=unique(round([bdx,bdz,bdy]/brodmannRes)*brodmannRes,'rows');
+         bigbd=[bigbd;bdxyz];
+         bigbdidx=[bigbdidx;ones(length(bdx),1)*bd_Areas(i)];
+        %hold on
+         %scatter3(bdxyz(:,1),bdxyz(:,2),bdxyz(:,3),50*brodmannRes,'MarkerFaceColor',cols(i,:),'MarkerEdgeColor','none');
+       % legendStr{i}=sprintf('BA%i',i);
     end
     
-    c_ind = round(length(cmap)*(C(:) - minVal)/(maxVal - minVal));
+   % legend(legendStr);
+
 end
 
-switch(projectmode)
-    case 'nearest'
-        C_temp = [brainColor;reshape(ind2rgb(c_ind, cmap), [], 3)];
-        C_temp([-1; c_ind] < 0, :) = repmat(brainColor, sum(c_ind < 0)+1, 1);
-        %C_temp = zeros(num_control+1, 3);
-        %C_temp(1,:) = brainColor;
-        %C_temp(logical([0;cmap_i == 1]),:) = reshape(ind2rgb(c_ind(cmap_i == 1), cmap_low), [], 3);
-        %C_temp(logical([0;cmap_i == 0]),:) = reshape(ind2rgb(c_ind(cmap_i == 0), cmap), [], 3);
 
-        counts = histcounts(ind, 0:num_control+1);
-        for i=1:num_control+1
-            Cs(ind==i-1,:) = repmat(C_temp(i,:), counts(i), 1);
-        end
-        n=length(Cs(~any(Cs,2), :));
-    case {'linear', 'quadratic', 'cubic'}
-        switch(projectmode)
-            case 'linear'
-                beta = 0.5;
-            case 'quadratic'
-                beta = 1;
-            case 'cubic'
-                beta = 1.5;
-        end
-        dist_array(dist_array >= max_distance_2) = Inf;
+if(~all(dataEmpty))
+    C=data2plot_concat;
 
-        my_interp_fx = @(dist, val, pow, dim) sum(val.*(1./(dist.^pow + 1e-8))./sum(1./(dist.^pow + 1e-8), dim), dim);
-        C_temp = repmat(c_ind', num_vertices, 1);
-        v_ind = my_interp_fx(dist_array, C_temp, beta, 2);
-        %v_ind = round(length(cmap)*(v_ind - minVal)/(maxVal - minVal));
-        
-        %alpha_interp(cmap_interp > 0.1 & cmap_interp < 0.9) = 1;
-        Cs = reshape(ind2rgb(round(v_ind), cmap), [], 3);
-        Cs(v_ind < 0, :) = repmat(brainColor, sum(v_ind < 0), 1);
-        Cs(ind == 0,:) = repmat(brainColor, sum(ind == 0), 1);    
-end
+    num_vertices = size(mdl.v, 1);
+
+    Cs = zeros(num_vertices, 3);
+
+    if(p.Results.useProjectedOptodeLocations)
+        controlPoints=probeInfo.TableOpt.VectorDir(includeChannels,:);
+        max_distance_2 = bufferDistance^1.2;
+    else
+        controlPoints = optPos;
+        max_distance_2 = bufferDistance^2/sqrt(2);
+    end
+
+    num_control = size(controlPoints, 1);
+
+%     d=nan(num_vertices,1);
+%     ind=nan(num_vertices,1);
+%     for i=1:num_vertices
+%         q = repmat(mdl.v(i,:), num_control, 1);
+%         dist_array = sum((controlPoints - q).^2, 2);
+%         [d(i), ind(i)] = min(dist_array);
+%         if(rem(i,1000)==0)
+%             toc
+%             fprintf('%i\n',i);
+%             tic
+%         end
+%     end
+%     cerebro_mdl.b_dist=d;
+%     cerebro_mdl.b_area=bigbdidx(ind);
+    
+    dist_array = zeros(num_vertices, num_control);
+    for i=1:num_control
+        q = repmat(controlPoints(i,:), num_vertices, 1);
+        dist_array(:,i) = sum((mdl.v - q).^2, 2);
+    end
+
+    [d, ind] = min(dist_array, [], 2);
+    ind(d > max_distance_2) = 0;
+
+    c_min = nanmin(C, [], 'all');
+    c_max = nanmax(C, [], 'all');
+    if twosided
+       if minVal(1) - maxVal(1) > maxVal(2) - minVal(2)
+           range = minVal(1) - maxVal(1);
+           cmap = colormap([cmap_low(256);
+                   repmat(brainColor, round(256*(minVal(2) - minVal(1))/range), 1);
+                   cmap_high(round(256*(maxVal(2) - minVal(2))/range))]);
+       else
+           range = maxVal(2) - minVal(2);
+           cmap = colormap([cmap_low(round(256*(minVal(1) - maxVal(1))/range));
+                   repmat(brainColor, round(256*(minVal(2) - minVal(1))/range), 1);
+                   cmap_high(256)]);
+       end
+       c_ind = round(length(cmap)*(C(:) - maxVal(1))/(maxVal(2) - maxVal(1)));
+       %for i=1:num_control  
+          %if C(i) <= minVal(1)
+          %    c_ind(i) = round(length(cmap)*(C(i) - c_min)/range);
+          %    cmap_i(i) = 1;
+          %elseif C(i) < minVal(2)
+          %    c_ind(i) = 0;
+          %    alphas(i) = 1;
+          %else
+          %    c_ind(i) = round(length(cmap)*(C(i) - minVal(2))/range);
+       %end
+    else
+        if minVal < maxVal
+            if(p.Results.logScale)
+                cmap = [cmap_high(256)];
+            else
+                cmap = [cmap_high(256)];
+            end
+        else
+            if(p.Results.logScale)
+                cmap = [flip(cmap_low(256))];
+            else
+                cmap = [flip(cmap_low(256))];
+            end
+        end
+
+        c_ind = round(length(cmap)*(C(:) - minVal)/(maxVal - minVal));
+    end
+
+    switch(projectmode)
+        case 'nearest'
+            C_temp = [brainColor;reshape(ind2rgb(c_ind, cmap), [], 3)];
+            C_temp([-1; c_ind] < 0, :) = repmat(brainColor, sum(c_ind < 0)+1, 1);
+            %C_temp = zeros(num_control+1, 3);
+            %C_temp(1,:) = brainColor;
+            %C_temp(logical([0;cmap_i == 1]),:) = reshape(ind2rgb(c_ind(cmap_i == 1), cmap_low), [], 3);
+            %C_temp(logical([0;cmap_i == 0]),:) = reshape(ind2rgb(c_ind(cmap_i == 0), cmap), [], 3);
+
+            counts = histcounts(ind, 0:num_control+1);
+            for i=1:num_control+1
+                Cs(ind==i-1,:) = repmat(C_temp(i,:), counts(i), 1);
+            end
+            n=length(Cs(~any(Cs,2), :));
+        case {'linear', 'quadratic', 'cubic'}
+            switch(projectmode)
+                case 'linear'
+                    beta = 0.5;
+                case 'quadratic'
+                    beta = 1;
+                case 'cubic'
+                    beta = 1.5;
+            end
+            dist_array(dist_array >= max_distance_2) = Inf;
+
+            my_interp_fx = @(dist, val, pow, dim) sum(val.*(1./(dist.^pow + 1e-8))./sum(1./(dist.^pow + 1e-8), dim), dim);
+            C_temp = repmat(c_ind', num_vertices, 1);
+            v_ind = my_interp_fx(dist_array, C_temp, beta, 2);
+            %v_ind = round(length(cmap)*(v_ind - minVal)/(maxVal - minVal));
+
+            %alpha_interp(cmap_interp > 0.1 & cmap_interp < 0.9) = 1;
+            Cs = reshape(ind2rgb(round(v_ind), cmap), [], 3);
+            Cs(v_ind < 0, :) = repmat(brainColor, sum(v_ind < 0), 1);
+            Cs(ind == 0,:) = repmat(brainColor, sum(ind == 0), 1);    
+    end
 else
     Cs = repmat(brainColor, size(mdl.v, 1), 1);
+    
+    if(p.Results.showBrodmann)
+       
+        BA_areas=[1:55];
+        
+        brainColmap=[brainColor;lines(length(BA_areas));];
+        
+        cerebro_mdl.b_area(~ismember(cerebro_mdl.b_area,BA_areas))=0;
+        cerebro_mdl.b_area(cerebro_mdl.b_dist>100)=0;
+        
+       % [a,b,c]=unique(cerebro_mdl.b_area);
+        
+        cerebro_mdl.Cs=brainColmap(cerebro_mdl.b_area+1,:);
+        Cs=cerebro_mdl.Cs;
+    end
 end
 
 
@@ -713,7 +755,7 @@ brainHndl=findobj(gca,'Type','Patch','Tag','Brain');
 if(isempty(brainHndl))
    brainHndl=gca; 
    cameratoolbar
-
+    hold off
     if(~isempty(p.Results.brainLineColor)&&all(~isnan(p.Results.brainLineColor)))
         brainHndl=patch(brainHndl,'vertices', mdl.v, 'faces', mdl.f,'FaceVertexCData',Cs,'FaceColor','interp',...
             'AmbientStrength',ka, 'DiffuseStrength', kd, 'SpecularStrength',ks, ...
@@ -726,6 +768,7 @@ if(isempty(brainHndl))
 
         brainHndl.Tag='Brain';
         
+        hold on;
         
 
 else
