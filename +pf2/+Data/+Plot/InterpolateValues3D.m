@@ -76,6 +76,9 @@ addParameter(p, 'useTalairach', false, @islogical); % Otherwise will default to 
 
 parse(p,varargin{:});
 
+
+figure(gcf);
+
 data2plot = p.Results.data2plot;
 multiprobe = iscell(data2plot);
 
@@ -443,7 +446,7 @@ probeInfo.TableOpt.sdDist=sqrt(sum(probeInfo.TableOpt.sd.^2,2));
 
 % formula for ellipse: C + a cos(theta) U + b sin(theta) V
 probeInfo.TableOpt.b(:,1)=probeInfo.TableOpt.sdDist/2;
-probeInfo.TableOpt.a(:,1)=probeInfo.TableOpt.b*p.Results.scatteringFactor*2;
+probeInfo.TableOpt.a(:,1)=probeInfo.TableOpt.b*p.Results.scatteringFactor;
 probeInfo.TableOpt.U=probeInfo.TableOpt.sd./vecnorm(probeInfo.TableOpt.sd')';
 probeInfo.TableOpt.V=camtarget-probeInfo.TableOpt.OptPos;
 probeInfo.TableOpt.V=probeInfo.TableOpt.V./vecnorm(probeInfo.TableOpt.V')';
@@ -504,9 +507,9 @@ TAL_RosCaud=[70,-110];
 TAL_RL=[68, -65];
 TAL_UD=[76, -50-13.5];
 
-MNI_RosCaud=[75,-114];
+MNI_RosCaud=[75,-108];
 MNI_RL=[73, -71];
-MNI_UD=[83, -60-13.5];
+MNI_UD=[83, -70-13.5];
 
 x2tx=@(x) (x-min(x))/(max(x)-min(x))*(TAL_RL(1)-TAL_RL(2))+TAL_RL(2);%*49/1.73/brainResizeFactor;  %L/R scaling
 y2ty=@(y) (y-min(y))/(max(y)-min(y))*(TAL_RosCaud(1)-TAL_RosCaud(2))+TAL_RosCaud(2);%(y-0.57)*143.5/4.35/brainResizeFactor; %rostral/caudal scaling
@@ -527,7 +530,7 @@ if(p.Results.useTalairach)
     mdl.v=mdl.v*rotx(4/180*pi);
     mdl.v=[x2tx(mdl.v(:,1)),y2ty(mdl.v(:,2)),z2tz(mdl.v(:,3))];
 else
-    mdl.v=mdl.v*rotx(5/180*pi);
+    mdl.v=mdl.v*rotx(0/180*pi);
     mdl.v=[x2mx(mdl.v(:,1)),y2my(mdl.v(:,2)),z2mz(mdl.v(:,3))];
     
     
@@ -827,19 +830,19 @@ zlabel('z (U/D)');
 
 switch(p.Results.initCamPosition)
     case 'auto'
-        campos(OptPos3D_mean/norm(OptPos3D_mean)*1500);   %Front facing
+        campos(nanmean(optPos,1)/norm(nanmean(optPos,1))*1500);   %Front facing
     case 'front'
-        campos([0,1000,0]);
+        campos([0,1200,0]);
     case 'back'
-        campos([0,-1000,0]);
+        campos([0,-1200,0]);
     case 'top'
         campos([0,0,1500]);
     case 'left'
-        campos([-1000,0,0]);  
+        campos([-1200,0,0]);  
     case 'right'
-        campos([1000,0,0]);
+        campos([1200,0,0]);
     case 'face'
-        campos([0,1000,-300]);
+        campos([0,1200,-300]);
     otherwise
         campos(OptPos3D_mean/norm(OptPos3D_mean)*1500);  %Front facing
 end
@@ -960,6 +963,21 @@ if(p.Results.showScattering||p.Results.optodeLines)
        end
     end
 end
+
+
+% Alt reference code
+% for y=-90:30:90
+%     y
+%     for x=-60:10:60
+%         z=0;
+%     %for z=-60:30:60
+%        mni3d(x,y,z); 
+%     %end
+%     
+%     end
+% end 
+%    
+    
 
 
 

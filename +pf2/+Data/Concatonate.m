@@ -69,9 +69,9 @@ outFNIR.channels=cell(1,numCh);
 outFNIR.probeNum=zeros(1,numCh);
 outFNIR.fchMask=[];
 
-outFNIR.raw=[];
+outFNIR.raw={};
 
-outFNIR.info.probename='Unknown';
+outFNIR.info.probename={}%'Unknown';
 
 for j=1:length(fieldsToFill)
      outFNIR.(fieldsToFill{j})=nan(length(newTime),numCh);
@@ -87,7 +87,8 @@ for i=1:length(fNIR_objs) %use Slowest fNIR file as reference
      fNumCh=length(fNIR_objs{i}.channels);
      
      outFNIR.probeNum(curCh:fNumCh+curCh-1)=i;
-     %outFNIR.info.probename{i}=fNIR_objs{i}.info.probename;
+     outFNIR.info.probename{i}=fNIR_objs{i}.info.probename;
+     outFNIR.raw{i}=fNIR_objs{i}.raw;
      
      for j=1:length(fieldsToFill)
           temp= outFNIR.(fieldsToFill{j});
