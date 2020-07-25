@@ -10,6 +10,7 @@ function [ h, imgOut ] = InterpolateValues3D(varargin)
 %
 tic
 validAxesHandle= @(x) isa(x,'matlab.graphics.axis.Axes')&&isvalid(x);
+validScalarPosNumOr0 = @(x) isnumeric(x) && x>=0;
 validScalarPosNum = @(x) isnumeric(x) && x>0;
 validScalarPosNumOrNan = @(x) isnumeric(x) && (x>0||isnan(x));
 validI1020Label = @(x) islogical(x) || iscellstr(x);
@@ -58,7 +59,7 @@ addParameter(p, 'labelfontsize', 10, validScalarPosNum);
 addParameter(p, 'labelfontcolor', 'k', validColor);
 addParameter(p, 'labelspherecolors', ["r", "y","w"]);
 addParameter(p, 'brainColor', [0.92, 0.68, 0.68], validColor);
-addParameter(p, 'brainAlpha', 1, validScalarPosNum);
+addParameter(p, 'brainAlpha', 1, validScalarPosNumOr0);
 addParameter(p, 'brainLineColor', [], validColor);
 addParameter(p, 'backgroundColor', [], validColor);
 addParameter(p, 'showColorbar', true, @islogical);
@@ -76,6 +77,7 @@ addParameter(p, 'useProjectedOptodeLocations', false,@islogical);
 addParameter(p, 'useTalairach', false, @islogical); % Otherwise will default to MNI
 addParameter(p, 'BrodmannAreas', false, validBrodmann); % Colors in Brodmann areas
 addParameter(p, 'BA_cmp', @lines, validColormap); % Colors in Brodmann areas
+addParameter(p, 'useVoxelBrodmannAreas', false, @islogical); % Colors in Brodmann areas
 
 parse(p,varargin{:});
 
@@ -755,35 +757,68 @@ else
         
         brainColmap=[brainColor;p.Results.BA_cmp(length(BA_areas));];
         
-        cerebro_mdl.b_area(~ismember(cerebro_mdl.b_area,BA_areas))=0;
-        cerebro_mdl.b_area(cerebro_mdl.b_dist>150)=0;
         
-        brainstembox=[-15,15;-40,15;-80,5];
         
-        inBox=@(xyz,xminmax,yminmax,zminmax) xyz(:,1)>min(xminmax)&xyz(:,1)<max(xminmax)& ...
-            xyz(:,2)>min(yminmax)&xyz(:,2)<max(yminmax)& ...
-            xyz(:,3)>min(zminmax)&xyz(:,3)<max(zminmax);
-        
-        cerebro_mdl.b_area(inBox(mdl.v,brainstembox(1,:),brainstembox(2,:),brainstembox(3,:)))=0;
-        
-        cerstembox=[-55,55;-120,-40;-80,-25];
-        
-        cerebro_mdl.b_area(inBox(mdl.v,cerstembox(1,:),cerstembox(2,:),cerstembox(3,:)))=0;
-        
-       [a,b,c]=unique(cerebro_mdl.b_area);
-        
-        cerebro_mdl.Cs=brainColmap(c,:);
-        Cs=cerebro_mdl.Cs;
-        
-        legendStr=cell(size(c));
-        
-        for i=2:length(a)
-            legendStr{i}=sprintf('BA%i',a(i));
+        if(p.Results.useVoxelBrodmannAreas)
+
+                brdm=load('brodmann.mat');
+                brdm=brdm.brdm;
+
+                center=[90,126,72];
+                szB=size(brdm);
+
+                brodmannRes=1;
+
+                brainColmap=p.Results.BA_cmp(length(BA_areas));
+
+              
+                for i=1:length(BA_areas)
+                     bdI=find(brdm==BA_areas(i));
+                     [bdx,bdz,bdy] = ind2sub(size(brdm),bdI);
+                     bdx=(szB(1)-center(1)-bdx);
+                     bdz=szB(2)-center(2)-bdz;
+                      bdy=bdy-center(3);
+                     bdxyz=unique(round([bdx,bdz,bdy]/brodmannRes)*brodmannRes,'rows');
+                     hold on
+                     h=scatter3(bdxyz(:,1),bdxyz(:,2),bdxyz(:,3),50*brodmannRes,'square','MarkerFaceColor',brainColmap(i,:),'MarkerEdgeColor','none');
+                     h.DisplayName=sprintf('BA%i',BA_areas(i));
+                     h.Tag='BA_area_mrk';
+    
+                end
+
+               % legend(legendStr);
+
             
-            h=scatter3(0,0,0,0.1,'square','MarkerFaceColor',brainColmap(i,:));
-            h.Tag='BA_area_mrk';
-            h.DisplayName=legendStr{i};
-            hold on
+        else
+        
+            cerebro_mdl.b_area(~ismember(cerebro_mdl.b_area,BA_areas))=0;
+            cerebro_mdl.b_area(cerebro_mdl.b_dist>150)=0;
+
+            brainstembox=[-15,15;-40,15;-80,5];
+
+            inBox=@(xyz,xminmax,yminmax,zminmax) xyz(:,1)>min(xminmax)&xyz(:,1)<max(xminmax)& ...
+                xyz(:,2)>min(yminmax)&xyz(:,2)<max(yminmax)& ...
+                xyz(:,3)>min(zminmax)&xyz(:,3)<max(zminmax);
+
+            cerebro_mdl.b_area(inBox(mdl.v,brainstembox(1,:),brainstembox(2,:),brainstembox(3,:)))=0;
+
+            cerstembox=[-55,55;-120,-40;-80,-25];
+
+            cerebro_mdl.b_area(inBox(mdl.v,cerstembox(1,:),cerstembox(2,:),cerstembox(3,:)))=0;
+
+           [a,b,c]=unique(cerebro_mdl.b_area);
+
+            cerebro_mdl.Cs=brainColmap(c,:);
+            Cs=cerebro_mdl.Cs;
+
+
+            for i=2:length(a)
+                h=scatter3(0,0,0,0.1,'square','MarkerFaceColor',brainColmap(i,:));
+                h.Tag='BA_area_mrk';
+                h.DisplayName=sprintf('BA%i',a(i));
+                hold on
+            end
+
         end
         
         legend();
