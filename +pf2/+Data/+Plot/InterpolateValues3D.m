@@ -250,7 +250,7 @@ showChannels = p.Results.ChannelLabels;
 hold off
 
 
-itemsToDelete={'BA_area_mrk','Eye','ProbeOpt','OptLabel','ProbeSrc','ProbeSrcLabel','ProbeDet','ProbeDetLabel','Scatter1020','Label1020','ScatterCurve','OptLines','BrainRef'};
+itemsToDelete={'BrainVoxel','BA_area_mrk','Eye','ProbeOpt','OptLabel','ProbeSrc','ProbeSrcLabel','ProbeDet','ProbeDetLabel','Scatter1020','Label1020','ScatterCurve','OptLines','BrainRef'};
 
 
 for i=1:length(itemsToDelete)
@@ -623,6 +623,42 @@ end
 %    % legend(legendStr);
 % 
 % end
+
+showVoxelBrain=false;
+
+if(showVoxelBrain)
+    mni_t1=load('mni_t1.mat');
+    mni_t1=mni_t1.mni_t1;
+    center=[90,126,181-72];
+    szM=size(mni_t1);
+    mni_t1_x=(1:szM(1))-center(1)-1;
+    mni_t1_y=(szM(2):-1:1)-center(2)-1;
+    mni_t1_z=(1:szM(3))-center(3);
+    
+    nnzMNI=find(mni_t1>0);
+    nnzMNIvals=(mni_t1(nnzMNI));
+    
+    
+    
+    [bdx,bdy,bdz] = ind2sub(size(mni_t1),nnzMNI);
+    
+    bdx=bdx-center(1)-1;
+    bdy=mni_t1_y(bdy)';
+    bdz=mni_t1_z(bdz)'*-1;
+    
+    voxelRes=10;
+    [bdxyz,b]=unique(round([bdx,bdz,bdy]/voxelRes)*voxelRes,'rows');
+    nnzMNIvals=nnzMNIvals(b);
+    
+    [X,Y,Z] = meshgrid(mni_t1_x,mni_t1_y,mni_t1_z);
+    
+    for i=1:255
+        h=scatter3(bdxyz(nnzMNIvals==i,1),bdxyz(nnzMNIvals==i,3),bdxyz(nnzMNIvals==i,2),30*voxelRes,'MarkerFaceColor',repmat(i/255,3,1),'MarkerEdgeColor','none','HandleVisibility','off');
+        h.Tag='BrainVoxel';
+        hold on
+    end
+end
+
 
 
 if(~all(dataEmpty))
@@ -1286,7 +1322,7 @@ if(p.Results.showReference)
     imgCoord3=[imgXY(1)*imgRes,-imgXY(2)*imgRes,0]*rotX;
     imgCoord4=[-imgXY(1)*imgRes,-imgXY(2)*imgRes,0]*rotX;
     
-   xImage = [imgCoord1(1)+xMid imgCoord2(1)+xMid; imgCoord3(1)+xMid imgCoord4(1)+xMid]*xStretch+xOffset;       % The x data for the image corners
+    xImage = [imgCoord1(1)+xMid imgCoord2(1)+xMid; imgCoord3(1)+xMid imgCoord4(1)+xMid]*xStretch+xOffset;       % The x data for the image corners
     yImage = [imgCoord1(2)+yMid imgCoord2(2)+yMid; imgCoord3(2)+yMid imgCoord4(2)+yMid]*yStretch+yOffset;            % The y data for the image corners
     zImage = [imgCoord1(3)+zMid imgCoord2(3)+zMid; imgCoord3(3)+zMid imgCoord4(3)+zMid]*zStretch+zOffset;   % The z data for the image corners
 
