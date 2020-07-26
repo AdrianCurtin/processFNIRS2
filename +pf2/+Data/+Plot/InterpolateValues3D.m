@@ -78,6 +78,7 @@ addParameter(p, 'useTalairach', false, @islogical); % Otherwise will default to 
 addParameter(p, 'BrodmannAreas', false, validBrodmann); % Colors in Brodmann areas
 addParameter(p, 'BA_cmp', @lines, validColormap); % Colors in Brodmann areas
 addParameter(p, 'useVoxelBrodmannAreas', false, @islogical); % Colors in Brodmann areas
+addParameter(p, 'showVoxelBrain', false, @islogical); % Colors in Brodmann areas
 
 parse(p,varargin{:});
 
@@ -624,9 +625,8 @@ end
 % 
 % end
 
-showVoxelBrain=false;
 
-if(showVoxelBrain)
+if(p.Results.showVoxelBrain)
     mni_t1=load('mni_t1.mat');
     mni_t1=mni_t1.mni_t1;
     center=[90,126,181-72];
@@ -640,23 +640,69 @@ if(showVoxelBrain)
     
     
     
-    [bdx,bdy,bdz] = ind2sub(size(mni_t1),nnzMNI);
+    [mnx,mny,mnz] = ind2sub(size(mni_t1),nnzMNI);
     
-    bdx=bdx-center(1)-1;
-    bdy=mni_t1_y(bdy)';
-    bdz=mni_t1_z(bdz)'*-1;
+    mnx=mnx-center(1)-1;
+    mny=mni_t1_y(mny)';
+    mnz=mni_t1_z(mnz)'*-1;
     
-    voxelRes=10;
-    [bdxyz,b]=unique(round([bdx,bdz,bdy]/voxelRes)*voxelRes,'rows');
+    voxelRes=5;
+    [mnxyz,b]=unique(round([mnx,mnz,mny]/voxelRes)*voxelRes,'rows');
     nnzMNIvals=nnzMNIvals(b);
     
     [X,Y,Z] = meshgrid(mni_t1_x,mni_t1_y,mni_t1_z);
     
+    
+    if(p.Results.useVoxelBrodmannAreas)
+
+        brdm=load('brodmann.mat');
+        brdm=brdm.brdm;
+        
+        brdm=brdm(:,:,end:-1:1);
+
+        %center=[90,126,72];
+        szB=size(brdm);
+
+        brodmannRes=voxelRes;
+
+        BA_areas=[9,10,46];
+
+        brainColmap=p.Results.BA_cmp(length(BA_areas));
+
+
+        for i=1:length(BA_areas)
+             bdI=find(brdm==BA_areas(i));
+             [bdx,bdy,bdz] = ind2sub(size(brdm),bdI);
+             
+             bdx=bdx-center(1)-1;
+             bdy=mni_t1_y(bdy)'+1;
+             bdz=mni_t1_z(bdz)'*-1;
+
+             [bdxyz,b_bd]=unique(round([bdx,bdz,bdy]/brodmannRes)*brodmannRes,'rows');
+             
+
+             bd_mni_intensity=mni_t1(bdI);
+             scattercols=brainColmap(i,:).*(double(bd_mni_intensity(b_bd))/255/3+0.66);
+             %h=plotCube(bdxyz(:,1),bdxyz(:,3),bdxyz(:,2),brodmannRes,brainColmap(i,:));
+             h=scatter3(bdxyz(:,1),bdxyz(:,3),bdxyz(:,2),50*brodmannRes,scattercols,'filled');
+             h.DisplayName=sprintf('BA%i',BA_areas(i));
+             h.Tag='BA_area_mrk';
+            hold on
+        end
+
+        nnzMNIvals(ismember(brdm,BA_areas))=0;
+        
+    end
+    
+
     for i=1:255
-        h=scatter3(bdxyz(nnzMNIvals==i,1),bdxyz(nnzMNIvals==i,3),bdxyz(nnzMNIvals==i,2),30*voxelRes,'MarkerFaceColor',repmat(i/255,3,1),'MarkerEdgeColor','none','HandleVisibility','off');
+        % h=plotCube(mnxyz(nnzMNIvals==i,1),mnxyz(nnzMNIvals==i,3),mnxyz(nnzMNIvals==i,2),voxelRes,repmat(i/255,1,3));
+        h=scatter3(mnxyz(nnzMNIvals==i,1),mnxyz(nnzMNIvals==i,3),mnxyz(nnzMNIvals==i,2),30*voxelRes,repmat(i/255,1,3),'filled','HandleVisibility','off');
         h.Tag='BrainVoxel';
         hold on
     end
+    
+    
 end
 
 
@@ -788,7 +834,7 @@ if(~all(dataEmpty))
 else
     Cs = repmat(brainColor, size(mdl.v, 1), 1);
     
-    if(showBrodmann)
+    if(showBrodmann&&~p.Results.showVoxelBrain)
       
         
         brainColmap=[brainColor;p.Results.BA_cmp(length(BA_areas));];
@@ -816,9 +862,9 @@ else
                       bdy=bdy-center(3);
                      bdxyz=unique(round([bdx,bdz,bdy]/brodmannRes)*brodmannRes,'rows');
                      hold on
-                     h=scatter3(bdxyz(:,1),bdxyz(:,2),bdxyz(:,3),50*brodmannRes,'square','MarkerFaceColor',brainColmap(i,:),'MarkerEdgeColor','none');
-                     h.DisplayName=sprintf('BA%i',BA_areas(i));
-                     h.Tag='BA_area_mrk';
+                     %h=scatter3(bdxyz(:,1),bdxyz(:,2),bdxyz(:,3),50*brodmannRes,'square','MarkerFaceColor',brainColmap(i,:),'MarkerEdgeColor','none');
+                    % h.DisplayName=sprintf('BA%i',BA_areas(i));
+                    % h.Tag='BA_area_mrk';
     
                 end
 
@@ -861,41 +907,43 @@ else
     end
 end
 
+if(~p.Results.showVoxelBrain)
+    brainHndl=findobj(gca,'Type','Patch','Tag','Brain');
 
-brainHndl=findobj(gca,'Type','Patch','Tag','Brain');
+    if(isempty(brainHndl))
+       brainHndl=gca; 
+       cameratoolbar
+        hold off
+        if(~isempty(p.Results.brainLineColor)&&all(~isnan(p.Results.brainLineColor)))
+            brainHndl=patch(brainHndl,'vertices', mdl.v, 'faces', mdl.f,'FaceVertexCData',Cs,'FaceColor','interp',...
+                'AmbientStrength',ka, 'DiffuseStrength', kd, 'SpecularStrength',ks, ...
+                'EdgeColor', p.Results.brainLineColor,'FaceAlpha', p.Results.brainAlpha,'LineStyle', '-');
+        else
+            brainHndl=patch(brainHndl,'vertices', mdl.v, 'faces', mdl.f,'FaceVertexCData',Cs,'FaceColor','interp',...
+                'AmbientStrength',ka, 'DiffuseStrength', kd, 'SpecularStrength',ks, ...
+                'LineStyle', 'None','FaceAlpha', p.Results.brainAlpha);
+        end
 
-if(isempty(brainHndl))
-   brainHndl=gca; 
-   cameratoolbar
-    hold off
-    if(~isempty(p.Results.brainLineColor)&&all(~isnan(p.Results.brainLineColor)))
-        brainHndl=patch(brainHndl,'vertices', mdl.v, 'faces', mdl.f,'FaceVertexCData',Cs,'FaceColor','interp',...
-            'AmbientStrength',ka, 'DiffuseStrength', kd, 'SpecularStrength',ks, ...
-            'EdgeColor', p.Results.brainLineColor,'FaceAlpha', p.Results.brainAlpha,'LineStyle', '-');
+            brainHndl.Tag='Brain';
+            brainHndl.DisplayName='Brain';
+            brainHndl.HandleVisibility='off';
+            hold on;
+
+
     else
-        brainHndl=patch(brainHndl,'vertices', mdl.v, 'faces', mdl.f,'FaceVertexCData',Cs,'FaceColor','interp',...
-            'AmbientStrength',ka, 'DiffuseStrength', kd, 'SpecularStrength',ks, ...
-            'LineStyle', 'None','FaceAlpha', p.Results.brainAlpha);
+
+        if(~isempty(p.Results.brainLineColor)&&all(~isnan(p.Results.brainLineColor)))
+            set(brainHndl,'vertices', mdl.v, 'faces', mdl.f,'FaceVertexCData',Cs,'FaceColor','interp',...
+                'AmbientStrength',ka, 'DiffuseStrength', kd, 'SpecularStrength',ks, ...
+                'EdgeColor', p.Results.brainLineColor,'FaceAlpha', p.Results.brainAlpha,'LineStyle', '-');
+        else
+           set(brainHndl,'vertices', mdl.v, 'faces', mdl.f,'FaceVertexCData',Cs,'FaceColor','interp',...
+               'AmbientStrength',ka, 'DiffuseStrength', kd, 'SpecularStrength',ks, ...
+               'LineStyle', 'None','FaceAlpha', p.Results.brainAlpha);
+        end
+
     end
 
-        brainHndl.Tag='Brain';
-        brainHndl.DisplayName='Brain';
-        brainHndl.HandleVisibility='off';
-        hold on;
-        
-
-else
-        
-    if(~isempty(p.Results.brainLineColor)&&all(~isnan(p.Results.brainLineColor)))
-        set(brainHndl,'vertices', mdl.v, 'faces', mdl.f,'FaceVertexCData',Cs,'FaceColor','interp',...
-            'AmbientStrength',ka, 'DiffuseStrength', kd, 'SpecularStrength',ks, ...
-            'EdgeColor', p.Results.brainLineColor,'FaceAlpha', p.Results.brainAlpha,'LineStyle', '-');
-    else
-       set(brainHndl,'vertices', mdl.v, 'faces', mdl.f,'FaceVertexCData',Cs,'FaceColor','interp',...
-           'AmbientStrength',ka, 'DiffuseStrength', kd, 'SpecularStrength',ks, ...
-           'LineStyle', 'None','FaceAlpha', p.Results.brainAlpha);
-    end
-    
 end
 
 
