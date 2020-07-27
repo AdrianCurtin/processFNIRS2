@@ -68,7 +68,7 @@ addParameter(p, 'bufferDistance', nan, validScalarPosNumOrNan); %In a grid, this
 addParameter(p, 'includeSS', true, @islogical);
 addParameter(p, 'showReference', false, @islogical);
 addParameter(p, 'showScattering', false, @islogical);
-addParameter(p, 'scatteringFactor', 2, validScalarPosNumOrNan);
+addParameter(p, 'scatteringFactor', 1, validScalarPosNumOrNan);
 addParameter(p, 'useEEG', false, @islogical);
 
 parse(p,varargin{:});
@@ -231,8 +231,15 @@ if(show1020)
     
     if(p.Results.useEEG)
        probeInfo = {};
-       idx = arrayfun(@(x) find(strcmp(c1020.Electrode, x)), labels);
-       data2plot = data2plot(idx);
+       if(islogical(p.Results.I1020_labels))
+           idx = 1:height(c1020);
+       else
+           [a,idx] = ismember(labels, c1020.Electrode);
+           if(any(~a))
+                warning("%s are invalid labels", evalc("disp(labels(~a))"));
+           end
+       end
+       data2plot = data2plot(idx(idx > 0));
        probeInfo.OptPos3DX = c1020.tx;
        probeInfo.OptPos3DY = c1020.ty;
        probeInfo.OptPos3DZ = c1020.tz;
@@ -469,7 +476,7 @@ end
 %    %camlight(lht,0,180); 
 % end
 
-if(~dataEmpty)
+
 C=data2plot;
 
 num_vertices = size(mdl.v, 1);
@@ -488,6 +495,7 @@ end
 [d, ind] = min(dist_array, [], 2);
 ind(d > max_distance_2) = 0;
 
+if(~dataEmpty)
 c_min = nanmin(C, [], 'all');
 c_max = nanmax(C, [], 'all');
 if twosided
@@ -785,21 +793,35 @@ if(p.Results.showScattering)
     optPos = [probeInfo.TableOpt.Pos3D_x, probeInfo.TableOpt.Pos3D_y, probeInfo.TableOpt.Pos3D_z];
     optSrcPos = srcPos(probeInfo.TableOpt.SrcIdx, :);
     optDetPos = detPos(probeInfo.TableOpt.DetIdx, :);
+    scatteringFactor = p.Results.scatteringFactor;
     for i=1:length(optSrcPos)
        s = optSrcPos(i,:);
        d = optDetPos(i,:);
        o = optPos(i,:);
        t = linspace(0, pi, 16);
        
+       influencePoints = mdl.v(ind == i, :);
+       target = mean(influencePoints);
+       
+       if(isnan(target))
+           continue;
+       end
+       
        % formula for ellipse: C + a cos(theta) U + b sin(theta) V
        b = norm(s - d)/2;
-       a = p.Results.scatteringFactor * b;
+       a = 2 * scatteringFactor * b;
        U = s - d;
        U = U / norm(U);
-       V = camtarget-o;
+       V = target-o;
        V = V / norm(V);
-       points = o + b*cos(t)' .* U + a*sin(t)' .* V; 
-       plot3(points(:,1), points(:,2), points(:,3), 'k', 'LineWidth', 1);
+       
+       line = @(t, r) o + b*cos(t)' .* U + r*a*sin(t)' .* V;
+       points1 = line(t, 1);
+       points2 = line(t, 1.25);
+       points3 = line(t, 0.75);
+       plot3(points1(:,1), points1(:,2), points1(:,3), 'k', 'LineWidth', 1);
+       plot3(points2(:,1), points2(:,2), points2(:,3), '--k', 'LineWidth', 1);
+       plot3(points3(:,1), points3(:,2), points3(:,3), '--k', 'LineWidth', 1);
     end
 end
 
