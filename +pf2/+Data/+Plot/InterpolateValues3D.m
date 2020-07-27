@@ -646,7 +646,7 @@ if(p.Results.showVoxelBrain)
     mny=mni_t1_y(mny)';
     mnz=mni_t1_z(mnz)'*-1;
     
-    voxelRes=5;
+    voxelRes=1;
     [mnxyz,b]=unique(round([mnx,mnz,mny]/voxelRes)*voxelRes,'rows');
     nnzMNIvals=nnzMNIvals(b);
     
@@ -675,7 +675,7 @@ if(p.Results.showVoxelBrain)
              [bdx,bdy,bdz] = ind2sub(size(brdm),bdI);
              
              bdx=bdx-center(1)-1;
-             bdy=mni_t1_y(bdy)'+1;
+             bdy=mni_t1_y(bdy)'+2;
              bdz=mni_t1_z(bdz)'*-1;
 
              [bdxyz,b_bd]=unique(round([bdx,bdz,bdy]/brodmannRes)*brodmannRes,'rows');
@@ -694,15 +694,17 @@ if(p.Results.showVoxelBrain)
         
     end
     
-
+   
     for i=1:255
-        % h=plotCube(mnxyz(nnzMNIvals==i,1),mnxyz(nnzMNIvals==i,3),mnxyz(nnzMNIvals==i,2),voxelRes,repmat(i/255,1,3));
+        %h=plotCube(mnxyz(nnzMNIvals==i,1),mnxyz(nnzMNIvals==i,3),mnxyz(nnzMNIvals==i,2),voxelRes,repmat(i/255,1,3));
         h=scatter3(mnxyz(nnzMNIvals==i,1),mnxyz(nnzMNIvals==i,3),mnxyz(nnzMNIvals==i,2),30*voxelRes,repmat(i/255,1,3),'filled','HandleVisibility','off');
         h.Tag='BrainVoxel';
         hold on
     end
     
-    
+%     h=plotCube(mnxyz(:,1),mnxyz(:,3),mnxyz(:,2),voxelRes,[0.7,0.7,0.7]);
+%     h.Tag='BrainVoxel';
+%     hold on
 end
 
 

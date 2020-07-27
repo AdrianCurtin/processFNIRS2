@@ -37,4 +37,15 @@ elementNodes_mapped=repmat(elementNodes,numCubes,1);
 elementNodes_mult=repmat(0:numCubes-1,6,1);
 elementNodes_mapped=repmat(elementNodes_mult(:),1,4)*8+elementNodes_mapped;
 
-h=patch('Faces', elementNodes_mapped, 'Vertices', nodeCoordinates_mapped,'FaceColor',faceColor,'EdgeColor','none');
+cleanUp=true;
+if(cleanUp)
+    [nodeCoordinates_mapped,uF,uI]=unique(nodeCoordinates_mapped,'rows');
+    elementNodes_mapped=uI(elementNodes_mapped);
+end
+
+ka=0.825;
+kd=0.4;
+ks=0.2;
+
+
+h=patch('Faces', elementNodes_mapped, 'Vertices', nodeCoordinates_mapped,'FaceColor',faceColor,'EdgeColor','none','AmbientStrength',ka, 'DiffuseStrength', kd, 'SpecularStrength',ks);
