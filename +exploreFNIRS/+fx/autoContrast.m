@@ -157,7 +157,7 @@ cRows=[];  %Contrast rows (for ftest)
 cAnvGrp=[]; %Whic
 cName={};
 nRows=0;
-isV0=[];
+isV0=logical(0);
 
 for s=1:length(sigAnvNames)  %Look for contrasts within each term
    curAnvIdx=sigAnvIdx(s); 
@@ -444,4 +444,9 @@ pVal_corr=pVal(:).*uCounts(:);
 pVal_corr(pVal_corr>1)=1;
 
 contrastTable=table(deltaE',SD_p',F',df',df2',pVal',pVal_corr,sig',cRows(uNameIdx,:),'VariableNames',{'deltaE','SD','F','df1','df2','pVal','pVal_corr','sig','coefContrasts'},'RowNames',cName(uNameIdx)');
+
+
+%Sorts with vs 0. on top
+contrastTable=[contrastTable(isV0,:);contrastTable(~isV0,:)];
+
 
