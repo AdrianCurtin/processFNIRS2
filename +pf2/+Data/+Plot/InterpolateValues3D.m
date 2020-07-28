@@ -593,39 +593,7 @@ if(islogical(p.Results.BrodmannAreas)&&p.Results.BrodmannAreas||isnumeric(p.Resu
 else
     showBrodmann=false;
 end
-% 
-% if(showBrodmann)
-%     brdm=load('brodmann.mat');
-%     brdm=brdm.brodmann;
-% 
-%     center=[90,126,72];
-%     szB=size(brdm);
-% 
-%     brodmannRes=1;
-% 
-%     hold off
-%     cols=lines(length(bd_Areas));
-%     
-%     bigbd=[];
-%     bigbdidx=[];
-%     legendStr={};
-%     for i=1:length(bd_Areas)
-%          bdI=find(brdm==BA_areas(i));
-%          [bdx,bdz,bdy] = ind2sub(size(brdm),bdI);
-%          bdx=(szB(1)-center(1)-bdx);
-%          bdz=szB(2)-center(2)-bdz;
-%           bdy=bdy-center(3);
-%          bdxyz=unique(round([bdx,bdz,bdy]/brodmannRes)*brodmannRes,'rows');
-%          bigbd=[bigbd;bdxyz];
-%          bigbdidx=[bigbdidx;ones(length(bdx),1)*BA_areas(i)];
-%         %hold on
-%          %scatter3(bdxyz(:,1),bdxyz(:,2),bdxyz(:,3),50*brodmannRes,'MarkerFaceColor',cols(i,:),'MarkerEdgeColor','none');
-%        % legendStr{i}=sprintf('BA%i',i);
-%     end
-%     
-%    % legend(legendStr);
-% 
-% end
+
 
 
 if(p.Results.showVoxelBrain)
@@ -735,7 +703,7 @@ if(p.Results.showVoxelBrain)
     else
 
 
-        nnzMNI=mni_t1>0.&~ismember(brdm,BA_areas);
+        nnzMNI=mni_t1>0;%.&~ismember(brdm,BA_areas);
         nnzMNIvals=(mni_t1(nnzMNI));
 
         [mnx,mny,mnz] = ind2sub(size(mni_t1),find(nnzMNI));
