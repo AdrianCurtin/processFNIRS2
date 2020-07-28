@@ -133,7 +133,7 @@ elseif(isstruct(varargin{1}))
         pf2ChannelCheck.overwriteExisting=varargin{3};
     end
 elseif((isstring(varargin{1})||ischar(varargin{1}))&&length(varargin)>1)
-    pf2ChannelCheck.nirsData=processFNIRS2.Import.ImportNIR(varargin{2},true,false);
+    pf2ChannelCheck.nirsData=pf2.Import.ImportNIR(varargin{2},true,false);
     
      if(isempty(pf2ChannelCheck.nirsData)||~isfield(pf2ChannelCheck.nirsData,'raw'))
        error('Empty dataset'); 
@@ -364,19 +364,32 @@ pf2ChannelCheckHandles.chCurAxesHandle=handles.chAxes;
 uiP=handles.uipanel_arranged;
   
 
-if(~isfield(probInfo,'OptLayout2D'))
+if(~isfield(probInfo,'OptLayout2D_ss')&&~isfield(probInfo,'OptLayout2D'))
     error('Unable to find 2D Optode Layout: Please build layout first');
 end
 
 
-for c=1:length(probInfo.OptLayout2D)
-     pf2ChannelCheckHandles.chAxesHandles{c} = axes(uiP);
-     plot([1:20],[1:20]);
-     pf2ChannelCheckHandles.chAxesHandles{c}.OuterPosition=probInfo.OptLayout2D{c};
-     set(pf2ChannelCheckHandles.chAxesHandles{c},'Tag',sprintf('ChAxes%i',c));
-     
-     pf2ChannelCheckHandles.chAxesHandles{c}.ButtonDownFcn = @myupdatefcn;
+if(isfield(probInfo,'OptLayout2D_ss'))
+    for c=1:length(probInfo.OptLayout2D_ss)
+         pf2ChannelCheckHandles.chAxesHandles{c} = axes(uiP);
+         plot([1:20],[1:20]);
+         pf2ChannelCheckHandles.chAxesHandles{c}.OuterPosition=probInfo.OptLayout2D_ss{c};
+         set(pf2ChannelCheckHandles.chAxesHandles{c},'Tag',sprintf('ChAxes%i',c));
+
+         pf2ChannelCheckHandles.chAxesHandles{c}.ButtonDownFcn = @myupdatefcn;
+    end
+else
+    for c=1:length(probInfo.OptLayout2D)
+         pf2ChannelCheckHandles.chAxesHandles{c} = axes(uiP);
+         plot([1:20],[1:20]);
+         pf2ChannelCheckHandles.chAxesHandles{c}.OuterPosition=probInfo.OptLayout2D{c};
+         set(pf2ChannelCheckHandles.chAxesHandles{c},'Tag',sprintf('ChAxes%i',c));
+
+         pf2ChannelCheckHandles.chAxesHandles{c}.ButtonDownFcn = @myupdatefcn;
+    end
 end
+
+
 
 pf2ChannelCheckHandles.text_channelStats=handles.text_channelStats;
 

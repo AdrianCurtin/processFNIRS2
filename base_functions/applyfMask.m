@@ -5,6 +5,6 @@ global PF2
 
 warning('Please replace with processFNIRS.Data.ApplyChannelMask');
 
-fnir=processFNIRS2.Data.ApplyChannelMask(fnir);
+fnir=pf2.Data.ApplyChannelMask(fnir);
 
 end

@@ -184,17 +184,17 @@ cfgRawImportPath=p.Results.ImportRawMethods;
 cfgOxyImportPath=p.Results.ImportOxyMethods;
 
 if(~strcmp(cfgRawImportPath,'NA'))
-    processFNIRS2.Methods.Raw.ImportMethods(cfgRawImportPath);
+    pf2.Methods.Raw.ImportMethods(cfgRawImportPath);
 end
 
 if(~strcmp(cfgOxyImportPath,'NA'))
-    processFNIRS2.Methods.Oxy.ImportMethods(cfgOxyImportPath);
+    pf2.Methods.Oxy.ImportMethods(cfgOxyImportPath);
 end
 
 
 if(isempty(data)&&isempty(varargin))
     
-    myNIRsample=processFNIRS2.Import.ImportSampleData;
+    myNIRsample=pf2.Import.SampleData;
     disp('No input arguments given, program is being loaded in with sample data');
     outputData.ShowGUI=true;
     data=myNIRsample;
