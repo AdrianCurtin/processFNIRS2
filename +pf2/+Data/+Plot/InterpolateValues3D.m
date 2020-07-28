@@ -503,7 +503,7 @@ else
     cerebro_mdl=cerebro_mdl.cerebro_mdl;
 end
 
-%lighting('phong')
+%
 
 camproj('perspective');
 axis square
@@ -582,6 +582,8 @@ if(isempty(lht))
     lht.Position=[0,100,0];
     
     shading interp
+    
+    lighting('phong');
    
     %camlight(lht,0, 180);
 else
@@ -636,82 +638,128 @@ end
 if(p.Results.showVoxelBrain)
     mni_t1=load('mni_t1.mat');
     mni_t1=mni_t1.mni_t1;
-    center=[90,126,181-72];
+    center=[90,126,72];
     szM=size(mni_t1);
-    mni_t1_x=(1:szM(1))-center(1)-1;
-    mni_t1_y=(szM(2):-1:1)-center(2)-1;
-    mni_t1_z=(1:szM(3))-center(3);
     
-    nnzMNI=find(mni_t1>0);
-    nnzMNIvals=(mni_t1(nnzMNI));
-    
-    
-    
-    [mnx,mny,mnz] = ind2sub(size(mni_t1),nnzMNI);
-    
-    mnx=mnx-center(1)-1;
-    mny=mni_t1_y(mny)';
-    mnz=mni_t1_z(mnz)'*-1;
     
     voxelRes=1;
-    [mnxyz,b]=unique(round([mnx,mnz,mny]/voxelRes)*voxelRes,'rows');
-    nnzMNIvals=nnzMNIvals(b);
     
-    [X,Y,Z] = meshgrid(mni_t1_x,mni_t1_y,mni_t1_z);
+    mni_t1_x=(1:voxelRes:szM(1))-center(1)-1;
+    mni_t1_y=(szM(2):-1*voxelRes:1)-center(2)-1;
+    mni_t1_z=(1:voxelRes:szM(3))-center(3)-1;
     
+    
+    %mni_t1=mni_t1(1:voxelRes:end,1:voxelRes:end,end:voxelRes*-1:1);
+    
+    
+    
+
+   
     
     if(p.Results.useVoxelBrodmannAreas)
 
         brdm=load('brodmann.mat');
         brdm=brdm.brdm;
         
-        brdm=brdm(:,:,end:-1:1);
+        brdm=brdm(1:voxelRes:end,1:voxelRes:end,1:voxelRes:end);
 
         %center=[90,126,72];
         szB=size(brdm);
 
         brodmannRes=voxelRes;
 
-        BA_areas=[9,10,46];
+        %BA_areas=[9,10,46];
 
         brainColmap=p.Results.BA_cmp(length(BA_areas));
 
-
+        
         for i=1:length(BA_areas)
              bdI=find(brdm==BA_areas(i));
+             
+             if(~any(bdI))
+                 continue;
+             end
+             
              [bdx,bdy,bdz] = ind2sub(size(brdm),bdI);
              
-             bdx=bdx-center(1)-1;
-             bdy=mni_t1_y(bdy)'+2;
-             bdz=mni_t1_z(bdz)'*-1;
+             bd_mni_intensity=mni_t1(bdI);
+             
+             
+             
+             mni_t1(bdI)=0;
 
-             [bdxyz,b_bd]=unique(round([bdx,bdz,bdy]/brodmannRes)*brodmannRes,'rows');
+                         
+             
+             bdx=mni_t1_x(bdx)';
+             bdy=mni_t1_y(bdy)';
+             bdz=mni_t1_z(bdz)';
+
+             bdxyz=[bdx,bdz,bdy];
              
 
-             bd_mni_intensity=mni_t1(bdI);
-             scattercols=brainColmap(i,:).*(double(bd_mni_intensity(b_bd))/255/3+0.66);
-             %h=plotCube(bdxyz(:,1),bdxyz(:,3),bdxyz(:,2),brodmannRes,brainColmap(i,:));
-             h=scatter3(bdxyz(:,1),bdxyz(:,3),bdxyz(:,2),50*brodmannRes,scattercols,'filled');
+             
+             
+             scattercols=brainColmap(i,:).*(double(bd_mni_intensity)/255/3+0.66);
+             h=plotCube(bdxyz(:,1),bdxyz(:,3),bdxyz(:,2),brodmannRes,scattercols);
+             %h=scatter3(bdxyz(:,1),bdxyz(:,3),bdxyz(:,2),50*brodmannRes,scattercols,'filled');
              h.DisplayName=sprintf('BA%i',BA_areas(i));
              h.Tag='BA_area_mrk';
             hold on
+            legend();
         end
+        lighting('none');
+             bdI=brdm>0.&~ismember(brdm,BA_areas);
+             [bdx,bdy,bdz] = ind2sub(size(brdm),find(bdI));
+             
+             bd_mni_intensity=mni_t1(bdI);
+             
+             mni_t1(bdI)=0;
 
-        nnzMNIvals(ismember(brdm,BA_areas))=0;
+                         
+             
+             bdx=mni_t1_x(bdx)';
+             bdy=mni_t1_y(bdy)';
+             bdz=mni_t1_z(bdz)';
+
+             bdxyz=[bdx,bdz,bdy];
+             
+
+             
+             
+             scattercols=brainColmap(i,:).*(double(bd_mni_intensity)/255/3+0.66);
+             h=plotCube(bdxyz(:,1),bdxyz(:,3),bdxyz(:,2),brodmannRes,scattercols);
+             %h=scatter3(bdxyz(:,1),bdxyz(:,3),bdxyz(:,2),50*brodmannRes,scattercols,'filled');
+             h.DisplayName=sprintf('BA%i',BA_areas(i));
+             h.Tag='BA_area_mrk';
+             
+            hold on
+            legend();
         
-    end
-    
-   
-    for i=1:255
-        %h=plotCube(mnxyz(nnzMNIvals==i,1),mnxyz(nnzMNIvals==i,3),mnxyz(nnzMNIvals==i,2),voxelRes,repmat(i/255,1,3));
-        h=scatter3(mnxyz(nnzMNIvals==i,1),mnxyz(nnzMNIvals==i,3),mnxyz(nnzMNIvals==i,2),30*voxelRes,repmat(i/255,1,3),'filled','HandleVisibility','off');
+        
+        %nnzMNIvals=nnzMNIvals(b);
+
+        
+    else
+
+
+        nnzMNI=mni_t1>0.&~ismember(brdm,BA_areas);
+        nnzMNIvals=(mni_t1(nnzMNI));
+
+        [mnx,mny,mnz] = ind2sub(size(mni_t1),find(nnzMNI));
+
+        mnx=mni_t1_x(mnx)';
+        mny=mni_t1_y(mny)';
+        mnz=mni_t1_z(mnz)';
+
+
+        mnxyz=[mnx,mnz,mny];
+
+        h=plotCube(mnxyz(:,1),mnxyz(:,3),mnxyz(:,2),voxelRes,repmat(nnzMNIvals,1,3));
         h.Tag='BrainVoxel';
+        h.HandleVisibility='off';
+        lighting('none');
         hold on
     end
-    
-%     h=plotCube(mnxyz(:,1),mnxyz(:,3),mnxyz(:,2),voxelRes,[0.7,0.7,0.7]);
-%     h.Tag='BrainVoxel';
-%     hold on
 end
 
 
