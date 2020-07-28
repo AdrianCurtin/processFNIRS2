@@ -244,7 +244,7 @@ else
 end
 useHighRes = p.Results.useHighRes;
 show1020 = p.Results.useEEG || islogical(p.Results.I1020_labels) && p.Results.I1020_labels || ~islogical(p.Results.I1020_labels) && ~isempty(p.Results.I1020_labels);
-showSD = p.Results.SDLabels && ~p.Results.useEEG;
+showSD = p.Results.SDLabels;
 showChannels = p.Results.ChannelLabels;
 
 %cla
@@ -262,50 +262,6 @@ for i=1:length(itemsToDelete)
 end
 
 probeInfo=[];
-
-
-
-if(show1020)
-    c1020=load('cerebro_1020_table.mat'); %estimation of 10-20 coordinates
-    c1020=c1020.c1020;
-    
-    if(p.Results.useTalairach)
-            txyz=pf2_base.external.icbm_fsl2tal([c1020.mx,c1020.my,c1020.mz]);
-        
-           c1020.x = txyz(:,1);
-           c1020.y = txyz(:,2);
-           c1020.z = txyz(:,3);
-       else
-           c1020.x = c1020.mx;
-           c1020.y = c1020.my;
-           c1020.z = c1020.mz;
-    end
-    
-    c1020 = c1020(~isnan(c1020.x), :);
-    if ~islogical(p.Results.I1020_labels)
-        labels = p.Results.I1020_labels;
-        c1020 = c1020(ismember(c1020.Electrode, labels), :);
-    end   
-    
-    if(p.Results.useEEG)
-       probeInfo = {};
-       idx = arrayfun(@(x) find(strcmp(c1020.Electrode, x)), labels);
-       data2plot_concat = data2plot_concat(idx);
-       
-       
-       
-       probeInfo.OptPos3DX = c1020.x;
-       probeInfo.OptPos3DY = c1020.y;
-       probeInfo.OptPos3DZ = c1020.z;
-       
-       probeInfo.NumOptodes = height(c1020);
-       probeInfo.IsShortSeparation = zeros(1, probeInfo.NumOptodes);
-       probeInfo.OptPos3D_mean = nanmean([probeInfo.OptPos3DX probeInfo.OptPos3DY probeInfo.OptPos3DZ]);
-       if(isnan(p.Results.bufferDistance))
-          bufferDistance = 40/sqrt(2); 
-       end
-    end
-end
 
 if(multiprobe)
     num_devices = length(fNIR);
@@ -376,8 +332,8 @@ if(multiprobe)
     probeInfo.NumShortSeparation = sum(probeInfo.IsShortSeparation);
     probeInfo.NumOptodes = length(probeInfo.OptPosX);
 else
-    if(p.Results.useEEG)
-       %pass
+    if(p.Results.useEEG && isempty(fNIR))
+       probeDraw = {};
     elseif(isempty(fNIR)&&isfield(setF,'device'))
         cfgFilePath=setF.device.cfg.File;
         if(~isfield(setF.device.Probe{1},'OptLayout2D'))
@@ -393,7 +349,7 @@ else
         cfgFilePath='';
     end
 
-    if(~isempty(probeInfo) || p.Results.useEEG)
+    if(~isempty(probeInfo) || isempty(cfgFilePath) && p.Results.useEEG)
 
     elseif(isempty(cfgFilePath)||~contains(cfgFilePath,'.cfg'))
 
@@ -423,6 +379,51 @@ else
     end
 end
 
+if(show1020)
+    c1020=load('cerebro_1020_table.mat'); %estimation of 10-20 coordinates
+    c1020=c1020.c1020;
+    
+    if(p.Results.useTalairach)
+            txyz=pf2_base.external.icbm_fsl2tal([c1020.mx,c1020.my,c1020.mz]);
+        
+           c1020.x = txyz(:,1);
+           c1020.y = txyz(:,2);
+           c1020.z = txyz(:,3);
+       else
+           c1020.x = c1020.mx;
+           c1020.y = c1020.my;
+           c1020.z = c1020.mz;
+    end
+    
+    c1020 = c1020(~isnan(c1020.x), :);
+    if ~islogical(p.Results.I1020_labels)
+        labels = p.Results.I1020_labels;
+        c1020 = c1020(ismember(c1020.Electrode, labels), :);
+    end   
+    
+    if(p.Results.useEEG)
+       probeDraw = probeInfo;
+       probeInfo = {};
+       idx = arrayfun(@(x) find(strcmp(c1020.Electrode, x)), labels);
+       data2plot_concat = data2plot_concat(idx);
+       
+       probeInfo.OptPos3DX = c1020.x;
+       probeInfo.OptPos3DY = c1020.y;
+       probeInfo.OptPos3DZ = c1020.z;
+       
+       probeInfo.NumOptodes = height(c1020);
+       probeInfo.IsShortSeparation = zeros(1, probeInfo.NumOptodes);
+       probeInfo.OptPos3D_mean = nanmean([probeInfo.OptPos3DX probeInfo.OptPos3DY probeInfo.OptPos3DZ]);
+       if(isnan(p.Results.bufferDistance))
+          bufferDistance = 40/sqrt(2); 
+       end
+    end
+end
+
+if(p.Results.useEEG)
+    tempProbe = probeInfo;
+    probeInfo =  probeDraw;
+end
 include_ss=p.Results.includeSS;
 if(include_ss&&probeInfo.NumOptodes>length(data2plot_concat)&&probeInfo.NumOptodes-probeInfo.NumShortSeparation==length(data2plot_concat))
    include_ss=false;
@@ -436,7 +437,9 @@ numOptodes=length(channelList);
 
 srcIdx=probeInfo.TableSD.Type=='Src';
 detIdx=~srcIdx;
-srcPos = [probeInfo.TableSD.Pos3D_x(srcIdx), probeInfo.TableSD.Pos3D_y(srcIdx), probeInfo.TableSD.Pos3D_z(srcIdx)];   
+srcPos = [probeInfo.TableSD.Pos3D_x(srcIdx), probeInfo.TableSD.Pos3D_y(srcIdx), probeInfo.TableSD.Pos3D_z(srcIdx)];
+srcLabels = probeInfo.TableSD.Label(srcIdx);
+detLabels = probeInfo.TableSD.Label(detIdx);
 detPos = [probeInfo.TableSD.Pos3D_x(detIdx), probeInfo.TableSD.Pos3D_y(detIdx), probeInfo.TableSD.Pos3D_z(detIdx)];
 optPos = [probeInfo.TableOpt.Pos3D_x, probeInfo.TableOpt.Pos3D_y, probeInfo.TableOpt.Pos3D_z];
 
@@ -460,7 +463,11 @@ probeInfo.TableOpt.V=camtarget-probeInfo.TableOpt.OptPos;
 probeInfo.TableOpt.V=probeInfo.TableOpt.V./vecnorm(probeInfo.TableOpt.V')';
 probeInfo.TableOpt.VectorDir=probeInfo.TableOpt.OptPos+probeInfo.TableOpt.V.*probeInfo.TableOpt.sdDist/3;
 
-
+if(p.Results.useEEG)
+    probeInfo = tempProbe;
+    numOptodes = probeInfo.NumOptodes;
+    includeChannels = ones(1, numOptodes);
+end
 
 if(~all(dataEmpty) && length(data2plot_concat)~=numOptodes)
     error('Must have a value for all optodes');
@@ -1006,40 +1013,40 @@ if(showChannels&&isfield(probeInfo, 'TableOpt'))
     end
 end
 
-if(plotFNIRS_SD&&isfield(probeInfo,'SrcPos3DX'))
-    srcIdx=probeInfo.TableSD.Type=='Src';
-    detIdx=~srcIdx;
+if(plotFNIRS_SD)
+    %srcIdx=probeInfo.TableSD.Type=='Src';
+    %detIdx=~srcIdx;
     
     
-    srcPos = [probeInfo.TableSD.Pos3D_x(srcIdx), probeInfo.TableSD.Pos3D_y(srcIdx), probeInfo.TableSD.Pos3D_z(srcIdx)];
+    %srcPos = [probeInfo.TableSD.Pos3D_x(srcIdx), probeInfo.TableSD.Pos3D_y(srcIdx), probeInfo.TableSD.Pos3D_z(srcIdx)];
     
-     if(p.Results.useTalairach)
-         srcPos=pf2_base.external.icbm_fsl2tal(srcPos);
-     end
+     %if(p.Results.useTalairach)
+     %    srcPos=pf2_base.external.icbm_fsl2tal(srcPos);
+     %end
     
     if(~isempty(srcColor) && (isnumeric(srcColor) && ~any(isnan(srcColor)) || ~ismissing(srcColor)))
         h = scatter3(srcPos(:,1),srcPos(:,2),srcPos(:,3),mrkScaleFactor*p.Results.labelfontsize,'filled',srcColor);
         h.Tag=sprintf('ProbeSrc');
         h.DisplayName='Source';
     end
-    h=text(srcPos(:,1), srcPos(:,2), srcPos(:,3), probeInfo.TableSD.Label(srcIdx), 'HorizontalAlignment', 'center','VerticalAlignment', 'middle', "FontSize", p.Results.labelfontsize, 'color', p.Results.labelfontcolor);
+    h=text(srcPos(:,1), srcPos(:,2), srcPos(:,3), srcLabels, 'HorizontalAlignment', 'center','VerticalAlignment', 'middle', "FontSize", p.Results.labelfontsize, 'color', p.Results.labelfontcolor);
     for i=1:length(h)
         h(i).Tag='ProbeSrcLabel';
     end
     hold on
     
-    detPos = [probeInfo.TableSD.Pos3D_x(detIdx), probeInfo.TableSD.Pos3D_y(detIdx), probeInfo.TableSD.Pos3D_z(detIdx)];
+    %detPos = [probeInfo.TableSD.Pos3D_x(detIdx), probeInfo.TableSD.Pos3D_y(detIdx), probeInfo.TableSD.Pos3D_z(detIdx)];
     
-    if(p.Results.useTalairach)
-        detPos=pf2_base.external.icbm_fsl2tal(detPos);
-    end
+    %if(p.Results.useTalairach)
+    %    detPos=pf2_base.external.icbm_fsl2tal(detPos);
+    %end
    
     if(~isempty(detColor) && (isnumeric(detColor) && ~any(isnan(detColor)) || ~ismissing(detColor)))
         h = scatter3(detPos(:,1), detPos(:,2), detPos(:,3), mrkScaleFactor*p.Results.labelfontsize, 'filled', detColor);
         h.Tag=sprintf('ProbeDet');
         h.DisplayName='Detector';
     end
-    h=text(detPos(:,1), detPos(:,2), detPos(:,3), probeInfo.TableSD.Label(detIdx), 'HorizontalAlignment', 'center','VerticalAlignment', 'middle', "FontSize", p.Results.labelfontsize, 'color', p.Results.labelfontcolor);
+    h=text(detPos(:,1), detPos(:,2), detPos(:,3), detLabels, 'HorizontalAlignment', 'center','VerticalAlignment', 'middle', "FontSize", p.Results.labelfontsize, 'color', p.Results.labelfontcolor);
     for i=1:length(h)
         h(i).Tag='ProbeDetLabel';
     end
