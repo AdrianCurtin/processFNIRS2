@@ -13,6 +13,7 @@ p=inputParser;
 addOptional(p, 'BrodmannAreas', false, validBrodmann); % Colors in Brodmann areas
 addParameter(p, 'BA_cmp', @lines, validColormap); % Colors in Brodmann areas
 addParameter(p, 'show_cursor', true,@islogical); % Colors in Brodmann areas
+addParameter(p, 'show3D', true,@islogical); % Colors in Brodmann areas
 addParameter(p, 'cursor_color', [1,0,0],@numeric); % Colors in Brodmann areas
 
 
@@ -33,7 +34,13 @@ end
 
 
 mni_t1=load('mni_t1.mat');
+
+
+
 mni_t1=mni_t1.mni_t1;
+
+
+
 center=[90,126,72];
 szM=size(mni_t1);
 
@@ -52,7 +59,7 @@ tickSize=20;
 
 
 
-xTicks=tickSize*(floor((szM(1)-center(1))/tickSize):-1:floor(-center(1)/tickSize));
+xTicks=tickSize*(floor(-center(1)/tickSize)+1:1:floor((szM(1)-center(1))/tickSize));
 yTicks=tickSize*(floor((szM(2)-center(2))/tickSize):-1:floor(-center(2)/tickSize));
 zTicks=tickSize*(floor((szM(3)-center(3))/tickSize):-1:floor(-center(3)/tickSize));
 
@@ -70,12 +77,14 @@ mniX_composite=repmat(mniX_img,1,1,3);
 mniY_composite=repmat(mniY_img,1,1,3);
 mniZ_composite=repmat(mniZ_img,1,1,3);
 
-show3D=false;
+show3D=p.Results.show3D;
 
 if(show3D)
     subplotX=2;
     subplotY=2;
     subplot(subplotX,subplotY,4);
+    hold off;
+    cla;
 else
     subplotX=1;
     subplotY=3;
@@ -194,11 +203,11 @@ if(showBrodmann)
 
 
 
-         scattercols=brainColmap(i,:).*(double(bd_mni_intensity)/255/3+0.66);
+         scattercols=repmat((double(bd_mni_intensity)/255),1,3);
          h=plotCube(bdxyz(:,1),bdxyz(:,3),bdxyz(:,2),brodmannRes,scattercols);
          %h=scatter3(bdxyz(:,1),bdxyz(:,3),bdxyz(:,2),50*brodmannRes,scattercols,'filled');
-         h.DisplayName=sprintf('BA%i',BA_areas(i));
-         h.Tag='BA_area_mrk';
+         %h.DisplayName=sprintf('BA%i',BA_areas(i));
+         %h.Tag='BA_area_mrk';
 
         hold on
         legend();
@@ -241,6 +250,17 @@ end
 
 if(p.Results.show_cursor)
     cursor_color=p.Results.cursor_color*255;
+    
+    
+    if(show3D)
+        plot3([mni_x,mni_x],[szM(2)-center(2),-center(2)],[mni_z,mni_z],'color',cursor_color/255,'handleVisibility','off');
+        plot3([szM(1)-center(1),-center(1)],[mni_y,mni_y],[mni_z,mni_z],'color',cursor_color/255,'handleVisibility','off');
+        plot3([mni_x,mni_x],[mni_y,mni_y],[szM(3)-center(3),-center(3)],'color',cursor_color/255,'handleVisibility','off');
+       hold off;
+    end
+    
+    
+    
     mniX_composite(mni_y_ind,:)=reshape(repmat(cursor_color,szM(1),1),szM(3)*3,1);
     mniX_composite(:,mni_z_ind,:)=repmat([255,0,0],szM(2),1);
     
@@ -265,7 +285,7 @@ ylabel('Z');
 title(sprintf('MNI X = %.0f',mni_x));
 
 subplot(subplotX,subplotY,2);
-image(imrotate(mniY_composite,90));
+image(flip(imrotate(mniY_composite,90),2));
 xticklabels(xTicks);
 yticklabels(zTicks);
 xticks(tickLocX);
@@ -273,6 +293,8 @@ yticks(tickLocZ);
 axis('image');
 xlabel('X');
 ylabel('Z');
+text(szM(1)-20,szM(3)-20,'L','Color','white');
+text(20,szM(3)-20,'R','Color','white');
 title(sprintf('MNI Y = %.0f',mni_y));
 
 subplot(subplotX,subplotY,3);
@@ -284,99 +306,9 @@ xticks(tickLocX);
 yticks(tickLocY);
 xlabel('X');
 ylabel('Y');
+text(szM(1)-20,szM(2)-20,'R','Color','white');
+text(20,szM(2)-20,'L','Color','white');
 axis('image');
 title(sprintf('MNI Z = %.0f',mni_z));
 
 end
-
-% 
-% 
-% A=imread('MNI_T1_1mm_stripped_xy.png');
-% 
-% A=reshape(A,217,181,181);
-% 
-% A=permute(A,[2,1,3]);
-% 
-% A=A(:,:,end:-1:1);
-% 
-% szA=size(A);
-% 
-% center=[90,126,72];
-% 
-% imX=reshapeIM(A(szA(1)-center(1)-x,:,:));
-% 
-% imY=reshapeIM(A(:,szA(2)-center(2)-y,:));
-% 
-% 
-% imZ=reshapeIM(A(:,:,szA(3)-center(3)-z));
-% 
-% imgCoord1=[szA(1)-center(1),y,szA(3)-center(3)];
-% imgCoord2=[0-center(1),y,szA(3)-center(3)];
-% imgCoord3=[szA(1)-center(1),y,0-center(3)];
-% imgCoord4=[0-center(1),y,0-center(3)];
-% 
-% xImage = [imgCoord1(1) imgCoord2(1); imgCoord3(1) imgCoord4(1)];       % The x data for the image corners
-% yImage = [imgCoord1(2) imgCoord2(2); imgCoord3(2) imgCoord4(2)];            % The y data for the image corners
-% zImage = [imgCoord1(3) imgCoord2(3); imgCoord3(3) imgCoord4(3)];   % The z data for the image corners
-% 
-% [imY3,imYA]=makeAlpha(imY);
-% 
-% hold on
-% 
-% h=surf(xImage,yImage,zImage,...    % Plot the surface
-%      'CData',imY3,...
-%      'FaceColor','texturemap','FaceLighting','none','FaceAlpha','texturemap','AlphaData',imYA,'EdgeColor','none');
-% 
-% imgCoord1=[x,szA(2)-center(2),szA(3)-center(3)];
-% imgCoord2=[x,0-center(2),szA(3)-center(3)];
-% imgCoord3=[x,szA(2)-center(2),0-center(3)];
-% imgCoord4=[x,0-center(2),0-center(3)];
-% 
-% xImage = [imgCoord1(1) imgCoord2(1); imgCoord3(1) imgCoord4(1)];       % The x data for the image corners
-% yImage = [imgCoord1(2) imgCoord2(2); imgCoord3(2) imgCoord4(2)];            % The y data for the image corners
-% zImage = [imgCoord1(3) imgCoord2(3); imgCoord3(3) imgCoord4(3)];   % The z data for the image corners
-% 
-% 
-% [imX3,imXA]=makeAlpha(imX);
-% h=surf(xImage,yImage,zImage,...    % Plot the surface
-%      'CData',imX3,...
-%      'FaceColor','texturemap','FaceLighting','none','FaceAlpha','texturemap','AlphaData',imXA,'EdgeColor','none');
-%  
-% 
-% imgCoord1=[szA(1)-center(1),szA(2)-center(2),z];
-% imgCoord2=[0-center(1),szA(2)-center(2),z];
-% imgCoord3=[szA(1)-center(1),0-center(2),z];
-% imgCoord4=[0-center(1),0-center(2),z];
-% 
-% xImage = [imgCoord1(1) imgCoord2(1); imgCoord3(1) imgCoord4(1)];       % The x data for the image corners
-% yImage = [imgCoord1(2) imgCoord2(2); imgCoord3(2) imgCoord4(2)];            % The y data for the image corners
-% zImage = [imgCoord1(3) imgCoord2(3); imgCoord3(3) imgCoord4(3)];   % The z data for the image corners
-% 
-% 
-% [imZ3,imZA]=makeAlpha(imZ);
-% h=surf(xImage,yImage,zImage,...    % Plot the surface
-%      'CData',imZ3,...
-%      'FaceColor','texturemap','FaceLighting','none','FaceAlpha','texturemap','AlphaData',imZA,'EdgeColor','none'); 
-% hold off
-% 
-% axis square
-% 
-% end
-% 
-% 
-% function im=reshapeIM(im)
-% 
-% szIm=size(im);
-% imIdx=(szIm==1);
-% 
-% im=reshape(im,szIm(~imIdx))';
-% 
-% end
-% 
-% function [im3,imAlpha]=makeAlpha(im)
-% 
-% im3=repmat(im,[1,1,3]);
-% 
-% imAlpha=im(:,:)~=0;
-% 
-% end
