@@ -213,7 +213,7 @@ if(showBrodmann)
         legend();
         
         
-        axis('square');
+        axis('image');
     
     end
 
@@ -246,6 +246,12 @@ else
     
 
     
+end
+
+if(show3D)
+   xlabel('X (R/L)');
+   zlabel('Z (U/D)');
+   ylabel('Y (Ros/Caud)');
 end
 
 if(p.Results.show_cursor)

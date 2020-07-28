@@ -506,10 +506,7 @@ end
 %
 
 camproj('perspective');
-axis square
-%axis off
-axis equal
-axis tight
+axis('image');
 
 plotFNIRS_SD=showSD;
 plot1020=show1020;
