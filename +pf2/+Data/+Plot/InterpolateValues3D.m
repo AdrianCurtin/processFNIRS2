@@ -30,7 +30,7 @@ validCamPosition = @(x) any(validatestring(x, validCamPositions)) || isnumeric(x
 defaultColormap = 'hot';
 defaultColormapLow = 'cool';
 validColormapLabels = {'hot', 'autumn', 'jet', 'gray', 'copper', 'bone', 'cool', 'winter', 'pink'};
-validColormap = @(x) isa(x,'function_handle')||ishandle(x)||any(validatestring(x, validColormapLabels));
+validColormap = @(x) isa(x,'function_handle') || any(ishandle(x)) || any(validatestring(x, validColormapLabels));
 
 if(numel(varargin) > 0 && isa(varargin{1},'matlab.graphics.axis.Axes')) %If first argument is axes then move to front
    ax=varargin{1};
@@ -334,6 +334,7 @@ if(multiprobe)
 else
     if(p.Results.useEEG && isempty(fNIR))
        probeDraw = {};
+       cfgFilePath = '';
     elseif(isempty(fNIR)&&isfield(setF,'device'))
         cfgFilePath=setF.device.cfg.File;
         if(~isfield(setF.device.Probe{1},'OptLayout2D'))
@@ -420,53 +421,58 @@ if(show1020)
     end
 end
 
-if(p.Results.useEEG)
+if(p.Results.useEEG && ~isempty(probeDraw))
     tempProbe = probeInfo;
     probeInfo =  probeDraw;
 end
-include_ss=p.Results.includeSS;
-if(include_ss&&probeInfo.NumOptodes>length(data2plot_concat)&&probeInfo.NumOptodes-probeInfo.NumShortSeparation==length(data2plot_concat))
-   include_ss=false;
-   warning('Not enough data for all channels, ignoring short separation channels');
+if(isfield(probeInfo, 'TableOpt'))
+    include_ss=p.Results.includeSS;
+    if(include_ss&&probeInfo.NumOptodes>length(data2plot_concat)&&probeInfo.NumOptodes-probeInfo.NumShortSeparation==length(data2plot_concat))
+        include_ss=false;
+        warning('Not enough data for all channels, ignoring short separation channels');
+    end
+    
+    includeChannels=probeInfo.TableOpt.HasData&(include_ss||~probeInfo.IsShortSeparation);
+    
+    channelList=probeInfo.ChannelList(includeChannels);
+    numOptodes=length(channelList);
+    
+    srcIdx=probeInfo.TableSD.Type=='Src';
+    detIdx=~srcIdx;
+    srcPos = [probeInfo.TableSD.Pos3D_x(srcIdx), probeInfo.TableSD.Pos3D_y(srcIdx), probeInfo.TableSD.Pos3D_z(srcIdx)];
+    srcLabels = probeInfo.TableSD.Label(srcIdx);
+    detLabels = probeInfo.TableSD.Label(detIdx);
+    detPos = [probeInfo.TableSD.Pos3D_x(detIdx), probeInfo.TableSD.Pos3D_y(detIdx), probeInfo.TableSD.Pos3D_z(detIdx)];
+    optPos = [probeInfo.TableOpt.Pos3D_x, probeInfo.TableOpt.Pos3D_y, probeInfo.TableOpt.Pos3D_z];
+    
+    if(p.Results.useTalairach)
+        optPos=pf2_base.external.icbm_fsl2tal(optPos);
+        detPos=pf2_base.external.icbm_fsl2tal(detPos);
+        srcPos=pf2_base.external.icbm_fsl2tal(srcPos);
+    end
+    
+    probeInfo.TableOpt.OptPos=optPos;
+    probeInfo.TableOpt.SrcPos=srcPos(probeInfo.TableOpt.SrcIdx, :);
+    probeInfo.TableOpt.DetPos=detPos(probeInfo.TableOpt.DetIdx, :);
+    probeInfo.TableOpt.sd=probeInfo.TableOpt.SrcPos-probeInfo.TableOpt.DetPos;
+    probeInfo.TableOpt.sdDist=sqrt(sum(probeInfo.TableOpt.sd.^2,2));
+
+    % formula for ellipse: C + a cos(theta) U + b sin(theta) V
+    probeInfo.TableOpt.b(:,1)=probeInfo.TableOpt.sdDist/2;
+    probeInfo.TableOpt.a(:,1)=probeInfo.TableOpt.b*p.Results.scatteringFactor;
+    probeInfo.TableOpt.U=probeInfo.TableOpt.sd./vecnorm(probeInfo.TableOpt.sd')';
+    probeInfo.TableOpt.V=camtarget-probeInfo.TableOpt.OptPos;
+    probeInfo.TableOpt.V=probeInfo.TableOpt.V./vecnorm(probeInfo.TableOpt.V')';
+    probeInfo.TableOpt.VectorDir=probeInfo.TableOpt.OptPos+probeInfo.TableOpt.V.*probeInfo.TableOpt.sdDist/3;
+
 end
-
-includeChannels=probeInfo.TableOpt.HasData&(include_ss||~probeInfo.IsShortSeparation);
-
-channelList=probeInfo.ChannelList(includeChannels);
-numOptodes=length(channelList);
-
-srcIdx=probeInfo.TableSD.Type=='Src';
-detIdx=~srcIdx;
-srcPos = [probeInfo.TableSD.Pos3D_x(srcIdx), probeInfo.TableSD.Pos3D_y(srcIdx), probeInfo.TableSD.Pos3D_z(srcIdx)];
-srcLabels = probeInfo.TableSD.Label(srcIdx);
-detLabels = probeInfo.TableSD.Label(detIdx);
-detPos = [probeInfo.TableSD.Pos3D_x(detIdx), probeInfo.TableSD.Pos3D_y(detIdx), probeInfo.TableSD.Pos3D_z(detIdx)];
-optPos = [probeInfo.TableOpt.Pos3D_x, probeInfo.TableOpt.Pos3D_y, probeInfo.TableOpt.Pos3D_z];
-
-if(p.Results.useTalairach)
-     optPos=pf2_base.external.icbm_fsl2tal(optPos);
-     detPos=pf2_base.external.icbm_fsl2tal(detPos);
-     srcPos=pf2_base.external.icbm_fsl2tal(srcPos);
-end
- 
-probeInfo.TableOpt.OptPos=optPos;
-probeInfo.TableOpt.SrcPos=srcPos(probeInfo.TableOpt.SrcIdx, :);
-probeInfo.TableOpt.DetPos=detPos(probeInfo.TableOpt.DetIdx, :);
-probeInfo.TableOpt.sd=probeInfo.TableOpt.SrcPos-probeInfo.TableOpt.DetPos;
-probeInfo.TableOpt.sdDist=sqrt(sum(probeInfo.TableOpt.sd.^2,2));
-
-% formula for ellipse: C + a cos(theta) U + b sin(theta) V
-probeInfo.TableOpt.b(:,1)=probeInfo.TableOpt.sdDist/2;
-probeInfo.TableOpt.a(:,1)=probeInfo.TableOpt.b*p.Results.scatteringFactor;
-probeInfo.TableOpt.U=probeInfo.TableOpt.sd./vecnorm(probeInfo.TableOpt.sd')';
-probeInfo.TableOpt.V=camtarget-probeInfo.TableOpt.OptPos;
-probeInfo.TableOpt.V=probeInfo.TableOpt.V./vecnorm(probeInfo.TableOpt.V')';
-probeInfo.TableOpt.VectorDir=probeInfo.TableOpt.OptPos+probeInfo.TableOpt.V.*probeInfo.TableOpt.sdDist/3;
 
 if(p.Results.useEEG)
-    probeInfo = tempProbe;
+    if(~isempty(probeDraw))
+        probeInfo = tempProbe;
+    end
     numOptodes = probeInfo.NumOptodes;
-    includeChannels = ones(1, numOptodes);
+    includeChannels = ~isnan(probeInfo.OptPos3DX);
 end
 
 if(~all(dataEmpty) && length(data2plot_concat)~=numOptodes)
