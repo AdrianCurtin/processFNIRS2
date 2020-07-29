@@ -79,6 +79,8 @@ addParameter(p, 'BrodmannAreas', false, validBrodmann); % Colors in Brodmann are
 addParameter(p, 'BA_cmp', @lines, validColormap); % Colors in Brodmann areas
 addParameter(p, 'useVoxelBrodmannAreas', false, @islogical); % Colors in Brodmann areas
 addParameter(p, 'showVoxelBrain', false, @islogical); % Colors in Brodmann areas
+centerCamPos=[0,-20,0];
+addParameter(p, 'camTarget', centerCamPos, validCamPosition); % Colors in Brodmann areas
 
 parse(p,varargin{:});
 
@@ -459,7 +461,7 @@ probeInfo.TableOpt.sdDist=sqrt(sum(probeInfo.TableOpt.sd.^2,2));
 probeInfo.TableOpt.b(:,1)=probeInfo.TableOpt.sdDist/2;
 probeInfo.TableOpt.a(:,1)=probeInfo.TableOpt.b*p.Results.scatteringFactor;
 probeInfo.TableOpt.U=probeInfo.TableOpt.sd./vecnorm(probeInfo.TableOpt.sd')';
-probeInfo.TableOpt.V=camtarget-probeInfo.TableOpt.OptPos;
+probeInfo.TableOpt.V=centerCamPos-probeInfo.TableOpt.OptPos;
 probeInfo.TableOpt.V=probeInfo.TableOpt.V./vecnorm(probeInfo.TableOpt.V')';
 probeInfo.TableOpt.VectorDir=probeInfo.TableOpt.OptPos+probeInfo.TableOpt.V.*probeInfo.TableOpt.sdDist/3;
 
@@ -1078,27 +1080,35 @@ ylabel('y (R/C)');
 zlabel('z (U/D)');
 
 
-
-switch(p.Results.initCamPosition)
-    case 'auto'
-        campos(nanmean(optPos,1)/norm(nanmean(optPos,1))*1500);   %Front facing
-    case 'front'
-        campos([0,1200,0]);
-    case 'back'
-        campos([0,-1200,0]);
-    case 'top'
-        campos([0,0,1500]);
-    case 'left'
-        campos([-1200,0,0]);  
-    case 'right'
-        campos([1200,0,0]);
-    case 'face'
-        campos([0,1200,-300]);
-    otherwise
-        campos(OptPos3D_mean/norm(OptPos3D_mean)*1500);  %Front facing
+if(isnumeric(p.Results.initCamPosition))
+    campos(p.Results.initCamPosition);
+else 
+    switch(p.Results.initCamPosition)
+        case 'auto'
+            campos(nanmean(optPos,1)/norm(nanmean(optPos,1))*1500);   %Front facing
+        case 'front'
+            campos([0,1200,0]);
+        case 'back'
+            campos([0,-1200,0]);
+        case 'top'
+            campos([0,0,1500]);
+        case 'left'
+            campos([-1200,0,0]);  
+        case 'right'
+            campos([1200,0,0]);
+        case 'face'
+            campos([0,1200,-300]);
+        otherwise
+            warning('Invalid camera position');
+            campos(OptPos3D_mean/norm(OptPos3D_mean)*1500);  %Front facing
+    end
 end
-%campos(OptPos3D_mean*25);  %Front facing
-camtarget([0,-20,0]);
+
+
+
+
+campPosTarget=p.Results.CamTarget;
+camtarget(campPosTarget);
 
 lht2=findobj(gca,'Type','Light','Tag','Rear');
 if(isempty(lht2))
