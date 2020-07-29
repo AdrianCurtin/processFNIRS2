@@ -59,6 +59,7 @@ addParameter(p, 'labelfontsize', 10, validScalarPosNum);
 addParameter(p, 'labelfontcolor', 'k', validColor);
 addParameter(p, 'labelspherecolors', ["r", "y","w"]);
 addParameter(p, 'brainColor', [0.92, 0.68, 0.68], validColor);
+addParameter(p, 'voxelColor', [1, 1, 1], validColor);
 addParameter(p, 'brainAlpha', 1, validScalarPosNumOr0);
 addParameter(p, 'brainLineColor', [], validColor);
 addParameter(p, 'backgroundColor', [], validColor);
@@ -598,6 +599,7 @@ if(islogical(p.Results.BrodmannAreas)&&p.Results.BrodmannAreas||isnumeric(p.Resu
     end
 else
     showBrodmann=false;
+    BA_areas=[];
 end
 
 
@@ -605,17 +607,26 @@ end
 if(p.Results.showVoxelBrain)
     mni_t1=load('mni_t1.mat');
     mni_t1=mni_t1.mni_t1;
-    center=[90,126,72];
+    center=[91,127,73];
     szM=size(mni_t1);
     
     
     voxelRes=1;
     
-    mni_t1_x=(1:voxelRes:szM(1))-center(1)-1;
-    mni_t1_y=(szM(2):-1*voxelRes:1)-center(2)-1;
-    mni_t1_z=(1:voxelRes:szM(3))-center(3)-1;
-    
-    
+
+    x2mni=@(x) x-center(1);
+    y2mni=@(y) y-center(2);
+    z2mni=@(z) z-center(3);
+
+    xyz2mni=@(x,y,z) [x2mni(x),y2mni(y),z2mni(z)];
+
+    mni2x=@(mx) mx+center(1);
+    mni2y=@(my) my+center(2);
+    mni2z=@(mz) mz+center(3);
+
+    mni_t1_x=x2mni(1:voxelRes:szM(1));
+    mni_t1_y=y2mni(1:voxelRes:szM(2));
+    mni_t1_z=z2mni(1:voxelRes:szM(3));
     %mni_t1=mni_t1(1:voxelRes:end,1:voxelRes:end,end:voxelRes*-1:1);
     
     
@@ -633,74 +644,62 @@ if(p.Results.showVoxelBrain)
         %center=[90,126,72];
         szB=size(brdm);
 
+        
         brodmannRes=voxelRes;
 
         %BA_areas=[9,10,46];
 
-        brainColmap=p.Results.BA_cmp(length(BA_areas));
+        if(showBrodmann)
+            brainColmap=p.Results.BA_cmp(length(BA_areas));
 
         
-        for i=1:length(BA_areas)
-             bdI=find(brdm==BA_areas(i));
-             
-             if(~any(bdI))
-                 continue;
-             end
-             
-             [bdx,bdy,bdz] = ind2sub(size(brdm),bdI);
-             
-             bd_mni_intensity=mni_t1(bdI);
-             
-             
-             
-             mni_t1(bdI)=0;
+            for i=1:length(BA_areas)
+                 bdI=find(brdm==BA_areas(i));
 
-                         
-             
-             bdx=mni_t1_x(bdx)';
-             bdy=mni_t1_y(bdy)';
-             bdz=mni_t1_z(bdz)';
+                 if(~any(bdI))
+                     continue;
+                 end
 
-             bdxyz=[bdx,bdz,bdy];
-             
+                 [bdx,bdy,bdz] = ind2sub(size(brdm),bdI);
 
-             
-             
-             scattercols=brainColmap(i,:).*(double(bd_mni_intensity)/255/3+0.66);
-             h=plotCube(bdxyz(:,1),bdxyz(:,3),bdxyz(:,2),brodmannRes,scattercols);
-             %h=scatter3(bdxyz(:,1),bdxyz(:,3),bdxyz(:,2),50*brodmannRes,scattercols,'filled');
-             h.DisplayName=sprintf('BA%i',BA_areas(i));
-             h.Tag='BA_area_mrk';
-            hold on
-            legend();
+                 bd_mni_intensity=mni_t1(bdI);
+
+                 mni_t1(bdI)=0;
+
+
+                 bdxyz=xyz2mni(bdx,bdy,bdz);
+
+
+                 scattercols=brainColmap(i,:).*(double(bd_mni_intensity)/255/3+0.66);
+                 h=plotCube(bdxyz(:,1),bdxyz(:,2),bdxyz(:,3),brodmannRes,scattercols);
+                 %h=scatter3(bdxyz(:,1),bdxyz(:,3),bdxyz(:,2),50*brodmannRes,scattercols,'filled');
+                 h.DisplayName=sprintf('BA%i',BA_areas(i));
+                 h.Tag='BA_area_mrk';
+                hold on
+                legend();
+            end
         end
+        
         lighting('none');
-             bdI=brdm>0.&~ismember(brdm,BA_areas);
-             [bdx,bdy,bdz] = ind2sub(size(brdm),find(bdI));
-             
-             bd_mni_intensity=mni_t1(bdI);
-             
-             mni_t1(bdI)=0;
+         bdI=brdm>0.&~ismember(brdm,BA_areas);
+         [bdx,bdy,bdz] = ind2sub(size(brdm),find(bdI));
 
-                         
-             
-             bdx=mni_t1_x(bdx)';
-             bdy=mni_t1_y(bdy)';
-             bdz=mni_t1_z(bdz)';
+         bd_mni_intensity=mni_t1(bdI);
 
-             bdxyz=[bdx,bdz,bdy];
-             
+         mni_t1(bdI)=0;
+          bdxyz=xyz2mni(bdx,bdy,bdz);
 
-             
-             
-             scattercols=brainColmap(i,:).*(double(bd_mni_intensity)/255/3+0.66);
-             h=plotCube(bdxyz(:,1),bdxyz(:,3),bdxyz(:,2),brodmannRes,scattercols);
-             %h=scatter3(bdxyz(:,1),bdxyz(:,3),bdxyz(:,2),50*brodmannRes,scattercols,'filled');
-             h.DisplayName=sprintf('BA%i',BA_areas(i));
-             h.Tag='BA_area_mrk';
-             
-            hold on
-            legend();
+
+
+         scattercols=p.Results.voxelColor.*(double(bd_mni_intensity)/255);
+         h=plotCube(bdxyz(:,1),bdxyz(:,2),bdxyz(:,3),brodmannRes,scattercols);
+         %h=scatter3(bdxyz(:,1),bdxyz(:,3),bdxyz(:,2),50*brodmannRes,scattercols,'filled');
+         %h.DisplayName=sprintf('BA%i',BA_areas(i));
+         h.Tag='BrainVoxel';
+         h.HandleVisibility='off';
+
+        hold on
+        legend();
         
         
         %nnzMNIvals=nnzMNIvals(b);
@@ -714,14 +713,10 @@ if(p.Results.showVoxelBrain)
 
         [mnx,mny,mnz] = ind2sub(size(mni_t1),find(nnzMNI));
 
-        mnx=mni_t1_x(mnx)';
-        mny=mni_t1_y(mny)';
-        mnz=mni_t1_z(mnz)';
+        mnxyz=xyz2mni(mnx,mny,mnz);
 
 
-        mnxyz=[mnx,mnz,mny];
-
-        h=plotCube(mnxyz(:,1),mnxyz(:,3),mnxyz(:,2),voxelRes,repmat(nnzMNIvals,1,3));
+        h=plotCube(mnxyz(:,1),mnxyz(:,2),mnxyz(:,3),voxelRes,p.Results.voxelColor.*nnzMNIvals);
         h.Tag='BrainVoxel';
         h.HandleVisibility='off';
         lighting('none');
@@ -1107,7 +1102,7 @@ end
 
 
 
-campPosTarget=p.Results.CamTarget;
+campPosTarget=p.Results.camTarget;
 camtarget(campPosTarget);
 
 lht2=findobj(gca,'Type','Light','Tag','Rear');

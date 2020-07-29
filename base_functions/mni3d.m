@@ -10,12 +10,12 @@ validColormap = @(x) isa(x,'function_handle')||ishandle(x)||any(validatestring(x
 
 
 p=inputParser;
-addOptional(p, 'BrodmannAreas', false, validBrodmann); % Colors in Brodmann areas
-addParameter(p, 'BA_cmp', @lines, validColormap); % Colors in Brodmann areas
-addParameter(p, 'show_cursor', true,@islogical); % Colors in Brodmann areas
-addParameter(p, 'show3D', true,@islogical); % Colors in Brodmann areas
-addParameter(p, 'cursor_color', [1,0,0],@numeric); % Colors in Brodmann areas
-
+addOptional(p, 'BrodmannAreas', false, validBrodmann); % Brodmann areas to plot
+addParameter(p, 'BA_cmp', @lines, validColormap); % Colormap for Brodmann areas
+addParameter(p, 'show_cursor', true,@islogical); % Draw 3D lines indicating MNI positions
+addParameter(p, 'show3D', true,@islogical); % Draw full voxel brain
+addParameter(p, 'skip3D', false,@islogical); % Only update the lines if they've changed
+addParameter(p, 'cursor_color', [1,0,0],@numeric); % Color of MNI lines
 
 parse(p,varargin{:});
 
@@ -34,42 +34,48 @@ end
 
 
 mni_t1=load('mni_t1.mat');
-
-
-
 mni_t1=mni_t1.mni_t1;
 
+%mni_t1=flip(mni_t1,2);
 
-
-center=[90,126,72];
+center=[91,127,73];
 szM=size(mni_t1);
 
 
 voxelRes=1;
 
-mni_t1_x=(1:voxelRes:szM(1))-center(1);
-mni_t1_y=(szM(2):-1*voxelRes:1)-center(2)-1;
-mni_t1_z=(1:voxelRes:szM(3))-center(3)-1;
+x2mni=@(x) x-center(1);
+y2mni=@(y) y-center(2);
+z2mni=@(z) z-center(3);
 
+xyz2mni=@(x,y,z) [x2mni(x),y2mni(y),z2mni(z)];
+
+mni2x=@(mx) mx+center(1);
+mni2y=@(my) my+center(2);
+mni2z=@(mz) mz+center(3);
+
+mni_t1_x=x2mni(1:voxelRes:szM(1));
+mni_t1_y=y2mni(1:voxelRes:szM(2));
+mni_t1_z=z2mni(1:voxelRes:szM(3));
+
+
+% Not really necessary if Voxel size is 1
 mni_x_ind=find(mni_t1_x>=mni_x,1);
-mni_y_ind=find(mni_t1_y<=mni_y,1);
+mni_y_ind=find(mni_t1_y>=mni_y,1);
 mni_z_ind=find(mni_t1_z>=mni_z,1);
 
 tickSize=20;
 
+tickLocX=rem(center(1),tickSize)+tickSize*(0:floor(((szM(1)-rem(center(1),tickSize))/tickSize)));
+tickLocY=rem(center(2),tickSize)+tickSize*(0:floor(((szM(2)-rem(center(2),tickSize))/tickSize)));
+tickLocZ=rem(center(3),tickSize)+tickSize*(0:floor(((szM(3)-rem(center(3),tickSize))/tickSize)));
+
+xTicks=x2mni(tickLocX);
+yTicks=y2mni(tickLocY);
+zTicks=z2mni(tickLocZ);
 
 
-xTicks=tickSize*(floor(-center(1)/tickSize)+1:1:floor((szM(1)-center(1))/tickSize));
-yTicks=tickSize*(floor((szM(2)-center(2))/tickSize):-1:floor(-center(2)/tickSize));
-zTicks=tickSize*(floor((szM(3)-center(3))/tickSize):-1:floor(-center(3)/tickSize));
-
-tickLocX=rem(center(1),tickSize)+tickSize*(0:length(xTicks)-1);
-tickLocY=rem(center(2),tickSize)+tickSize*(0:length(yTicks)-1);
-tickLocZ=rem(szM(3)-center(3),tickSize)+tickSize*(0:length(zTicks)-1);
-
-%mni_t1=mni_t1(1:voxelRes:end,1:voxelRes:end,end:voxelRes*-1:1);
-
-mniX_img=reshape(mni_t1(szM(1)-mni_x_ind,:,:),size(mni_t1,2),size(mni_t1,3));
+mniX_img=reshape(mni_t1(mni_x_ind,:,:),size(mni_t1,2),size(mni_t1,3));
 mniY_img=reshape(mni_t1(:,mni_y_ind,:),size(mni_t1,1),size(mni_t1,3));
 mniZ_img=reshape(mni_t1(:,:,mni_z_ind),size(mni_t1,1),size(mni_t1,2));
 
@@ -78,6 +84,7 @@ mniY_composite=repmat(mniY_img,1,1,3);
 mniZ_composite=repmat(mniZ_img,1,1,3);
 
 show3D=p.Results.show3D;
+skip3D=p.Results.skip3D;
 
 if(show3D)
     subplotX=2;
@@ -95,7 +102,7 @@ if(showBrodmann)
     brdm=brdm.brdm;
 
     brdm=brdm(1:voxelRes:end,1:voxelRes:end,1:voxelRes:end);
-
+    
     %center=[90,126,72];
     szB=size(brdm);
 
@@ -153,24 +160,14 @@ if(showBrodmann)
          [bdx,bdy,bdz] = ind2sub(size(brdm),bdI);
 
          bd_mni_intensity=mni_t1(bdI);
-
-
-
-         mni_t1(bdI)=0;
-
          
+         %mni_t1(bdI)=0;
 
-         bdx=mni_t1_x(bdx)';
-         bdy=mni_t1_y(bdy)';
-         bdz=mni_t1_z(bdz)';
+         bdxyz=xyz2mni(bdx,bdy,bdz);
 
-         bdxyz=[bdx,bdz,bdy];
-
-        if(show3D)
-
-
+        if(show3D&&~skip3D)
              scattercols=brainColmap(i,:).*(double(bd_mni_intensity)/255/3+0.66);
-             h=plotCube(bdxyz(:,1),bdxyz(:,3),bdxyz(:,2),brodmannRes,scattercols);
+             h=plotCube(bdxyz(:,1),bdxyz(:,2),bdxyz(:,3),brodmannRes,scattercols);
              %h=scatter3(bdxyz(:,1),bdxyz(:,3),bdxyz(:,2),50*brodmannRes,scattercols,'filled');
 
 
@@ -183,31 +180,23 @@ if(showBrodmann)
         end
     end
     
-    if(show3D)
+    if(show3D&&~skip3D)
         lighting('none');
          bdI=brdm>0.&~ismember(brdm,BA_areas);
          [bdx,bdy,bdz] = ind2sub(size(brdm),find(bdI));
 
          bd_mni_intensity=mni_t1(bdI);
 
-         mni_t1(bdI)=0;
+         %mni_t1(bdI)=0;
 
-
-
-         bdx=mni_t1_x(bdx)';
-         bdy=mni_t1_y(bdy)';
-         bdz=mni_t1_z(bdz)';
-
-         bdxyz=[bdx,bdz,bdy];
-
-
-
+         bdxyz=xyz2mni(bdx,bdy,bdz);
 
          scattercols=repmat((double(bd_mni_intensity)/255),1,3);
-         h=plotCube(bdxyz(:,1),bdxyz(:,3),bdxyz(:,2),brodmannRes,scattercols);
+         h=plotCube(bdxyz(:,1),bdxyz(:,2),bdxyz(:,3),brodmannRes,scattercols);
          %h=scatter3(bdxyz(:,1),bdxyz(:,3),bdxyz(:,2),50*brodmannRes,scattercols,'filled');
          %h.DisplayName=sprintf('BA%i',BA_areas(i));
          %h.Tag='BA_area_mrk';
+         h.HandleVisibility='off';
 
         hold on
         legend();
@@ -222,26 +211,21 @@ if(showBrodmann)
 
 
 else
-    if(show3D)
+    if(show3D&&~skip3D)
 
         nnzMNI=mni_t1>0;%.&~ismember(brdm,BA_areas);
         nnzMNIvals=(mni_t1(nnzMNI));
 
         [mnx,mny,mnz] = ind2sub(size(mni_t1),find(nnzMNI));
 
-        mnx=mni_t1_x(mnx)';
-        mny=mni_t1_y(mny)';
-        mnz=mni_t1_z(mnz)';
+        mnxyz=xyz2mni(mnx,mny,mnz);
 
-
-        mnxyz=[mnx,mnz,mny];
-
-        h=plotCube(mnxyz(:,1),mnxyz(:,3),mnxyz(:,2),voxelRes,repmat(nnzMNIvals,1,3));
+        h=plotCube(mnxyz(:,1),mnxyz(:,2),mnxyz(:,3),voxelRes,repmat(nnzMNIvals,1,3));
         h.Tag='BrainVoxel';
         h.HandleVisibility='off';
         lighting('none');
         hold on
-        axis('square');
+        axis('image');
     end
     
 
@@ -250,8 +234,8 @@ end
 
 if(show3D)
    xlabel('X (R/L)');
-   zlabel('Z (U/D)');
    ylabel('Y (Ros/Caud)');
+   zlabel('Z (U/D)');
 end
 
 if(p.Results.show_cursor)
@@ -259,9 +243,31 @@ if(p.Results.show_cursor)
     
     
     if(show3D)
-        plot3([mni_x,mni_x],[szM(2)-center(2),-center(2)],[mni_z,mni_z],'color',cursor_color/255,'handleVisibility','off');
-        plot3([szM(1)-center(1),-center(1)],[mni_y,mni_y],[mni_z,mni_z],'color',cursor_color/255,'handleVisibility','off');
-        plot3([mni_x,mni_x],[mni_y,mni_y],[szM(3)-center(3),-center(3)],'color',cursor_color/255,'handleVisibility','off');
+        
+        item = findobj(gca, "Tag", 'XZ_line');
+        if(~isempty(item))
+            delete(item);
+        else
+            hold on;
+            h=plot3([mni_x,mni_x],[y2mni(szM(2)),y2mni(1)],[mni_z,mni_z],'color',cursor_color/255,'handleVisibility','off','linewidth',3);
+            h.Tag='XZ_line';
+        end
+
+        item = findobj(gca, "Tag", 'XZ_line');
+        if(~isempty(item))
+            delete(item);
+        else
+            h=plot3([x2mni(szM(1)),x2mni(0)],[mni_y,mni_y],[mni_z,mni_z],'color',cursor_color/255,'handleVisibility','off','linewidth',3);
+            h.Tag='YZ_line';
+        end
+        
+        item = findobj(gca, "Tag", 'XZ_line');
+        if(~isempty(item))
+            delete(item);
+        else
+            h=plot3([mni_x,mni_x],[mni_y,mni_y],[z2mni(szM(3)),z2mni(0)],'color',cursor_color/255,'handleVisibility','off','linewidth',3);
+            h.Tag='XY_line';
+        end
        hold off;
     end
     
@@ -271,11 +277,11 @@ if(p.Results.show_cursor)
     mniX_composite(:,mni_z_ind,:)=repmat([255,0,0],szM(2),1);
     
     
-    mniY_composite(szM(1)-mni_x_ind,:,:)=repmat(cursor_color,szM(1),1);
+    mniY_composite(mni_x_ind,:,:)=repmat(cursor_color,szM(1),1);
     mniY_composite(:,mni_z_ind,:)=repmat(cursor_color,szM(3),1);
     
     mniZ_composite(:,mni_y_ind,:)=repmat(cursor_color,szM(1),1);
-    mniZ_composite(szM(1)-mni_x_ind,:,:)=repmat(cursor_color,szM(2),1);
+    mniZ_composite(mni_x_ind,:,:)=repmat(cursor_color,szM(2),1);
     
 end
 
@@ -292,9 +298,9 @@ title(sprintf('MNI X = %.0f',mni_x));
 
 subplot(subplotX,subplotY,2);
 image(flip(imrotate(mniY_composite,90),2));
-xticklabels(xTicks);
+xticklabels(xTicks(end:-1:1));
 yticklabels(zTicks);
-xticks(tickLocX);
+xticks(sort(szM(1)-tickLocX));
 yticks(tickLocZ);
 axis('image');
 xlabel('X');
@@ -304,12 +310,13 @@ text(20,szM(3)-20,'R','Color','white');
 title(sprintf('MNI Y = %.0f',mni_y));
 
 subplot(subplotX,subplotY,3);
-image(flip(imrotate(mniZ_composite,-90),2));
+
+image(imrotate(mniZ_composite,90));
 
 xticklabels(xTicks);
-yticklabels(yTicks);
+yticklabels(yTicks(end:-1:1));
 xticks(tickLocX);
-yticks(tickLocY);
+yticks(sort(szM(2)-tickLocY));
 xlabel('X');
 ylabel('Y');
 text(szM(1)-20,szM(2)-20,'R','Color','white');

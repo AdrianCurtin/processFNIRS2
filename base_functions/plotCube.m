@@ -14,6 +14,12 @@ else
     replicateColor=false;
 end
 
+if(isnumeric(faceColor)&&numel(faceColor)==length(x))
+    faceColor=repmat(faceColor(:),1,3);
+end
+
+
+
 if(nargin<4)
     
     sz=1;
