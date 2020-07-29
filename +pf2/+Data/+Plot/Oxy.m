@@ -24,7 +24,6 @@ function [ figHandle ] = Oxy(fNIR,channels,showMarkers,bioMlist,baseline,ylimit,
 % rejectedLineProps will just be passed on to rejected Optodes
 %   (fchMask<rejectLevel)
 
-
 global PF2
 if(~isfield(PF2,'RejectLevel'))
     pf2_base.pf2_initialize();
@@ -157,7 +156,10 @@ idx2plot=ismember(probeInfo.ChannelList,channels);
 if(~isempty(channels))
     if(nargout>0)
         figHandle=figure(); 
+        clf(figHandle);
     else
+        figHandle=gcf;
+        clf(figHandle);
         %figure();
     end
 else
@@ -312,8 +314,8 @@ for(optIdx=1:length(channels))
     if(plotArranged)
         optPos=optLayout{optNum};
         optPos([2])=1-optPos([2])-optPos([4]); %flips y vertical axis
-        optPos([3,4])=optPos([3,4]).*[0.65,0.9];
-        optPos([1,2])=optPos([1,2])+0.03;
+        optPos([3,4])=optPos([3,4]).*[0.65,0.7];
+        optPos([1,2])=optPos([1,2])+[0.03,0.075];
         h{optIdx}= axes('Position',optPos,'Box','on');
         
     else
@@ -329,8 +331,6 @@ for(optIdx=1:length(channels))
     idx2plot=probeInfo.ChannelList==optNum;
     
     num2plot=sum(idx2plot);
-    
-
     
     if(oxyMaxValue>0&&oxyMinValue<0)
         zeroH=plot([tmin,tmax],[0,0],'--k','HandleVisibility','off');
