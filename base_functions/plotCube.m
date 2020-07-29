@@ -1,8 +1,21 @@
-function h=plotCube(x,y,z,sz,faceColor)
+function h=plotCube(x,y,z,varargin)
 
-if(nargin<5)
-    faceColor='red';
-end
+validColor = @(x) ischar(x) || isnumeric(x) && any(size(x) == 3);
+validScalarPosNum = @(x) isnumeric(x) && x>0;
+validScalarPosNumOr0 = @(x) isnumeric(x) && x>=0;
+
+p=inputParser;
+addOptional(p, 'pixelSize', 1, validScalarPosNum); % Brodmann areas to plot
+addOptional(p, 'faceColor', 'red', validColor); % Brodmann areas to plot
+addOptional(p, 'alpha', 1, validScalarPosNumOr0); % Brodmann areas to plot
+
+
+parse(p,varargin{:});
+
+faceColor=p.Results.faceColor;
+
+sz=p.Results.pixelSize;
+
 
 if(isnumeric(faceColor)&&size(faceColor,1)==length(x))
     replicateColor=true;
@@ -19,11 +32,6 @@ if(isnumeric(faceColor)&&numel(faceColor)==length(x))
 end
 
 
-
-if(nargin<4)
-    
-    sz=1;
-end
 
 nodeCoordinates=[0 0 0; 0 0 1; 1 0 1; 1 0 0; 0 1 0; 0 1 1; 1 1 1; 1 1 0; ];
 
@@ -200,8 +208,8 @@ ks=0.2;
 
 
 if(~isstring(faceColor))
-    h=patch('Faces', elementNodes_mapped, 'Vertices', nodeCoordinates_mapped,'FaceVertexCData',faceColor,'FaceColor','interp','EdgeColor','none','AmbientStrength',ka, 'DiffuseStrength', kd, 'SpecularStrength',ks);
+    h=patch('Faces', elementNodes_mapped, 'Vertices', nodeCoordinates_mapped,'FaceVertexCData',faceColor,'FaceColor','interp','EdgeColor','none','AmbientStrength',ka, 'DiffuseStrength', kd, 'SpecularStrength',ks,'FaceAlpha', p.Results.alpha);
 else
-    h=patch('Faces', elementNodes_mapped, 'Vertices', nodeCoordinates_mapped,'FaceColor',faceColor,'EdgeColor','none','AmbientStrength',ka, 'DiffuseStrength', kd, 'SpecularStrength',ks);
+    h=patch('Faces', elementNodes_mapped, 'Vertices', nodeCoordinates_mapped,'FaceColor',faceColor,'EdgeColor','none','AmbientStrength',ka, 'DiffuseStrength', kd, 'SpecularStrength',ks,'FaceAlpha', p.Results.alpha);
 
 end
