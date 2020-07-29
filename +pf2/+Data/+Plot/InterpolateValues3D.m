@@ -581,7 +581,7 @@ if(isempty(lht))
     lht.Color=camColor;
     lht.Position=[0,100,0];
     
-    shading interp
+    shading('interp');
     
     lighting('phong');
    
@@ -632,7 +632,7 @@ if(p.Results.showVoxelBrain)
     
     
 
-   
+   lighting('none');
     
     if(p.Results.useVoxelBrodmannAreas)
 
@@ -654,7 +654,7 @@ if(p.Results.showVoxelBrain)
 
         
             for i=1:length(BA_areas)
-                 bdI=find(brdm==BA_areas(i));
+                 bdI=find(brdm==BA_areas(i)); %&mni_t1>0); % Might look better with these for whatever reason
 
                  if(~any(bdI))
                      continue;
@@ -681,7 +681,7 @@ if(p.Results.showVoxelBrain)
         end
         
         lighting('none');
-         bdI=brdm>0.&~ismember(brdm,BA_areas);
+         bdI=brdm>0.&~ismember(brdm,BA_areas);%&mni_t1>0;
          [bdx,bdy,bdz] = ind2sub(size(brdm),find(bdI));
 
          bd_mni_intensity=mni_t1(bdI);
@@ -715,8 +715,9 @@ if(p.Results.showVoxelBrain)
 
         mnxyz=xyz2mni(mnx,mny,mnz);
 
-
-        h=plotCube(mnxyz(:,1),mnxyz(:,2),mnxyz(:,3),voxelRes,p.Results.voxelColor.*nnzMNIvals);
+        cubeCols=p.Results.voxelColor.*double(nnzMNIvals)/255;
+        
+        h=plotCube(mnxyz(:,1),mnxyz(:,2),mnxyz(:,3),voxelRes,cubeCols);
         h.Tag='BrainVoxel';
         h.HandleVisibility='off';
         lighting('none');
