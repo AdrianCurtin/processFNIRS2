@@ -22,7 +22,7 @@ pF2_folder=pf2_base.pf2_defaultRootPath();
 
 
 if(nargin>0&&~isempty(deviceCfgFilename)) % If file name is specified, try to load it
-    
+    global deviceTable
     global setF
     
     
@@ -31,20 +31,18 @@ if(nargin>0&&~isempty(deviceCfgFilename)) % If file name is specified, try to lo
 
 
     saveOptLayout2=false;
-    if(pf2_base.isnestedfield(setF,'device.Info.CfgName')&&(strcmpi(setF.device.Info.CfgName,name)))
-        if(~isfield(setF.device.Probe{1},'OptLayout2D')&&buildProbeLayout)
-            saveOptLayout2=true;
-        else
+    if(~isempty(deviceTable) && any(strcmp(name, deviceTable.Probe)))
+       setF = deviceTable.ProbeInfo(strcmp(name, deviceTable.Probe));
+       %if(~isfield(setF.device.Probe{1},'OptLayout2D')&&buildProbeLayout)
+       %     saveOptLayout2=true;
+       % else
             probeInfo=setF.device;
             return;
-        end
+       % end
     end
 
 
-    fid = fopen(deviceCfgFilename);
-    
- 
-    
+    fid = fopen(deviceCfgFilename);   
     
     if fid==-1 && isempty(devCfg_folder) % if the file wasn't immediately accessible...
                         %try loading from root/devices
@@ -56,7 +54,7 @@ if(nargin>0&&~isempty(deviceCfgFilename)) % If file name is specified, try to lo
 
     if fid==-1
         warning('Local Config File not found');
-    
+        
         if(isempty(devCfg_folder))
         
             [file, pathname] = uigetfile({'*.cfg';'*.*'},'Please Select Device Configuration file',sprintf('%s/devices/',pF2_folder));
@@ -83,6 +81,8 @@ if(nargin>0&&~isempty(deviceCfgFilename)) % If file name is specified, try to lo
         probeInfo.cfg = pf2_base.external.INI('File',deviceCfgFilename);
     end
 else %otherwise try to load the default
+    saveOptLayout2=false;
+    
     [file, pathname] = uigetfile({'*.cfg';'*.*'},'Please Select Device Configuration file',sprintf('%s/devices',sprintf('%s/devices/',pF2_folder)));
     
     if(isempty(file)||(isnumeric(file)&&file==0))
@@ -90,12 +90,14 @@ else %otherwise try to load the default
     end
     fid = fopen([pathname file]);
     
-
+    
 
     if fid==-1
       error('Data file not found or permission denied');
     end
 
+    [~,name,~] = fileparts(file); 
+    
     fclose(fid);
 
     probeInfo.cfg = pf2_base.external.INI('File',[pathname file]);
@@ -349,6 +351,13 @@ end
 
 if(nargout==0) % assigns the global device
     global setF
+    global deviceTable
+    if(isempty(deviceTable))
+        deviceTable = cell2table(cell(0, 2), 'VariableNames', {'Probe', 'ProbeInfo'});
+    end
+    container = {};
+    container.device = probeInfo;
+    deviceTable = [deviceTable; {name, container}];
     setF.device=probeInfo;
 end
 
