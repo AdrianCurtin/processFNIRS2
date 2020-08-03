@@ -24,7 +24,7 @@ addParameter(p, 'show_cursor', true,@islogical); % Draw 3D lines indicating MNI 
 addParameter(p, 'show3D', true,@islogical); % Draw full voxel brain
 addParameter(p, 'skip3D', false,@islogical); % Only update the lines if they've changed
 addParameter(p, 'cursor_color', [1,0,0],@numeric); % Color of MNI lines
-addParameter(p, 'alpha', 0.1,@validScalarPosNumOr0); % Alpha of voxels
+addParameter(p, 'alpha', 1,@validScalarPosNumOr0); % Alpha of voxels
 
 parse(p,varargin{:});
 
