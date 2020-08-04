@@ -38,6 +38,7 @@ if(islogical(p.Results.BrodmannAreas)&&p.Results.BrodmannAreas||isnumeric(p.Resu
     end
 else
     showBrodmann=false;
+    BA_areas=false;
 end
 
 
@@ -308,7 +309,7 @@ else
 end
 
 set(h,'ButtonDownFcn',@buttonDownX);
-set(h,'UserData',{mni_x,mni_t1_y,mni_t1_z});
+set(h,'UserData',{mni_x,mni_t1_y,mni_t1_z,BA_areas});
 
 axis('image');
 
@@ -398,9 +399,9 @@ if(event_obj.Button==1)
         z2mni=z2mni(end:-1:1);
         mni_y=y2mni(round(y));
         mni_z=z2mni(round(z));
+        BA_areas=UserData{4};
         
-        
-        mni3d(mni_x,mni_y,mni_z,'skip3d',true);
+        mni3d(mni_x,mni_y,mni_z,'skip3d',true,'BrodmannAreas',BA_areas);
     end
 end
 end
@@ -418,8 +419,8 @@ if(event_obj.Button==1)
         z2mni=z2mni(end:-1:1);
         mni_x=x2mni(round(x));
         mni_z=z2mni(round(z));
-        
-        mni3d(mni_x,mni_y,mni_z,'skip3d',true);
+        BA_areas=UserData{4};
+        mni3d(mni_x,mni_y,mni_z,'skip3d',true,'BrodmannAreas',BA_areas);
     end
 end
 end
@@ -436,8 +437,9 @@ function buttonDownZ(imageZ, event_obj)
             y2mni=y2mni(end:-1:1);
             mni_x=x2mni(round(x));
             mni_y=y2mni(round(y));
+            BA_areas=UserData{4};
 
-            mni3d(mni_x,mni_y,mni_z,'skip3d',true);
+            mni3d(mni_x,mni_y,mni_z,'skip3d',true,'BrodmannAreas',BA_areas);
         end
     end
 end
