@@ -335,7 +335,7 @@ else
     h.Tag='mniY';
 end
 set(h,'ButtonDownFcn',@buttonDownY);
-set(h,'UserData',{mni_y,mni_t1_x,mni_t1_z});
+set(h,'UserData',{mni_y,mni_t1_x,mni_t1_z,BA_areas});
 axis('image');
 if(~skip3D)
     xticklabels(xTicks(end:-1:1));
@@ -364,7 +364,7 @@ else
 end
 
 set(h,'ButtonDownFcn',@buttonDownZ);
-set(h,'UserData',{mni_z,mni_t1_x,mni_t1_y});
+set(h,'UserData',{mni_z,mni_t1_x,mni_t1_y,BA_areas});
     axis('image');
 if(~skip3D)
     xticklabels(xTicks);
