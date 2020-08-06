@@ -406,8 +406,11 @@ for(optIdx=1:length(channels))
     xlim([tmin,tmax]);
     
     
-    
-    xlabel(sprintf('Opt %i',optNum));
+    if(iscell(fNIR.channels))
+        xlabel(sprintf('Opt %s',fNIR.channels{optNum}));
+    else
+        xlabel(sprintf('Opt %i', optNum));
+    end
     
 
     if(length(bioM)>1)
