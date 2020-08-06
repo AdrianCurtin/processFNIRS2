@@ -14,17 +14,31 @@ function fNIR=loadExistingMaskOrCheck(fNIR,nirFilename)
 			filestr=[pathstr,'/',name,'_CH.mat'];
 		else
 			filestr=[name,'_CH.mat'];
-		end
+        end
 		
-
-		if exist(filestr, 'file') == 2
-			chMaskFile=load(filestr,'fmask');
-			fNIR.fchMask=chMaskFile.fmask;
-			fprintf('Channel mask loaded from: %s\n',filestr);
-			fprintf('%i channels rejected, %i channels marked noisy',(sum(fNIR.fchMask==0)),sum(fNIR.fchMask==0.5));
-		else
-			fNIR=probeCheckGUI(fNIR,nirFilename);
-		end
+        if exist(filestr, 'file') == 2
+			chMaskFile=load(filestr);
+            
+            maskFields=fields(chMaskFile);
+            
+            potentiallyValidMasks=find(contains(lower(maskFields),'mask'));
+            % Just accept anything that says mask
+            for m=1:length(potentiallyValidMasks)
+                potentialField=chMaskFile.(maskFields{potentiallyValidMasks(m)});
+                if(isnumeric(potentialField))
+                    fNIR.fchMask=potentialField;
+                    fprintf('Channel mask loaded from: %s\n',filestr);
+                    fprintf('%i channels rejected, %i channels marked noisy\n',(sum(fNIR.fchMask==0)),sum(fNIR.fchMask==0.5));
+                    
+                    return;
+                end
+                
+            end
+            
+        end
+        
+        fNIR=probeCheckGUI(fNIR,nirFilename);
+		
 	end
 
 
