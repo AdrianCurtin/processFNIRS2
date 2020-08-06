@@ -5458,8 +5458,10 @@ else
 end
 
 if(ExFNIRS.settings.plot_legend_mode==3||(ExFNIRS.settings.plot_legend_mode==2))
-    legend(gAStrs(:),'Location', 'Best');
-    legend boxoff;
+    if(~isempty(gAStrs)&&~isempty(gAStrs{1}))
+        legend(gAStrs(:),'Location', 'Best');
+        legend boxoff;
+    end
 end
 
 fprintf('Info Table Values\n');
