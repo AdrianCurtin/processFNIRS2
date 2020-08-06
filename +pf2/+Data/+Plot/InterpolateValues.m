@@ -9,13 +9,16 @@ function [ imgOut,optPos2Plot ] = InterpolateValues(varargin)
 %
 p = inputParser;
 
+isStructOrEmpty=@(x) isstruct(x)||isempty(x);
+isStringOrChar=@(x)isstring(x)||ischar(x);
+
 addRequired(p, 'data2plot');
-addOptional(p, 'fNIR', {}, @isstruct);
+addOptional(p, 'fNIR', {}, isStructOrEmpty);
 addOptional(p, 'minVal', [], @isnumeric);
 addOptional(p, 'maxVal', [], @isnumeric);
 addOptional(p, 'bufferMult', 1, @isnumeric);
-addOptional(p, 'titleString', '', @isstring);
-addOptional(p, 'clrBarTitle', '', @isstring);
+addOptional(p, 'titleString', '', isStringOrChar);
+addOptional(p, 'clrBarTitle', '', isStringOrChar);
 
 parse(p, varargin{:});
 
