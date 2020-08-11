@@ -65,6 +65,7 @@ newTime=[minTime:1/outFNIR.fs:maxTime]';
 fieldsToFill={'HbO','HbR','CBSI','HbDiff','HbTotal'};
 
 outFNIR.time=newTime;
+outFNIR.rawTime = cell(1,length(fNIR_objs));
 outFNIR.channels=cell(1,numCh);
 outFNIR.probeNum=zeros(1,numCh);
 outFNIR.fchMask=[];
@@ -81,6 +82,7 @@ end
 curCh=1;
 
 for i=1:length(fNIR_objs) %use Slowest fNIR file as reference
+     outFNIR.rawTime{i} = fNIR_objs{i}.time;
      fMinTime=nanmin(fNIR_objs{i}.time);
      
      fMinIdx=find(fNIR_objs{i}.time==fMinTime);

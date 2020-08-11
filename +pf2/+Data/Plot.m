@@ -17,9 +17,9 @@ if(isfield(fNIR,'HbO')&&~isempty(fNIR.HbO))
     end
 elseif(isfield(fNIR,'raw')&&~isempty(fNIR.raw))
     if(nargout>0)
-        varargout{1:nargout}=pf2.Data.Plot.Raw(fNIR,varargin{:});
+        varargout{1:nargout}=pf2.Data.Plot.RawWrapper(fNIR,varargin{:});
     else
-        pf2.Data.Plot.Raw(fNIR,varargin{:});
+        pf2.Data.Plot.RawWrapper(fNIR,varargin{:});
     end
 end
 
