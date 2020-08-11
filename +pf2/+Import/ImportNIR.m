@@ -314,6 +314,7 @@ end
 
 fNIR.raw=data;
 fNIR.time=data(:,1);
+fNIR.fs=1./median(diff(fNIR.time));
 fNIR.fchMask=fchMask;
 
 if(isfield(markers,'data'))

@@ -31,7 +31,11 @@ maxTime=-inf;
 
 numCh=0;
 
+
 for i=1:length(fNIR_objs) %use Slowest fNIR file as reference
+    if(~isfield(fNIR_objs{i},'HbO'))
+       error('fNIR segment %i has not been processed for Oxy data yet'); 
+    end
     numCh=numCh+length(fNIR_objs{i}.channels);
     if(minFsIdx~=i||centerOnT0)
         
