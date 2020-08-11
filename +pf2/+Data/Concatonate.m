@@ -79,14 +79,16 @@ outFNIR.DPF_factor={};
 
 outFNIR.info.probename={};%'Unknown';
 
-for j=1:length(fieldsToFill)  % Copy remaining fields
+for j=1:length(fieldsToFill)  % Build NULL Oxy fields
      outFNIR.(fieldsToFill{j})=nan(length(newTime),numCh);
 end
 
 curCh=1;
 
+probeFieldsToRetain={'time','raw','markers','DPF_factor','fs','units','fchMask','channels'};
+
 for i=1:length(fNIR_objs) %use Slowest fNIR file as reference
-     outFNIR.rawTime{i} = fNIR_objs{i}.time;
+     %outFNIR.rawTime{i} = fNIR_objs{i}.time;
      fMinTime=nanmin(fNIR_objs{i}.time);
      
      fMinIdx=find(fNIR_objs{i}.time==fMinTime);
@@ -95,11 +97,12 @@ for i=1:length(fNIR_objs) %use Slowest fNIR file as reference
      
      outFNIR.probeNum(curCh:fNumCh+curCh-1)=i;
      outFNIR.info.probename{i}=fNIR_objs{i}.info.probename;
-     outFNIR.raw{i}=fNIR_objs{i}.raw;
-     outFNIR.DPF_factor{i}=fNIR_objs{i}.DPF_factor;
+     %outFNIR.raw{i}=fNIR_objs{i}.raw;
+     %outFNIR.DPF_factor{i}=fNIR_objs{i}.DPF_factor;
      
-     outFNIR.markers_orig{i}=fNIR_objs{i}.markers;
+     %outFNIR.markers_orig{i}=fNIR_objs{i}.markers;
      
+     %Fill in oxy fields
      for j=1:length(fieldsToFill)
           temp= outFNIR.(fieldsToFill{j});
           temp(fMinIdx:fLength,curCh:fNumCh+curCh-1)=fNIR_objs{i}.(fieldsToFill{j});
@@ -107,11 +110,19 @@ for i=1:length(fNIR_objs) %use Slowest fNIR file as reference
           
      end
      
+     %Save old probe information
+      outFNIR.probe{i}.probename=fNIR_objs{i}.info.probename;
+      for j=1:length(probeFieldsToRetain)
+          outFNIR.probe{i}.(probeFieldsToRetain{j})=fNIR_objs{i}.(probeFieldsToRetain{j});
+      end
+     
+     %Build new channel information
      for ch=1:fNumCh
          outFNIR.channels{ch-1+curCh}=sprintf('%i:%i',i,ch);
      end
      curCh=fNumCh+curCh;
      
+     %Merge channel mask info
      outFNIR.fchMask=[outFNIR.fchMask,fNIR_objs{i}.fchMask];
 end
 
