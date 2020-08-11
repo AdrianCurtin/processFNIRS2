@@ -4551,10 +4551,10 @@ if(showTopo)
                                                                                
                                         switch(ExFNIRS.settings.ChannelMode)
                                             case 'fNIR'
-                                                pf2.Data.Plot.InterpolateValues([],curF,estimatedPval_min,[],1,titleSTR,'F-val');%InterpolateValues(fNIR,data2plot,minVal,maxVal,bufferMult,titleString,clrBarTitle)
+                                                pf2.Data.Plot.InterpolateValues(curF,[],estimatedPval_min,[],1,titleSTR,'F-val');%InterpolateValues(fNIR,data2plot,minVal,maxVal,bufferMult,titleString,clrBarTitle)
                                             case 'ROI'
                                                 roiInfo=ExFNIRS.currentROI;
-                                                pf2.Data.Plot.InterpolateValues([],mapROIvaluesToCh(roiInfo,curF),estimatedPval_min,[],1,titleSTR,'F-val');%,7,11,2,1,false,'[Hb-Oxy] Natural High Vs. Low',12,'hot',true)
+                                                pf2.Data.Plot.InterpolateValues(mapROIvaluesToCh(roiInfo,curF),[],'minVal',estimatedPval_min,'maxVal',[],'bufferMult',1,'titleString',titleSTR,'clrBarTitle','F-val');%,7,11,2,1,false,'[Hb-Oxy] Natural High Vs. Low',12,'hot',true)
                                         end
                                 end
 
@@ -5458,8 +5458,10 @@ else
 end
 
 if(ExFNIRS.settings.plot_legend_mode==3||(ExFNIRS.settings.plot_legend_mode==2))
-    legend(gAStrs(:),'Location', 'Best');
-    legend boxoff;
+    if(~isempty(gAStrs)&&~isempty(gAStrs{1}))
+        legend(gAStrs(:),'Location', 'Best');
+        legend boxoff;
+    end
 end
 
 fprintf('Info Table Values\n');
@@ -6547,7 +6549,7 @@ for chIdx=1:numOpt
                                 switch(ExFNIRS.settings.ChannelMode)
                                     case 'fNIR'
                                          axes(curPlotHandle);
-                                         pf2.Data.Plot.InterpolateValues([],curR,[minR1,minR2],[],1,titleSTR,clrBtitle);
+                                         pf2.Data.Plot.InterpolateValues(curR,[minR1,minR2],[],1,titleSTR,clrBtitle);
                                         %interpolateNIR(abs(curR),'Mode',topoMode,'fontSize',12,'transparent',true,'lowerThreshold',min([abs(minR2),minR1]),'TitleText',titleSTR,'ChannelLabels',true)%,7,11,2,1,false,'[Hb-Oxy] Natural High Vs. Low',12,'hot',true)
                                     case 'ROI'
                                         roiInfo=ExFNIRS.currentROI;

@@ -24,7 +24,7 @@ addParameter(p, 'show_cursor', true,@islogical); % Draw 3D lines indicating MNI 
 addParameter(p, 'show3D', true,@islogical); % Draw full voxel brain
 addParameter(p, 'skip3D', false,@islogical); % Only update the lines if they've changed
 addParameter(p, 'cursor_color', [1,0,0],@numeric); % Color of MNI lines
-addParameter(p, 'alpha', 1,@validScalarPosNumOr0); % Alpha of voxels
+addParameter(p, 'alpha', 1,validScalarPosNumOr0); % Alpha of voxels
 
 parse(p,varargin{:});
 
@@ -38,6 +38,7 @@ if(islogical(p.Results.BrodmannAreas)&&p.Results.BrodmannAreas||isnumeric(p.Resu
     end
 else
     showBrodmann=false;
+    BA_areas=false;
 end
 
 
@@ -98,9 +99,11 @@ skip3D=p.Results.skip3D;
 if(show3D)
     subplotX=2;
     subplotY=2;
-    subplot(subplotX,subplotY,4);
-    hold off;
-    cla;
+    %if(true)
+        subplot(subplotX,subplotY,4);
+        %hold off;
+        %cla;
+    %end
 else
     subplotX=1;
     subplotY=3;
@@ -162,9 +165,9 @@ if(showBrodmann)
             bdZ_composite(bdZ_3d_ind)=reshape(repmat(brainColmap(i,:),bdZ_ind_len,1),[bdZ_ind_len*3,1]);
          end
 
-         mniX_composite(bdX_3d_ind)=mniX_composite(bdX_3d_ind).*uint8(bdX_composite(bdX_3d_ind)*255);
-         mniY_composite(bdY_3d_ind)=mniY_composite(bdY_3d_ind).*uint8(bdY_composite(bdY_3d_ind)*255);
-         mniZ_composite(bdZ_3d_ind)=mniZ_composite(bdZ_3d_ind).*uint8(bdZ_composite(bdZ_3d_ind)*255);
+         mniX_composite(bdX_3d_ind)=uint8(double(mniX_composite(bdX_3d_ind)).*bdX_composite(bdX_3d_ind));
+         mniY_composite(bdY_3d_ind)=uint8(double(mniY_composite(bdY_3d_ind)).*bdY_composite(bdY_3d_ind));
+         mniZ_composite(bdZ_3d_ind)=uint8(double(mniZ_composite(bdZ_3d_ind)).*bdZ_composite(bdZ_3d_ind));
 
          [bdx,bdy,bdz] = ind2sub(size(brdm),bdI);
 
@@ -178,16 +181,17 @@ if(showBrodmann)
              scattercols=brainColmap(i,:).*(double(bd_mni_intensity)/255/3+0.66);
              h=plotCube(bdxyz(:,1),bdxyz(:,2),bdxyz(:,3),brodmannRes,scattercols,'alpha',p.Results.alpha);
              %h=scatter3(bdxyz(:,1),bdxyz(:,3),bdxyz(:,2),50*brodmannRes,scattercols,'filled');
+            h.HitTest='off';
 
-
-
+            BA_Handle(i)=h;
              h.DisplayName=sprintf('BA%i',BA_areas(i));
              h.Tag='BA_area_mrk';
             hold on
-            legend();
-        
+            
+            
         end
     end
+    
     
     if(show3D&&~skip3D)
         lighting('none');
@@ -206,9 +210,9 @@ if(showBrodmann)
          %h.DisplayName=sprintf('BA%i',BA_areas(i));
          %h.Tag='BA_area_mrk';
          h.HandleVisibility='off';
-
+         h.HitTest='off';
         hold on
-        legend();
+       
         
         
         axis('image');
@@ -255,7 +259,10 @@ if(p.Results.show_cursor)
         
         item = findobj(gca, "Tag", 'XZ_line');
         if(~isempty(item))
-            delete(item);
+            item.XData=[mni_x,mni_x];
+            item.YData=[y2mni(szM(2)),y2mni(1)];
+            item.ZData=[mni_z,mni_z];
+            %delete(item);
         else
             hold on;
             h=plot3([mni_x,mni_x],[y2mni(szM(2)),y2mni(1)],[mni_z,mni_z],'color',cursor_color/255,'linewidth',3);
@@ -264,7 +271,9 @@ if(p.Results.show_cursor)
 
         item = findobj(gca, "Tag", 'YZ_line');
         if(~isempty(item))
-            delete(item);
+            item.XData=[x2mni(szM(1)),x2mni(0)];
+            item.YData=[mni_y,mni_y];
+            item.ZData=[mni_z,mni_z];
         else
             h=plot3([x2mni(szM(1)),x2mni(0)],[mni_y,mni_y],[mni_z,mni_z],'color',cursor_color/255,'linewidth',3);
             h.Tag='YZ_line';
@@ -272,10 +281,14 @@ if(p.Results.show_cursor)
         
         item = findobj(gca, "Tag", 'XY_line');
         if(~isempty(item))
-            delete(item);
+            item.XData=[mni_x,mni_x];
+            item.YData=[mni_y,mni_y];
+            item.ZData=[z2mni(szM(3)),z2mni(0)];
         else
             h=plot3([mni_x,mni_x],[mni_y,mni_y],[z2mni(szM(3)),z2mni(0)],'color',cursor_color/255,'linewidth',3);
             h.Tag='XY_line';
+            h.HitTest='off';
+            h.DisplayName='';
         end
        hold off;
     end
@@ -296,19 +309,27 @@ if(p.Results.show_cursor)
     
 end
 
+if(show3D&&~skip3D&&~isempty(BA_areas))
+       legend(BA_Handle);
+end
+    
+
 sh=subplot(subplotX,subplotY,1);
 set(sh,'ButtonDownFcn',@(~,~)disp('axes'),...
    'HitTest','off');
 item = findobj(gca, "Tag", 'mniX');
 if(~isempty(item))
     item.CData=imrotate(mniX_composite,90);
+    item.UserData={mni_x,mni_t1_y,mni_t1_z,BA_areas};
+    set(item,'ButtonDownFcn',@buttonDownX);
 else
     h=image(imrotate(mniX_composite,90));
     h.Tag='mniX';
+    set(h,'ButtonDownFcn',@buttonDownX);
+    set(h,'UserData',{mni_x,mni_t1_y,mni_t1_z,BA_areas});
 end
 
-set(h,'ButtonDownFcn',@buttonDownX);
-set(h,'UserData',{mni_x,mni_t1_y,mni_t1_z});
+
 
 axis('image');
 
@@ -329,12 +350,15 @@ set(sh,'ButtonDownFcn',@(~,~)disp('axes'),...
 item = findobj(gca, "Tag", 'mniY');
 if(~isempty(item))
     item.CData=flip(imrotate(mniY_composite,90),2);
+    item.UserData={mni_y,mni_t1_x,mni_t1_z,BA_areas};
+    set(item,'ButtonDownFcn',@buttonDownY);
 else
     h=image(flip(imrotate(mniY_composite,90),2));
     h.Tag='mniY';
+    set(h,'ButtonDownFcn',@buttonDownY);
+    set(h,'UserData',{mni_y,mni_t1_x,mni_t1_z,BA_areas});
 end
-set(h,'ButtonDownFcn',@buttonDownY);
-set(h,'UserData',{mni_y,mni_t1_x,mni_t1_z});
+
 axis('image');
 if(~skip3D)
     xticklabels(xTicks(end:-1:1));
@@ -357,13 +381,16 @@ set(sh,'ButtonDownFcn',@(~,~)disp('axes'),...
 item = findobj(gca, "Tag", 'mniZ');
 if(~isempty(item))
     item.CData=imrotate(mniZ_composite,90);
+    item.UserData={mni_z,mni_t1_x,mni_t1_y,BA_areas};
+    set(item,'ButtonDownFcn',@buttonDownZ);
 else
     h=image(imrotate(mniZ_composite,90));
     h.Tag='mniZ';
+    set(h,'ButtonDownFcn',@buttonDownZ);
+    set(h,'UserData',{mni_z,mni_t1_x,mni_t1_y,BA_areas});
 end
 
-set(h,'ButtonDownFcn',@buttonDownZ);
-set(h,'UserData',{mni_z,mni_t1_x,mni_t1_y});
+
     axis('image');
 if(~skip3D)
     xticklabels(xTicks);
@@ -398,9 +425,9 @@ if(event_obj.Button==1)
         z2mni=z2mni(end:-1:1);
         mni_y=y2mni(round(y));
         mni_z=z2mni(round(z));
+        BA_areas=UserData{4};
         
-        
-        mni3d(mni_x,mni_y,mni_z,'skip3d',true);
+        mni3d(mni_x,mni_y,mni_z,'skip3d',true,'BrodmannAreas',BA_areas);
     end
 end
 end
@@ -418,8 +445,8 @@ if(event_obj.Button==1)
         z2mni=z2mni(end:-1:1);
         mni_x=x2mni(round(x));
         mni_z=z2mni(round(z));
-        
-        mni3d(mni_x,mni_y,mni_z,'skip3d',true);
+        BA_areas=UserData{4};
+        mni3d(mni_x,mni_y,mni_z,'skip3d',true,'BrodmannAreas',BA_areas);
     end
 end
 end
@@ -436,11 +463,13 @@ function buttonDownZ(imageZ, event_obj)
             y2mni=y2mni(end:-1:1);
             mni_x=x2mni(round(x));
             mni_y=y2mni(round(y));
+            BA_areas=UserData{4};
 
-            mni3d(mni_x,mni_y,mni_z,'skip3d',true);
+            mni3d(mni_x,mni_y,mni_z,'skip3d',true,'BrodmannAreas',BA_areas);
         end
     end
 end
+
 
 
 

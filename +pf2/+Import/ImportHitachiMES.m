@@ -226,7 +226,11 @@ end
 
 
 if(channelCheck)
-    fNIR=probeCheckGUI(fNIR,filename,forceChannelCheck);
+        if(forceChannelCheck)
+            fNIR=probeCheckGUI(fNIR,filename,forceChannelCheck);
+        else
+            fNIR=pf2_base.loadExistingMaskOrCheck(fNIR,filename); 
+        end
 else
    if(~isempty(fmask))
        fNIR.fchMask=fmask;
