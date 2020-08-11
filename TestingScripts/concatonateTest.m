@@ -8,6 +8,7 @@ x2=pf2(pf2.Data.SetT0(x2,min(x2.time)));
 
 %% Concatonate fNIRS Files
 x3=pf2.Data.Concatonate(x,x2);
+
 %% Plot Default
 
 
@@ -20,5 +21,10 @@ pf2.Data.Plot.Raw(x3)
 
 %% Plot Oxy
 
-
+%% Show only marker 1
 pf2.Data.Plot.Oxy(x3,[],1)
+
+
+%% Show all markers
+
+pf2.Data.Plot.Oxy(x3)

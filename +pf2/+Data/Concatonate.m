@@ -79,7 +79,7 @@ outFNIR.DPF_factor={};
 
 outFNIR.info.probename={};%'Unknown';
 
-for j=1:length(fieldsToFill)
+for j=1:length(fieldsToFill)  % Copy remaining fields
      outFNIR.(fieldsToFill{j})=nan(length(newTime),numCh);
 end
 
@@ -97,6 +97,8 @@ for i=1:length(fNIR_objs) %use Slowest fNIR file as reference
      outFNIR.info.probename{i}=fNIR_objs{i}.info.probename;
      outFNIR.raw{i}=fNIR_objs{i}.raw;
      outFNIR.DPF_factor{i}=fNIR_objs{i}.DPF_factor;
+     
+     outFNIR.markers_orig{i}=fNIR_objs{i}.markers;
      
      for j=1:length(fieldsToFill)
           temp= outFNIR.(fieldsToFill{j});
