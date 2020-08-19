@@ -1,18 +1,16 @@
-function probeInfo=loadDeviceCfg(deviceCfgFilename,buildProbeLayout,includeSSchannels)
+function probeInfo=loadDeviceCfg(deviceCfgFilename,includeSSchannels)
 % Builds a probeInfo struct from the device.cfg file
 % use BuildProbeLayout to build a 2D representation for plotting
 %   use includeSSchannels disable remove short separation channels from 2D
 %   plot layouts and figures
 
+%If no input argument, open a device configuration file
 if(nargin<1)
     deviceCfgFilename='';
 end
 
+% Option to hide SS channels
 if(nargin<2)
-   buildProbeLayout=true; 
-end
-
-if(nargin<3)
     includeSSchannels=true;
 end
 
@@ -29,7 +27,7 @@ if(nargin>0&&~isempty(deviceCfgFilename)) % If file name is specified, try to lo
    [devCfg_folder,name,ext] = fileparts(deviceCfgFilename); 
 
 
-
+    % Find matching probe name in global deviceTable
     saveOptLayout2=false;
     if(~isempty(deviceTable) && any(strcmp(name, deviceTable.Probe)))
        setF = deviceTable.ProbeInfo(strcmp(name, deviceTable.Probe));
@@ -41,7 +39,7 @@ if(nargin>0&&~isempty(deviceCfgFilename)) % If file name is specified, try to lo
        % end
     end
 
-
+    % Otherwise, open device cfg file
     fid = fopen(deviceCfgFilename);   
     
     if fid==-1 && isempty(devCfg_folder) % if the file wasn't immediately accessible...
@@ -80,7 +78,7 @@ if(nargin>0&&~isempty(deviceCfgFilename)) % If file name is specified, try to lo
         fclose(fid);
         probeInfo.cfg = pf2_base.external.INI('File',deviceCfgFilename);
     end
-else %otherwise try to load the default
+else %otherwise prompt user to open a file
     saveOptLayout2=false;
     
     [file, pathname] = uigetfile({'*.cfg';'*.*'},'Please Select Device Configuration file',sprintf('%s/devices',sprintf('%s/devices/',pF2_folder)));
@@ -127,6 +125,42 @@ for j=1:length(probeInfo.cfg.Sections)
         end
         
         p.TableSD=table();
+        p.TableCh=table(); % Map for raw probe data
+        
+        p.TableCh.ColNumber=[1:length(p.ChannelNumbers)]';
+        p.TableCh.OptodeNumber=p.ChannelNumbers(:);
+        p.TableCh.isTime=p.TableCh.OptodeNumber==0;
+        p.TableCh.isMarker=p.TableCh.OptodeNumber<0|isnan(p.TableCh.OptodeNumber);
+        p.TableCh.OptodeNumber(p.TableCh.OptodeNumber<1)=nan;
+        
+        validCols=~isnan(p.TableCh.OptodeNumber);
+        
+        p.TableCh.Wavelength=p.Wavelength(:);
+        p.TableCh.SourceIndex(:)=nan;
+        p.TableCh.DetectorIndex(:)=nan;
+        p.TableCh.SourceIndex(validCols)=p.sI(p.TableCh.OptodeNumber(validCols));
+        p.TableCh.DetectorIndex(validCols)=p.dI(p.TableCh.OptodeNumber(validCols));
+        
+        p.TableCh.isDark=(isnan(p.TableCh.Wavelength)|p.TableCh.Wavelength==0) &validCols;
+        p.TableCh.isCh=validCols(:);
+        
+        p.TableCh.Label(:)="";
+        
+        for ch=1:length(p.ChannelNumbers)
+            if(p.TableCh.isTime(ch))
+               p.TableCh.Label(ch)="Time"; 
+            elseif(p.TableCh.isMarker(ch))
+                p.TableCh.Label(ch)="Mrk";
+            elseif(p.TableCh.isDark(ch))
+                opt=p.TableCh.OptodeNumber(ch);
+                p.TableCh.Label(ch)=sprintf('Opt%i_dark',opt);
+            else
+                wv=p.TableCh.Wavelength(ch);
+                opt=p.TableCh.OptodeNumber(ch);
+                p.TableCh.Label(ch)=sprintf('Opt%i_wv%.1f',opt,wv);
+            end
+        end
+        
         
         if(isfield(p,'SDLabels'))
             p.TableSD.Label=p.SDLabels(:);
@@ -192,9 +226,10 @@ for j=1:length(probeInfo.cfg.Sections)
         if(isfield(p,'OptPosX')&&isfield(p,'OptPosY'))
            if(isfield(p,'OptPosZ')) % Calculate 3D SD
                p.SD=sqrt((p.DetPosX-p.SrcPosX).^2+(p.DetPosY-p.SrcPosY).^2+(p.DetPosZ-p.SrcPosZ).^2);
+               p.TableOpt.SD=p.SD(:);
            else % Calculate 2D SD
                p.SD=sqrt((p.DetPosX-p.SrcPosX).^2+(p.DetPosY-p.SrcPosY).^2);
-               p.TableOpt.SD=p.SD;
+               p.TableOpt.SD=p.SD(:);
            end
            
            p.IsShortSeparation=p.SD<2;
@@ -259,7 +294,7 @@ for j=1:length(probeInfo.cfg.Sections)
         end
         
         
-        if(buildProbeLayout) % auto generate plot layour
+        if(true)%buildProbeLayout) % auto generate plot layour
             if(isfield(p,'OptPosX')&&isfield(p,'OptPosY')&&~isfield(p,'OptPosZ'))
                 if(includeSSchannels)
                     p.OptLayout2D_ss=pf2_base.fitProbe2D(p.OptPosX,p.OptPosY);
@@ -340,10 +375,49 @@ for j=1:length(probeInfo.cfg.Sections)
         
         p.OptPos3D_mean=nanmean(xyz,1);
             
+        p.SrcPos=table();
+        p.SrcPos.x_2d=p.SrcPosX(:);
+        p.SrcPos.y_2d=p.SrcPosY(:);
+        p.SrcPos.z_2d=p.SrcPosZ(:);
+        p.SrcPos.x=p.SrcPos3DX(:);
+        p.SrcPos.y=p.SrcPos3DY(:);
+        p.SrcPos.z=p.SrcPos3DZ(:);
         
-        if(saveOptLayout2&&isfield(p,'OptLayout2D'))
+        
+        p.DetPos=table();
+        p.DetPos.x_2d=p.DetPosX(:);
+        p.DetPos.y_2d=p.DetPosY(:);
+        p.DetPos.z_2d=p.DetPosZ(:);
+        p.DetPos.x=p.DetPos3DX(:);
+        p.DetPos.y=p.DetPos3DY(:);
+        p.DetPos.z=p.DetPos3DZ(:);
+        
+        p.OptPos=table();
+        p.OptPos.x_2d=p.OptPosX(:);
+        p.OptPos.y_2d=p.OptPosY(:);
+        p.OptPos.z_2d=p.OptPosZ(:);
+        p.OptPos.x=p.OptPos3DX(:);
+        p.OptPos.y=p.OptPos3DY(:);
+        p.OptPos.z=p.OptPos3DZ(:);
+        
+        p.OptPos.subplot_layout(:)=cell(size(p.OptPos.z));
+        p.OptPos.subplot_layout(~p.IsShortSeparation)=p.OptLayout2D(~p.IsShortSeparation);
+        p.OptPos.subplot_layout_ss=p.OptLayout2D_ss(:);
+        
+        
+        
+        fieldsToRemove={'SrcPosX','SrcPosY','SrcPosZ','SrcPos3DX','SrcPos3DY','SrcPos3DZ' ...
+            'DetPosX','DetPosY','DetPosZ','DetPos3DX','DetPos3DY','DetPos3DZ'...
+            'OptPosX','OptPosY','OptPosZ','OptPos3DX','OptPos3DY','OptPos3DZ'...
+            'sI','dI','ChannelList','SD','IsShortSeparation','OptLayout2D','OptLayout2D_ss','Wavelength','ChannelNumbers','OptPos3D_mean'};
+        
+        p=rmfield(p,fieldsToRemove);
+        
+     
+        
+        %if(saveOptLayout2&&isfield(p,'OptLayout2D'))
             setF.device.Probe{probeCount}=p;
-        end
+        %end
         probeInfo.Probe{probeCount}=p;
     end
     

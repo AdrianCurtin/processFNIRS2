@@ -53,30 +53,45 @@ channels=channels(validChannels);
 
 time=data(:,timeIndex);
 
-uCh=sort(unique(channels));
-numCh=length(uCh);
+uOpt=sort(unique(channels));
+numOpt=length(uOpt);
 
 numWv=sum(channels==channels(1));
 
-rawArray=zeros(numWv,numCh,length(data(:,1)));
-wvArray=zeros(numWv,numCh);
+rawArray=zeros(len,numOpt,numWv);
+wvArray=zeros(numOpt,numWv);
 
-for(i=1:numCh)
-    chInd=find(channels==uCh(i));
-    if(length(chInd)==numWv)
-        wvArray(:,i)=wavelengths(chInd)';
-        chArray(:,i)=chInd';
-    else
-       error('Mismatched number of wavelengths across optodes'); 
-    end
+if(numWv>2)
+    error('MultiWavelengths are not supported yet');
 end
 
+wv700=wavelengths<805; %Split so wavelength under isobestic point is first column
 
-[wvArray,ind]=sort(wvArray);
+%Should be fast but only supports two wavelengths
+wvArray(channels(wv700),1)=wavelengths(wv700);
+wvArray(channels(~wv700),2)=wavelengths(~wv700);
 
-for i=1:size(ind,2)
-    chArray(:,i)=chArray(ind(:,i)+(i-1)*2);
-    rawArray( 1:numWv,i,:)=rawData(:,chArray(:,i))';
+chArray(channels(wv700),1)=find(wv700);
+chArray(channels(~wv700),2)=find(~wv700);
+
+
+[wvArray,ind]=sort(wvArray,2); %Sort so left array is lower
+
+indReshape=ind';
+
+
+
+%Use new sort order
+
+chArrIdx=repmat([0:numWv:((numOpt*numWv)-1)]',1,numWv)';
+chArrIdx=chArrIdx(:);
+chOrigInd=repmat(1:numWv,numOpt,1);
+
+chArrIdxSorted=chArrIdx+indReshape(:);
+chArray(:)=chArray(chArrIdxSorted);
+
+for i=1:numWv
+    rawArray(:,:,i)=rawData(:,chArray(:,i));
 end
 
 
@@ -90,11 +105,11 @@ end
 %sStart=bEnd+1;
 %len=size(w700,1)-sStart+1;
 
-Baseline=nanmean(rawArray(:,:,baselineSamples),3);
-Baseline=repmat(Baseline,[1,1,len]);
+Baseline=nanmean(rawArray(baselineSamples,:,:),1);
+Baseline=repmat(Baseline,[len,1,1]);
 
-eHbOArray=repmat(eHbOArray,[1,1,len]);
-eHbRArray=repmat(eHbRArray,[1,1,len]);
+eHbOArray=repmat(reshape(eHbOArray,[1,numOpt,numWv]),[len,1,1]);
+eHbRArray=repmat(reshape(eHbRArray,[1,numOpt,numWv]),[len,1,1]);
 
 if(~isOD)
     OD=real(-log10(rawArray./Baseline));
@@ -103,8 +118,8 @@ else
 end
 
 
-HbO=zeros(len,numCh);
-HbR=zeros(len,numCh);
+HbO=zeros(len,numOpt);
+HbR=zeros(len,numOpt);
 
 if(numWv~=2)
     error('Sorry I don''t support this yet');
@@ -116,8 +131,8 @@ end
 %Channels are sorted by wavelength so <805 should be first and >805
 %should be second
 
-od700=OD(1,:,:);
-od830=OD(2,:,:);
+od700=OD(:,:,1);
+od830=OD(:,:,2);
 
 if(NoPathlength)
     %Convert to mM*mm from uM*cm
@@ -151,8 +166,8 @@ else
     sigma=-0.9025;
     calcDPF=@(lambda,Age) alpha + beta*Age.^gamma+delta*lambda.^3+eta.*lambda.^2+sigma*lambda;
     
-    DPF_700=calcDPF(wvArray(1,:),subject_age);
-    DPF_830=calcDPF(wvArray(2,:),subject_age);
+    DPF_700=calcDPF(wvArray(:,1),subject_age);
+    DPF_830=calcDPF(wvArray(:,2),subject_age);
     
     
     L_700=sd_distance.*DPF_700; %0.015 = 2.5cm*5.92 /1000
@@ -163,24 +178,27 @@ else
     units='uM';
 end
 
-eHBO_700=eHbOArray(1,:,:);
-eHBR_700=eHbRArray(1,:,:);
-eHBO_830=eHbOArray(2,:,:);
-eHBR_830=eHbRArray(2,:,:);
+eHBO_700=eHbOArray(:,:,1);
+eHBR_700=eHbRArray(:,:,1);
+eHBO_830=eHbOArray(:,:,2);
+eHBR_830=eHbRArray(:,:,2);
 
-% eHBO_700=reshape(eHBO_700,[numCh,len]);
-% eHBR_700=reshape(eHBR_700,[numCh,len]);
-% eHBO_830=reshape(eHBO_830,[numCh,len]);
-% eHBR_830=reshape(eHBR_830,[numCh,len]);
+% eHBO_700=reshape(eHBO_700,[numOpt,len]);
+% eHBR_700=reshape(eHBR_700,[numOpt,len]);
+% eHBO_830=reshape(eHBO_830,[numOpt,len]);
+% eHBR_830=reshape(eHBR_830,[numOpt,len]);
 % 
-% od700=reshape(od700,[numCh,len]);
-% od830=reshape(od830,[numCh,len]);
+% od700=reshape(od700,[numOpt,len]);
+% od830=reshape(od830,[numOpt,len]);
+
+L_700=repmat(L_700',len,1);
+L_830=repmat(L_830',len,1);
 
 HbO=(eHBR_830.*(od700./L_700)-eHBR_700.*(od830./L_830))./(eHBO_700.*eHBR_830-eHBO_830.*eHBR_700);
 HbR=(eHBO_700.*(od830./L_830)-eHBO_830.*(od700./L_700))./(eHBO_700.*eHBR_830-eHBO_830.*eHBR_700);
 
-HbO= reshape(HbO,[numCh,len])';
-HbR= reshape(HbR,[numCh,len])';
+%HbO= reshape(HbO,[numOpt,len])';
+%HbR= reshape(HbR,[numOpt,len])';
 
 %Oxy(:,ch)=(OD(1,:,ch)*eHBR_830-OD_830(:,ch)*eHBR_700)/(eHBO_700*eHBR_830-eHBO_830*eHBR_700)/DiffPathlengthFactor;
 %Deoxy(:,ch)=(OD_830(:,ch)*eHBO_700-OD_700(:,ch)*eHBO_830)/(eHBO_700*eHBR_830-eHBO_830*eHBR_700)/DiffPathlengthFactor;
@@ -194,7 +212,7 @@ CBSI=[calcCBSI(HbO,HbR), data(:,mrkIndex)];
 HbO=[(HbO), data(:,mrkIndex)];
 HbR=[(HbR), data(:,mrkIndex)];
 
-channels=[uCh,(mrkIndex*0-1)];
+channels=[uOpt,(mrkIndex*0-1)];
 
 if(nargout==1) % if one output argument, return all as fNIR struct
 	fNIR.HbO=HbO;

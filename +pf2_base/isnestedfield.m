@@ -13,19 +13,35 @@ else
     fieldParts=strsplit(nestedFieldString,'.');
     curPartName=fieldParts{1};
     
-    isvalidfield=isfield(var,curPartName);
-    if(isvalidfield)
-        for i=2:length(fieldParts)
-            var=var.(curPartName);
-            curPartName=fieldParts{i};
-            isvalidfield=isfield(var,curPartName)|isprop(var,curPartName);
-            
-            if(isempty(isvalidfield)||~isvalidfield)
-                isvalidfield=false;
-                break;
+    %if(isstruct(var))
+        isvalidfield=isfield(var,curPartName)|isprop(var,curPartName);
+        
+        if(isempty(isvalidfield)||~isvalidfield)
+            isvalidfield=false;
+            return;
+        else
+            for i=2:length(fieldParts)
+                var=var.(curPartName);
+                curPartName=fieldParts{i};
+                
+                if(istable(var))
+                    isvalidfield=ismember(curPartName,var.Properties.VariableNames);
+                    
+                else
+                    isvalidfield=isfield(var,curPartName)|(~istable(var)&isprop(var,curPartName));
+                end
+                
+                
+
+                if(isempty(isvalidfield)||~isvalidfield)
+                    isvalidfield=false;
+                    return;
+                end
             end
         end
-    end
+        
+        
+  
 
 end
 

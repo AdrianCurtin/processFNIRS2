@@ -344,7 +344,10 @@ end
 fData=updateCurrentDevice(fData);
 
 [numDataRows,numDataCols]=size(fData.stage{1});
-numDevCols=length(setF.device.Probe{1}.ChannelNumbers);
+
+probeIdx=1;
+curProbe=setF.device.Probe{probeIdx};
+numDevCols=size(curProbe.TableCh,1);
 while(numDataCols~=numDevCols)
     if(numDataCols==numDataRows)
        fData.stage{1}=fData.stage{1}';
@@ -355,7 +358,8 @@ while(numDataCols~=numDevCols)
        pf2_base.loadDeviceCfg();
     end
     [numDataRows,numDataCols]=size(fData.stage{1});
-    numDevCols=length(setF.device.Probe{1}.ChannelNumbers);  
+    curProbe=setF.device.Probe{probeIdx};
+    numDevCols=size(curProbe.TableCh,1);
 
 end
 
@@ -365,13 +369,13 @@ varargout={};
 
 if(~isempty(data))
     if(~isfield(fData,'fchMask')||(isfield(fData,'fchMask')&&isempty(fData.fchMask)))
-        fData.fchMask=true(1,length(setF.device.Probe{1}.ChannelList));
+        fData.fchMask=true(1,curProbe.numOptodes);
     end
-    numChannels=length(setF.device.Probe{1}.ChannelList);
-    channelNumbers=setF.device.Probe{1}.ChannelNumbers;
-    wavelengths=setF.device.Probe{1}.Wavelength;
+    numOptodes=curProbe.NumOptodes;
+    channelNumbers=curProbe.TableCh.OptodeNumber;
+    wavelengths=curProbe.TableCh.Wavelength;
     
-    rawMask=ismember(channelNumbers,setF.device.Probe{1}.ChannelList(reshape(fData.fchMask>PF2.RejectLevel|outputData.ProcessRejected,1,numChannels)));
+    rawMask=ismember(channelNumbers,curProbe.TableOpt.OptodeNum(reshape(fData.fchMask>PF2.RejectLevel|outputData.ProcessRejected,1,numOptodes)));
 
    %varargout=processFNIRdata(); 
    
@@ -384,7 +388,7 @@ if(~isempty(data))
         
         [fData.stage{3},fData.stage{2}]=pf2_base.fnirs.processStageRaw2OD(PF2.stageRawMethod,fData.stage{1},fData.fs,fData.time,rawMask,fMarkers,fAux,channelNumbers,wavelengths); % Raw data processing
         if(outputData.ProcessOxy)
-            fData.stage{4}=processStageOD2Hb(fData.stage{3},fData.time,fData.info.Age,outputData.DirtyBaseline); % Beer-Lambert conversion
+            fData.stage{4}=processStageOD2Hb(fData.stage{3},fData.time,fData.info.Age,outputData.DirtyBaseline,curProbe); % Beer-Lambert conversion
         end
         if(pf2_base.isnestedfield(fData,'ROI.info'))
             fData.stage{4}.ROI.info=fData.ROI.info; %Regenerate from info
@@ -392,7 +396,7 @@ if(~isempty(data))
     else
         %fData.stage{2}=fData.stage{1};
         if(~isempty(fData.stage{4})&&~isfield(fData.stage{4},'channels'))
-           fData.stage{4}.channels=setF.device.Probe{1}.ChannelList;
+           fData.stage{4}.channels=curProbe.ChannelList;
            warning('No channel information given, assuming all columns indexs correspond with channel numbers');
         end
         if(pf2_base.isnestedfield(fData,'ROI.info'))
@@ -482,10 +486,10 @@ clearVarsOnClose();
 end
 
 
-function outData=processStageOD2Hb(data,time,subjectAge,DirtyBaseline)
+function outData=processStageOD2Hb(data,time,subjectAge,DirtyBaseline,curProbe)
  % Beer-Lambert conversion
 
-global setF
+
 global PF2
 
 if(strcmp(PF2.dpf_mode,'None'))
@@ -515,9 +519,12 @@ else
     baselineSamples=startSample:endSample;
 end
 
+curTableCh=curProbe.TableCh;
+curTableOpt=curProbe.TableOpt;
+
 
 [outData.HbO, outData.HbR, outData.HbTotal, outData.HbDiff,outData.CBSI,outData.channels,~,outData.units,outData.DPF_factor]=...
-    pf2_base.fnirs.bvoxy(data,setF.device.Probe{1}.ChannelNumbers,setF.device.Probe{1}.Wavelength,setF.device.Probe{1}.SD,baselineSamples,subjectAge,[],true,'NoPathlength',NoPathlength,'DiffPathlengthFactor',fixedDPF);
+    pf2_base.fnirs.bvoxy(data,curTableCh.OptodeNumber,curTableCh.Wavelength,curTableOpt.SD,baselineSamples,subjectAge,[],true,'NoPathlength',NoPathlength,'DiffPathlengthFactor',fixedDPF);
 outData.time=time;
                                                           %BASELINE
                                                           %START/END
@@ -532,8 +539,8 @@ function outData=processStageFilterHb(data,fs,ProcessRejected)
 
 bioM_list={'HbO','HbR','HbTotal','HbDiff','CBSI'};
 validChannels=false(size(data.channels));
-numChannels=length(data.channels(data.channels>0));
-validChannels(data.channels>0)=data.channels(data.channels>0)&(reshape(data.fchMask|ProcessRejected,[1,numChannels]));
+numOptodes=length(data.channels(data.channels>0));
+validChannels(data.channels>0)=data.channels(data.channels>0)&(reshape(data.fchMask(:)|ProcessRejected,[numOptodes,1]));
 
 curfMask=data.fchMask|ProcessRejected;
 
@@ -784,7 +791,7 @@ end
 
 
 invalidChannels=false(size(data.channels));
-invalidChannels(data.channels>0)=data.channels(data.channels>0)&(reshape(~curfMask,[1,numChannels]));
+invalidChannels(data.channels>0)=data.channels(data.channels>0)&(reshape(~curfMask,[numOptodes,1]));
 
 for bioM=1:length(bioM_list) % go through each biomarker and set invalid cahnnels to nan
     outData.(bioM_list{bioM})(:,invalidChannels)=nan;
@@ -822,13 +829,27 @@ end
 
 if(PF2.mergedProbe) %All channel numbers are unique for merged probes
     for i =1:length(setF.device.Probe)
-        PF2.curChSet=[PF2.curChSet,setF.device.Probe{i}.ChannelNumbers];
-        PF2.curProbeInd=[PF2.curProbeInd,i*length(setF.device.Probe{i}.ChannelNumbers)];
-    
-        PF2.curWvSet=[PF2.curWvSet,setF.device.Probe{i}.Wavelength];
-        PF2.curSDSet=[PF2.curSDSet,setF.device.Probe{i}.SD];
+        curProbe=setF.device.Probe{i};
+        curChTable=curProbe.TableCh;
+        curOptTable=curProbe.TableOpt;
+        curSDTable=curProbe.TableSD;
+        
+        curChTable.ProbeInd(:)=i;
+        curOptTable.ProbeInd(:)=i;
+        curSDTable.ProbeInd(:)=i;
+        
+        if(i==1)
+            PF2.curCh=curChTable;
+            PF2.curOpt=curOptTable;
+            PF2.curSD=curSDTable;
+        else
+            PF2.curCh=[PF2.curCh;curChTable];
+            PF2.curOpt=[PF2.curOpt;curOptTable];
+            PF2.curSD=[PF2.curSD;curSDTable];
+        end
+        
     end
-    PF2.timeIndex=find(PF2.curChSet==0);
+    PF2.timeIndex=find(PF2.curCh.isTime);
     if(isempty(PF2.timeIndex))
         warning('Time column could not be found, assuming each row is a sample');
         PF2.timeIndex=0;
@@ -837,8 +858,8 @@ else
     error('Not yet implemented for seperate probe data,\nAssumes concatenated datasets with unique channels in the config file'); 
 end
 
-[~,i]=unique(PF2.curChSet);
-PF2.curChList=PF2.curChSet(i);
+[~,i]=unique(PF2.curCh.OptodeNumber);
+PF2.curChList=PF2.curCh.OptodeNumber(i);
 
 
 if(PF2.mergedProbe) %All channel numbers are unique for merged probes  

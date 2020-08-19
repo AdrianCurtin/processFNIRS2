@@ -1,8 +1,10 @@
 % Load fNIRS files
+
+clear all
 x=pf2.Import.SampleData.Hitachi_ETG4000_3x5;
 x2=pf2.Import.SampleData.fNIR1200;
 
-% Set Start times to 0
+% Set Start times to 0  
 x=pf2(pf2.Data.SetT0(x,min(x.time)));
 x2=pf2(pf2.Data.SetT0(x2,min(x2.time)));
 
@@ -28,3 +30,7 @@ pf2.Data.Plot.Oxy(x3,[],1)
 %% Show all markers
 
 pf2.Data.Plot.Oxy(x3)
+
+%% Display concatonated data
+
+pf2(x3);

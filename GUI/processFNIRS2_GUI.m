@@ -356,7 +356,10 @@ end
 updateCurrentDevice();
 
 [numDataRows,numDataCols]=size(PF2.GUIPF2.data.stage{1});
-numDevCols=length(setF.device.Probe{1}.ChannelNumbers);
+
+probeIdx=1;
+curProbe=setF.device.Probe{probeIdx};
+numDevCols=size(curProbe.TableCh,1);
 while(numDataCols~=numDevCols)
     
     if(numDataCols==numDataRows)
@@ -368,15 +371,16 @@ while(numDataCols~=numDevCols)
        pf2_base.loadDeviceCfg();
     end
     [numDataRows,numDataCols]=size(PF2.GUIPF2.data.stage{1});
-    numDevCols=length(setF.device.Probe{1}.ChannelNumbers);  
+    curProbe=setF.device.Probe{probeIdx};
+    numDevCols=size(curProbe.TableCh,1);
 end
 
 if(~isfield(PF2.GUIPF2.data,'fchMask')||(isfield(PF2.GUIPF2.data,'fchMask')&&isempty(PF2.GUIPF2.data.fchMask)))
     PF2.GUIPF2.data.fchMask=true(1,length(setF.device.Probe{1}.ChannelList));
 end
 
-numChannels=length(setF.device.Probe{1}.ChannelList);
-PF2.GUIPF2.data.rawMask=ismember(setF.device.Probe{1}.ChannelNumbers,setF.device.Probe{1}.ChannelList(reshape(PF2.GUIPF2.data.fchMask>PF2.RejectLevel|outputData.ProcessRejected,[1,numChannels])));
+numOptodes=curProbe.NumOptodes;
+PF2.GUIPF2.data.rawMask=ismember(curProbe.TableCh.OptodeNumber,curProbe.TableOpt.OptodeNum(reshape(PF2.GUIPF2.data.fchMask>PF2.RejectLevel|outputData.ProcessRejected,[1,numOptodes])));
 
 
 if(~isempty(data))
@@ -490,8 +494,8 @@ global PF2
 outData=data;
 OD_converted=false;
 
-validChannels=((PF2.curWvSet>0)&PF2.GUIPF2.data.rawMask);  %Dark Channel should be 0, time should be NA, other information should be negative values
-validDarkChannels=((PF2.curWvSet==0)&PF2.GUIPF2.data.rawMask);
+validChannels=((PF2.curCh.Wavelength>0)&PF2.GUIPF2.data.rawMask);  %Dark Channel should be 0, time should be NA, other information should be negative values
+validDarkChannels=((PF2.curCh.isDark)&PF2.GUIPF2.data.rawMask);
 
 curRawMask=PF2.GUIPF2.data.rawMask;
 
@@ -698,16 +702,16 @@ outData(~timeChMask)=nan;
 if(OD_converted==false)
     outDataRaw=outData;
     outDataOD=outData;
-    validChannels=((PF2.curWvSet>=0)&curRawMask); %convert all and Dark channels
+    validChannels=((PF2.curCh.Wavelength>=0)&curRawMask); %convert all and Dark channels
     outDataOD(:,validChannels)=pf2_Intensity2OD(outData(:,validChannels));
 else
-    validDarkChannels=((PF2.curWvSet==0)&curRawMask); %convert just dark channels
+    validDarkChannels=((PF2.curCh.isDark)&curRawMask); %convert just dark channels
     outDataOD=outData; 
     outDataOD(:,validDarkChannels)=pf2_Intensity2OD(outData(:,validDarkChannels));
 end
 
-outDataRaw(:,((PF2.curWvSet>=0)&~curRawMask))=nan;
-outDataOD(:,((PF2.curWvSet>=0)&~curRawMask))=nan;
+outDataRaw(:,((PF2.curCh.Wavelength>=0>=0)&~curRawMask))=nan;
+outDataOD(:,((PF2.curCh.Wavelength>=0>=0)&~curRawMask))=nan;
 
 function outData=processStageOD2Hb(data,subAge)
  % Beer-Lambert conversion
@@ -716,6 +720,9 @@ global setF
 global PF2
 global outputData
 
+
+probeIdx=1;
+curProbe=setF.device.Probe{probeIdx};
 
 if(outputData.DirtyBaseline)
     baselineSamples=1:length(PF2.GUIPF2.data.time);
@@ -752,7 +759,7 @@ if(isempty(subAge))
 end
     
 [outData.HbO, outData.HbR, outData.HbTotal, outData.HbDiff,outData.CBSI,outData.channels,~,outData.units,outData.DPF_factor]=...
-    pf2_base.fnirs.bvoxy(data,setF.device.Probe{1}.ChannelNumbers,setF.device.Probe{1}.Wavelength,setF.device.Probe{1}.SD,baselineSamples,subAge,[],true,'NoPathlength',NoPathlength,'DiffPathlengthFactor',fixedDPF);
+    pf2_base.fnirs.bvoxy(data,curProbe.TableCh.OptodeNumber,curProbe.TableCh.Wavelength,curProbe.TableOpt.SD,baselineSamples,subAge,[],true,'NoPathlength',NoPathlength,'DiffPathlengthFactor',fixedDPF);
 outData.time=PF2.GUIPF2.data.time;
 
                                                           %BASELINE
@@ -772,7 +779,7 @@ bioM_list={'HbO','HbR','HbDiff','HbTotal','CBSI'};
 
 validChannels=false(size(data.channels));
 numChannels=length(data.channels(data.channels>0));
-validChannels(data.channels>0)=data.channels(data.channels>0)&(reshape(PF2.GUIPF2.data.fchMask>PF2.RejectLevel|outputData.ProcessRejected,[1,numChannels]));
+validChannels(data.channels>0)=data.channels(data.channels>0)&(reshape(PF2.GUIPF2.data.fchMask>PF2.RejectLevel|outputData.ProcessRejected,[numChannels,1]));
 
 curfMask=PF2.GUIPF2.data.fchMask>PF2.RejectLevel|outputData.ProcessRejected;
 
@@ -1068,7 +1075,7 @@ if(pf2_base.isnestedfield(outData,'ROI.info')&&~isempty(outData.ROI.info)&&~isfi
 end
 
 invalidChannels=false(size(data.channels));
-invalidChannels(data.channels>0)=data.channels(data.channels>0)&(reshape(~curfMask&~outputData.ProcessRejected,[1,numChannels]));
+invalidChannels(data.channels>0)=data.channels(data.channels>0)&(reshape(~curfMask&~outputData.ProcessRejected,[numChannels,1]));
 PF2.GUIPF2.data.curChMask=curfMask;
 
 
@@ -1109,13 +1116,27 @@ end
 
 if(PF2.mergedProbe) %All channel numbers are unique for merged probes
     for i =1:length(setF.device.Probe)
-        PF2.curChSet=[PF2.curChSet,setF.device.Probe{i}.ChannelNumbers];
-        PF2.curProbeInd=[PF2.curProbeInd,i*length(setF.device.Probe{i}.ChannelNumbers)];
-    
-        PF2.curWvSet=[PF2.curWvSet,setF.device.Probe{i}.Wavelength];
-        PF2.curSDSet=[PF2.curSDSet,setF.device.Probe{i}.SD];
+        curProbe=setF.device.Probe{i};
+        
+        curChTable=curProbe.TableCh;
+        curOptTable=curProbe.TableOpt;
+        curSDTable=curProbe.TableSD;
+        
+        curChTable.ProbeInd(:)=i;
+        curOptTable.ProbeInd(:)=i;
+        curSDTable.ProbeInd(:)=i;
+        
+        if(i==1)
+            PF2.curCh=curChTable;
+            PF2.curOpt=curOptTable;
+            PF2.curSD=curSDTable;
+        else
+            PF2.curCh=[PF2.curCh;curChTable];
+            PF2.curOpt=[PF2.curOpt;curOptTable];
+            PF2.curSD=[PF2.curSD;curSDTable];
+        end
     end
-    PF2.timeIndex=find(PF2.curChSet==0);
+    PF2.timeIndex=find(PF2.curCh.isTime);
     if(isempty(PF2.timeIndex)||setF.device.Info.TimeIsSampleCount)
         if(~setF.device.Info.TimeIsSampleCount)
             warning('Time column could not be found, assuming each row contains samples only');
@@ -1807,9 +1828,10 @@ PF2.curProbeInd=[];
 
 if(PF2.mergedProbe) %All channel numbers are unique for merged probes
     for i =1:length(setF.device.Probe)
-        PF2.curProbeInd=[PF2.curProbeInd,i*length(setF.device.Probe{i}.ChannelNumbers)];
-        PF2.curChSet=[PF2.curChSet,setF.device.Probe{i}.ChannelNumbers];
-        PF2.curWvSet=[PF2.curWvSet,setF.device.Probe{i}.Wavelength];
+        curProbe=setF.device.Probe{i};
+        PF2.curProbeInd=[PF2.curProbeInd,i*length(curProbe.TableCh.OptodeNumber)];
+        PF2.curChSet=[PF2.curChSet,curProbe.TableCh.OptodeNumber];
+        PF2.curWvSet=[PF2.curWvSet,curProbe.TableCh.Wavelength];
     end
 
     tempWvSet=sort(unique(PF2.curWvSet));
@@ -2595,7 +2617,8 @@ probeTable=table([],[],[],[],{},'VariableNames',{'ProbeNum','Index','Optode','Wv
 optodeTable=table([],[],[],[],[],{},{},'VariableNames',{'ProbeNum','Optode','ManualRej','AutoRej','IsROI','Label','Optodes_roi'});
 for i=1:length(setF.device.Probe)
     probeNum=i;
-    rawChannels=setF.device.Probe{probeNum}.ChannelNumbers;
+    curProbe=setF.device.Probe{probeNum};
+    rawChannels=curProbe.TableCh.OptodeNumber;
     numCh=length(rawChannels);
     probeChIdx=1:numCh;
     startIdx_probe=size(probeTable,1)+1;
@@ -2603,7 +2626,7 @@ for i=1:length(setF.device.Probe)
     probeTable.Index(startIdx_probe:endIdx_probe)=probeChIdx;
     probeTable.Optode(startIdx_probe:endIdx_probe)=rawChannels;
     probeTable.ProbeNum(startIdx_probe:endIdx_probe)=probeNum;
-    probeTable.Wv(startIdx_probe:endIdx_probe)=setF.device.Probe{probeNum}.Wavelength;
+    probeTable.Wv(startIdx_probe:endIdx_probe)=curProbe.TableCh.Wavelength;
     
     %if(i==1)%need to convert to string only the first time
     %    probeTable.Label{startIdx_probe:endIdx_probe}=num2str(probeTable.Label);

@@ -91,6 +91,14 @@ if(include_ss&&length(probeInfo.OptLayout2D_ss)>length(data2plot)&&length(probeI
    warning('Not enough data for all channels, ignoring short separation channels');
 end
 
+if(pf2_base.isnestedfield(probeInfo,'OptPos.subplot_layout_ss'))
+	optLayout=probeInfo.OptPos.subplot_layout_ss;
+elseif(pf2_base.isnestedfield(probeInfo,'OptPos.subplot_layout'))
+	optLayout=probeInfo.OptPos.subplot_layout;
+else
+   plotArranged=false; 
+end
+
 if(include_ss)
     numOptodes=probeInfo.NumOptodes;
     channelList=probeInfo.ChannelList;
