@@ -325,13 +325,13 @@ end
         printOnce=false; % flag for multiple printing
         flagOnce=false;
         
-        if(isfield(probeInfo,'OptLayout2D_ss'))
-            optLayout=probeInfo.OptLayout2D_ss;
-        elseif(isfield(probeInfo,'OptLayout2D'))
-            optLayout=probeInfo.OptLayout2D;
-        else
-            plotArranged=false;
-        end
+        if(pf2_base.isnestedfield(probeInfo,'OptPos.subplot_layout_ss'))
+			optLayout=probeInfo.OptPos.subplot_layout_ss;
+		elseif(pf2_base.isnestedfield(probeInfo,'OptPos.subplot_layout'))
+			optLayout=probeInfo.OptPos.subplot_layout;
+		else
+		   plotArranged=false; 
+		end
         
         h=cell(0);
         for(optIdx=1:length(channels))
