@@ -11,15 +11,15 @@ end
 
 if(isfield(fNIR,'HbO')&&~isempty(fNIR.HbO))
     if(nargout>0)
-        varargout{1:nargout}=pf2.Data.Plot.OxyWrapper(fNIR,varargin{:});
+        varargout{1:nargout}=pf2.Data.Plot.Oxy(fNIR,varargin{:});
     else
-        pf2.Data.Plot.OxyWrapper(fNIR,varargin{:});
+        pf2.Data.Plot.Oxy(fNIR,varargin{:});
     end
 elseif(isfield(fNIR,'raw')&&~isempty(fNIR.raw))
     if(nargout>0)
-        varargout{1:nargout}=pf2.Data.Plot.RawWrapper(fNIR,varargin{:});
+        varargout{1:nargout}=pf2.Data.Plot.Raw(fNIR,varargin{:});
     else
-        pf2.Data.Plot.RawWrapper(fNIR,varargin{:});
+        pf2.Data.Plot.Raw(fNIR,varargin{:});
     end
 end
 
