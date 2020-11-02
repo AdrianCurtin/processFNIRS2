@@ -593,7 +593,7 @@ if(isempty(itemsToSkipPlot))
     axis('image');
 end
 
-plotFNIRS_SD=showSD&&~contains(itemsToSkipPlot,'ProbeSrc');
+plotFNIRS_SD=showSD&&~contains('ProbeSrc',itemsToSkipPlot);
 plot1020=show1020;
 brainColor=p.Results.brainColor;
 cMdl=cerebro_mdl;
