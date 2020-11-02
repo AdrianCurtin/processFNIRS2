@@ -4,9 +4,10 @@ subplot(1, 2, 1);
 pf2_base.loadDeviceCfg('fNIR_Devices_fNIR1000.cfg');
 fnirData = [1, 2, 1, 2, 2, 3, 3, 3, 4, 3, 4, 2, 3, 3, 1, 1];
 pf2.Data.Plot.InterpolateValues3D(fnirData, 'ChannelLabels', false, 'SDLabels', false);
+title('Linear');
 subplot(1, 2, 2);
 pf2.Data.Plot.InterpolateValues3D(fnirData, 'ChannelLabels', false, 'SDLabels', false, 'InterpolateType', 'linear');
-
+title('Interpolate');
 
 %% Multiple Probes
 % Combine sample data on two different probes on the same graph
@@ -38,17 +39,19 @@ subplot(1, 2, 1);
 pf2_base.loadDeviceCfg('fNIR_Devices_fNIR1000.cfg');
 fnirData = [1, 2, 1, 2, 2, 3, 3, 3, 4, 3, 4, 2, 3, 3, 1, 1];
 pf2.Data.Plot.InterpolateValues3D(fnirData, 'ChannelLabels', false, 'SDLabels', false, 'InterpolateType', 'linear', 'bufferDistance', 25, 'showColorbar', false);
+title('DrawBuffer 25');
 subplot(1, 2, 2);
 pf2.Data.Plot.InterpolateValues3D(fnirData, 'ChannelLabels', false, 'SDLabels', false, 'InterpolateType', 'linear', 'bufferDistance', 50, 'showColorbar', false);
-
+title('DrawBuffer 50');
 %% Initial Camera Position
 hitachi35 = pf2.Import.SampleData.Hitachi_ETG4000_3x5();
 fnir1200 = pf2.Import.SampleData.fNIR1200();
 subplot(2, 1, 1);
 pf2.Data.Plot.InterpolateValues3D({1:16, 1:22}, {fnir1200, hitachi35}, 'initCamPosition', 'front', 'ChannelLabels', false, 'SDLabels', false);
+title('Front');
 subplot(2, 1, 2);
 pf2.Data.Plot.InterpolateValues3D({1:16, 1:22}, {fnir1200, hitachi35}, 'initCamPosition', 'left', 'ChannelLabels', false, 'SDLabels', false);
-
+title('Left');
 %% Colorbar title
 pf2_base.loadDeviceCfg('Hitachi_ETG4000_3x5.cfg');
 pf2.Data.Plot.InterpolateValues3D(1:22, 'interpolateType', 'quadratic', 'colorbarStr', "HbO");
@@ -86,6 +89,14 @@ pf2.Data.Plot.InterpolateValues3D(1:16, 'showScattering', true, "brainAlpha", 0.
 pf2_base.loadDeviceCfg('Hitachi_ETG4000_3x5.cfg');
 pf2.Data.Plot.InterpolateValues3D(1:22, 'showScattering', true, "brainAlpha", 0.7, "scatteringFactor", 0.5);
 
+
+%% Plot optical pathways for NIRX and FNIRS 
+pf2_base.loadDeviceCfg('NIRX_Sport_16x16_parietal.cfg');
+pf2.Data.Plot.InterpolateValues3D({([1:16]*5/16+3)*-1, [[1:48]*5/48]+3}, {'fNIR_Devices_fNIR1000', 'NIRX_Sport_16x16_parietal'}, 'initCamPosition', 'left', 'ChannelLabels', true, 'SDLabels', true,'showScattering', true,'cmap', 'autumn', 'cmap_lower', 'winter', 'minVal', [-1,1],"brainAlpha", 0.85,'brainColor', [1 1 1]*0.8);
+
+%% Plot optical pathways for NIRX Only
+pf2_base.loadDeviceCfg('NIRX_Sport_16x16_parietal.cfg');
+pf2.Data.Plot.InterpolateValues3D({1:48}, {'NIRX_Sport_16x16_parietal'}, 'initCamPosition', 'left', 'ChannelLabels', true, 'SDLabels', true,'showScattering', true);
 %% Animation test
 
 
@@ -94,10 +105,12 @@ ax=gca();
 
 fnir1200 = pf2.Import.SampleData.fNIR1200();
 
-optData=[(1:16)/16];
+optData=rand(1,16)*10-4;
+
+fData=rand(1,16)*2+10;
 
 for i=1:50
     
-    pf2.Data.Plot.InterpolateValues3D(optData.*sin(optData*i/20*pi), fnir1200,'ax',ax, 'initCamPosition', 'front', 'ChannelLabels', true, 'SDLabels', false,'minVal',0.2,'maxVal',1);
+    pf2.Data.Plot.InterpolateValues3D(optData.*sin(fData*i/100*pi+fData), fnir1200,'ax',ax,'useHighRes', true, 'initCamPosition', 'front', 'ChannelLabels', true, 'SDLabels', false,'minVal',0.2,'maxVal',max(optData),'animated',true);
     pause(0.0001);
 end

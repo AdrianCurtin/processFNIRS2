@@ -82,11 +82,13 @@ addParameter(p, 'useVoxelBrodmannAreas', false, @islogical); % Colors in Brodman
 addParameter(p, 'showVoxelBrain', false, @islogical); % Colors in Brodmann areas
 centerCamPos=[0,-20,0];
 addParameter(p, 'camTarget', centerCamPos, validCamPosition); % Colors in Brodmann areas
+addParameter(p, 'animated', false, @islogical); % Optimizes for animation (By not redrawing certain things when possible)
+
+
 
 parse(p,varargin{:});
 
 
-figure(gcf);
 
 data2plot = p.Results.data2plot;
 multiprobe = iscell(data2plot);
@@ -130,38 +132,73 @@ if(iscell(fNIR)&&all(dataEmpty))
     end
 end
 
+animationOptimized=p.Results.animated;
+
+cbarUpper_minmax=[nan,nan];
+cbarLower_minmax=[nan,nan];
+
 minVal = p.Results.minval;
 maxVal = p.Results.maxval;
+
+negColorbar=false; % Enabled when only negative color bar is present and min>max
+
+
 if(isempty(p.Results.minval))
     minVal = nanmin(data2plot_concat);
 end
+
 if(length(minVal)==2)
     twosided = true;
+    minVal=sort(minVal);
 else
     twosided = false;
 end
 
-if(isempty(maxVal))
+if(length(maxVal)==2)
+    twosided=true;
+    maxVal=sort(maxVal);
+elseif(length(maxVal)==1)
+    if(~twosided&&minVal>maxVal)
+        negColorbar=true; 
+    end
+end
+
+if(isempty(maxVal)) % No max value specified
     if(~twosided)
-        maxVal = nanmax(data2plot_concat);
+        %[X,X] [Min1, Datamax]
+        maxVal=nanmax(data2plot_concat);
+        cbarUpper_minmax=[minVal maxVal];
     else
-        maxVal = [nanmin(data2plot_concat) nanmax(data2plot_concat)];
+        %[DataMin, Min2] [Min1, Datamax] or DataMin-1e-3, DataMax+1e-3
+        dataMaxVal=max(max(minVal)+1e-3,nanmax(data2plot_concat));
+        cbarUpper_minmax=[max(minVal) dataMaxVal];
+        dataMinVal=min(min(minVal)-1e-3,nanmin(data2plot_concat));
+        cbarLower_minmax=[dataMinVal min(minVal)];
     end
-elseif(length(maxVal) == 1 && length(minVal) == 2)
-    if min(minVal) < maxVal && maxVal < max(minVal)
-        temp = maxVal;
-        maxVal = [minVal(1) minVal(2)];
-        minVal = [temp temp];
+elseif(length(maxVal) == 1 && length(minVal) == 2) % One Max value specified
+    % If a max value is in the middle, then it is the 0
+    if maxVal > min(minVal)  && maxVal < max(minVal)
+        % [Min1 Max Min2]
+        s = sort([minVal, maxVal]);
+        cbarLower_minmax=s(1:2);
+        cbarUpper_minmax=s(2:3);
     else
+        % [-Max Min1], [Min2 Max]
         maxVal = [-abs(maxVal) abs(maxVal)];
+        s = sort([minVal, maxVal]);
+        cbarLower_minmax=s(1:2);
+        cbarUpper_minmax=s(3:4);
     end
-elseif(length(maxVal) == 2 && length(minVal) == 1)
-    minVal = min(maxVal);
-    maxVal = max(maxVal);
-elseif(length(maxVal) == 2 && length(minVal) == 2)
+elseif(length(maxVal) == 2 && length(minVal) == 1) % Two Max value specified, one min, two colorbars
     s = sort([minVal, maxVal]);
-    maxVal = s([1, 4]);
-    minVal = s([2, 3]);
+    cbarLower_minmax=s(1:2);
+    cbarUpper_minmax=s(2:3);
+elseif(length(maxVal) == 2 && length(minVal) == 2) % Everything specified
+    s = sort([minVal, maxVal]);
+    cbarLower_minmax=s(1:2);
+    cbarUpper_minmax=s(3:4);
+elseif(length(maxVal)==1 && length(minVal)==1)
+    cbarUpper_minmax=sort([minVal, maxVal]);
 end
 
 if(p.Results.logScale)
@@ -169,8 +206,8 @@ if(p.Results.logScale)
         error("Cannot use logscale when data contains negative values")    
    end
    data2plot_concat = log(data2plot_concat);
-   minVal = log(minVal);
-   maxVal = log(maxVal);
+   cbarLower_minmax=log(cbarUpper_minmax);
+   cbarUpper_minmax=log(cbarUpper_minmax);
 end
 
 titleString = p.Results.titleString;
@@ -254,23 +291,36 @@ showChannels = p.Results.ChannelLabels;
 hold off
 
 
+
 itemsToDelete={'BrainVoxel','BA_area_mrk','Eye','ProbeOpt','OptLabel','ProbeSrc','ProbeSrcLabel','ProbeDet','ProbeDetLabel','Scatter1020','Label1020','ScatterCurve','OptLines','BrainRef'};
 
-
+grootHandle=groot;
+grootHandle.ShowHiddenHandles=true;
+itemsToSkipPlot=cell(0);
+j=1;
 for i=1:length(itemsToDelete)
     item = findobj(gcf, "Tag", itemsToDelete{i});
-    if(~isempty(item))
+    if(~isempty(item)&&~animationOptimized)
         delete(item);
+    elseif(~isempty(item)&&animationOptimized)
+        itemsToSkipPlot{j}=itemsToDelete{i};
+        j=j+1;
     end
 end
+grootHandle.ShowHiddenHandles=false;
 
 probeInfo=[];
 
 if(multiprobe)
     num_devices = length(fNIR);
     probeInfos = {};
+    maxSrcIdx=0;
+    maxDetIdx=0;
     for i=1:num_devices
-        if(pf2_base.isnestedfield(fNIR{i}, 'info.probename')&&isfield(fNIR{i}.info, 'probename')&&~contains(fNIR{i}.info.probename,'Unknown')) 
+        if(isstring(fNIR{i})||ischar(fNIR{i}))
+            cfgFilePath=sprintf('%s.cfg', fNIR{i}); 
+            
+        elseif(pf2_base.isnestedfield(fNIR{i}, 'info.probename')&&isfield(fNIR{i}.info, 'probename')&&~contains(fNIR{i}.info.probename,'Unknown')) 
             cfgFilePath = sprintf('%s.cfg', fNIR{i}.info.probename); 
         else
             cfgFilePath = '';
@@ -285,6 +335,10 @@ if(multiprobe)
             probeInfos{i}=probeInfos{i}.Probe{probeNum};
             probeInfos{i}.TableOpt.ProbeNum(:,1)=i;
             probeInfos{i}.TableSD.ProbeNum(:,1)=i;
+            probeInfos{i}.TableOpt.SrcIdx=probeInfos{i}.TableOpt.SrcIdx+maxSrcIdx;
+            maxSrcIdx=maxSrcIdx+max(probeInfos{i}.TableOpt.SrcIdx);
+            probeInfos{i}.TableOpt.DetIdx=probeInfos{i}.TableOpt.DetIdx+maxDetIdx;
+            maxDetIdx=maxDetIdx+max(probeInfos{i}.TableOpt.DetIdx);
             probeInfos{i}.TableOpt.HasData(:,1)=~dataEmpty(i);
         else
             error('Unable to identify probe'); 
@@ -331,9 +385,9 @@ if(multiprobe)
     
 
     
-    probeInfo.OptPos3D_mean = [nanmean(probeInfo.OptPos3DX) nanmean(probeInfo.OptPos3DY) nanmean(probeInfo.OptPos3DZ)];
-    probeInfo.NumShortSeparation = sum(probeInfo.IsShortSeparation);
-    probeInfo.NumOptodes = length(probeInfo.OptPosX);
+    probeInfo.OptPos3D_mean = [nanmean(probeInfo.OptPos.x) nanmean(probeInfo.OptPos.y) nanmean(probeInfo.OptPos.z)];
+    probeInfo.NumShortSeparation = sum(probeInfo.TableOpt.IsShortSeparation);
+    probeInfo.NumOptodes = length(probeInfo.OptPos.x);
 else
     if(p.Results.useEEG && isempty(fNIR))
        probeDraw = {};
@@ -377,6 +431,7 @@ else
         probeInfo=probeInfo.Probe{probeNum};
         
         probeInfo.TableOpt.HasData(:,1)=~dataEmpty;
+        probeInfo.TableOpt.ProbeNum(:,1)=1;
         
     elseif(~p.Results.useEEG)
        error('Unable to identify probe'); 
@@ -415,6 +470,10 @@ if(show1020)
        probeInfo.OptPos3DY = c1020.y;
        probeInfo.OptPos3DZ = c1020.z;
        
+       probeInfo.OptPos.x=c1020.x;
+       probeInfo.OptPos.y=c1020.y;
+       probeInfo.OptPos.z=c1020.z;
+       
        probeInfo.NumOptodes = height(c1020);
        probeInfo.IsShortSeparation = zeros(1, probeInfo.NumOptodes);
        probeInfo.OptPos3D_mean = nanmean([probeInfo.OptPos3DX probeInfo.OptPos3DY probeInfo.OptPos3DZ]);
@@ -437,7 +496,7 @@ if(isfield(probeInfo, 'TableOpt'))
     
     includeChannels=probeInfo.TableOpt.HasData&(include_ss||~probeInfo.IsShortSeparation);
     
-    channelList=probeInfo.ChannelList(includeChannels);
+    channelList=probeInfo.TableOpt.OptodeNum(includeChannels);
     numOptodes=length(channelList);
     
     srcIdx=probeInfo.TableSD.Type=='Src';
@@ -461,12 +520,16 @@ if(isfield(probeInfo, 'TableOpt'))
     probeInfo.TableOpt.sdDist=sqrt(sum(probeInfo.TableOpt.sd.^2,2));
 
     % formula for ellipse: C + a cos(theta) U + b sin(theta) V
+    
+    uProbe=unique(probeInfo.TableOpt.ProbeNum);
+    
     probeInfo.TableOpt.b(:,1)=probeInfo.TableOpt.sdDist/2;
     probeInfo.TableOpt.a(:,1)=probeInfo.TableOpt.b*p.Results.scatteringFactor;
     probeInfo.TableOpt.U=probeInfo.TableOpt.sd./vecnorm(probeInfo.TableOpt.sd')';
     probeInfo.TableOpt.V=centerCamPos-probeInfo.TableOpt.OptPos;
     probeInfo.TableOpt.V=probeInfo.TableOpt.V./vecnorm(probeInfo.TableOpt.V')';
     probeInfo.TableOpt.VectorDir=probeInfo.TableOpt.OptPos+probeInfo.TableOpt.V.*probeInfo.TableOpt.sdDist/3;
+    
 
 end
 
@@ -488,7 +551,7 @@ end
 %h{1}= axes('Position',[0.05,0.05,0.9,0.9],'Box','on');
 
 
-optPos=[probeInfo.OptPos3DX(includeChannels),probeInfo.OptPos3DY(includeChannels),probeInfo.OptPos3DZ(includeChannels)];
+optPos=[probeInfo.OptPos.x(includeChannels),probeInfo.OptPos.y(includeChannels),probeInfo.OptPos.z(includeChannels)];
 
 if(p.Results.useTalairach)
      optPos=pf2_base.external.icbm_fsl2tal(optPos);
@@ -498,26 +561,39 @@ OptPos3D_mean=nanmean(optPos,1);
 
 
 if(isnan(bufferDistance))
-   bufferDistance=median(probeInfo.SD(includeChannels))*10/sqrt(2);
+   bufferDistance=median(probeInfo.TableOpt.SD(includeChannels))*10/sqrt(2);
 end
 
 
 
 % TAL EEG locations from Automated cortical projection of EEG sensors: Anatomical correlation via the international 10–10 system
+h=gcf;
 if(useHighRes)
-    cerebro_mdl=load('cerebro_mdl.mat');    %high res model
-    cerebro_mdl=cerebro_mdl.cerebro_mdl;
+    if(isfield(h,'UserData')&&isfield(h.UserData,'cMdl_high'))
+        cerebro_mdl=h.UserData.cMdl_high;
+    else
+        cerebro_mdl=load('cerebro_mdl.mat');    %high res model
+        cerebro_mdl=cerebro_mdl.cerebro_mdl;
+        h.UserData.cMdl_high=cerebro_mdl;
+    end
 else
-    cerebro_mdl=load('cerebro_mdl_05.mat');  %Low-res model
-    cerebro_mdl=cerebro_mdl.cerebro_mdl;
+    if(isfield(h,'UserData')&&isfield(h.UserData,'cMdl_low'))
+        cerebro_mdl=h.UserData.cMdl_low;
+    else
+        cerebro_mdl=load('cerebro_mdl_05.mat');    %high res model
+        cerebro_mdl=cerebro_mdl.cerebro_mdl;
+        h.UserData.cMdl_low=cerebro_mdl;
+    end
 end
 
 %
 
-camproj('perspective');
-axis('image');
+if(isempty(itemsToSkipPlot))
+    camproj('perspective');
+    axis('image');
+end
 
-plotFNIRS_SD=showSD;
+plotFNIRS_SD=showSD&&~contains(itemsToSkipPlot,'ProbeSrc');
 plot1020=show1020;
 brainColor=p.Results.brainColor;
 cMdl=cerebro_mdl;
@@ -610,9 +686,16 @@ end
 
 
 
-if(p.Results.showVoxelBrain)
-    mni_t1=load('mni_t1.mat');
-    mni_t1=mni_t1.mni_t1;
+if(p.Results.showVoxelBrain&&~contains(itemsToSkipPlot,'BrainVoxel'))
+    h=gcf;
+    if(isfield(h,'UserData')&&isfield(h.UserData,'mni_t1'))
+        mni_t1=h.UserData.mni_t1;
+    else
+        mni_t1=load('mni_t1.mat');
+        mni_t1=mni_t1.mni_t1;
+        h.UserData.mni_t1=mni_t1;
+    end
+    
     center=[91,127,73];
     szM=size(mni_t1);
     
@@ -641,9 +724,15 @@ if(p.Results.showVoxelBrain)
    lighting('none');
     
     if(p.Results.useVoxelBrodmannAreas)
-
-        brdm=load('brodmann.mat');
-        brdm=brdm.brdm;
+        h=gcf;
+        if(isfield(h,'UserData')&&isfield(h.UserData,'brdm'))
+            brdm=h.UserData.brdm;
+        else
+            brdm=load('brodmann.mat');
+            brdm=brdm.brdm;
+            h.UserData.brdm=brdm;
+        end
+       
         
         brdm=brdm(1:voxelRes:end,1:voxelRes:end,1:voxelRes:end);
 
@@ -692,7 +781,7 @@ if(p.Results.showVoxelBrain)
 
          bd_mni_intensity=mni_t1(bdI);
 
-         mni_t1(bdI)=0;
+          mni_t1(bdI)=0;
           bdxyz=xyz2mni(bdx,bdy,bdz);
 
 
@@ -781,19 +870,35 @@ if(~all(dataEmpty))
 
     c_min = nanmin(C, [], 'all');
     c_max = nanmax(C, [], 'all');
+    
+    nColorsMaxBar=1024;
+    cbarUpperRange=max(cbarUpper_minmax)-min(cbarUpper_minmax);
+    
     if twosided
-       if minVal(1) - maxVal(1) > maxVal(2) - minVal(2)
-           range = minVal(1) - maxVal(1);
-           cmap = colormap([cmap_low(256);
-                   repmat(brainColor, round(256*(minVal(2) - minVal(1))/range), 1);
-                   cmap_high(round(256*(maxVal(2) - minVal(2))/range))]);
+       cbarLowerRange=max(cbarLower_minmax)-min(cbarLower_minmax);
+       cbarRangeFull=max(cbarUpper_minmax)-min(cbarLower_minmax);
+       cbarOverlappingRange=min(cbarUpper_minmax)-max(cbarLower_minmax);
+       cbarIsOverlapping=cbarOverlappingRange>0;
+       
+       
+       
+       fracUpper=cbarUpperRange/cbarRangeFull;
+       fracLower=cbarLowerRange/cbarRangeFull;
+       fracOverlap=cbarOverlappingRange/cbarRangeFull;
+       
+       nColorLower=floor(fracLower*nColorsMaxBar)+1;
+       nColorUpper=floor(fracUpper*nColorsMaxBar)+1;
+       nOverlap=floor(fracOverlap*nColorsMaxBar)+1;
+       
+       if cbarIsOverlapping %non-overlapping colorbars
+           cmap = colormap([cmap_low(nColorLower);
+                   repmat(brainColor, nOverlap, 1);
+                   cmap_high(nColorUpper)]);
        else
-           range = maxVal(2) - minVal(2);
-           cmap = colormap([cmap_low(round(256*(minVal(1) - maxVal(1))/range));
-                   repmat(brainColor, round(256*(minVal(2) - minVal(1))/range), 1);
-                   cmap_high(256)]);
+           cmap = colormap([cmap_low(nColorLower);
+                   cmap_high(nColorUpper)]);
        end
-       c_ind = round(length(cmap)*(C(:) - maxVal(1))/(maxVal(2) - maxVal(1)));
+       c_ind = round(length(cmap)*(C(:) - min(cbarLower_minmax))/(cbarRangeFull)); %Renormalize to min/max of 0 and 1
        %for i=1:num_control  
           %if C(i) <= minVal(1)
           %    c_ind(i) = round(length(cmap)*(C(i) - c_min)/range);
@@ -805,21 +910,21 @@ if(~all(dataEmpty))
           %    c_ind(i) = round(length(cmap)*(C(i) - minVal(2))/range);
        %end
     else
-        if minVal < maxVal
+        if ~negColorbar
             if(p.Results.logScale)
-                cmap = [cmap_high(256)];
+                cmap = [cmap_high(nColorsMaxBar)];
             else
-                cmap = [cmap_high(256)];
+                cmap = [cmap_high(nColorsMaxBar)];
             end
-        else
+        else 
             if(p.Results.logScale)
-                cmap = [flip(cmap_low(256))];
+                cmap = [flip(cmap_low(nColorsMaxBar))];
             else
-                cmap = [flip(cmap_low(256))];
+                cmap = [flip(cmap_low(nColorsMaxBar))];
             end
         end
 
-        c_ind = round(length(cmap)*(C(:) - minVal)/(maxVal - minVal));
+        c_ind = round(length(cmap)*(C(:) - min(cbarUpper_minmax))/cbarUpperRange);
     end
 
     switch(projectmode)
@@ -857,7 +962,7 @@ if(~all(dataEmpty))
             Cs(v_ind < 0, :) = repmat(brainColor, sum(v_ind < 0), 1);
             Cs(ind == 0,:) = repmat(brainColor, sum(ind == 0), 1);    
     end
-else
+else % No data to plot, everything is brain and anatomy
     Cs = repmat(brainColor, size(mdl.v, 1), 1);
     
     if(showBrodmann&&~p.Results.showVoxelBrain)
@@ -869,8 +974,14 @@ else
         
         if(p.Results.useVoxelBrodmannAreas)
 
-                brdm=load('brodmann.mat');
-                brdm=brdm.brdm;
+                h=gcf;
+                if(isfield(h,'UserData')&&isfield(h.UserData,'brdm'))
+                    brdm=h.UserData.brdm;
+                else
+                    brdm=load('brodmann.mat');
+                    brdm=brdm.brdm;
+                    h.UserData.brdm=brdm;
+                end
 
                 center=[90,126,72];
                 szB=size(brdm);
@@ -979,7 +1090,7 @@ end
 
 mrkScaleFactor=22;
 
-if(showChannels&&isfield(probeInfo, 'TableOpt'))
+if(showChannels&&isfield(probeInfo, 'TableOpt')&&~contains('ProbeOpt',itemsToSkipPlot))
     optPos = [probeInfo.TableOpt.Pos3D_x probeInfo.TableOpt.Pos3D_y probeInfo.TableOpt.Pos3D_z];
     
     if(p.Results.useTalairach)
@@ -1014,7 +1125,7 @@ if(showChannels&&isfield(probeInfo, 'TableOpt'))
     end
 end
 
-if(plotFNIRS_SD)
+if(plotFNIRS_SD&&isfield(probeInfo,'TableSD'))
     %srcIdx=probeInfo.TableSD.Type=='Src';
     %detIdx=~srcIdx;
     
@@ -1053,7 +1164,7 @@ if(plotFNIRS_SD)
     end
 end
 
-if(plot1020)
+if(plot1020&&~contains('Scatter1020',itemsToSkipPlot))
 
 for i=1:size(c1020,1)
     %text(cerebro1020(i,1),cerebro1020(i,2),cerebro1020(i,3),cerebro1020_labels{i})
@@ -1077,121 +1188,58 @@ for i=1:size(c1020,1)
 end
 end
 
-xlabel('x (R/L)');
-ylabel('y (R/C)');
-zlabel('z (U/D)');
+if(isempty(itemsToSkipPlot))
+
+        xlabel('x (R/L)');
+        ylabel('y (R/C)');
+        zlabel('z (U/D)');
 
 
-if(isnumeric(p.Results.initCamPosition))
-    campos(p.Results.initCamPosition);
-else 
-    switch(p.Results.initCamPosition)
-        case 'auto'
-            campos(nanmean(optPos,1)/norm(nanmean(optPos,1))*1500);   %Front facing
-        case 'front'
-            campos([0,1200,0]);
-        case 'back'
-            campos([0,-1200,0]);
-        case 'top'
-            campos([0,0,1500]);
-        case 'left'
-            campos([-1200,0,0]);  
-        case 'right'
-            campos([1200,0,0]);
-        case 'face'
-            campos([0,1200,-300]);
-        otherwise
-            warning('Invalid camera position');
-            campos(OptPos3D_mean/norm(OptPos3D_mean)*1500);  %Front facing
+
+    if(isnumeric(p.Results.initCamPosition))
+        campos(p.Results.initCamPosition);
+    else 
+        switch(p.Results.initCamPosition)
+            case 'auto'
+                campos(nanmean(optPos,1)/norm(nanmean(optPos,1))*1500);   %Front facing
+            case 'front'
+                campos([0,1200,0]);
+            case 'back'
+                campos([0,-1200,0]);
+            case 'top'
+                campos([0,0,1500]);
+            case 'left'
+                campos([-1200,0,0]);  
+            case 'right'
+                campos([1200,0,0]);
+            case 'face'
+                campos([0,1200,-300]);
+            otherwise
+                warning('Invalid camera position');
+                campos(OptPos3D_mean/norm(OptPos3D_mean)*1500);  %Front facing
+        end
     end
-end
 
 
 
 
-campPosTarget=p.Results.camTarget;
-camtarget(campPosTarget);
+    campPosTarget=p.Results.camTarget;
+    camtarget(campPosTarget);
 
-lht2=findobj(gca,'Type','Light','Tag','Rear');
-if(isempty(lht2))
-    lht2=camlight('left');
-    lht2.Tag='Rear';
-    lht2.Position=[0,-100,90];
-    lht2.Color=camColor;
-else
-    
-end
-
-
-title(ax, titleString);
-if(p.Results.showColorbar && ~all(dataEmpty))
-    cbars = findobj(gcf, "Type", "ColorBar");
-    delete(cbars);
-    ax1=ax;
-    curAxPosition=ax1.Position;
-    
-    if(~twosided)
-        
-        if(maxVal>minVal)
-            colormap(ax1,cmap_high(256));
-            negColorbar=false;
-        else
-            colormap(ax1,cmap_low(256));
-            temp=minVal;
-            minVal=maxVal;
-            maxVal=temp;
-            negColorbar=true;
-        end
-        
-        chPos=colorbar(ax1);
-        
-        if(p.Results.logScale)
-            set(ax1, 'ColorScale', 'log');
-            caxis(ax1, [exp(minVal), exp(maxVal)]);
-        else
-            caxis(ax1, [minVal, maxVal]);
-        end
-        
-        set(get(chPos, 'title'), 'string', clrBarTitle);
+    lht2=findobj(gca,'Type','Light','Tag','Rear');
+    if(isempty(lht2))
+        lht2=camlight('left');
+        lht2.Tag='Rear';
+        lht2.Position=[0,-100,90];
+        lht2.Color=camColor;
     else
-        curAxPosition=ax1.OuterPosition;
 
-        colormap(ax1,cmap_high(256));
-        caxis(ax1, [minVal(2), maxVal(2)]);
-
-        ax2=axes('OuterPosition',curAxPosition);
-        ax2.Position=ax1.Position;
-
-        set(gca,'xtick',[]);
-        set(gca,'ytick',[]);
-
-        %set( chNeg, 'YDir', 'reverse' );
-        colormap(ax2,cmap_low(256));
-        caxis(ax2, [maxVal(1), minVal(1)]);
-        %caxis([-1*minVal(1),-1*maxVal(2)])
-
-        axis off
-
-        curAxInnerPosition=ax1.Position;
-
-        linkprop([ax1, ax2],{'CameraUpVector', 'CameraPosition', 'CameraTarget', 'XLim', 'YLim', 'ZLim'});
-        %set([ax1,ax2],'Position',[.05 .11 .885 .815]);
-        chPos=colorbar(ax1);
-        chPos.Tag = "Main";
-        
-        set(get(chPos, 'title'), 'string', clrBarTitle);
-        %chPos_position=chPos.OuterPosition;
-        cbHeight=curAxInnerPosition(4)/2;
-
-        set(chPos,'Position',[curAxInnerPosition(1)+curAxInnerPosition(3),curAxInnerPosition(2)+cbHeight,0.02,cbHeight]);
-
-
-        chNeg=colorbar(ax2,'Position',[curAxInnerPosition(1)+curAxInnerPosition(3),curAxInnerPosition(2)-cbHeight/5,0.02,cbHeight]); 
-        chNeg.Tag = "Lower";
     end
+
 end
 
-if(p.Results.showScattering||p.Results.optodeLines)
+
+if(p.Results.showScattering||p.Results.optodeLines)&&~contains('OptLines',itemsToSkipPlot)&&~contains('ScatterCurve',itemsToSkipPlot)
    t = linspace(0, pi, 16);
     
    s = probeInfo.TableOpt.SrcPos;
@@ -1228,6 +1276,71 @@ if(p.Results.showScattering||p.Results.optodeLines)
 end
 
 
+title(ax, titleString);
+if(p.Results.showColorbar && ~all(dataEmpty)&&isempty(itemsToSkipPlot))
+    cbars = findobj(gcf, "Type", "ColorBar");
+    delete(cbars);
+    ax1=ax;
+    curAxPosition=ax1.Position;
+    
+    if(~twosided)
+        
+        if(~negColorbar)
+            colormap(ax1,cmap_high(nColorsMaxBar));
+        else
+            colormap(ax1,cmap_low(nColorsMaxBar));
+        end
+        
+        chPos=colorbar(ax1);
+        
+        if(p.Results.logScale)
+            set(ax1, 'ColorScale', 'log');
+            caxis(ax1, [exp(cbarUpper_minmax)]);
+        else
+            caxis(ax1, [cbarUpper_minmax]);
+        end
+        
+        set(get(chPos, 'title'), 'string', clrBarTitle);
+    else
+        curAxPosition=ax1.OuterPosition;
+
+        colormap(ax1,cmap_high(nColorsMaxBar));
+        caxis(ax1, [cbarUpper_minmax]);
+
+        ax2=axes('OuterPosition',curAxPosition);
+        ax2.Position=ax1.Position;
+
+        set(gca,'xtick',[]);
+        set(gca,'ytick',[]);
+
+        %set( chNeg, 'YDir', 'reverse' );
+        colormap(ax2,cmap_low(nColorsMaxBar));
+
+        caxis(ax2, [cbarLower_minmax]);
+        %caxis([-1*minVal(1),-1*maxVal(2)])
+
+        axis off
+
+        curAxInnerPosition=ax1.Position;
+
+        linkprop([ax1, ax2],{'CameraUpVector', 'CameraPosition', 'CameraTarget', 'XLim', 'YLim', 'ZLim'});
+        %set([ax1,ax2],'Position',[.05 .11 .885 .815]);
+        chPos=colorbar(ax1);
+        chPos.Tag = "Main";
+        
+        set(get(chPos, 'title'), 'string', clrBarTitle);
+        %chPos_position=chPos.OuterPosition;
+        cbHeight=curAxInnerPosition(4)/2;
+
+        set(chPos,'Position',[curAxInnerPosition(1)+curAxInnerPosition(3),curAxInnerPosition(2)+cbHeight,0.02,cbHeight]);
+
+
+        chNeg=colorbar(ax2,'Position',[curAxInnerPosition(1)+curAxInnerPosition(3),curAxInnerPosition(2)-cbHeight/5,0.02,cbHeight]); 
+        chNeg.Tag = "Lower";
+    end
+end
+
+
 % Alt reference code
 % for y=-90:30:90
 %     y
@@ -1244,7 +1357,7 @@ end
 
 
 
-if(p.Results.showReference)
+if(p.Results.showReference&&(isempty(itemsToSkipPlot)))
     %% Test code for calibration
     path4debug=mfilename('fullpath');
     

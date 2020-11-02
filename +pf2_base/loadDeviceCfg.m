@@ -166,6 +166,16 @@ for j=1:length(probeInfo.cfg.Sections)
             p.TableSD.Label=p.SDLabels(:);
         end
         
+        if(~isfield(p,'DetPosX')&&~isfield(p,'SrcPosX')&&isfield(p,'DetPos3DX')&&isfield(p,'SrcPos3DX'))
+           warning('No 2D position info available, plotting in 2D may not work');
+           p.SrcPosX=p.SrcPos3DX/10;
+           p.SrcPosY=p.SrcPos3DY/10;
+           p.SrcPosZ=p.SrcPos3DZ/10;
+           p.DetPosX=p.DetPos3DX/10;
+           p.DetPosY=p.DetPos3DY/10;
+           p.DetPosZ=p.DetPos3DZ/10;
+        end
+        
         if(isfield(p,'DetPosX')&&isfield(p,'SrcPosX'))
             if(isfield(p,'dI')&&isfield(p,'sI'))
                 
@@ -222,6 +232,8 @@ for j=1:length(probeInfo.cfg.Sections)
             p.OptPosZ=nanmean([p.DetPosZ(:)';p.SrcPosZ(:)'],1)';
             p.TableOpt.Pos2D_z=p.OptPosZ;
         end
+        
+        
         
         if(isfield(p,'OptPosX')&&isfield(p,'OptPosY'))
            if(isfield(p,'OptPosZ')) % Calculate 3D SD
