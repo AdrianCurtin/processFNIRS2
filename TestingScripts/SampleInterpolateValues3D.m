@@ -1,3 +1,12 @@
+%% Plot just device fNIR1000
+pf2_base.loadDeviceCfg('fNIR_Devices_fNIR1000.cfg');
+pf2.Data.Plot.InterpolateValues3D([],{'fNIR_Devices_fNIR1000.cfg'});
+
+%% Plot just device 3x5 Hitachi
+%% Show 10-20 data
+pf2_base.loadDeviceCfg('Hitachi_ETG4000_3x5.cfg');
+pf2.Data.Plot.InterpolateValues3D([],{'Hitachi_ETG4000_3x5.cfg'});
+
 %% Interpolate Types
 % Faux data with 'linear' and 'interpolate' modes
 subplot(1, 2, 1);

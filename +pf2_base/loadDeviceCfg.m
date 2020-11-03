@@ -414,16 +414,23 @@ for j=1:length(probeInfo.cfg.Sections)
         
         p.OptPos.subplot_layout(:)=cell(size(p.OptPos.z));
         p.OptPos.subplot_layout(~p.IsShortSeparation)=p.OptLayout2D(~p.IsShortSeparation);
-        p.OptPos.subplot_layout_ss=p.OptLayout2D_ss(:);
-        
+        if(includeSSchannels)
+            p.OptPos.subplot_layout_ss=p.OptLayout2D_ss(:);
+        else
+           p.OptPos.subplot_layout_ss= p.OptPos.subplot_layout;
+        end
         
         
         fieldsToRemove={'SrcPosX','SrcPosY','SrcPosZ','SrcPos3DX','SrcPos3DY','SrcPos3DZ' ...
             'DetPosX','DetPosY','DetPosZ','DetPos3DX','DetPos3DY','DetPos3DZ'...
             'OptPosX','OptPosY','OptPosZ','OptPos3DX','OptPos3DY','OptPos3DZ'...
-            'sI','dI','ChannelList','SD','IsShortSeparation','OptLayout2D','OptLayout2D_ss','Wavelength','ChannelNumbers','OptPos3D_mean'};
+            'sI','dI','ChannelList','SD','IsShortSeparation','OptLayout2D','Wavelength','ChannelNumbers','OptPos3D_mean'};
         
         p=rmfield(p,fieldsToRemove);
+        
+        if(includeSSchannels)
+            p=rmfield(p,'OptLayout2D_ss');
+        end
         
      
         

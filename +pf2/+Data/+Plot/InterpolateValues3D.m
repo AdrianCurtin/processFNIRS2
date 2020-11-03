@@ -36,8 +36,16 @@ if(numel(varargin) > 0 && isa(varargin{1},'matlab.graphics.axis.Axes')) %If firs
    ax=varargin{1};
    varargin=varargin(2:end);
 else
+    curFig=gcf;
+    if(~curFig.Visible)
+       figure(); 
+    end
    ax=gca;
 end
+
+
+
+
 
 p=inputParser;
 
