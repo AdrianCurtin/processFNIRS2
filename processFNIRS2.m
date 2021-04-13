@@ -540,7 +540,7 @@ function outData=processStageFilterHb(data,fs,ProcessRejected)
 bioM_list={'HbO','HbR','HbTotal','HbDiff','CBSI'};
 validChannels=false(size(data.channels));
 numOptodes=length(data.channels(data.channels>0));
-validChannels(data.channels>0)=data.channels(data.channels>0)'&(reshape(data.fchMask(:)|ProcessRejected,[numOptodes,1]));
+validChannels(data.channels>0)=data.channels(data.channels>0)&(reshape(data.fchMask(:)|ProcessRejected,[numOptodes,1]));
 
 curfMask=data.fchMask|ProcessRejected;
 
@@ -791,7 +791,7 @@ end
 
 
 invalidChannels=false(size(data.channels));
-invalidChannels(data.channels>0)=data.channels(data.channels>0)'&(reshape(~curfMask,[numOptodes,1]));
+invalidChannels(data.channels>0)=data.channels(data.channels>0)&(reshape(~curfMask,[numOptodes,1]));
 
 for bioM=1:length(bioM_list) % go through each biomarker and set invalid cahnnels to nan
     outData.(bioM_list{bioM})(:,invalidChannels)=nan;
