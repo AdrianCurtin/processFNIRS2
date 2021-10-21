@@ -52,6 +52,7 @@ if(length(channels)>1&&any(logical(channels))&&any(~isnumeric(channels)))
 end
 
 if(~isfield(fNIR, 'probeNum'))
+    fNIR.probeNum=ones(size(fNIR.fchMask));
     figHandle = pf2.Data.Plot.Oxy(fNIR, channels, showMarkers, bioMlist, baseline, ylimit, plotArranged, lineProps, rejectedLineProps);
     return;
 end
@@ -64,13 +65,21 @@ for j=1:length(probes_index)
     probeChannels = fNIR.probeNum == i;
     fNIR_i.HbO = fNIR.HbO(probeChannels);
     fNIR_i.HbR = fNIR.HbR(probeChannels);
-    plotChannels = probeChannels;
+    
     if(~isempty(channels))
-        plotChannels = channels(probeChannels);
+        
+        plotChannels = zeros(size(probeChannels));
+        plotChannels(channels)=1;
+    else
+        plotChannels = probeChannels;
     end
     plotChannels = find(plotChannels);
-    plotChannels = plotChannels - min(plotChannels) + 1;
-    fNIR_i.info.probename = fNIR.info.probename{j};
+    plotChannels = plotChannels - min(probeChannels) + 1;
+    if(iscell(fNIR.info.probename))
+        fNIR_i.info.probename = fNIR.info.probename{j};
+    else
+       fNIR_i.info.probename = fNIR.info.probename;
+    end
     fNIR_i.probeinfo = pf2_base.loadDeviceCfg(fNIR_i.info.probename, plotArranged);
     fNIR_i.probeinfo.Probe{1}.NumOptodes = length(fNIR.probeNum);
     fNIR_i.channels = fNIR_i.channels(probeChannels);
@@ -231,7 +240,7 @@ end
             error('Must have valid time field');
         end
         
-        idx2plot=ismember(probeInfo.ChannelList,channels);
+        idx2plot=ismember(probeInfo.TableOpt.OptodeNum,channels);
         
         
         if(~isempty(channels))
@@ -409,7 +418,7 @@ end
                 'SnapToDataVertex','off','Enable','on');
             set(dcm_obj,'UpdateFcn', @myupdatefcn);
             
-            idx2plot=probeInfo.ChannelList==optNum;
+            idx2plot=probeInfo.TableOpt.OptodeNum==optNum;
             
             num2plot=sum(idx2plot);
             
