@@ -22,11 +22,13 @@ addOptional(p, 'ylimit', [], @isnumeric);
 addOptional(p, 'plotArranged', false, @islogical);
 addOptional(p, 'lineProps', {'LineWidth', 1}, @iscell);
 addOptional(p, 'rejectedLineProps', {'--', 'LineWidth', 1}, @iscell);
+addOptional(p, 'baseline', false, @islogical);
 addOptional(p, 'RawData', true, @islogical);
 
 parse(p, varargin{:});
 fNIR = p.Results.fNIR;
 channels = p.Results.channels;
+baseline = p.Results.baseline;
 showMarkers = p.Results.showMarkers;
 signalNames = p.Results.signalNames;
 ylimit = p.Results.ylimit;
