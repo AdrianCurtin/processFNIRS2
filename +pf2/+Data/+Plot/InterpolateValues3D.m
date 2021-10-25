@@ -502,7 +502,7 @@ if(isfield(probeInfo, 'TableOpt'))
         warning('Not enough data for all channels, ignoring short separation channels');
     end
     
-    includeChannels=probeInfo.TableOpt.HasData&(include_ss||~probeInfo.IsShortSeparation);
+    includeChannels=probeInfo.TableOpt.HasData&(include_ss|~probeInfo.TableOpt.IsShortSeparation);
     
     channelList=probeInfo.TableOpt.OptodeNum(includeChannels);
     numOptodes=length(channelList);

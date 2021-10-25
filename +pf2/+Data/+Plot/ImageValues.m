@@ -86,29 +86,20 @@ else
    error('Unable to identify probe'); 
 end
 
-if(include_ss&&length(probeInfo.OptLayout2D_ss)>length(data2plot)&&length(probeInfo.OptLayout2D)==length(data2plot))
+if(include_ss&&size(probeInfo.OptPos,1)>length(data2plot)&&sum(~probeInfo.TableOpt.IsShortSeparation)==length(data2plot))
    include_ss=false;
    warning('Not enough data for all channels, ignoring short separation channels');
 end
 
-if(pf2_base.isnestedfield(probeInfo,'OptPos.subplot_layout_ss'))
-	optLayout=probeInfo.OptPos.subplot_layout_ss;
-elseif(pf2_base.isnestedfield(probeInfo,'OptPos.subplot_layout'))
-	optLayout=probeInfo.OptPos.subplot_layout;
-else
-   plotArranged=false; 
-end
-
 if(include_ss)
-    numOptodes=probeInfo.NumOptodes;
-    channelList=probeInfo.ChannelList;
-    optLayout=probeInfo.OptLayout2D_ss;
+    numOptodes=size(probeInfo.TableOpt,1);
+    channelList=probeInfo.TableOpt.OptodeNum;
+    optLayout=probeInfo.OptPos.subplot_layout_ss;
 else
-    numOptodes=probeInfo.NumOptodes-probeInfo.NumShortSeparation;
-    channelList=probeInfo.ChannelList(~probeInfo.IsShortSeparation);
-    optLayout=probeInfo.OptLayout2D;
+    numOptodes=sum(~probeInfo.TableOpt.IsShortSeparation);
+    channelList=probeInfo.TableOpt.OptodeNum(~probeInfo.TableOpt.IsShortSeparation);
+    optLayout=probeInfo.OptPos.subplot_layout;
 end
-
 
 if(length(data2plot)~=numOptodes)
     error('Must have a value for all optodes');

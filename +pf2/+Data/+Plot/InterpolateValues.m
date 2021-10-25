@@ -119,9 +119,9 @@ end
 
 include_ss=false;
 if(~include_ss)
-    numOptodes=probeInfo.NumOptodes-probeInfo.NumShortSeparation;
-    channelList=probeInfo.ChannelList(~probeInfo.IsShortSeparation);
-    optLayout=probeInfo.OptLayout2D;
+    numOptodes=sum(~probeInfo.TableOpt.IsShortSeparation);
+    channelList=probeInfo.TableOpt.OptodeNum(~probeInfo.TableOpt.IsShortSeparation);
+    optLayout=probeInfo.OptPos.subplot_layout;
 end
 
 
@@ -136,8 +136,8 @@ end
 
 imgSize=1000;
 
-OptPosX=probeInfo.OptPosX(~probeInfo.IsShortSeparation);
-OptPosY=probeInfo.OptPosY(~probeInfo.IsShortSeparation);
+OptPosX=probeInfo.OptPos.x_2d(~probeInfo.TableOpt.IsShortSeparation);
+OptPosY=probeInfo.OptPos.y_2d(~probeInfo.TableOpt.IsShortSeparation);
 
 OptPosY=-OptPosY;
 
@@ -197,7 +197,7 @@ for optIdx=1:length(data2plot)
     %if optIdx > 16
     %    continue
     %end
-    optNum=probeInfo.ChannelList(optIdx); 
+    optNum=probeInfo.TableOpt.OptodeNum(optIdx); 
     optXidx(optIdx)=round(OptPosX(optNum)/OptDistX)+bufferMult+1;
     optYidx(optIdx)=round(OptPosY(optNum)/OptDistY)+bufferMult+1;
     
