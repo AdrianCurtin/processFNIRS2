@@ -1,5 +1,13 @@
 function [ figHandle ] = Raw(varargin)
 % Raw(fNIR,channels,showMarkers,wavelengths,ylimit,plotArranged,lineProps,rejectedLineProps)
+% This function plots and automatically arranges raw fNIRS data based on
+% the input values.
+%   It expects fNIR (the data struct), the channels to plot:
+%       (can be a number or a logical index)
+%      a set of wavelengths (ie: 730 or logical index)
+%   A specific ylimit ( to force all to use the same axes
+%   a boolean to plot the arranged channels
+%  Accepted line properties and for normal and rejected channels
 
 validFnirs = @(x) (iscell(x) || isstruct(x));
 validChannels = @(x) (isnumeric(x) || ischar(x));
