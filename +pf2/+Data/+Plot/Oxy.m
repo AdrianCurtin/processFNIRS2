@@ -40,7 +40,7 @@ if(~iscell(bioMlist))
 end
 
 if(isempty(channels)||(ischar(channels)&&strcmpi(channels,'all')))
-    plotArranged=true; %Enabled when all channels are plot
+    plotArranged=true; %Enabled when all channels are plotted
     channels=[];
 end
 
