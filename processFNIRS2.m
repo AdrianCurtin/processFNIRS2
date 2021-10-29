@@ -725,7 +725,7 @@ else
                             curfMask=curfMask&funcOutput{fmask_out_ind};
                         end
                         
-                        validChannels=validChannels&curfMask;
+                        validChannels=validChannels&curfMask(:);
                         outData.(bioM_list{bioM})(:,~validChannels)=nan;
                         if(pf2_base.isnestedfield(data,'ROI.HbO')&&~isempty(x_ind))
                             if(size(funcOutput_roi{fmask_out_ind},2)<size(validChannels_roi,2))

@@ -19,9 +19,9 @@ elseif(isempty(method)) % use loaded method
 
 end
     
-    
 
-
+wavelengths=wavelengths(:)';
+rawMask=rawMask(:)';
 
 validChannels=(wavelengths>0)&rawMask;  %Dark Channel should be 0, time should be NA, other information should be negative values
 validDarkChannels=((wavelengths==0)&rawMask);
