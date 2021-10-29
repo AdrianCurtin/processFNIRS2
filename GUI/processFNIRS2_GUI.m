@@ -454,9 +454,12 @@ if(outputData.ProcessRaw)
         endSample=find(PF2.GUIPF2.data.time>PF2.GUIPF2.view.endTime,1);
         croppedData(1:(startSample-1),:)=nan;
         croppedData(endSample:end,:)=nan;
-        [PF2.GUIPF2.data.stage{3},PF2.GUIPF2.data.stage{2}]=processStageRaw2OD(croppedData); % Raw data processing
+        croppedTime=PF2.GUIPF2.data.time;
+        croppedTime(1:(startSample-1),:)=nan;
+        croppedTime(endSample:end,:)=nan;
+        [PF2.GUIPF2.data.stage{3},PF2.GUIPF2.data.stage{2}]=processStageRaw2OD(croppedData,croppedTime,PF2.GUIPF2.data.markers,PF2.GUIPF2.data.Aux); % Raw data processing
     else
-        [PF2.GUIPF2.data.stage{3},PF2.GUIPF2.data.stage{2}]=processStageRaw2OD(PF2.GUIPF2.data.stage{1}); % Raw data processing
+        [PF2.GUIPF2.data.stage{3},PF2.GUIPF2.data.stage{2}]=processStageRaw2OD(PF2.GUIPF2.data.stage{1},PF2.GUIPF2.data.time,PF2.GUIPF2.data.markers,PF2.GUIPF2.data.Aux); % Raw data processing
     end
     
     if(outputData.ProcessOxy)
@@ -486,232 +489,13 @@ end
 
 
 
-function [outDataOD,outDataRaw]=processStageRaw2OD(data)
+function [outDataOD,outDataRaw]=processStageRaw2OD(data,time,fMarkers,fAux)
  % Raw data processing
-
+ 
 global PF2
+ 
+[outDataOD,outDataRaw]=pf2_base.fnirs.processStageRaw2OD(PF2.GUIPF2.stageRawMethod,data,PF2.GUIPF2.data.fs,time,PF2.GUIPF2.data.rawMask,fMarkers,fAux,PF2.curCh.OptodeNumber,PF2.curCh.Wavelength); % Raw data processing
 
-outData=data;
-OD_converted=false;
-
-validChannels=((PF2.curCh.Wavelength>0)&PF2.GUIPF2.data.rawMask);  %Dark Channel should be 0, time should be NA, other information should be negative values
-validDarkChannels=((PF2.curCh.isDark)&PF2.GUIPF2.data.rawMask);
-
-curRawMask=PF2.GUIPF2.data.rawMask;
-
-timeChMask=ones(size(data));
-
-firstValidRow=nan;
-for i=1:size(data,1)
-   if(any(~isnan(data(i,validChannels))))
-       firstValidRow=i;
-       break;
-   end
-end
-
-lastValidRow=nan;
-for i=size(data,1):-1:1
-   if(any(~isnan(data(i,validChannels))))
-       lastValidRow=i;
-       break;
-   end
-end
-
-if(isnan(firstValidRow)||isnan(lastValidRow))
-   warning('All Data is invalid'); 
-   validRows=1;
-else
-   validRows=firstValidRow:lastValidRow; 
-end
-
-if(~isfield(PF2.GUIPF2,'stageRawMethod'))
-    disp('No current Filters enabled');
-    %outData(:,validChannels)=medfilt1(data(:,validChannels),10);
-else
-    for i=1:length(PF2.GUIPF2.stageRawMethod.F)
-        Fidx=PF2.GUIPF2.stageRawMethod.F{i};
-            if(isfield(Fidx,'f'))
-            func=str2func(Fidx(1).f);
-            if(contains(Fidx(1).f,'Intensity2OD'))
-                outDataRaw=outData;
-                OD_converted=true;
-            end
-            x_ind=[];
-            fs_ind=[];
-            time_ind=[];
-            fmask_ind=[];
-            fchInfo_ind=[];
-            fmrk_ind=[];
-            fAux_ind=[];
-            fsd_ind=[];
-            ftimeMask_ind=[];
-
-            if(length(Fidx)>1) %This is a struct array for some reason?
-               %Change it back!
-               args=cell(0,0);
-               passedArgVals=cell(0,0);
-               for j=1:length(Fidx)
-                    args{j}=Fidx(j).args;
-                    passedArgVals{j}=Fidx(j).argvals;
-               end
-            else
-                args=Fidx.args;
-                passedArgVals=Fidx.argvals;
-                if(~iscell(args))
-                    args={args};
-                end
-                if(~iscell(passedArgVals))
-                    passedArgVals={passedArgVals};
-                end
-            end
-
-            if(isfield(Fidx,'output'))
-               x_out_ind=[];
-               fmask_out_ind=[];
-               ftimeMask_out_ind=[];
-
-               outputList=Fidx.output;
-
-               if(iscell(outputList)&&iscell(outputList{1}))
-                  outputList=outputList{1}; 
-               elseif(~iscell(outputList))
-                  outputList={outputList};   
-               end
-               for output_idx=1:length(outputList)
-                   if strcmpi(outputList{output_idx},'x')==1 && isempty(x_out_ind)
-                        x_out_ind=output_idx;
-                   elseif strcmpi(outputList{output_idx},'fchMask')==1 && isempty(fmask_out_ind)
-                       fmask_out_ind=output_idx;
-                   elseif strcmpi(outputList{output_idx},'ftimeChMask')==1 && isempty(ftimeMask_out_ind)
-                       ftimeMask_out_ind=output_idx;
-                   end
-               end
-            else %legacy code missing output
-                x_out_ind=1;
-                fmask_out_ind=[];
-                ftimeMask_out_ind=[];
-            end
-            
-
-            
-            for a=1:length(args)
-               if strcmp(args{a},'x')==1
-                  x_ind=a;
-                  passedArgVals{x_ind}=data(validRows,validChannels);
-               elseif strcmp(args{a},'fs')==1
-                  fs_ind=a; 
-                  passedArgVals{fs_ind}=PF2.GUIPF2.data.fs;
-               elseif strcmp(args{a},'fTime')==1
-                  time_ind=a; 
-                  passedArgVals{time_ind}=PF2.GUIPF2.data.time(validRows);
-               elseif strcmp(args{a},'fchMask')==1
-                  fmask_ind=a;
-                  passedArgVals{fmask_ind}=curRawMask(:,validChannels);
-               elseif strcmp(args{a},'ftimeChMask')==1
-                  ftimeMask_ind=a;
-                  passedArgVals{ftimeMask_ind}=timeChMask(:,validChannels); % always needs channel info when used in raw
-               elseif strcmp(args{a},'fChannelNumbers')==1
-                  fchInfo_ind=a;
-                  passedArgVals{fchInfo_ind}=PF2.curChSet(validChannels);               
-               elseif strcmp(args{a},'fChannelSD')==1
-                  fsd_ind=a;
-                  passedArgVals{fsd_ind}=PF2.curSDSet(ismember(PF2.curChList,PF2.curChSet(validChannels)));
-               elseif strcmp(args{a},'fMarkers')==1
-                  fmrk_ind=a; 
-                  passedArgVals{fmrk_ind}=PF2.GUIPF2.data.markers;
-               elseif strcmp(args{a},'fAux')==1
-                  fAux_ind=a;
-                  passedArgVals{fAux_ind}=PF2.GUIPF2.data.Aux;
-               elseif strcmp(args{a},'fAmbient')==1
-                  fAmb_ind=a;
-                  passedArgVals{fAmb_ind}=data(validRows,validDarkChannels);
-               end
-            end
-            
-            
-            if(~isempty(x_ind))
-                outData=data;
-                %for ch=1:size(data,2)
-                    
-                    try
-                        funcOutput{:}=func(passedArgVals{:});
-                    catch ME
-                        global outputData
-                        if(outputData.ShowGUI)
-                            outData(:,validChannels)=nan;
-                            warning('Error occured in method %s when processing %s\n',PF2.GUIPF2.stageRawMethod.name,Fidx(1).f);
-                            waitfor(errordlg(sprintf('Error occured in method %s when processing %s\n%s\n',PF2.GUIPF2.stageRawMethod.name,Fidx(1).f,ME.message),'Raw Processing Error'));
-                        else
-                            fprintf('Error occured in method %s when processing %s\n',PF2.GUIPF2.stageRawMethod.name,Fidx(1).f);
-                            outData(:,validChannels)=nan;
-                            rethrow(ME);
-                        end
-                    end
-                    
-                    try
-                        if(~isempty(x_out_ind)) 
-                            outData(validRows,validChannels)=funcOutput{x_out_ind};
-                        end
-                        
-                        if(~isempty(fmask_out_ind)) % Or with current fmask
-                            if(size(funcOutput{fmask_out_ind},2)<size(curRawMask,2))
-                                curRawMask(:,validChannels)=curRawMask(:,validChannels)&funcOutput{fmask_out_ind};
-                            else
-                                curRawMask=curRawMask&funcOutput{fmask_out_ind};
-                            end
-
-                            validChannels=validChannels&curRawMask;
-                            %outData(:,~rawMask)=nan;
-
-                        end
-
-                        if(~isempty(ftimeMask_out_ind)) % Or with current fmask
-                            if(size(funcOutput{ftimeMask_out_ind},2)<size(curRawMask,2))
-                                timeChMask(validRows,validChannels)=timeChMask(validRows,validChannels)&funcOutput{ftimeMask_out_ind};
-                            else
-                                timeChMask=timeChMask&funcOutput{ftimeMask_out_ind};
-                            end
-
-                        end
-                    catch ME
-                        global outputData
-                        if(outputData.ShowGUI)
-                            outData(:,validChannels)=nan;
-                            warning('Error occured in method %s when processing %s\n',PF2.GUIPF2.stageRawMethod.name,Fidx(1).f);
-                            waitfor(errordlg(sprintf('Error occured in method %s when processing %s\n%s\n',PF2.GUIPF2.stageRawMethod.name,Fidx(1).f,ME.message),'Raw Processing Error'));
-                        else
-                            fprintf('Error occured in method %s when processing %s\n',PF2.GUIPF2.stageRawMethod.name,Fidx(1).f);
-                            outData(:,validChannels)=nan;
-                            rethrow(ME);
-                        end
-                    end
-                    
-                    
-                %end
-                data=outData;
-            else
-                outData=data;
-                warning('Unable to identify NIRS input argument\n');
-            end
-        end
-    end
-end
-
-outData(~timeChMask)=nan;
-
-if(OD_converted==false)
-    outDataRaw=outData;
-    outDataOD=outData;
-    validChannels=((PF2.curCh.Wavelength>=0)&curRawMask); %convert all and Dark channels
-    outDataOD(:,validChannels)=pf2_Intensity2OD(outData(:,validChannels));
-else
-    validDarkChannels=((PF2.curCh.isDark)&curRawMask); %convert just dark channels
-    outDataOD=outData; 
-    outDataOD(:,validDarkChannels)=pf2_Intensity2OD(outData(:,validDarkChannels));
-end
-
-outDataRaw(:,((PF2.curCh.Wavelength>=0>=0)&~curRawMask))=nan;
-outDataOD(:,((PF2.curCh.Wavelength>=0>=0)&~curRawMask))=nan;
 
 function outData=processStageOD2Hb(data,subAge)
  % Beer-Lambert conversion
@@ -775,322 +559,37 @@ function outData=processStageFilterHb(data)
 global outputData
 global PF2
 
-bioM_list={'HbO','HbR','HbDiff','HbTotal','CBSI'};
+data.fchMask=PF2.GUIPF2.data.fchMask;
 
-validChannels=false(size(data.channels));
-numChannels=length(data.channels(data.channels>0));
-validChannels(data.channels>0)=data.channels(data.channels>0)&(reshape(PF2.GUIPF2.data.fchMask>PF2.RejectLevel|outputData.ProcessRejected,[numChannels,1]));
-
-curfMask=PF2.GUIPF2.data.fchMask>PF2.RejectLevel|outputData.ProcessRejected;
-
-if(pf2_base.isnestedfield(data,'ROI.HbO')&&~isempty(data.ROI))
-    validChannels_roi=true(1,size(data.ROI.('HbO'),2));
-    curftimeMask_roi=true(size(data.ROI.('HbO')));
-end
-
-if(isfield(data,'ftimeChMask'))
-    curftimeMask=data.ftimeChMask|ProcessRejected;
-else
-    curftimeMask=ones(size(data.HbO));
-end
-
-if(pf2_base.isnestedfield(data,'ROI.info')&&~isempty(data.ROI.info)&&isfield(data.ROI,'HbO')&&~isempty(data.ROI.HbO))
-    if(~isempty(data.ROI)&&isfield(data.ROI,'HbO'))
-        validChannels_roi=true(1,size(data.ROI.('HbO'),2));
-        curftimeMask_roi=true(size(data.ROI.('HbO')));
-    end
-end
-
-firstValidRow=nan;
-for i=1:size(data.HbO,1)
-   if(any(~isnan(data.HbO(i,validChannels))))
-       firstValidRow=i;
-       break;
-   end
-end
-
-lastValidRow=nan;
-for i=size(data.HbO,1):-1:1
-   if(any(~isnan(data.HbO(i,validChannels))))
-       lastValidRow=i;
-       break;
-   end
-end
-
-if(isnan(firstValidRow)||isnan(lastValidRow))
-   warning('All Data is invalid'); 
-   validRows=1;
-else
-   validRows=firstValidRow:lastValidRow; 
-end
-
-if(isfield(data,'ROI')&&isempty(data.ROI))
-    clear data.ROI
-end
-
-
-if(~isfield(PF2.GUIPF2,'stageOxyMethod'))
-    disp('No stage2 processing method left');
-    outData=data;
-    %outData.HbO(:,validChannels)=medfilt1(outData.HbO(:,validChannels),25);
-    %outData.HbR(:,validChannels)=medfilt1(outData.HbR(:,validChannels),25);
-else
-    outData=data;
-    for i=1:length(PF2.GUIPF2.stageOxyMethod.F)
-        Fidx=PF2.GUIPF2.stageOxyMethod.F{i};
-        if(isfield(Fidx,'f'))
-            func=str2func(Fidx(1).f);
-            errorFlag=false;
-            x_ind=[];
-            fs_ind=[];
-            time_ind=[];
-            fmask_ind=[];
-            fchInfo_ind=[];
-            fmrk_ind=[];
-            fAux_ind=[];
-            fsd_ind=[];
-            fStruct_ind=[];
-            
-            if(length(Fidx)>1||~iscell(Fidx.args)) %This is a struct array for some reason?
-               %Change it back!
-               args=cell(0,0);
-               passedArgVals=cell(0,0);
-               for j=1:length(Fidx)
-                    args{j}=Fidx(j).args;
-                    passedArgVals{j}=Fidx(j).argvals;
-               end
-            else
-                args=Fidx.args;
-                passedArgVals=Fidx.argvals;
-            end
-            
-            if(isfield(Fidx,'output'))
-               x_out_ind=[];
-               roi_out_ind=[];
-               fmask_out_ind=[];
-               ftimeMask_out_ind=[];
-               fstruct_out_ind=[];
-               
-               outputList=Fidx.output;
-               if(~iscell(outputList))
-                  outputList={outputList}; 
-               end
-               
-               for output_idx=1:length(outputList)
-                   if strcmpi(outputList{output_idx},'x')==1 && isempty(x_out_ind)
-                        x_out_ind=output_idx;
-                   elseif strcmpi(outputList{output_idx},'fchMask')==1 && isempty(fmask_out_ind)
-                       fmask_out_ind=output_idx;
-                   elseif strcmpi(outputList{output_idx},'ftimeChMask')==1 && isempty(ftimeMask_out_ind)
-                       ftimeMask_out_ind=output_idx;
-                   elseif strcmpi(outputList{output_idx},'fNIRstruct')==1 && isempty(fstruct_out_ind)
-                       fstruct_out_ind=output_idx;
-                   elseif strcmpi(outputList{output_idx},'ROI')==1 && isempty(roi_out_ind)
-                       roi_out_ind=output_idx;
-                   end
-               end
-            else %legacy code missing output
-                x_out_ind=1;
-                roi_out_ind=[];
-                fmask_out_ind=[];
-                ftimeMask_out_ind=[];
-                fstruct_out_ind=[];
-            end
-            
-            for a=1:length(args)
-               if strcmp(args{a},'x')==1
-                  x_ind=a;
-               elseif strcmp(args{a},'fs')==1
-                  fs_ind=a; 
-                  passedArgVals{fs_ind}=PF2.GUIPF2.data.fs;
-               elseif strcmp(args{a},'fTime')==1
-                  time_ind=a; 
-                  passedArgVals{time_ind}=PF2.GUIPF2.data.time(validRows);
-               elseif strcmp(args{a},'fchMask')==1
-                  fmask_ind=a;
-                  passedArgVals{fmask_ind}=curfMask;
-               elseif strcmp(args{a},'fChannelNumbers')==1
-                  fchInfo_ind=a;
-                  passedArgVals{fchInfo_ind}=data.channels(validChannels);
-               elseif strcmp(args{a},'fChannelSD')==1
-                  fsd_ind=a;
-                  passedArgVals{fsd_ind}=PF2.curSDSet(validChannels);
-               elseif strcmp(args{a},'fMarkers')==1
-                  fmrk_ind=a; 
-                  passedArgVals{fmrk_ind}=PF2.GUIPF2.data.markers;
-               elseif strcmp(args{a},'fAux')==1
-                  fAux_ind=a;
-                  passedArgVals{fAux_ind}=PF2.GUIPF2.data.Aux;
-               elseif strcmp(args{a},'ftimeChMask')==1
-                  ftimeMask_ind=a;
-                  passedArgVals{ftimeMask_ind}=curftimeMask(:,validChannels); % always needs channel info when used in raw
-               elseif strcmp(args{a},'fNIRstruct')==1  % Try not to use, can be inefficient
-                   fStruct_ind=a;
-                   passedArgVals{fStruct_ind}=data;
-               end
-            end
-            
-            if(~isempty(x_ind)||~isempty(fStruct_ind))
-                outData=data;
-                %for ch=1:size(data,2)
-                
-                if(~isempty(fStruct_ind)||~isempty(fstruct_out_ind))
-                    runOnce=true;
-                else
-                    runOnce=false;
-                end
-                
-                for bmrkIdx=1:length(bioM_list)
-                    bmrk=bioM_list{bmrkIdx};
-                    
-                    if(pf2_base.isnestedfield(data,'ROI.HbO'))
-                       passedArgVals_roi=passedArgVals; 
-                    end
-                    
-                    if(~isempty(x_ind))
-                        passedArgVals{x_ind}=data.(bmrk)(validRows,validChannels);
-                        
-                        if(pf2_base.isnestedfield(data,'ROI.HbO'))
-                        % Note ROI functions may not be able to handle
-                        % functions using channel numbers of SD separation
-                            passedArgVals_roi{x_ind}=data.ROI.(bmrk)(validRows,validChannels_roi);
-                        end
-                    end
-                    
-                    if(~isempty(fStruct_ind))
-                        passedArgVals{fStruct_ind}=data;
-                    end
-                    
-                    
-                     
-                    
-                    try
-                        if(~errorFlag)
-                            
-                            funcOutput{:}=func(passedArgVals{:});
-                            if(pf2_base.isnestedfield(outData,'ROI.HbO')&&~isempty(x_ind))
-                                funcOutput_roi{:}=func(passedArgVals_roi{:}); 
-                            end
-                            
-                            if(~isempty(x_out_ind)) % Assign values to fNIRS Biomarkers
-                                outData.(bmrk)(validRows,validChannels)=funcOutput{x_out_ind};
-                                if(pf2_base.isnestedfield(outData,'ROI.HbO'))
-                                    outData.ROI.(bmrk)(validRows,validChannels_roi)=funcOutput_roi{x_out_ind};
-                                end
-                            end
-                            
-                            if(~isempty(fmask_out_ind)) % Or with current fmask
-                                if(size(funcOutput{fmask_out_ind},2)<size(curfMask,2))
-                                    curfMask(:,validChannels)=curfMask(:,validChannels)&funcOutput{fmask_out_ind};
-                                else
-                                    curfMask=curfMask&funcOutput{fmask_out_ind};
-                                end
-                                curfMask=curfMask&funcOutput{fmask_out_ind};
-                                validChannels=validChannels&curfMask;
-                                outData.(bmrk)(:,~validChannels)=nan;
-
-                                if(pf2_base.isnestedfield(outData,'ROI.HbO')&&~isempty(x_ind)) % won't run on full fNIR struct fxs
-                                    if(size(funcOutput_roi{fmask_out_ind},2)<size(validChannels_roi,2))
-                                        validChannels_roi(:,validChannels)=validChannels_roi(:,validChannels)&funcOutput{fmask_out_ind};
-                                    else
-                                        validChannels_roi=validChannels_roi&funcOutput_roi{fmask_out_ind};
-                                    end
-                                    outData.ROI.(bmrk)(:,~validChannels_roi)=nan;
-                                end
-                            end
-                            
-                            if(~isempty(ftimeMask_out_ind)) % Or with current ftimemask
-                                if(size(funcOutput{ftimeMask_out_ind},2)<size(validChannels,2)||size(funcOutput{fmask_out_ind},2)<length(validRows))
-                                    curftimeMask(validRows,validChannels)=curftimeMask(validRows,validChannels)&funcOutput{ftimeMask_out_ind};
-                                else
-                                    curftimeMask=curftimeMask&funcOutput{ftimeMask_out_ind};
-                                end
-                                if(pf2_base.isnestedfield(data,'ROI.HbO')&&~isempty(x_ind))
-                                    if(size(funcOutput_roi{fmask_out_ind},2)<size(validChannels_roi,2)||size(funcOutput_roi{fmask_out_ind},2)<length(validRows))
-                                        curftimeMask_roi(validRows,validChannels)=curftimeMask_roi(validRows,validChannels)&funcOutput{ftimeMask_out_ind};
-                                    else
-                                        curftimeMask_roi=curftimeMask_roi&funcOutput{ftimeMask_out_ind};
-                                    end
-                                    
-                                end
-                            end
-                            
-                            if(~isempty(roi_out_ind)&&isfield(outData,'ROI')&&~isempty(outData.ROI)) % Build ROIs
-                                outData=funcOutput{roi_out_ind};
-                                if(pf2_base.isnestedfield(outData,'ROI.HbO')&&~isempty(outData.ROI))
-                                    validChannels_roi=true(1,size(outData.ROI.(bmrk),2));
-                                    curftimeMask_roi=true(size(data.ROI.('HbO')));
-                                else
-                                    clear outData.ROI; 
-                                end
-                                    
-                            end
-                            
-                            if(~isempty(fstruct_out_ind)) % Build ROIs
-                                outData=funcOutput{fstruct_out_ind};
-                            end
-                            
-                            if(runOnce)
-                                break;
-                            end
-                            
-                        else
-                            outData.(bmrk)(:,validChannels)=nan;
-                        end
-                    catch ME
-                        %global outputData
-                        if(outputData.ShowGUI)
-                            outData.(bmrk)(:,validChannels)=nan;
-                            errorFlag=true;  % Set all other biomarkers to na
-                            fprintf('Error occured in method %s when processing %s\n',PF2.GUIPF2.stageRawMethod.name,Fidx(1).f);
-                            waitfor(errordlg(sprintf('Error occured in method %s when processing %s\n%s\n',PF2.GUIPF2.stageRawMethod.name,Fidx(1).f,ME.message),'Raw Processing Error'));
-                        else
-                            fprintf('Error occured in method %s when processing %s\n',PF2.GUIPF2.stageRawMethod.name,Fidx(1).f);
-                            outData.(bmrk)(:,validChannels)=nan;
-                            rethrow(ME);
-                        end
-                    end
-                end
-
-                %end
-                data=outData;
-            else
-                %outData=data;
-                warning('Unable to identify NIRS input argument\n');
-            end
-        end
-    end
-end
-
-
-if(pf2_base.isnestedfield(outData,'ROI.info')&&~isempty(outData.ROI.info)&&~isfield(outData.ROI,'HbO'))
-    fprintf(2,'No ROI build step was specified\nDefaulting to nanmean of valid channels\n');
-    outData=pf2_build_nanmean_ROI(outData);
-    if(~isempty(outData.ROI))
-        validChannels_roi=true(1,size(outData.ROI.('HbO'),2));
-        curftimeMask_roi=true(size(outData.ROI.('HbO')));
-    else
-        clear outData.ROI; 
-    end
-end
-
-invalidChannels=false(size(data.channels));
-invalidChannels(data.channels>0)=data.channels(data.channels>0)&(reshape(~curfMask&~outputData.ProcessRejected,[numChannels,1]));
-PF2.GUIPF2.data.curChMask=curfMask;
-
-
-
-for bioM=1:length(bioM_list) % go through each biomarker and set invalid cahnnels to nan
-    outData.(bioM_list{bioM})(:,invalidChannels)=nan;
-    outData.(bioM_list{bioM})(~curftimeMask)=nan;
-    if(isfield(outData,'ROI')&&isfield(outData.ROI,'HbO'))
-        outData.ROI.(bioM_list{bioM})(:,~validChannels_roi)=nan;
-        outData.ROI.(bioM_list{bioM})(~curftimeMask_roi)=nan;
-    end
-end
-
+outData=pf2_base.fnirs.processStageFilterHb(PF2.GUIPF2.stageOxyMethod,data,PF2.GUIPF2.data.fs,outputData.ProcessRejected);
 
 if(PF2.GUIPF2.processWindowOnly)
+    validChannels=false(size(outData.channels));
+    numOptodes=length(outData.channels(outData.channels>0));
+    validChannels(outData.channels>0)=outData.channels(outData.channels>0)&(reshape(outData.fchMask(:)|outputData.ProcessRejected,[numOptodes,1]));
+
+    firstValidRow=nan;
+    for i=1:size(outData.HbO,1)
+       if(any(~isnan(outData.HbO(i,validChannels))))
+           firstValidRow=i;
+           break;
+       end
+    end
+
+    lastValidRow=nan;
+    for i=size(outData.HbO,1):-1:1
+       if(any(~isnan(outData.HbO(i,validChannels))))
+           lastValidRow=i;
+           break;
+       end
+    end
+
+    if(isnan(firstValidRow)||isnan(lastValidRow))
+       warning('All Data is invalid'); 
+       validRows=1;
+    else
+       validRows=firstValidRow:lastValidRow; 
+    end
     outData.validRows=validRows;
 end
 
