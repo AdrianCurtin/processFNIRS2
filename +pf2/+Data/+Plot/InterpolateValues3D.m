@@ -694,7 +694,7 @@ end
 
 
 
-if(p.Results.showVoxelBrain&&~contains(itemsToSkipPlot,'BrainVoxel'))
+if(p.Results.showVoxelBrain&&(isempty(itemsToSkipPlot)||~contains(itemsToSkipPlot,'BrainVoxel')))
     h=gcf;
     if(isfield(h,'UserData')&&isfield(h.UserData,'mni_t1'))
         mni_t1=h.UserData.mni_t1;
