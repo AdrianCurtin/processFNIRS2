@@ -1,6 +1,10 @@
 
-function [outDataOD,outDataRaw]=processStageRaw2OD(method,data,fs,time,rawMask,fMarkers,fAux,channelNumbers,wavelengths)
+function [outDataOD,outDataRaw]=processStageRaw2OD(method,data,fs,time,rawMask,fMarkers,fAux,channelNumbers,wavelengths,showGUIerrors)
  % Raw data processing
+ 
+ if(nargin<10)
+    showGUIerrors=false; 
+ end
 
 global PF2
 
@@ -129,7 +133,20 @@ for i=1:length(method.F)
         if(~isempty(x_ind))
             outData=data;
 
-            funcOutput{:}=func(passedArgVals{:});
+            if(showGUIerrors)
+                try
+                    funcOutput{:}=func(passedArgVals{:});
+                catch ME
+                    outData(:,validChannels)=nan;
+                    warning('Error occured in method %s when processing %s\n',method.name,Fidx(1).f);
+                    waitfor(errordlg(sprintf('Error occured in method %s when processing %s\n%s\n',method.name,Fidx(1).f,ME.message),'Raw Processing Error'));
+                end
+            else
+                funcOutput{:}=func(passedArgVals{:});
+            end
+            
+            
+            
             if(~isempty(x_out_ind)) % Assign values to fNIRS Biomarkers and ROIs when available
                     outData(:,validChannels)=funcOutput{x_out_ind};
             end

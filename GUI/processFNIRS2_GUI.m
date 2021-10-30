@@ -451,13 +451,20 @@ if(outputData.ProcessRaw)
     if(PF2.GUIPF2.processWindowOnly)
         croppedData=PF2.GUIPF2.data.stage{1};
         startSample=find(PF2.GUIPF2.data.time>=PF2.GUIPF2.view.startTime,1);
-        endSample=find(PF2.GUIPF2.data.time>PF2.GUIPF2.view.endTime,1);
-        croppedData(1:(startSample-1),:)=nan;
-        croppedData(endSample:end,:)=nan;
-        croppedTime=PF2.GUIPF2.data.time;
-        croppedTime(1:(startSample-1),:)=nan;
-        croppedTime(endSample:end,:)=nan;
-        [PF2.GUIPF2.data.stage{3},PF2.GUIPF2.data.stage{2}]=processStageRaw2OD(croppedData,croppedTime,PF2.GUIPF2.data.markers,PF2.GUIPF2.data.Aux); % Raw data processing
+        endSample=min([length(PF2.GUIPF2.data.time),find(PF2.GUIPF2.data.time>=PF2.GUIPF2.view.endTime,1)]);
+        croppedData=croppedData(startSample:endSample,:);
+        croppedTime=PF2.GUIPF2.data.time(startSample:endSample);
+        
+        stage2=nan(size(PF2.GUIPF2.data.stage{1}));
+        stage3=stage2;
+        
+
+        
+        [stage3(startSample:endSample,:),stage2(startSample:endSample,:)]=processStageRaw2OD(croppedData,croppedTime,PF2.GUIPF2.data.markers,PF2.GUIPF2.data.Aux); % Raw data processing
+        
+        PF2.GUIPF2.data.stage{2}=stage2;
+        PF2.GUIPF2.data.stage{3}=stage3;
+        
     else
         [PF2.GUIPF2.data.stage{3},PF2.GUIPF2.data.stage{2}]=processStageRaw2OD(PF2.GUIPF2.data.stage{1},PF2.GUIPF2.data.time,PF2.GUIPF2.data.markers,PF2.GUIPF2.data.Aux); % Raw data processing
     end
@@ -508,8 +515,10 @@ global outputData
 probeIdx=1;
 curProbe=setF.device.Probe{probeIdx};
 
-if(outputData.DirtyBaseline)
+if(outputData.DirtyBaseline&&~PF2.GUIPF2.processWindowOnly)
     baselineSamples=1:length(PF2.GUIPF2.data.time);
+elseif(outputData.DirtyBaseline&&PF2.GUIPF2.processWindowOnly)
+        baselineSamples=PF2.GUIPF2.data.timeInd;
 else
     if(PF2.GUIPF2.baseline.relative2View==1||PF2.GUIPF2.processWindowOnly)
         startTime=PF2.GUIPF2.view.startTime+PF2.GUIPF2.baseline.windowStartTime;

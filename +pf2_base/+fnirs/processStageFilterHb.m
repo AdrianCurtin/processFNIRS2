@@ -1,5 +1,9 @@
-function outData=processStageFilterHb(method,data,fs,ProcessRejected)
+function outData=processStageFilterHb(method,data,fs,ProcessRejected,showGUIerrors)
 % Oxy data processing
+
+if(nargin<5)
+    showGUIerrors=false;
+end
 
 bioM_list={'HbO','HbR','HbTotal','HbDiff','CBSI'};
 validChannels=false(size(data.channels));
