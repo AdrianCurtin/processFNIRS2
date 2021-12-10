@@ -1,3 +1,4 @@
 *.asv
 OtherToolboxes/Wavelab850/MEXSource/FWT_PO.mexw64
 OtherToolboxes/Wavelab850/MEXSource/IWT_PO.mexw64
+sampledata/sampleNIR_CH.mat

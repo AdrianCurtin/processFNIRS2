@@ -28,14 +28,14 @@ numRawCh=size(rawData,2);
 numAmbCh=size(ambientData,2);
 
 if(icaWeight>0)
-   rawData=[ones(numRawCh,icaWeight);rawData;ones(numRawCh,icaWeight)];
-   ambientData=[ones(numAmbCh,icaWeight);ambientData;ones(numAmbCh,icaWeight)];
+   rawData=[ones(icaWeight,numRawCh);rawData;ones(icaWeight,numRawCh)];
+   ambientData=[ones(icaWeight,numAmbCh);ambientData;ones(icaWeight,numAmbCh)];
 end
 
 for i=1:length(uCh)
     tempArr=rawData(:,channelList==uCh(i));
     for i2=1:size(rawData(:,channelList==uCh(i)),2)
-        tempArr(:,i2)=icaClean(tempArr(:,i2),ambientData(:,uCh(i))); 
+        tempArr(:,i2)=icaClean(tempArr(:,i2),ambientData(:,i)); 
     end
     rawData(:,channelList==uCh(i))=tempArr;
 end

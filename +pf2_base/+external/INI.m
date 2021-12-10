@@ -370,7 +370,9 @@ classdef INI < hgsetget & dynamicprops
                 
                 fprintf(ID,Symbols{1});
                 
-                if isobject(Value)
+                if isstring(Value)
+                    Class = 'char';
+                elseif isobject(Value)
                     Class = 'struct';
                 else
                     Class = class(Value);
@@ -399,6 +401,9 @@ classdef INI < hgsetget & dynamicprops
                                             fprintf(ID,',');
                                         end     
                                     otherwise
+                                        if(islogical(Value))
+                                           Value=double(Value); 
+                                        end
                                         fprintf(ID,Format(Value(n,m)),Value(n,m));
                                         if m < size(Value,2)
                                             fprintf(ID,',');
