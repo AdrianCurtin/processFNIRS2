@@ -32,15 +32,15 @@ fprintf('This is genearlly done in three stages\n\n');
 
 
 fprintf('\t<strong>1) Import Data\n</strong>');
-fprintf('\t\tImport your data using processFNIRS.Import.ImportNIR (or other function)\n');
+fprintf('\t\tImport your data using pf2.Import.ImportNIR (or other function)\n');
 fprintf('\t\tLoad your data using the function as a string or select the file yourself\n');
-fprintf(2,'\t\tex: mydata = processFNIRS.Import.ImportNIR(''myNIRSfile.nir'')\n');
+fprintf(2,'\t\tex: mydata = pf2.Import.ImportNIR(''myNIRSfile.nir'')\n');
 fprintf('\n');
 
 fprintf('\t<strong>2) Set Methods\n</strong>');
 fprintf('\t\tSelect a method for both Raw and Oxy domain proccesing\n');
-fprintf('\t\tYou can visualize the effects of your methods by using processFNIRS(mydata)\n');
-fprintf('\t\tand configure your methods by using processFNIRS.Methods.Oxy/Raw.ConfigureMethods\n');
+fprintf('\t\tYou can visualize the effects of your methods by using pf2(mydata)\n');
+fprintf('\t\tand configure your methods by using pf2.Methods.Oxy/Raw.ConfigureMethods\n');
 fprintf('\t\tSelecting methods is easy, you can select a method using either the methond name,\n');
 fprintf('\t\tOr selecting the method interactively\n');
 fprintf('\t\tPlease note that both the Raw method is applied first and then the Oxy method\n');
@@ -49,10 +49,10 @@ fprintf(2,'\t\tex: pf2.Methods.Oxy.SetMethod(''MyMethodName'')\n');
 fprintf('\n');
 
 fprintf('\t<strong>3) Process Data\n</strong>');
-fprintf('\t\tRun your processing method on your data using processFNIRS2(mydata)\n');
+fprintf('\t\tRun your processing method on your data using pf2(mydata)\n');
 fprintf('\t\tYou can optionally process only the oxy or raw domain signals using pf2.Process.ProcessRaw/ProcessOxy\n');
 fprintf('\t\tHowever the default funciton will run both Raw and Oxy pipelines\n');
-fprintf(2,'\t\tex: myprocesseddata=processFNIRS2(mydata))\n');
+fprintf(2,'\t\tex: myprocesseddata=pf2(mydata))\n');
 
 fprintf('\n\nPress Any Key to continue...\n\n\n')
 pause;
