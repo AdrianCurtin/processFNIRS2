@@ -108,7 +108,13 @@ parse(p,varargin{:});
 
 outputData.ProcessOxy=~p.Results.SkipOxy;
 outputData.ProcessRaw=~p.Results.SkipRaw;
-outputData.OutputRaw=p.Results.SkipOD;
+outputData.OutputPreProcessedRaw=p.Results.SkipOD;
+
+if(outputData.OutputPreProcessedRaw)
+    outputData.ProcessOxy=false;
+    outputData.ProcessRaw=true;
+end
+
 outputData.ProcessRejected=p.Results.ProcessRejectedChannels;
 PF2.OutputLegacyMarkers=p.Results.OutputLegacyMarkers;
 
@@ -436,7 +442,7 @@ if(nargout>0)
           if(~isempty(fData.stage{1}))
             outfNIR.raw=fData.stage{1};
           end
-       elseif(outputData.ProcessRaw&&~outputData.OutputRaw)
+       elseif(outputData.ProcessRaw&&~outputData.OutputPreProcessedRaw)
           if(~isempty(fData.stage{3}))
               outfNIR.OD=fData.stage{3}; %start with OD
           end

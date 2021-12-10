@@ -322,6 +322,9 @@ if(isfield(markers,'data'))
 end
 
 fNIR.info=[];
+
+fNIR.info.header=header;
+
 if(isfield(markers,'info'))
 	fNIR.info.mrkheaders=markers.info;
 end
