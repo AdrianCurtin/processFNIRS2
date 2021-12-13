@@ -122,22 +122,20 @@ log_filename=sprintf('%s.log',fileroot);
 log_info=importCOBIlog(log_filename);
 
 
-
-
 lineF=fgetl(fid);
 while(ischar(lineF))
     if(contains(lineF, 'Start Code:'))
         sC=strsplit(lineF,'\t');
         if(length(sC)>1&&~isempty(sC{2}))
-            header.startCodeAlt=str2double(sC{2});
+            header.startCodeAlt=str2double(sC{2}); %Start code for start of .nir file
         end
         if(length(sC)>2&&~isempty(sC{3}))
-            header.startCode=str2double(sC{3})/1000;
+            header.startCode=str2double(sC{3})/1000; %start code for start of experiment
             if((header.startCodeAlt-header.startCode)>1)
                 warning(sprintf('StartCode Diff %.2f\nMay affect manual marker integrity\n',(header.startCodeAlt-header.startCode)));
             end
         else
-            header.startCode=header.startCodeAlt;
+            header.startCode=header.startCodeAlt; %if second code is missing, just use first
         end
         
     end
@@ -161,6 +159,13 @@ while(ischar(lineF))
        for i=1:length(temp)
           if(~isempty(strfind(temp,':')))
              header.Time=temp;
+
+             temp2=lineF(13:end);
+             try
+                header.StartDateTime= datetime(temp2,'InputFormat','eee MMM dd HH:mm:ss.SSS yyyy'); % try to get timestamp with milliseconds
+             catch
+                header.StartDateTime= datetime(temp2,'InputFormat','eee MMM dd HH:mm:ss yyyy'); % else use only regular seconds
+             end
           end
        end
     end
