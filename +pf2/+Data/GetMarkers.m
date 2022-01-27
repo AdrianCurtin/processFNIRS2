@@ -1,5 +1,5 @@
-function [markerTimes,cellMrkTimes, matchedPatterns] = GetMarkers(varargin) %(fNIR, markersStart,markersEnd)   or (fNIR, markerPattern)
-%GETFNIRSMARKERS Function which matches markers and marker patterns to
+function [markerTimes,tableMrkTimes, matchedPatterns] = GetMarkers(varargin) %(fNIR, markersStart,markersEnd)   or (fNIR, markerPattern)
+%GetMarkers Function which matches markers and marker patterns to
 %return start and end times
 % markersStart, markersEnd, and markerPattern  may be  N x mrk  arrays or
 %                                                   cell arrays of 1 x mrk 
@@ -10,11 +10,11 @@ function [markerTimes,cellMrkTimes, matchedPatterns] = GetMarkers(varargin) %(fN
    %                ex: markersStart [50;51] will look for the markers
    %                            50 and then the markers 51
 
-%   getFNIRSmarkertimes(fNIR, markersStart)
+%   GetMarkers(fNIR, markersStart)
 %       returns all markers at specified time
 %
 %
-%   getFNIRSmarkertimes(fNIR, markersStart,markersEnd)
+%   GetMarkers(fNIR, markersStart,markersEnd)
 %       returns all markers between start and end marker pairs 
 %               if only one start marker is given, all start-end pairs are
 %               matched
@@ -22,7 +22,7 @@ function [markerTimes,cellMrkTimes, matchedPatterns] = GetMarkers(varargin) %(fN
 %               matched
 %                   otherwise each start and end marker must be paired
 %
-%   getFNIRSmakertimes(fNIR,markerPattern)
+%   GetMarkers(fNIR,markerPattern)
 %       returns all start and end times for markers matching specific
 %       pattern (with any interleaving markers allowed)
 
@@ -30,13 +30,20 @@ function [markerTimes,cellMrkTimes, matchedPatterns] = GetMarkers(varargin) %(fN
 
 p=inputParser;
 
-validfNIRInput = @(x) (isnumeric(x)&&length(x)>1) || (isstruct(x) && (isfield(x,'raw')||isfield(x,'time')||isfield(x,'info')));
+validfNIR_Input = @(x) (isstruct(x) && (isfield(x,'raw')||isfield(x,'time')||isfield(x,'info')));
+validfNIR_or_marker_Input = @(x) (istable(x)&&size(x,1)>1)||(isnumeric(x)&&length(x)>1) ||validfNIR_Input(x);
 validScalarNum = @(x) isnumeric(x) && ismatrix(x);
+validScalarNumOrCell = @(x) (isnumeric(x) && ismatrix(x) || iscell(x));
+isStringOrChar = @(x) isstring(x)||ischar(x);
 
-addRequired(p,'fNIR',validfNIRInput);
+addRequired(p,'fNIR',validfNIR_or_marker_Input);
 addOptional(p,'markersStart',[],validScalarNum);
 addOptional(p,'markersEnd',[],validScalarNum);
-addParameter(p,'markerPattern',[],validScalarNum);
+addParameter(p,'markerPattern',[],validScalarNumOrCell);
+addParameter(p,'markerColumn',2,validScalarNum);
+addParameter(p,'markerVariableName',[],isStringOrChar);
+addParameter(p,'timeColumn',1,validScalarNum);
+
 
 
 parse(p,varargin{:});
@@ -46,8 +53,11 @@ markersStart=p.Results.markersStart;
 markersEnd=p.Results.markersEnd;
 
 markerPattern=p.Results.markerPattern;
+markerColumn=p.Results.markerColumn;
+markerVariableName=p.Results.markerVariableName;
+timeColumn=p.Results.timeColumn;
 
-
+isFNIRstruct=validfNIR_Input(fNIR);
 
 if(isempty(markersEnd)&&isempty(markerPattern)) % if only start patterns are provided, only start times are returned
     startMrkOnly=true;
@@ -55,7 +65,16 @@ else
     startMrkOnly=false;
 end
 
-if(~isfield(fNIR,'markers')||size(fNIR.markers,1)<1)
+if(~isFNIRstruct)
+    %processing data as just markers
+    temp=fNIR;
+    fNIR=[];
+    fNIR.markers=temp;
+    
+    if(istable(fNIR.markers)&&~isempty(markerVariableName))
+        markerColumn=find(ismember(fNIR.markers.Properties.VariableNames,markerVariableName));
+    end
+elseif(isFNIRstruct&&~isfield(fNIR,'markers')||size(fNIR.markers,1)<1)
     warning('fNIR struct has no marker data')
     markerTimes=[];
     return;
@@ -87,15 +106,39 @@ for i=1:size(markerPattern,1)
    end
 end
 
-reducedMarkers=fNIR.markers(ismember(fNIR.markers(:,2),uMatchingMarkers),:);
-reducedTimes=reducedMarkers(:,1);
+
+markerVals=fNIR.markers(:,markerColumn);
 
 
-[uMarkers,~,uMrkIdx]=unique(reducedMarkers(:,2));
+
+if(istable(markerVals))
+    markerVals=markerVals{:,1};
+end
+
+reducedIndex=find(ismember(markerVals,uMatchingMarkers));
+reducedMarkers=fNIR.markers(reducedIndex,:);
+reducedTimes=reducedMarkers(:,timeColumn);
+
+
+if(istable(reducedTimes))
+    reducedTimes=reducedTimes{:,1};
+end
+
+if(isnumeric(markerVals(1))&&isnumeric(reducedTimes(1)))
+    returnArray=true;
+else
+    returnArray=false;
+end
+
+[uMarkers,~,uMrkIdx]=unique(reducedMarkers(:,markerColumn));
+
+if(istable(uMarkers))
+    uMarkers=uMarkers{:,1};
+end
 
 if(isempty(uMarkers))
     markerTimes=[];
-    cellMrkTimes={};
+    tableMrkTimes={};
     return;
 end
 
@@ -174,6 +217,7 @@ else
     %convert pattern into ucodes
     markerPatternNum=markerPattern;
     markerPattern=cell(0);
+    matchedPatterns=cell(0);
     for i=1:size(markerPatternNum,1)
         if(iscell(markerPatternNum(i)))
            patternVals=markerPatternNum{i};
@@ -193,7 +237,7 @@ else
            markerPattern{i}=sprintf('%s\\w*?%s',markerPattern{i},markersPatternStr{i}(c));
        end
        
-       matchedPatterns=markerPatternNum(i);
+       matchedPatterns(i)=markerPatternNum(i);
     end
 end
 
@@ -202,26 +246,31 @@ redMrkStr=char(uMrkIdx'+47);
 markerTimes=[];
 for i=1:length(markerPattern)
     [patterns,startIdx,endIdx]=regexp(redMrkStr,markerPattern{i},'match');
-    cellMrkTimes{i}=[reducedTimes(startIdx),reducedTimes(endIdx)];
-    cellMrkTimes{i}(:,3)=i;
+    tableMrkTimes{i}=table(reducedTimes(startIdx),reducedTimes(endIdx),ones(length(startIdx),1)*i,reducedIndex(startIdx),reducedIndex(endIdx));
+    tableMrkTimes{i}.Properties.VariableNames={'StartTime','EndTime','PatternNum','StartIndex','EndIndex'};
     
-    markerTimes=[markerTimes;cellMrkTimes{i}];
+    markerTimes=[markerTimes;tableMrkTimes{i}];
 end
 
 if(isempty(markerTimes))
    return; 
 end
 
+if(returnArray)
+   markerTimes=[markerTimes{:,1},markerTimes{:,2},markerTimes{:,3}]; 
+end
 
 if(length(markerPattern)==1)
    markerTimes=markerTimes(:,[1,2]);
    if(startMrkOnly)
        markerTimes=markerTimes(:,1);
+       if(istable(markerTimes))
+          markerTimes=markerTimes{:,1}; 
+       end
    end
 elseif(startMrkOnly)
    markerTimes=markerTimes(:,[1,3]);
 end
-
 
 end
 
