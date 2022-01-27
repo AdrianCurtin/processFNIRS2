@@ -38,6 +38,7 @@ function [markerTimes,tableMrkTimes, matchedPatterns] = GetMarkers(varargin) %(f
 %       %timeColumn: the column number containing the marker timing
 %       %returnIndicies:  will return marker indicies instead of times as
 %               the default time output
+%       %exactMatch: requires that all makers are explicitly found in order
 
 
 
@@ -45,7 +46,7 @@ p=inputParser;
 
 validfNIR_Input = @(x) (isstruct(x) && (isfield(x,'raw')||isfield(x,'time')||isfield(x,'info')));
 validfNIR_or_marker_Input = @(x) (istable(x)&&size(x,1)>1)||(isnumeric(x)&&length(x)>1) ||validfNIR_Input(x);
-validScalarNum = @(x) isnumeric(x) && ismatrix(x);
+validScalarNum = @(x) isnumeric(x) && ismatrix(x)||islogical(x);
 validScalarNumOrCell = @(x) (isnumeric(x) && ismatrix(x) || iscell(x));
 isStringOrChar = @(x) isstring(x)||ischar(x);
 
@@ -57,6 +58,8 @@ addParameter(p,'markerColumn',2,validScalarNum);
 addParameter(p,'markerVariableName',[],isStringOrChar);
 addParameter(p,'timeColumn',1,validScalarNum);
 addParameter(p,'returnIndicies',false,validScalarNum);
+addParameter(p,'exactMatch',false,validScalarNum);
+addParameter(p,'sortTimes',false,validScalarNum);
 
 
 
@@ -71,6 +74,9 @@ markerColumn=p.Results.markerColumn;
 markerVariableName=p.Results.markerVariableName;
 timeColumn=p.Results.timeColumn;
 returnIndicies=p.Results.returnIndicies;
+exactMatch=p.Results.exactMatch;
+sortTimes=p.Results.sortTimes;
+
 
 if(timeColumn<=0)
     returnIndicies=true;
@@ -134,7 +140,11 @@ if(istable(markerVals))
     markerVals=markerVals{:,1};
 end
 
-reducedIndex=find(ismember(markerVals,uMatchingMarkers));
+if(~exactMatch)
+    reducedIndex=find(ismember(markerVals,uMatchingMarkers));
+else
+    reducedIndex=1:size(markerVals,1);
+end
 reducedMarkers=fNIR.markers(reducedIndex,:);
 
 if(timeColumn<=0)
@@ -256,7 +266,7 @@ else
        markersPatternStr{i}=char(uPatternVals+47); %convert to ascii
        
        markerPattern{i}(1)=markersPatternStr{i}(1);
-       for c=1:length(markersPatternStr{i})
+       for c=2:length(markersPatternStr{i})
            markerPattern{i}=sprintf('%s\\w*?%s',markerPattern{i},markersPatternStr{i}(c));
        end
        
@@ -269,14 +279,24 @@ redMrkStr=char(uMrkIdx'+47);
 markerTimes=[];
 for i=1:length(markerPattern)
     [patterns,startIdx,endIdx]=regexp(redMrkStr,markerPattern{i},'match');
-    tableMrkTimes{i}=table(reducedTimes(startIdx),reducedTimes(endIdx),ones(length(startIdx),1)*i,reducedIndex(startIdx),reducedIndex(endIdx));
-    tableMrkTimes{i}.Properties.VariableNames={'StartTime','EndTime','PatternNum','StartIndex','EndIndex'};
+    startIdx=startIdx(:);
+    endIdx=endIdx(:);
+    tableMrkTimes{i}=table(reducedTimes(startIdx),reducedTimes(endIdx),ones(length(startIdx),1)*i,reducedIndex(startIdx),reducedIndex(endIdx),reducedTimes(endIdx)-reducedTimes(startIdx));
+    tableMrkTimes{i}.Properties.VariableNames={'StartTime','EndTime','PatternNum','StartIndex','EndIndex','TimeDiff'};
     
     markerTimes=[markerTimes;tableMrkTimes{i}];
 end
 
 if(isempty(markerTimes))
    return; 
+end
+
+if(returnIndicies)
+   markerTimes=markerTimes(:,[4,5,3,1,2,6]);
+end
+
+if(sortTimes)
+    markerTimes=sortrows(markerTimes,1);
 end
 
 if(returnArray)
