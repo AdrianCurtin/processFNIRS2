@@ -143,7 +143,7 @@ end
 if(~exactMatch)
     reducedIndex=find(ismember(markerVals,uMatchingMarkers));
 else
-    reducedIndex=1:size(markerVals,1);
+    reducedIndex=[1:size(markerVals,1)]';
 end
 reducedMarkers=fNIR.markers(reducedIndex,:);
 
@@ -266,8 +266,14 @@ else
        markersPatternStr{i}=char(uPatternVals+47); %convert to ascii
        
        markerPattern{i}(1)=markersPatternStr{i}(1);
-       for c=2:length(markersPatternStr{i})
-           markerPattern{i}=sprintf('%s\\w*?%s',markerPattern{i},markersPatternStr{i}(c));
+       if(~exactMatch)
+           for c=2:length(markersPatternStr{i})
+               markerPattern{i}=sprintf('%s\\w*?%s',markerPattern{i},markersPatternStr{i}(c));
+           end
+       else
+           for c=2:length(markersPatternStr{i})
+               markerPattern{i}=sprintf('%s%s',markerPattern{i},markersPatternStr{i}(c));
+           end
        end
        
        matchedPatterns(i)=markerPatternNum(i);
