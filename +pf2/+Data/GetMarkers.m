@@ -8,7 +8,12 @@ function [markerTimes,tableMrkTimes, matchedPatterns] = GetMarkers(varargin) %(f
    %                ex: markersStart [50,51] will look for the marker
    %                            pattern 50 followed by 51
    %                ex: markersStart [50;51] will look for the markers
-   %                            50 and then the markers 51
+   %                            50 and markers valued at 51
+      %                ex: markerPattern {25,[50,51]} will look for markers
+      %                            25 and the pattern 50-51
+%   Note: in patterns, all extra markers are removed, ie: the pattern [1,4]
+%                   will return the markers 1 and 4 in the set [1,2,3,4]
+   
 
 %   GetMarkers(fNIR, markersStart)
 %       returns all markers at specified time
@@ -25,6 +30,14 @@ function [markerTimes,tableMrkTimes, matchedPatterns] = GetMarkers(varargin) %(f
 %   GetMarkers(fNIR,markerPattern)
 %       returns all start and end times for markers matching specific
 %       pattern (with any interleaving markers allowed)
+
+% Additional parameters
+%       %markerColumn: the column number containing the respective markers
+%       %markerVariableName: the variable name containing respective marker
+%                         values (in a table), will overwrite markerColumn
+%       %timeColumn: the column number containing the marker timing
+%       %returnIndicies:  will return marker indicies instead of times as
+%               the default time output
 
 
 
@@ -43,6 +56,7 @@ addParameter(p,'markerPattern',[],validScalarNumOrCell);
 addParameter(p,'markerColumn',2,validScalarNum);
 addParameter(p,'markerVariableName',[],isStringOrChar);
 addParameter(p,'timeColumn',1,validScalarNum);
+addParameter(p,'returnIndicies',false,validScalarNum);
 
 
 
@@ -56,6 +70,11 @@ markerPattern=p.Results.markerPattern;
 markerColumn=p.Results.markerColumn;
 markerVariableName=p.Results.markerVariableName;
 timeColumn=p.Results.timeColumn;
+returnIndicies=p.Results.returnIndicies;
+
+if(timeColumn<=0)
+    returnIndicies=true;
+end
 
 isFNIRstruct=validfNIR_Input(fNIR);
 
@@ -117,8 +136,12 @@ end
 
 reducedIndex=find(ismember(markerVals,uMatchingMarkers));
 reducedMarkers=fNIR.markers(reducedIndex,:);
-reducedTimes=reducedMarkers(:,timeColumn);
 
+if(timeColumn<=0)
+    reducedTimes=reducedIndex;
+else
+    reducedTimes=reducedMarkers(:,timeColumn);
+end
 
 if(istable(reducedTimes))
     reducedTimes=reducedTimes{:,1};
