@@ -77,6 +77,11 @@ returnIndicies=p.Results.returnIndicies;
 exactMatch=p.Results.exactMatch;
 sortTimes=p.Results.sortTimes;
 
+if(iscell(markersStart))
+    markerPattern=markersStart;
+    markersStart=[];
+end
+
 
 if(timeColumn<=0)
     returnIndicies=true;
@@ -263,12 +268,12 @@ else
            uPatternVals(j)=find(patternVals(j)==uMarkers);
        end
        
-       markersPatternStr{i}=char(uPatternVals+47); %convert to ascii
+       markersPatternStr{i}=uValsToString(uPatternVals); %convert to ascii
        
        markerPattern{i}(1)=markersPatternStr{i}(1);
        if(~exactMatch)
            for c=2:length(markersPatternStr{i})
-               markerPattern{i}=sprintf('%s\\w*?%s',markerPattern{i},markersPatternStr{i}(c));
+               markerPattern{i}=sprintf('%s\\S*?%s',markerPattern{i},markersPatternStr{i}(c));
            end
        else
            for c=2:length(markersPatternStr{i})
@@ -280,11 +285,13 @@ else
     end
 end
 
-redMrkStr=char(uMrkIdx'+47);
+regMrkIdx=uValsToString(uMrkIdx);
+
+regMrkStr=char(regMrkIdx)';
 
 markerTimes=[];
 for i=1:length(markerPattern)
-    [patterns,startIdx,endIdx]=regexp(redMrkStr,markerPattern{i},'match');
+    [patterns,startIdx,endIdx]=regexp(regMrkStr,markerPattern{i},'match');
     startIdx=startIdx(:);
     endIdx=endIdx(:);
     tableMrkTimes{i}=table(reducedTimes(startIdx),reducedTimes(endIdx),ones(length(startIdx),1)*i,reducedIndex(startIdx),reducedIndex(endIdx),reducedTimes(endIdx)-reducedTimes(startIdx));
@@ -321,5 +328,16 @@ elseif(startMrkOnly)
    markerTimes=markerTimes(:,[1,3]);
 end
 
+end
+
+function regMrkIdx=uValsToString(uVals)
+    reg_numeric_idx=uVals<=10;
+    reg_upper_idx=(~reg_numeric_idx)&uVals<=37;
+    reg_lower_idx=(~reg_numeric_idx&~reg_upper_idx&uVals<=63);
+
+    regMrkIdx=nan(size(uVals));
+    regMrkIdx(reg_numeric_idx)=uVals(reg_numeric_idx)+47;
+    regMrkIdx(reg_upper_idx)=uVals(reg_upper_idx)+64;
+    regMrkIdx(reg_lower_idx)=uVals(reg_lower_idx)+96;
 end
 
