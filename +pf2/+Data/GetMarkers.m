@@ -162,6 +162,13 @@ if(istable(reducedTimes))
     reducedTimes=reducedTimes{:,1};
 end
 
+if(isempty(reducedTimes))
+    markerTimes=[];
+    tableMrkTimes={};
+    matchedPatterns=cell(0);
+    return;
+end
+
 if(isnumeric(markerVals(1))&&isnumeric(reducedTimes(1)))
     returnArray=true;
 else
@@ -177,12 +184,13 @@ end
 if(isempty(uMarkers))
     markerTimes=[];
     tableMrkTimes={};
+    matchedPatterns=cell(0);
     return;
 end
 
-for i=1:length(uMatchingMarkers)
-   uMatchIdx(i)=find(uMatchingMarkers(i)==uMarkers);
-end
+%for i=1:length(uMatchingMarkers)
+%   uMatchIdx(i)=find(uMatchingMarkers(i)==uMarkers);
+%end
 
 
 
@@ -265,7 +273,10 @@ else
        
        uPatternVals=nan(size(patternVals));
        for j=1:length(patternVals)
-           uPatternVals(j)=find(patternVals(j)==uMarkers);
+           matchedVals=patternVals(j)==uMarkers;
+           if(any(matchedVals))
+                uPatternVals(j)=find(matchedVals);
+           end
        end
        
        markersPatternStr{i}=uValsToString(uPatternVals); %convert to ascii
