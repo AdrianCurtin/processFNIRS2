@@ -301,6 +301,7 @@ end
 regMrkStr=char(uValsToString(uMrkIdx)');
 
 markerTimes=[];
+tableMrkTimes=cell(0);
 for i=1:size(markerPatternChar,1)
     if (~isempty(markerPatternChar{i}))
         clean_mrk_str=onlyPatternMrk(markerPatternChar{i},regMrkStr);
