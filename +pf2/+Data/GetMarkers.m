@@ -69,7 +69,7 @@ fNIR=p.Results.fNIR;
 markersStart=p.Results.markersStart;
 markersEnd=p.Results.markersEnd;
 
-markerPattern=p.Results.markerPattern;
+markerPatternIn=p.Results.markerPattern;
 markerColumn=p.Results.markerColumn;
 markerVariableName=p.Results.markerVariableName;
 timeColumn=p.Results.timeColumn;
@@ -78,7 +78,7 @@ exactMatch=p.Results.exactMatch;
 sortTimes=p.Results.sortTimes;
 
 if(iscell(markersStart))
-    markerPattern=markersStart;
+    markerPatternIn=markersStart;
     markersStart=[];
 end
 
@@ -89,7 +89,7 @@ end
 
 isFNIRstruct=validfNIR_Input(fNIR);
 
-if(isempty(markersEnd)&&isempty(markerPattern)) % if only start patterns are provided, only start times are returned
+if(isempty(markersEnd)&&isempty(markerPatternIn)) % if only start patterns are provided, only start times are returned
     startMrkOnly=true;
 else
     startMrkOnly=false;
@@ -128,11 +128,11 @@ for i=1:size(markersEnd,1)
    end
 end
 
-for i=1:size(markerPattern,1)
-   if(iscell(markerPattern(i)))
-       uMatchingMarkers=[uMatchingMarkers,unique(markerPattern{i})];
+for i=1:size(markerPatternIn,1)
+   if(iscell(markerPatternIn(i)))
+       uMatchingMarkers=[uMatchingMarkers,unique(markerPatternIn{i})];
    else
-       uMatchingMarkers=[uMatchingMarkers,unique(markerPattern(i,:))];
+       uMatchingMarkers=[uMatchingMarkers,unique(markerPatternIn(i,:))];
    end
 end
 
@@ -146,8 +146,10 @@ if(istable(markerVals))
 end
 
 if(~exactMatch)
+    % non-exact match discards all misc markers before match
     reducedIndex=find(ismember(markerVals,uMatchingMarkers));
 else
+    % exact match retains all misc markers before match
     reducedIndex=[1:size(markerVals,1)]';
 end
 reducedMarkers=fNIR.markers(reducedIndex,:);
@@ -194,7 +196,7 @@ end
 
 
 
-if(isempty(markerPattern))
+if(isempty(markerPatternIn))
     % convert start and end terms into ucodes (characters)
     markersStartStr=cell(0);
     for i=1:size(markersStart,1)
@@ -234,22 +236,22 @@ if(isempty(markerPattern))
     
     %merge strings for start and end
     
-    markerPattern=cell(0);
+    markerPatternChar=cell(0);
     for i=1:size(markersStart,1)
        if(size(markersEnd,1)==0)
-            markerPattern{i}=sprintf('%s',markersStartStr{i});
+            markerPatternChar{i}=sprintf('%s',markersStartStr{i});
             matchedPatterns{i}=markersStart(i,:);
        elseif(size(markersEnd,1)==1)
-           markerPattern{i}=sprintf('%s\\w*?%s',markersStartStr{i},markersEndStr{1});
+           markerPatternChar{i}=sprintf('%s\\w*?%s',markersStartStr{i},markersEndStr{1});
            matchedPatterns{i,1}=markersStart(i,:);
            matchedPatterns{i,2}=markersEndStr(1,:);
        elseif(size(markersEnd,1)==size(markersStart,1))
-           markerPattern{i}=sprintf('%s?%s',markersStartStr{i},markersEndStr{i});
+           markerPatternChar{i}=sprintf('%s?%s',markersStartStr{i},markersEndStr{i});
            matchedPatterns{i,1}=markersStart(i,:);
            matchedPatterns{i,2}=markersEndStr(i,:);
        elseif(size(markersStart,1)==1)
            for j=1:size(markersEnd,1)
-               markerPattern{j}=sprintf('%s\\w*?%s',markersStartStr{1},markersEndStr{j});
+               markerPatternChar{j}=sprintf('%s\\w*?%s',markersStartStr{1},markersEndStr{j});
                matchedPatterns{j,1}=markersStart(1,:);
                matchedPatterns{j,2}=markersEndStr(j,:);
            end
@@ -261,54 +263,55 @@ if(isempty(markerPattern))
     
 else
     %convert pattern into ucodes
-    markerPatternNum=markerPattern;
-    markerPattern=cell(0);
+    markerPatternNum=markerPatternIn;
+    markerPatternChar=cell(0);
     matchedPatterns=cell(0);
     for i=1:size(markerPatternNum,1)
+        % For each markerPattern
         if(iscell(markerPatternNum(i)))
            patternVals=markerPatternNum{i};
        else
            patternVals=markerPatternNum(i,:);
-       end
+        end
        
+       % recode values into unique marker ids
        uPatternVals=nan(size(patternVals));
-       for j=1:length(patternVals)
-           matchedVals=patternVals(j)==uMarkers;
+       for j=1:length(uMarkers)
+           matchedVals=patternVals==uMarkers(j);
            if(any(matchedVals))
-                uPatternVals(j)=find(matchedVals);
+                uPatternVals(matchedVals)=j;
            end
        end
        
-       markersPatternStr{i}=uValsToString(uPatternVals); %convert to ascii
-       
-       markerPattern{i}(1)=markersPatternStr{i}(1);
-       if(~exactMatch)
-           for c=2:length(markersPatternStr{i})
-               markerPattern{i}=sprintf('%s\\S*?%s',markerPattern{i},markersPatternStr{i}(c));
-           end
+       if(any(isnan(uPatternVals)))
+           markerPatternChar{i}='';
+           matchedPatterns(i)=markerPatternNum(i);
+           continue
        else
-           for c=2:length(markersPatternStr{i})
-               markerPattern{i}=sprintf('%s%s',markerPattern{i},markersPatternStr{i}(c));
-           end
-       end
        
-       matchedPatterns(i)=markerPatternNum(i);
+           markersPatternStr{i}=uValsToString(uPatternVals); %convert to ascii
+
+           markerPatternChar{i}=char(markersPatternStr{i});
+
+           matchedPatterns(i)=markerPatternNum(i);
+       end
     end
 end
 
-regMrkIdx=uValsToString(uMrkIdx);
-
-regMrkStr=char(regMrkIdx)';
+regMrkStr=char(uValsToString(uMrkIdx)');
 
 markerTimes=[];
-for i=1:length(markerPattern)
-    [patterns,startIdx,endIdx]=regexp(regMrkStr,markerPattern{i},'match');
-    startIdx=startIdx(:);
-    endIdx=endIdx(:);
-    tableMrkTimes{i}=table(reducedTimes(startIdx),reducedTimes(endIdx),ones(length(startIdx),1)*i,reducedIndex(startIdx),reducedIndex(endIdx),reducedTimes(endIdx)-reducedTimes(startIdx));
-    tableMrkTimes{i}.Properties.VariableNames={'StartTime','EndTime','PatternNum','StartIndex','EndIndex','TimeDiff'};
-    
-    markerTimes=[markerTimes;tableMrkTimes{i}];
+for i=1:size(markerPatternChar,1)
+    if (~isempty(markerPatternChar{i}))
+        clean_mrk_str=onlyPatternMrk(markerPatternChar{i},regMrkStr);
+        [patterns,startIdx,endIdx]=regexp(clean_mrk_str,markerPatternChar{i},'match');
+        startIdx=startIdx(:);
+        endIdx=endIdx(:);
+        tableMrkTimes{i}=table(reducedTimes(startIdx),reducedTimes(endIdx),ones(length(startIdx),1)*i,reducedIndex(startIdx),reducedIndex(endIdx),reducedTimes(endIdx)-reducedTimes(startIdx));
+        tableMrkTimes{i}.Properties.VariableNames={'StartTime','EndTime','PatternNum','StartIndex','EndIndex','TimeDiff'};
+
+        markerTimes=[markerTimes;tableMrkTimes{i}];
+    end
 end
 
 if(isempty(markerTimes))
@@ -327,7 +330,7 @@ if(returnArray)
    markerTimes=[markerTimes{:,1},markerTimes{:,2},markerTimes{:,3}]; 
 end
 
-if(length(markerPattern)==1)
+if(length(markerPatternChar)==1)
    markerTimes=markerTimes(:,[1,2]);
    if(startMrkOnly)
        markerTimes=markerTimes(:,1);
@@ -350,5 +353,36 @@ function regMrkIdx=uValsToString(uVals)
     regMrkIdx(reg_numeric_idx)=uVals(reg_numeric_idx)+47;
     regMrkIdx(reg_upper_idx)=uVals(reg_upper_idx)+64;
     regMrkIdx(reg_lower_idx)=uVals(reg_lower_idx)+96;
+    if(max(uVals>63))
+        error('Too many unique markers');
+    end
+end
+
+function cleanedMarkers=onlyPatternMrk(input_pattern,markers)
+
+
+    if(ischar(input_pattern))
+        input_pattern=double(input_pattern);
+    end
+    
+    if(ischar(markers))
+       markers=double(markers); 
+       returnChar=true;
+    else
+       returnChar=false; 
+    end
+    
+    uInput=unique(input_pattern);
+    numInputs=length(uInput);
+    
+    markers(~ismember(markers,uInput))=0;
+    
+    if(returnChar)
+        markers(markers==0)=',';
+        markers=char(markers);
+    end
+    
+    cleanedMarkers=markers;
+
 end
 
