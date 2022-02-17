@@ -285,7 +285,11 @@ else
        
        if(any(isnan(uPatternVals)))
            markerPatternChar{i}='';
-           matchedPatterns(i)=markerPatternNum(i);
+           if(iscell(markerPatternNum(i)))
+                matchedPatterns(i)=markerPatternNum(i);
+           else
+                 matchedPatterns{i}=markerPatternNum(i);
+           end
            continue
        else
        
@@ -293,7 +297,11 @@ else
 
            markerPatternChar{i}=char(markersPatternStr{i});
 
-           matchedPatterns(i)=markerPatternNum(i);
+           if(iscell(markerPatternNum(i)))
+                matchedPatterns(i)=markerPatternNum(i);
+           else
+                matchedPatterns{i}=markerPatternNum(i);
+           end
        end
     end
 end
