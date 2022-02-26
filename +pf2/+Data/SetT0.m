@@ -4,12 +4,15 @@ function outFNIR=SetT0(fnirStruct,t0time)
 %t0 is now 0;
 
 outFNIR=fnirStruct;
-outFNIR.time=outFNIR.time-t0time;
+if(isfield(outFNIR,'time'))
+    outFNIR.time=outFNIR.time-t0time;
+end
+
 
 if(isfield(outFNIR,'markers'))
    if(isfield(outFNIR.markers,'data'))
        outFNIR.markers.data(:,1)= outFNIR.markers.data(:,1)-t0time;
-   else
+   elseif(~isempty(outFNIR.markers))
       outFNIR.markers(:,1)= outFNIR.markers(:,1)-t0time;
    end
 end

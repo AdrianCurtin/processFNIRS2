@@ -172,7 +172,7 @@ while(ischar(lineF))
     
     lineF=fgetl(fid); %Get Next Line
     
-    if(contains(lineF, 'Baseline Started'))
+    if(ischar(lineF)&&contains(lineF, 'Baseline Started'))
         countCheckFlag=true;
         lineF=fgetl(fid); %Get Next Line
 

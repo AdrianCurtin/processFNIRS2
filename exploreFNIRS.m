@@ -502,6 +502,7 @@ warning off MATLAB:table:RowsAddedExistingVars
 global ProgressHandles
 
 if(isempty(FNIRS_array))
+    error('No Data to build exploreFNIRS data table!\n')
     return;
 else
     pf2_base.closeProgressHandles();
@@ -534,6 +535,7 @@ else
                    (isnumeric(curField)&&length(curField)==1)||...  %numeric items of 1
                    ischar(curField)||isstring(curField)||...        %strings or chars
                    (islogical(curField)&&length(curField)==1)||...   %logical values
+                   (iscategorical(curField)&&length(curField)==1)||... %categorical values
                    (istable(curField)&&size(curField,1)==1&&size(curField,2)==1)) %singular tables
                
               if(istable(curField)&&size(curField,1)==1&&size(curField,2)==1)
@@ -561,6 +563,9 @@ else
                   elseif(islogical(curField))
                       outTable.(curFieldName)=strings(size(outTable,1),1);
                       outTable.(curFieldName)(i,1)=nominal(string(curField));
+                  elseif(iscategorical(curField))
+                      outTable.(curFieldName)=categorical(size(outTable,1),1);
+                      outTable.(curFieldName)(i,1)=curField;
                   end
                   
               end
@@ -1306,17 +1311,21 @@ selSubIdx=ismember(ExFNIRS.dataTable.('SubjectID'),selectedSubs);
 strs=get(handles.listbox_condition,'String');
 selectedStrs=get(handles.listbox_condition,'Value');
 selectedCondition=strs(selectedStrs,:);
-if(isnumeric(ExFNIRS.dataTable.('Condition')))
-    selectedCondition=str2num(selectedCondition);
+if(ismember('Condition',ExFNIRS.dataTable.Properties.VariableNames))
+    if(isnumeric(ExFNIRS.dataTable.('Condition')))
+        selectedCondition=str2num(selectedCondition);
+        else
+           if(~iscell(selectedCondition))
+               selectedCondition={selectedCondition};
+           end
+           
+           missingIdx=strcmp('Missing',selectedCondition);
+           %selectedCondition(missingIdx)={''};
+    end
+    selConditionIdx=ismember(ExFNIRS.dataTable.('Condition'),selectedCondition);
 else
-   if(~iscell(selectedCondition))
-       selectedCondition={selectedCondition};
-   end
-   
-   missingIdx=strcmp('Missing',selectedCondition);
-   %selectedCondition(missingIdx)={''};
+    selConditionIdx=true([height(ExFNIRS.dataTable),1]);
 end
-selConditionIdx=ismember(ExFNIRS.dataTable.('Condition'),selectedCondition);
 
 strs=get(handles.listbox_session,'String');
 selectedStrs=get(handles.listbox_session,'Value');
@@ -1336,17 +1345,21 @@ selSessionIdx=ismember(ExFNIRS.dataTable.('Session'),selectedSession);
 strs=get(handles.listbox_block,'String');
 selectedStrs=get(handles.listbox_block,'Value');
 selectedBlock=strs(selectedStrs,:);
-if(isnumeric(ExFNIRS.dataTable.('Block')))
-    selectedBlock=str2num(selectedBlock);
+if(ismember('Block',ExFNIRS.dataTable.Properties.VariableNames))
+    if(isnumeric(ExFNIRS.dataTable.('Block')))
+        selectedBlock=str2num(selectedBlock);
+    else
+       if(~iscell(selectedBlock))
+           selectedBlock={selectedBlock};
+       end
+       
+       missingIdx=strcmp('Missing',selectedBlock);
+       %selectedBlock(missingIdx)={''};
+    end
+    selBlockIdx=ismember(ExFNIRS.dataTable.('Block'),selectedBlock);
 else
-   if(~iscell(selectedBlock))
-       selectedBlock={selectedBlock};
-   end
-   
-   missingIdx=strcmp('Missing',selectedBlock);
-   %selectedBlock(missingIdx)={''};
+    selBlockIdx=true([height(ExFNIRS.dataTable),1]);
 end
-selBlockIdx=ismember(ExFNIRS.dataTable.('Block'),selectedBlock);
 
 if(ExFNIRS.settings.use_group)
     strs=get(handles.listbox_group,'String');
@@ -5360,11 +5373,16 @@ for g=1:numGroups
     
     curData=table2array(curData);
     
-    if(isstring(curData))
-       warning('Strings return count');
+    if(isstring(curData)||iscategorical(curData)||ischar(curData))
+       warning('Strings and categories return count');
        [~,~,curData]=unique(curData);
        plotFeature='Count';
        % return;
+    end
+
+    if(islogical(curData))
+       warning('boolean/logical values return count ');
+       curData=numeric(curData);
     end
     curData(curData==-9999)=nan;
     
