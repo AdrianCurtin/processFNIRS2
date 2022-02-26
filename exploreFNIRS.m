@@ -564,8 +564,8 @@ else
                       outTable.(curFieldName)=strings(size(outTable,1),1);
                       outTable.(curFieldName)(i,1)=nominal(string(curField));
                   elseif(iscategorical(curField))
-                      outTable.(curFieldName)=categorical(size(outTable,1),1);
-                      outTable.(curFieldName)(i,1)=curField;
+                      outTable.(curFieldName)=strings(size(outTable,1),1);
+                      outTable.(curFieldName)(i,1)=string(curField);
                   end
                   
               end
