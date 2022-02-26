@@ -5330,7 +5330,8 @@ end
 
 
 if(useCurInfoGroup)
-    [uCurInfoG,a,uCurIdx]=unique(cellstr(curInfoGby));
+    
+    [uCurInfoG,a,uCurIdx]=unique(cellstr(string(curInfoGby)));
     numCurInfoG=length(uCurInfoG);
     barChartData=nan(max(uCurIdx),numUgroups,3);
 else
