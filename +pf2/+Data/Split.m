@@ -188,7 +188,16 @@ end
 
 
 hasRawField=isfield(fNIR,'raw');
+
+if(hasRawField&&isempty(fNIR.raw))
+    hasRawField=false;
+    fNIR=rmfield(fNIR,'raw');
+end
+
 hasOxyField=isfield(fNIR,'HbO');
+
+
+
 hasCARfield=isfield(fNIR,'CAR');
 hasROIfield=isfield(fNIR,'ROI');
 

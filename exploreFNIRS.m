@@ -564,8 +564,8 @@ else
                       outTable.(curFieldName)=strings(size(outTable,1),1);
                       outTable.(curFieldName)(i,1)=nominal(string(curField));
                   elseif(iscategorical(curField))
-                      outTable.(curFieldName)=categorical(size(outTable,1),1);
-                      outTable.(curFieldName)(i,1)=curField;
+                      outTable.(curFieldName)=strings(size(outTable,1),1);
+                      outTable.(curFieldName)(i,1)=string(curField);
                   end
                   
               end
@@ -2315,11 +2315,11 @@ for chIdx=1:numOpt
             
             switch(xType)
                 case 'channels'
-                    title(curFigH.subH{curSy,curSx},chNamePartLong);
+                    title_with_space(curFigH.subH{curSy,curSx},chNamePartLong);
                 case 'bioM'
-                    title(curFigH.subH{curSy,curSx},bioM);
+                    title_with_space(curFigH.subH{curSy,curSx},bioM);
                 case 'groupby'
-                    title(curFigH.subH{curSy,curSx},uCurInfoG{curGroupInfoIdx});
+                    title_with_space(curFigH.subH{curSy,curSx},uCurInfoG{curGroupInfoIdx});
                 otherwise 
             end
             
@@ -2332,7 +2332,7 @@ for chIdx=1:numOpt
                     ylbl={uCurInfoG{curGroupInfoIdx};ylbl};
                 otherwise 
             end
-            ylabel(curFigH.subH{curSy,curSx},ylbl);
+            ylabel_with_space(curFigH.subH{curSy,curSx},ylbl);
             
         if(ExFNIRS.settings.ylim_fixed)
             xlim(curFigH.subH{curSy,curSx},[ExFNIRS.settings.plot_start,ExFNIRS.settings.plot_end]);
@@ -2368,7 +2368,7 @@ for i=1:size(sH,1)
     for b=1:size(sH,2)
         for x=1:numSubX
             for y=1:numSubY
-                xlabel(sH{i,b}.subH{y,x},'Time (s)');
+                xlabel_with_space(sH{i,b}.subH{y,x},'Time (s)');
                 xlim(sH{i,b}.subH{y,x},[ExFNIRS.settings.plot_start,ExFNIRS.settings.plot_end]);
                 
                 if(ExFNIRS.settings.ylim_fixed)
@@ -2407,12 +2407,53 @@ for i=1:size(sH,1)
         addDebugAnnotation(sH{i,b}.h);
         switch(figType)
             case 'bioM'
-                pf2_base.external.suptitle(sH{i,b}.h,selectedBioM{i});
+                suptitle_with_space(sH{i,b}.h,selectedBioM{i});
             otherwise
                 
         end
     end
 end
+
+function h=xlabel_with_space(figHandle,labelstring)
+if(nargin<2)
+    labelstring=figHandle;
+    figHandle=gca;
+end
+
+if(~isempty(labelstring))
+    labelstring(labelstring=='_')=' ';
+end
+h=xlabel(figHandle,labelstring);
+
+function h=ylabel_with_space(figHandle,labelstring)
+if(nargin<2)
+    labelstring=figHandle;
+    figHandle=gca;
+end
+
+if(~isempty(labelstring))
+    labelstring(labelstring=='_')=' ';
+end
+h=ylabel(figHandle,labelstring);
+
+function h=title_with_space(figHandle,labelstring)
+if(nargin<2)
+    labelstring=figHandle;
+    figHandle=gca;
+end
+
+if(~isempty(labelstring))
+    labelstring(labelstring=='_')=' ';
+end
+h=title(figHandle,labelstring);
+
+function h=suptitle_with_space(labelstring)
+
+if(~isempty(labelstring))
+    labelstring(labelstring=='_')=' ';
+end
+h=pf2_base.external.suptitle(labelstring);
+
 
     
 function addDebugAnnotation(figHandle,optionalstring)
@@ -3982,9 +4023,9 @@ for chIdx=1:numOpt
                     bioM=bioM{1};
                 end
                 if(plotCount)
-                    ylabel(sprintf('%s \\Delta[%s] (\\muM)',plotFeature,bioM));
+                    ylabel_with_space(sprintf('%s \\Delta[%s] (\\muM)',plotFeature,bioM));
                 else
-                    ylabel(sprintf('%s \\Delta[%s] (\\muM)  +/- (%s)',plotFeature,bioM,errorFeature));
+                    ylabel_with_space(sprintf('%s \\Delta[%s] (\\muM)  +/- (%s)',plotFeature,bioM,errorFeature));
                 end
             else
                 bioM=selectedBioM(curChart);
@@ -3992,36 +4033,36 @@ for chIdx=1:numOpt
                     bioM=bioM{1};
                 end
                 if(plotCount)
-                    ylabel(sprintf('%s \\Delta[%s] (\\muM)',plotFeature,bioM));
+                    ylabel_with_space(sprintf('%s \\Delta[%s] (\\muM)',plotFeature,bioM));
                 else
-                    ylabel(sprintf('%s \\Delta[%s] (\\muM)  +/- (%s)',plotFeature,bioM,errorFeature));
+                    ylabel_with_space(sprintf('%s \\Delta[%s] (\\muM)  +/- (%s)',plotFeature,bioM,errorFeature));
                 end
                 
             end
         elseif(numBioM==b)
             if(plotCount)
-                ylabel(sprintf('%s \\Delta[%s] (\\muM)',plotFeature,'X'));
+                ylabel_with_space(sprintf('%s \\Delta[%s] (\\muM)',plotFeature,'X'));
             else
-                ylabel(sprintf('%s \\Delta[%s] (\\muM)  +/- (%s)',plotFeature,'X',errorFeature));
+                ylabel_with_space(sprintf('%s \\Delta[%s] (\\muM)  +/- (%s)',plotFeature,'X',errorFeature));
             end
         end
         
         
         switch ExFNIRS.settings.ChannelMode
             case 'fNIR'
-                title(sprintf('Optode %i',ch));
+                title_with_space(sprintf('Optode %i',ch));
             case 'ROI'
-                title(sprintf('ROI: %s',optStrs{ch}));
+                title_with_space(sprintf('ROI: %s',optStrs{ch}));
             case 'Aux'
-                title(sprintf('Aux: %s', bioM));
+                title_with_space(sprintf('Aux: %s', bioM));
         end
         
         if(useCurInfoGroup&&numChartTimes==1)
-            xlabel(sprintf('%s (t=%s)',curInfoGroup,barChartTimeStrings{1}));
+            xlabel_with_space(sprintf('%s (t=%s)',curInfoGroup,barChartTimeStrings{1}));
         elseif(useCurInfoGroup)
-            xlabel(sprintf('Time (s) x %s',curInfoGroup));
+            xlabel_with_space(sprintf('Time (s) x %s',curInfoGroup));
         else
-            xlabel('Time (s)');
+            xlabel_with_space('Time (s)');
         end
         
         if((numBioM>1||numUgroups>1)&&(ExFNIRS.settings.plot_legend_mode==3||(ExFNIRS.settings.plot_legend_mode==2&&curSubplotIdx==lastPlotNum)))
@@ -4489,14 +4530,14 @@ if(showTopo)
                                         curAxes=gca;
                                         axesPos=curAxes.OuterPosition;
                                         axis off
-                                        title(sprintf('%s_N_S',coefNames{c}));
+                                        title_with_space(sprintf('%s_N_S',coefNames{c}));
                                         if(a==1) % first column
                                             th=annotation(gcf,'textbox',[0,axesPos(2),axesPos(3),axesPos(4)/2],'String',selectedBioM(b),'FitBoxToText','on');
                                         end
                                     end
                             end
                             if(c==1) % first column
-                                ylabel(selectedBioM(b));
+                                ylabel_with_space(selectedBioM(b));
                             end
                         end
                    case 'anova'
@@ -4582,7 +4623,7 @@ if(showTopo)
                                 curAxes=gca;
                                 axesPos=curAxes.OuterPosition;
                                 axis off
-                                title(sprintf('%s_N_S',anovaNames{a}));
+                                title_with_space(sprintf('%s_N_S',anovaNames{a}));
                                 if(a==1) % first column
                                     th=annotation(gcf,'textbox',[0,axesPos(2),axesPos(3),axesPos(4)/2],'String',selectedBioM(b),'FitBoxToText','on');
                                 end
@@ -4626,7 +4667,7 @@ if(showTopo)
         %                             pf2.Data.Plot.InterpolateROIvalues(roiInfo,vals,minVal,maxVal,1,coefNames{c},'tstat');%,7,11,2,1,false,'[Hb-Oxy] Natural High Vs. Low',12,'hot',true)
                             end
                             if(c==1) % first column
-                                ylabel(selectedBioM(b));
+                                ylabel_with_space(selectedBioM(b));
                             end
                         end
                         case 'anova'
@@ -4654,13 +4695,13 @@ if(showTopo)
         %                             pf2.Data.Plot.InterpolateROIvalues(roiInfo,vals,minVal,maxVal,1,coefNames{c},'tstat');%,7,11,2,1,false,'[Hb-Oxy] Natural High Vs. Low',12,'hot',true)
                             end
                             if(a==1) % first column
-                                ylabel(selectedBioM(b));
+                                ylabel_with_space(selectedBioM(b));
                             end
                         end
                             
                     end
                 end
-            suptitle('FDR Edition');
+            suptitle_with_space('FDR Edition');
         end
         
     end
@@ -5456,11 +5497,11 @@ if(ExFNIRS.settings.plot_bar_err)
     ylimUpper=max(max(barChartData(:,:,1)))+max(max(barChartData(:,:,2)));
     yrange=ylimUpper-ylimLower;
     ylim([min(ylimLower-0.1*yrange,0),max(ylimUpper+0.1*yrange,0)]);
-    ylabel(sprintf('%s %s   +/- (%s)',plotFeature,curInfoStr,errorFeature));
+    ylabel_with_space(sprintf('%s %s   +/- (%s)',plotFeature,curInfoStr,errorFeature));
     
     if(useCurInfoGroup)
-       title(sprintf('%s by %s',curInfoStr,curInfoGroup)); 
-       xlabel(curInfoGroup);
+       title_with_space(sprintf('%s by %s',curInfoStr,curInfoGroup)); 
+       xlabel_with_space(curInfoGroup);
     end
 else
     pf2_base.external.barweb(barChartData(:,:,1),[],1,uCurInfoG, [], [], [], cIndex,[],gAStrs,[],'hide');
@@ -5468,11 +5509,11 @@ else
     ylimUpper=max(max(barChartData(:,:,1)));
     yrange=ylimUpper-ylimLower;
     ylim([min(ylimLower-0.1*yrange,0),max(ylimUpper+0.1*yrange,0)]);
-    ylabel(sprintf('%s %s   +/- (%s)',plotFeature,curInfoStr,errorFeature));
+    ylabel_with_space(sprintf('%s %s   +/- (%s)',plotFeature,curInfoStr,errorFeature));
     
     if(useCurInfoGroup)
-       title(sprintf('%s by %s',curInfoStr,curInfoGroup)); 
-       xlabel(curInfoGroup);
+       title_with_space(sprintf('%s by %s',curInfoStr,curInfoGroup)); 
+       xlabel_with_space(curInfoGroup);
     end
 end
 
@@ -6585,7 +6626,7 @@ for chIdx=1:numOpt
                                 axes(curPlotHandle);
                                 axesPos=curAxes.OuterPosition;
                                 axis off
-                                title(sprintf('%s_N_S',titleSTR));
+                                title_with_space(sprintf('%s_N_S',titleSTR));
                                 if(curSx==1) % first column
                                     th=annotation(gcf,'textbox',[0,max(axesPos(2),0.05),axesPos(3),axesPos(4)/2],'String',rowLabel,'FitBoxToText','on');
                                 end
@@ -6597,7 +6638,7 @@ for chIdx=1:numOpt
                         axes(curPlotHandle);
                         axesPos=curAxes.OuterPosition;
                         axis off
-                        title(sprintf('%s_N_S',titleSTR));
+                        title_with_space(sprintf('%s_N_S',titleSTR));
                         if(curSx==1) % first column
                             th=annotation(gcf,'textbox',[0,axesPos(2),axesPos(3),axesPos(4)/2],'String',rowLabel,'FitBoxToText','on');
                         end
@@ -6635,13 +6676,13 @@ for chIdx=1:numOpt
 
                     switch(xType)
                         case 'time'
-                            title(curPlotHandle,sprintf('t=%i',round(barChartTimes(t))));
+                            title_with_space(curPlotHandle,sprintf('t=%i',round(barChartTimes(t))));
                         case 'groupby'
-                            title(curPlotHandle,curInfoGby{g});
+                            title_with_space(curPlotHandle,curInfoGby{g});
                         case 'channels'
-                            title(curPlotHandle,sprintf('Opt. %i',ch));
+                            title_with_space(curPlotHandle,sprintf('Opt. %i',ch));
                         case 'bioM'
-                            title(curPlotHandle,bioM);
+                            title_with_space(curPlotHandle,bioM);
                     end
 
 
@@ -6649,24 +6690,24 @@ for chIdx=1:numOpt
 
                         switch(yType)
                             case 'time'
-                                xlabel(curPlotHandle,{sprintf('t=%i',round(barChartTimes(t)));curFeatureString});
+                                xlabel_with_space(curPlotHandle,{sprintf('t=%i',round(barChartTimes(t)));curFeatureString});
                             case 'groupby'
-                                xlabel(curPlotHandle,{curInfoGby{curUgroupIdx};curFeatureString});
+                                xlabel_with_space(curPlotHandle,{curInfoGby{curUgroupIdx};curFeatureString});
                             case 'channels'
-                                xlabel(curPlotHandle,{sprintf('Opt. %i',ch);curFeatureString});
+                                xlabel_with_space(curPlotHandle,{sprintf('Opt. %i',ch);curFeatureString});
                             case 'bioM'
                                 if(numBioM>1)
-                                    xlabel(curPlotHandle,{bioM,curFeatureString});
+                                    xlabel_with_space(curPlotHandle,{bioM,curFeatureString});
                                 else
-                                    xlabel(curPlotHandle,curFeatureString);
+                                    xlabel_with_space(curPlotHandle,curFeatureString);
                                 end
                             otherwise
-                                ylabel(curPlotHandle,{sprintf('Opt. %i',ch);curFeatureString});
+                                ylabel_with_space(curPlotHandle,{sprintf('Opt. %i',ch);curFeatureString});
                         end
                         if(ExFNIRS.settings.plot_scatter_nonparametric)
-                            ylabel(curPlotHandle,sprintf('Rank %s',curInfoStr));
+                            ylabel_with_space(curPlotHandle,sprintf('Rank %s',curInfoStr));
                         else
-                            ylabel(curPlotHandle,curInfoStr);
+                            ylabel_with_space(curPlotHandle,curInfoStr);
                         end
                         
                     else
@@ -6674,24 +6715,24 @@ for chIdx=1:numOpt
 
                         switch(yType)
                             case 'time'
-                                ylabel(curPlotHandle,{sprintf('t=%i',round(barChartTimes(t)));curFeatureString});
+                                ylabel_with_space(curPlotHandle,{sprintf('t=%i',round(barChartTimes(t)));curFeatureString});
                             case 'groupby'
-                                ylabel(curPlotHandle,{curInfoGby{curUgroupIdx};curFeatureString});
+                                ylabel_with_space(curPlotHandle,{curInfoGby{curUgroupIdx};curFeatureString});
                             case 'channels'
-                                ylabel(curPlotHandle,{sprintf('Opt. %i',ch);curFeatureString});
+                                ylabel_with_space(curPlotHandle,{sprintf('Opt. %i',ch);curFeatureString});
                             case 'bioM'
                                 if(numBioM>1)
-                                    ylabel(curPlotHandle,{bioM,curFeatureString});
+                                    ylabel_with_space(curPlotHandle,{bioM,curFeatureString});
                                 else
-                                    ylabel(curPlotHandle,curFeatureString);
+                                    ylabel_with_space(curPlotHandle,curFeatureString);
                                 end
                             otherwise
-                                ylabel(curPlotHandle,{sprintf('Opt. %i',ch);curFeatureString});
+                                ylabel_with_space(curPlotHandle,{sprintf('Opt. %i',ch);curFeatureString});
                         end
                         if(ExFNIRS.settings.plot_scatter_nonparametric)
-                            xlabel(curPlotHandle,sprintf('Rank %s',curInfoStr));
+                            xlabel_with_space(curPlotHandle,sprintf('Rank %s',curInfoStr));
                         else
-                            xlabel(curPlotHandle,curInfoStr);
+                            xlabel_with_space(curPlotHandle,curInfoStr);
                         end
                     end
 
@@ -6947,18 +6988,18 @@ for i=1:size(sH,1)
         switch(figType)
             case 'bioM'
                 suptStr=sprintf('%s: %s',suptStr,selectedBioM{i});
-                pf2_base.external.suptitle(sH{i,b}.h,suptStr);
+                suptitle_with_space(sH{i,b}.h,suptStr);
             case 'channels'
                 suptStr=sprintf('%s: Optode %i',suptStr,selOpt(i));
-                pf2_base.external.suptitle(sH{i,b}.h,suptStr);
+                suptitle_with_space(sH{i,b}.h,suptStr);
             case 'bio,channels'
                 suptStr=sprintf('%s: Optode %i [%s]',suptStr,selOpt(i),selectedBioM{b});
-                pf2_base.external.suptitle(sH{i,b}.h,suptStr);
+                suptitle_with_space(sH{i,b}.h,suptStr);
             case 'groupby,bio'
                 suptStr=sprintf('%s: %s [%s]',suptStr,uCurInfoG{i},selectedBioM{b});
-                pf2_base.external.suptitle(sH{i,b}.h,suptStr);
+                suptitle_with_space(sH{i,b}.h,suptStr);
             otherwise
-                pf2_base.external.suptitle(suptStr);
+                suptitle_with_space(suptStr);
         end
         
         if(plotTopo)
@@ -8361,7 +8402,7 @@ for g=1:numGroups
 
         switch(xType)
             case 'groupby'
-                title(curPlotHandle,curInfoGby{g});
+                title_with_space(curPlotHandle,curInfoGby{g});
         end
         
         
@@ -8372,27 +8413,27 @@ for g=1:numGroups
             switch(yType)
 
                 case 'groupby'
-                    ylabel(curPlotHandle,{curInfoGby{g};curInfoStr});
+                    ylabel_with_space(curPlotHandle,{curInfoGby{g};curInfoStr});
 
                 otherwise
-                    ylabel(curPlotHandle,curInfoStr);
+                    ylabel_with_space(curPlotHandle,curInfoStr);
             end
-            xlabel(curPlotHandle,curFeatureString);
+            xlabel_with_space(curPlotHandle,curFeatureString);
         else
 
 
             switch(yType)
 
                 case 'groupby'
-                    ylabel(curPlotHandle,{curInfoGby{curUgroupIdx};curFeatureString});
+                    ylabel_with_space(curPlotHandle,{curInfoGby{curUgroupIdx};curFeatureString});
 
                 otherwise
-                    ylabel(curPlotHandle,curFeatureString);
+                    ylabel_with_space(curPlotHandle,curFeatureString);
             end
             if(ExFNIRS.settings.plot_scatter_nonparametric)
-                xlabel(curPlotHandle,sprintf('Rank %s',curInfoStr));
+                xlabel_with_space(curPlotHandle,sprintf('Rank %s',curInfoStr));
             else
-                xlabel(curPlotHandle,curInfoStr);
+                xlabel_with_space(curPlotHandle,curInfoStr);
             end
         end
 
@@ -8647,9 +8688,9 @@ for i=1:size(sH,1)
         
         switch(xType)
             case 'groupby'
-                pf2_base.external.suptitle(sprintf('%s by %s',suptStr,curInfoGroup));
+                suptitle_with_space(sprintf('%s by %s',suptStr,curInfoGroup));
             otherwise
-                pf2_base.external.suptitle(suptStr);
+                suptitle_with_space(suptStr);
         end
       
     end
