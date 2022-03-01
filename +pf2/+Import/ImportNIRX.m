@@ -1,4 +1,4 @@
-function [ fNIR] = ImportNIRX( folderDIR,channelCheck)
+function [fNIR] = ImportNIRX(folderDIR,channelCheck)
 %ImportNIRX imports data from NIRX device recordings
 
 if(nargin<2)
@@ -105,12 +105,12 @@ for i=1:size(files,1)
             device.Info.TimeIsSampleCount=0;
         end
         if(isfield(probeInfo,'d'))
-            fNIR.raw=probeInfo.d;
+            fNIR.raw=[probeInfo.t,probeInfo.d];
         end
         if(isfield(probeInfo,'s'))
             mrk=[];
             for mrkID=1:size(probeInfo.s,2)
-                curMrkTime=fNIR.time(probeInfo.s(:,mrkID)==1);
+                curMrkTime(:,1)=fNIR.time(probeInfo.s(:,mrkID)==1);
                 curMrkTime(:,2)=mrkID;
                 mrk=[mrk;curMrkTime];
             end
@@ -184,7 +184,7 @@ for i=1:size(files,1)
                 detPosY(opt)=device.Probe{p}.DetPosY(dIdx);
                 detPosZ(opt)=device.Probe{p}.DetPosZ(dIdx);
                 srcPos3D(opt,:)=device.Probe{p}.SrcPos3D(sIdx,:);
-                detPos3D(opt,:)=device.Probe{p}.DetPos3D(sIdx,:);
+                detPos3D(opt,:)=device.Probe{p}.DetPos3D(dIdx,:);
             end
             
             device.Probe{p}.SrcPosX=srcPosX';
@@ -242,9 +242,9 @@ for i=1:size(files,1)
     end
     
     if(strcmp(files{i,2},'info'))
-        filenameParts=strplit(filename,'.');
+        filenameParts=strsplit(filename,'.');
         fileroot=filenameParts{1};
-        fNIR.info.probeInfo=INI('File',filename);
+        fNIR.info.probeInfo=pf2_base.external.INI('File',filename);
         fNIR.info.probeInfo.read();
         pInfo=fNIR.info.probeInfo;
         

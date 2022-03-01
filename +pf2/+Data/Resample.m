@@ -477,7 +477,7 @@ fdataFields=fields(fNIR);  % Copy known fields
 for i=1:length(fdataFields)
    memberIdx=ismember(validFields,fdataFields{i});
    if(any(memberIdx)&&~strcmp(fdataFields{i},'time')...
-           &&~strcmp(fdataFields{i},'fs')&&~strcmp(fdataFields{i},'ROI'))
+           &&~strcmp(fdataFields{i},'fs')&&~strcmp(fdataFields{i},'ROI')&&~strcmp(fdataFields{i},'Aux'))
         outFNIR.(validFields{memberIdx})=fNIR.(fdataFields{i});
    end
 end
