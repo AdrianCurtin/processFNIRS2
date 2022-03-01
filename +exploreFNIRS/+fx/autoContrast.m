@@ -351,7 +351,7 @@ for s=1:length(sigAnvNames)  %Look for contrasts within each term
                   
                   for cmp=1:length(u_contrast_levels)
                       
-                      if(isnan(u_contrast_levels(cmp)))
+                      if(isnan(u_contrast_levels(cmp))||isnan(cIdx(c2)))
                           continue;
                       end
                       
@@ -361,6 +361,7 @@ for s=1:length(sigAnvNames)  %Look for contrasts within each term
                       cRow(cmp_contrast_val)=-1;
 
                       if(any(ismember(cRows,cRow,'rows'))||any(ismember(cRows,cRow*-1,'rows')))
+                          %if the contrast is already being compared, skip
                         continue;
                       else
                           nRows=nRows+1;

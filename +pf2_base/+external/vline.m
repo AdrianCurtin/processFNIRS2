@@ -31,7 +31,7 @@ function hhh=vline(varargin)
 % Modified by Adrian Curtin
 % To allow multiple arguments and not fail when empty
 
-validX= @(x) isempty(x)||isnumeric(x);
+validX= @(x) isempty(x)||isnumeric(x)||isdatetime(x)||isduration(x);
 validAxesHandle= @(x) isa(x,'matlab.graphics.axis.Axes')&&isvalid(x);
 validStrCell = @(x) ischar(x) || (iscell(x));
 validHeight= @(x) isnumeric(x)&&~isempty(x)&&~any(x>1)&&~any(x<0);
@@ -68,7 +68,7 @@ if(~isempty(lineTags)&&(ischar(lineTags)||isstring(lineTags)))
 end
 
 
-if isempty(x)||~isnumeric(x)
+if isempty(x)
     hhh=[];
     return;
 end

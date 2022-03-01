@@ -148,6 +148,10 @@ else
     numCh=size(fNIR.HbR,2); 
 end
 
+if(isfield(fNIR,'raw')&&isempty(fNIR.raw))
+    fNIR.raw=nan(size(fNIR.HbR));
+end
+
 if(centerOnT0) % foces time blocks to start from t=0
     times=(0:segLength:(maxfTime+segLength))';
     
