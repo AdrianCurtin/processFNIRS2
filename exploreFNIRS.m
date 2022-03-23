@@ -2420,6 +2420,10 @@ if(nargin<2)
     figHandle=gca;
 end
 
+if(iscell(labelstring))
+    labelstring=labelstring{1};
+end
+
 if(~isempty(labelstring))
     labelstring(labelstring=='_')=' ';
 end
@@ -2429,6 +2433,10 @@ function h=ylabel_with_space(figHandle,labelstring)
 if(nargin<2)
     labelstring=figHandle;
     figHandle=gca;
+end
+
+if(iscell(labelstring))
+    labelstring=labelstring{1};
 end
 
 if(~isempty(labelstring))
