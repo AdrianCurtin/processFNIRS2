@@ -8,7 +8,9 @@ end
 bioM_list={'HbO','HbR','HbTotal','HbDiff','CBSI'};
 validChannels=false(size(data.channels));
 numOptodes=length(data.channels(data.channels>0));
-validChannels(data.channels>0)=data.channels(data.channels>0)&(reshape(data.fchMask(:)|ProcessRejected,[numOptodes,1]));
+validChannels(data.channels>0)=data.channels(data.channels>0)&(reshape(data.fchMask(:)|ProcessRejected,[numOptodes,1]));% error in this line
+%validChannels(data.channels>0)=data.channels(data.channels>0)&(reshape(data.fchMask(:)|ProcessRejected,[1,numOptodes,1]));
+
 
 curfMask=data.fchMask|ProcessRejected;
 
@@ -259,7 +261,11 @@ end
 
 
 invalidChannels=false(size(data.channels));
+
+%error in this line
 invalidChannels(data.channels>0)=data.channels(data.channels>0)&(reshape(~curfMask,[numOptodes,1]));
+
+%invalidChannels(data.channels>0)=data.channels(data.channels>0)&(reshape(~curfMask,[1,numOptodes]));
 
 for bioM=1:length(bioM_list) % go through each biomarker and set invalid cahnnels to nan
     outData.(bioM_list{bioM})(:,invalidChannels)=nan;
