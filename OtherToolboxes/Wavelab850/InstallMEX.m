@@ -14,8 +14,9 @@ for file={'CPAnalysis' 'WPAnalysis' 'FWT_PO' 'FWT2_PO' 'IWT_PO' ...
       'FMIPT' 'IMIPT' ...
       'FAIPT' 'IAIPT' 'LMIRefineSeq' 'MedRefineSeq'}
   
-  file = isfunc(file);
-  if exist(file)~=3,
+  funcExist=cellfun(isfunc,file);
+
+  if ~any(funcExist)
     MEX_OK = 0;
     break;
   end
