@@ -14,7 +14,7 @@ for file={'CPAnalysis' 'WPAnalysis' 'FWT_PO' 'FWT2_PO' 'IWT_PO' ...
       'FMIPT' 'IMIPT' ...
       'FAIPT' 'IAIPT' 'LMIRefineSeq' 'MedRefineSeq'}
   
-  file = char(file);
+  file = isfunc(file);
   if exist(file)~=3,
     MEX_OK = 0;
     break;
