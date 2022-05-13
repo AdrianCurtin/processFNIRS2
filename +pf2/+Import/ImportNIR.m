@@ -103,16 +103,22 @@ end
 header.fname=nir_filename;
 
 fileroot=nir_filename(1:strfind(lower(nir_filename),'.nir')-1);
-
-if(autoLoadMrk)
-   mrk_filename=cell(2,1);
-   mrk_filename{1}=sprintf('%s.mrk',fileroot);
-   mrk_filename{2}=sprintf('%s_C.mrk',fileroot);
-end
+fileroot_modern=fileroot(1:strfind(lower(nir_filename),'_dev')-1);
 
 if(contains(fileroot,'_Dev'))
-    fileroot=nir_filename(1:strfind(lower(nir_filename),'_dev')-1);
+    fileroot=fileroot_modern;
 end
+
+
+if(autoLoadMrk)
+   mrk_filename=cell(4,1);
+   mrk_filename{1}=sprintf('%s.mrk',fileroot);
+   mrk_filename{2}=sprintf('%s_C.mrk',fileroot);
+   mrk_filename{3}=sprintf('%s_Mark1.mrk',fileroot_modern);
+   mrk_filename{4}=sprintf('%s_Mark2.mrk',fileroot_modern);
+end
+
+
 
 %Default names for markers, manual markers, and log file
 
@@ -421,7 +427,7 @@ function markers=importMrk(mrk_filename,startCode,mrkSourceID)
     if(nargin<3)
         mrkSourceID=0;
     end
-	if(isstr(mrk_filename)&&~isempty(mrk_filename))
+	if((ischar(mrk_filename)||isstring(mrk_filename))&&~isempty(mrk_filename))
 		mrkid = fopen(mrk_filename);
 	else
 		mrkid=-1;

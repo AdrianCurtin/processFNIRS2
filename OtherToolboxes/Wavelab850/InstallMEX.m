@@ -14,8 +14,9 @@ for file={'CPAnalysis' 'WPAnalysis' 'FWT_PO' 'FWT2_PO' 'IWT_PO' ...
       'FMIPT' 'IMIPT' ...
       'FAIPT' 'IAIPT' 'LMIRefineSeq' 'MedRefineSeq'}
   
-  file = char(file);
-  if exist(file)~=3,
+  funcExist=cellfun(isfunc,file);
+
+  if ~any(funcExist)
     MEX_OK = 0;
     break;
   end
@@ -90,60 +91,60 @@ if strcmp(R,'') + strcmp(R,'Yes') | strcmp(R,'yes') | strcmp(R,'y') | strcmp(R,'
     !mv LMIRefineSeq.mex* ../Papers/MIPT
     !mv MedRefineSeq.mex* ../Papers/MIPT
   elseif isPC
-    dos('move CPAnalysis.mexw ..\Packets\One-D');
-    dos('move WPAnalysis.mexw ..\Packets\One-D');
-    dos('move FWT_PO.mexw ..\Orthogonal');
-    dos('move FWT2_PO.mexw ..\Orthogonal');
-    dos('move IWT_PO.mexw ..\Orthogonal');
-    dos('move IWT2_PO.mexw ..\Orthogonal');
-    dos('move UpDyadHi.mexw ..\Orthogonal');
-    dos('move UpDyadLo.mexw ..\Orthogonal');
-    dos('move DownDyadHi.mexw ..\Orthogonal');
-    dos('move DownDyadLo.mexw ..\Orthogonal');
-    dos('move dct_iv.mexw ..\Packets\One-D');
-    dos('move FCPSynthesis.mexw ..\Pursuit');
-    dos('move FWPSynthesis.mexw ..\Pursuit');
-    dos('move dct_ii.mexw ..\Meyer');
-    dos('move dst_ii.mexw ..\Meyer');
-    dos('move dct_iii.mexw ..\Meyer');
-    dos('move dst_iii.mexw ..\Meyer');
-    dos('move FWT_PBS.mexw ..\Biorthogonal');
-    dos('move IWT_PBS.mexw ..\Biorthogonal');
-    dos('move FWT_TI.mexw ..\Invariant');
-    dos('move IWT_TI.mexw ..\Invariant');
-    dos('move FMIPT.mexw ..\Median ');
-    dos('move IMIPT.mexw ..\Median');
-    dos('move FAIPT.mexw ..\Papers\MIPT');
-    dos('move IAIPT.mexw ..\Papers\MIPT');
-    dos('move LMIRefineSeq.mexw ..\Papers\MIPT');
-    dos('move MedRefineSeq.mexw ..\Papers\MIPT');
-    dos('move CPAnalysis.mexw64 ..\Packets\One-D');
-    dos('move WPAnalysis.mexw64 ..\Packets\One-D');
-    dos('move FWT_PO.mexw64 ..\Orthogonal');
-    dos('move FWT2_PO.mexw64 ..\Orthogonal');
-    dos('move IWT_PO.mexw64 ..\Orthogonal');
-    dos('move IWT2_PO.mexw64 ..\Orthogonal');
-    dos('move UpDyadHi.mexw64 ..\Orthogonal');
-    dos('move UpDyadLo.mexw64 ..\Orthogonal');
-    dos('move DownDyadHi.mexw64 ..\Orthogonal');
-    dos('move DownDyadLo.mexw64 ..\Orthogonal');
-    dos('move dct_iv.mexw64 ..\Packets\One-D');
-    dos('move FCPSynthesis.mexw64 ..\Pursuit');
-    dos('move FWPSynthesis.mexw64 ..\Pursuit');
-    dos('move dct_ii.mexw64 ..\Meyer');
-    dos('move dst_ii.mexw64 ..\Meyer');
-    dos('move dct_iii.mexw64 ..\Meyer');
-    dos('move dst_iii.mexw64 ..\Meyer');
-    dos('move FWT_PBS.mexw64 ..\Biorthogonal');
-    dos('move IWT_PBS.mexw64 ..\Biorthogonal');
-    dos('move FWT_TI.mexw64 ..\Invariant');
-    dos('move IWT_TI.mexw64 ..\Invariant');
-    dos('move FMIPT.mexw64 ..\Median ');
-    dos('move IMIPT.mexw64 ..\Median');
-    dos('move FAIPT.mexw64 ..\Papers\MIPT');
-    dos('move IAIPT.mexw64 ..\Papers\MIPT');
-    dos('move LMIRefineSeq.mexw64 ..\Papers\MIPT');
-    dos('move MedRefineSeq.mexw64 ..\Papers\MIPT');
+    dos('move CPAnalysis.mexw ..\\Packets\\One-D');
+    dos('move WPAnalysis.mexw ..\\Packets\\One-D');
+    dos('move FWT_PO.mexw ..\\Orthogonal');
+    dos('move FWT2_PO.mexw ..\\Orthogonal');
+    dos('move IWT_PO.mexw ..\\Orthogonal');
+    dos('move IWT2_PO.mexw ..\\Orthogonal');
+    dos('move UpDyadHi.mexw ..\\Orthogonal');
+    dos('move UpDyadLo.mexw ..\\Orthogonal');
+    dos('move DownDyadHi.mexw ..\\Orthogonal');
+    dos('move DownDyadLo.mexw ..\\Orthogonal');
+    dos('move dct_iv.mexw ..\\Packets\\One-D');
+    dos('move FCPSynthesis.mexw ..\\Pursuit');
+    dos('move FWPSynthesis.mexw ..\\Pursuit');
+    dos('move dct_ii.mexw ..\\Meyer');
+    dos('move dst_ii.mexw ..\\Meyer');
+    dos('move dct_iii.mexw ..\\Meyer');
+    dos('move dst_iii.mexw ..\\Meyer');
+    dos('move FWT_PBS.mexw ..\\Biorthogonal');
+    dos('move IWT_PBS.mexw ..\\Biorthogonal');
+    dos('move FWT_TI.mexw ..\\Invariant');
+    dos('move IWT_TI.mexw ..\\Invariant');
+    dos('move FMIPT.mexw ..\\Median ');
+    dos('move IMIPT.mexw ..\\Median');
+    dos('move FAIPT.mexw ..\\Papers\\MIPT');
+    dos('move IAIPT.mexw ..\\Papers\\MIPT');
+    dos('move LMIRefineSeq.mexw ..\\Papers\\MIPT');
+    dos('move MedRefineSeq.mexw ..\\Papers\\MIPT');
+    dos('move CPAnalysis.mexw64 ..\\Packets\\One-D');
+    dos('move WPAnalysis.mexw64 ..\\Packets\\One-D');
+    dos('move FWT_PO.mexw64 ..\\Orthogonal');
+    dos('move FWT2_PO.mexw64 ..\\Orthogonal');
+    dos('move IWT_PO.mexw64 ..\\Orthogonal');
+    dos('move IWT2_PO.mexw64 ..\\Orthogonal');
+    dos('move UpDyadHi.mexw64 ..\\Orthogonal');
+    dos('move UpDyadLo.mexw64 ..\\Orthogonal');
+    dos('move DownDyadHi.mexw64 ..\\Orthogonal');
+    dos('move DownDyadLo.mexw64 ..\\Orthogonal');
+    dos('move dct_iv.mexw64 ..\\Packets\\One-D');
+    dos('move FCPSynthesis.mexw64 ..\\Pursuit');
+    dos('move FWPSynthesis.mexw64 ..\\Pursuit');
+    dos('move dct_ii.mexw64 ..\\Meyer');
+    dos('move dst_ii.mexw64 ..\\Meyer');
+    dos('move dct_iii.mexw64 ..\\Meyer');
+    dos('move dst_iii.mexw64 ..\\Meyer');
+    dos('move FWT_PBS.mexw64 ..\\Biorthogonal');
+    dos('move IWT_PBS.mexw64 ..\\Biorthogonal');
+    dos('move FWT_TI.mexw64 ..\\Invariant');
+    dos('move IWT_TI.mexw64 ..\\Invariant');
+    dos('move FMIPT.mexw64 ..\\Median ');
+    dos('move IMIPT.mexw64 ..\\Median');
+    dos('move FAIPT.mexw64 ..\\Papers\\MIPT');
+    dos('move IAIPT.mexw64 ..\\Papers\\MIPT');
+    dos('move LMIRefineSeq.mexw64 ..\\Papers\\MIPT');
+    dos('move MedRefineSeq.mexw64 ..\\Papers\\MIPT');
   elseif isMAC
     acopy('CPAnalysis.mex', '::Packets:One-D')
     acopy('WPAnalysis.mex' ,'::Packets:One-D')
