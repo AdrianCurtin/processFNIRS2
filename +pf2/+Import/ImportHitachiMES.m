@@ -92,44 +92,58 @@ lineF=fgetl(fid);
 startLineNum=lineNum;
 fclose(fid);
 
-numCols=find(strcmp(strsplit(header.HeaderInfo,delimiter),'Time')); %Use Time column to estimate number of columns and remove body movement mark
-if(~isempty(numCols))
-    numCols=numCols-1;
-    timeCol=numCols+1; %save time column information to extract first timepoint
-else
-    numCols=length(strsplit(header.HeaderInfo,delimiter)); %else grab all columns
-    timeCol=nan;
-end
+dataLineParts=strsplit(header.HeaderInfo,delimiter);
 
-markCol=find(strcmp(strsplit(header.HeaderInfo,delimiter),'Mark'));
+numCols=length(dataLineParts);
+timeCol=find(strcmp(dataLineParts,'Time')); %Use Time column to estimate number of columns and remove body movement mark
+
+markCol=find(strcmp(dataLineParts,'Mark'));
 
 
 fprintf('Importing %s...\n',filename);
-hMES = importdata(filename,delimiter,startLineNum);
+fid=fopen(filename,'r');
+for i=1:startLineNum
+    line=fgetl(fid);  % Figure out the number of columns based on the header
+end
 
-if(~isnan(timeCol)) %Searches for first timepoint in data (to add seconds to start time)
+
+f=[]; 
+isNum=true(1,numCols);
+for i=1:numCols
+    if(i==timeCol) % find time segment
+        f=[f '%s '];
+
+        isNum(i)=false;
+    else
+        f=[f '%f '];
+    end
+end
+
+if(~isempty(f))
+    data=textscan(fid,f,'delimiter',delimiter);
+    datetimeCol=data{(~isNum)};
+    data=horzcat(data{isNum});
+else
+    disp('Data is empty!');
+    data=[];
+    datetimeCol=[];
+end
+
+fclose(fid);
+
+
+hMES = data;%importdata(filename,delimiter,startLineNum);
+
+if(~isempty(datetimeCol)) %Searches for first timepoint in data (to add seconds to start time)
    fNIR.info=[];
-   timeColData=hMES.textdata(:,timeCol);
-   timeStartIndex=nan;
-   for i=1:startLineNum
-      if(~isempty(timeColData{i})&&contains(timeColData{i},'Time'))
-        timeStartIndex=i+1;
-        break;
-      elseif(~isempty(timeColData{i})&&contains(timeColData{i},':'))
-        timeStartIndex=i;
-        break;
-      end
-   end
-   if(length(timeColData)>=timeStartIndex+1)
-    fNIR.info.startTime=timeColData{timeStartIndex+1};
+   timeColData=datetimeCol;
+
+   if(length(datetimeCol)>=1)
+    fNIR.info.startTime=timeColData{1};
    else
       warning('Unable to find first sample timepoint in MES file'); 
    end
 end
-
-hMES.textdata=hMES.textdata(:,1:numCols);
-hMES=str2double(hMES.textdata);
-
 
 
 hMES(isnan(hMES(:,1)),:)=[]; %remove nan columns
