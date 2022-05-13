@@ -176,6 +176,21 @@ else
    error('Missing number of wavelengths'); 
 end
 
+if(isfield(header,'Date'))
+    startDate=header.Date; 
+    try
+        header.StartDateTime= datetime(startDate,'InputFormat','yyyy/MM/dd HH:mm:ss'); % try to get timestamp with milliseconds
+     catch
+        header.StartDateTime= datetime(startDate,'InputFormat','yyyy/MM/dd HH:mm'); % else use only regular seconds
+     end
+    if(~isempty(datetimeCol))
+        startTime=datetimeCol{1};
+        startTime=datetime(startTime,'InputFormat','HH:mm:ss.SS'); % try to get timestamp with milliseconds
+        header.StartDateTime.Minute=startTime.Minute;
+        header.StartDateTime.Second=startTime.Second;
+    end
+end
+
 
 
 fNIR.markers=[fNIR.time(mrkIdx),hMES(mrkIdx,markCol),mrkIdx];
