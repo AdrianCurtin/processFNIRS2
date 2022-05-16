@@ -2817,10 +2817,10 @@ PF2.curProbeInd=[];
 
 if(PF2.mergedProbe) %All channel numbers are unique for merged probes
     for i =1:length(setF.device.Probe)
-        PF2.curProbeInd=[PF2.curProbeInd,i*length(setF.device.Probe{i}.ChannelNumbers)];
-        PF2.curChSet=[PF2.curChSet,setF.device.Probe{i}.ChannelNumbers];
-        PF2.curWvSet=[PF2.curWvSet,setF.device.Probe{i}.Wavelength];
-        PF2.topoPlotInfo{i}=setF.device.Probe{i}.OptLayout2D;
+        PF2.curProbeInd=[PF2.curProbeInd,i*size(setF.device.Probe{i}.TableCh,2)];
+        PF2.curChSet=[PF2.curChSet,setF.device.Probe{i}.TableCh.OptodeNumber];
+        PF2.curWvSet=[PF2.curWvSet,setF.device.Probe{i}.TableCh.Wavelength];
+        PF2.topoPlotInfo{i}=setF.device.Probe{i}.OptPos;
     end
 
     tempWvSet=sort(unique(PF2.curWvSet));
@@ -2877,11 +2877,11 @@ if(~isempty(data))
             
         end
 
-        numOptodes=length(curTopoInfo);
+        numOptodes=size(curTopoInfo,1);
         
         for optIdx=1:numOptodes
             h{optIdx}= axes('Position',[0 0 .001 .001],'Box','on');
-            h{optIdx}.OuterPosition=curTopoInfo{optIdx};
+            h{optIdx}.OuterPosition=curTopoInfo.subplot_layout{optIdx};
         end
 
         for optIdx=1:numOptodes
@@ -3007,10 +3007,10 @@ PF2.curProbeInd=[];
 
 if(PF2.mergedProbe) %All channel numbers are unique for merged probes
     for i =1:length(setF.device.Probe)
-        PF2.curProbeInd=[PF2.curProbeInd,i*length(setF.device.Probe{i}.ChannelNumbers)];
-        PF2.curChSet=[PF2.curChSet,setF.device.Probe{i}.ChannelNumbers];
-        PF2.curWvSet=[PF2.curWvSet,setF.device.Probe{i}.Wavelength];
-        PF2.topoPlotInfo{i}=setF.device.Probe{i}.OptLayout2D;
+        PF2.curProbeInd=[PF2.curProbeInd,i*size(setF.device.Probe{i}.TableCh,1)];
+        PF2.curChSet=[PF2.curChSet,setF.device.Probe{i}.TableCh.OptodeNumber];
+        PF2.curWvSet=[PF2.curWvSet,setF.device.Probe{i}.TableCh.Wavelength];
+        PF2.topoPlotInfo{i}=setF.device.Probe{i}.OptPos;
     end
 
     tempWvSet=sort(unique(PF2.curWvSet));
@@ -3078,12 +3078,12 @@ if(~isempty(data))
             annotstr=sprintf('Probe %i: Processed Raw',prb);
             th=annotation(PF2.rawTopo{prb},'textbox',[0,1,0,0],'String',annotstr,'FitBoxToText','on');
         end
-        numOptodes=length(curTopoInfo);
+        numOptodes=size(curTopoInfo,1);
         
         
         for optIdx=1:numOptodes
             h{optIdx}= axes('Position',[0 0 .001 .001],'Box','on');
-            h{optIdx}.OuterPosition=curTopoInfo{optIdx};
+            h{optIdx}.OuterPosition=curTopoInfo.subplot_layout{optIdx};
         end
 
         for optIdx=1:numOptodes
