@@ -455,7 +455,9 @@ outFNIR.HbO=HbO(1:end-1,:);
 outFNIR.HbDiff=HbDiff(1:end-1,:);
 outFNIR.HbTotal=HbTotal(1:end-1,:);
 outFNIR.CBSI=CBSI(1:end-1,:);
-outFNIR.raw=raw(1:end,:);
+if(exist('raw','var'))
+    outFNIR.raw=raw(1:end,:);
+end
 
 if(calcROI&&exist('HbR_roi'))
     outFNIR.ROI=fNIR.ROI;

@@ -1544,9 +1544,8 @@ if(ExFNIRS.UpdateNeeded==2||~isfield(ExFNIRS,'curPreprocessedFNIR'))
 
      numSegs2Process=size(ExFNIRS.curProcessedData,1);
 
-    global ProgressHandles
-    ProgressHandles.h.hF=waitbar(0,sprintf('ExploreFNIRS\nResampling and baselining fNIRS %i of %i',1,numSegs2Process));
-    hF=ProgressHandles.h.hF;
+    fprintf('ExploreFNIRS\nResampling and baselining fNIRS %i of %i\n',1,numSegs2Process);
+    %hF=ProgressHandles.h.hF;
 
    
     ExFNIRS.curPreprocessedFNIR=[];
@@ -1557,11 +1556,8 @@ if(ExFNIRS.UpdateNeeded==2||~isfield(ExFNIRS,'curPreprocessedFNIR'))
 
     for i=1:numSegs2Process
         
-       try
-            waitbar(i/numSegs2Process,hF,sprintf('ExploreFNIRS\nResampling and baselining fNIRS %i of %i',i,numSegs2Process));
-       catch
-
-       end
+       fprintf('ExploreFNIRS\nResampling and baselining fNIRS %i of %i\n',i,numSegs2Process);
+       
        if(ExFNIRS.settings.use_baseline)
             ExFNIRS.curPreprocessedFNIR.baseline{i}=pf2.Data.Split(ExFNIRS.curPreprocessedFNIR.fNIR{i},ExFNIRS.settings.baseline_start,ExFNIRS.settings.baseline_end); %baselineining is handled in processing section
             ExFNIRS.curPreprocessedFNIR.gbyFNIRS{i}.time=ExFNIRS.curPreprocessedFNIR.gbyFNIRS{i}.time-ExFNIRS.settings.block_start; %change time so that 0 is start of block
@@ -1598,11 +1594,7 @@ if(ExFNIRS.UpdateNeeded==2||~isfield(ExFNIRS,'curPreprocessedFNIR'))
        end
     end
 
-    try
-        close(hF);
-    catch
     
-end
 else
 
     ExFNIRS.UpdateNeeded=true; % mark that data was preprocesed
@@ -1613,9 +1605,8 @@ global ExFNIRS
 pf2_base.closeProgressHandles();
 
 
-global ProgressHandles
-ProgressHandles.h.hF=waitbar(0,sprintf('ExploreFNIRS\nProcessing Group %i of %i',1,max(gbyIdx)));
-hF=ProgressHandles.h.hF;
+fprintf('ExploreFNIRS\nProcessing Group %i of %i\n',1,max(gbyIdx));
+%hF=ProgressHandles.h.hF;
 
 numSegs2Process=size(ExFNIRS.selectedTable,1);
 
@@ -1628,11 +1619,8 @@ ExFNIRS.gbyFlat.gbyIndex=gbyIdx;
 
 
 for i=1:max(gbyIdx)
-    try
-        waitbar(i/max(gbyIdx),hF,sprintf('ExploreFNIRS\nProcessing Group %i of %i',i,max(gbyIdx)));
-    catch
-        
-    end
+    fprintf('ExploreFNIRS\nProcessing Group %i of %i\n',i,max(gbyIdx));
+    
     ExFNIRS.gby(i).gbyTables=ExFNIRS.selectedTable(gbyIdx==i,:); 
     ExFNIRS.gby(i).gbyFNIRS=ExFNIRS.gbyFlat.gbyFNIRS(gbyIdx==i,:);
     ExFNIRS.gby(i).gbyFNIRS_blk=ExFNIRS.gbyFlat.gbyFNIRS_blk(gbyIdx==i,:);
@@ -1658,11 +1646,6 @@ for i=1:max(gbyIdx)
 end
 
 set(handles.text_status,'String',sprintf('%i Segments in\n%i Group(s)',numSegs2Process,max(gbyIdx)));
-try
-    close(hF);
-catch
-    
-end
 
 
 flagForUpdate(false,handles);
