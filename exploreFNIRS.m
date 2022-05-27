@@ -285,8 +285,14 @@ if(isempty(ExFNIRS.data))
     error('Must supply data!');
 end
 
-fsArray=nan(length(ExFNIRS.data(:)));
-for i=length(ExFNIRS.data):-1:1
+fprintf('Examining experimental data array\n');
+
+numEx=length(ExFNIRS.data);
+fsArray=nan(numEx);
+for i=numEx:-1:1
+    %if(rem(i,100)==0)
+          fprintf('record %i of %i\n',i,numEx);
+    %end
     if(isempty(ExFNIRS.data{i}))
         ExFNIRS.data(i)=[];
         continue;
@@ -308,7 +314,11 @@ estimatedFS=nanmedian(fsArray(:));
 
 subIdAuto=1;
 
-for i=1:length(ExFNIRS.data)
+fprintf('Building experimental data array\n');
+numEx=length(ExFNIRS.data);
+for i=1:length(numEx)
+    fprintf('Preprocessing record %i of %i\n',i,numEx);
+
    if((~isfield(ExFNIRS.data{i},'raw')&&~isfield(ExFNIRS.data{i},'HbO'))||(length(ExFNIRS.data{i}.time)==1&&(isnan(ExFNIRS.data{i}.time)))||sum(sum(~isnan(ExFNIRS.data{i}.raw(:,2:end)),1),2)==0) %info only
        ExFNIRS.data{i}.time=nan;
        ExFNIRS.data{i}.info.missingFNIRS=1;
@@ -346,6 +356,7 @@ for i=1:length(ExFNIRS.data)
    end
 end
 
+fprintf('Building Info Table:\n');
 ExFNIRS.dataTable=BuildSegmentInfoTable(ExFNIRS.data);
 
 
@@ -508,15 +519,16 @@ else
     pf2_base.closeProgressHandles();
     
     numF=length(FNIRS_array);
-    hF=waitbar(0,sprintf('ExploreFNIRS\nBuilding Table: Row %i of %i',1,numF));
+    %hF=waitbar(0,sprintf('ExploreFNIRS\nBuilding Table: Row %i of %i',1,numF));
     
     outTable=table();
     for i=1:numF
-        try
-            waitbar(i/numF,hF,sprintf('ExploreFNIRS\nBuilding Table: Row %i of %i',i,numF));
-        catch
-            hF=waitbar(i/numF,0,sprintf('ExploreFNIRS\nBuilding Table: Row %i of %i',i,numF));
-        end
+        fprintf('Row %i of %i\n',i,numF);
+%        try
+ %           waitbar(i/numF,hF,sprintf('ExploreFNIRS\nBuilding Table: Row %i of %i',i,numF));
+   %     catch
+  %          hF=waitbar(i/numF,0,sprintf('ExploreFNIRS\nBuilding Table: Row %i of %i',i,numF));
+    %    end
        curFNIRseg=FNIRS_array{i};
        
        if(~isfield(curFNIRseg,'info'))
@@ -572,7 +584,7 @@ else
            end
        end
     end
-    close(hF);
+    %close(hF);
 end
     
 function PopulateGUIfields(dataTable,handles)

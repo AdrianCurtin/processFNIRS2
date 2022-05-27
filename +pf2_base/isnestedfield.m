@@ -14,7 +14,7 @@ else
     curPartName=fieldParts{1};
     
     %if(isstruct(var))
-        isvalidfield=isfield(var,curPartName)|isprop(var,curPartName);
+        isvalidfield=isfield(var,curPartName)||isprop(var,curPartName);
         
         if(isempty(isvalidfield)||~isvalidfield)
             isvalidfield=false;
