@@ -7573,7 +7573,7 @@ switch (ExFNIRS.settings.ChannelMode)
         uOpt=[];
         for i=1:length(ExFNIRS.data)
             if(isfield(ExFNIRS.data{i},'channels'))
-                uOpt=[uOpt,ExFNIRS.data{i}.channels];
+                uOpt=[uOpt;ExFNIRS.data{i}.channels(:)];
             end
         end
         uOpt=sort(unique(uOpt));
@@ -7634,7 +7634,17 @@ switch (ExFNIRS.settings.ChannelMode)
                 fprintf(2,'************\nStandardizing all ROI fields..\n********\n');
                 for i=1:length(ExFNIRS.data)
                     if(pf2_base.isnestedfield(ExFNIRS.data{i},'raw')&&~isempty(ExFNIRS.data{i}))
-                       ExFNIRS.data{i}.ROI.info=uAux;
+                        if(~pf2_base.isnestedfield(ExFNIRS.data{i},'ROI.info'))
+                            ExFNIRS.data{i}.ROI.info=uAux;
+                        else
+                            for roi_idx=1:size(uAux,1)
+                               roi_name=uAux.Row(roi_idx);
+                               if(~contains(ExFNIRS.data{i}.ROI.info.Row,roi_name))
+                                   ExFNIRS.data{i}.ROI.info=[ExFNIRS.data{i}.ROI.info;uAux(roi_idx,:)];
+                               end
+                            end
+                            
+                        end
                     end
                 end
             end
