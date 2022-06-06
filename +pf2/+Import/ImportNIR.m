@@ -309,16 +309,15 @@ clear fid line1 lineCount line
 
 data(data(:,1)==0,:)=[];
 
-newColTest=diff(data(:,end));
-newColTest(newColTest<-63000)=0; % counts up to about 65k and then resets sample count
+justOnes=all(data==1);
+justOnes_Baseline=all(baseline==1);
 
-if(sum(newColTest<0)==0) % newer COBI, last column is sample time
+data=data(:,~justOnes); %Drop all columns that are only 1
+baseline=baseline(:,~justOnes_Baseline); %Drop all columns that are only 1
+
+if(size(data,2)>(size(baseline,2))) % Last column in newer cobi is sample count, but not included in baseline
     data=data(:,1:end-1);
-else
-    data=data(:,1:end);
 end
-
-
 
 
 
@@ -372,9 +371,11 @@ end
 
 numRawChannels=size(data,2)-1;
 
+
+
 switch(numRawChannels)
     case 12
-        fNIR.info.probename='fNIR_Devices_fNIR1200_Split4';
+        fNIR.info.probename='fNIR_Devices_fNIR1000_Linear';
     case 48
         fNIR.info.probename='fNIR_Devices_fNIR1000';
     case 48

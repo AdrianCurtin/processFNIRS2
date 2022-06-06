@@ -22,9 +22,26 @@ elseif(rangeZ>rangeX&&rangeY>=rangeX)
     ChxList=ChzList;
 end
 
-ChxList=(ChxList-min(ChxList))./(max(ChxList)-min(ChxList));
 
-ChyList=1-(ChyList-min(ChyList))./(max(ChyList)-min(ChyList));
+ChxList_Norm=(ChxList-min(ChxList))./(max(ChxList)-min(ChxList));
+
+if(any(isnan(ChxList_Norm)))
+   [~,srtIdx]=sort(ChxList,'ascend');
+   ChxList= (srtIdx-min(srtIdx))./(max(srtIdx)-min(srtIdx));
+else
+   ChxList=ChxList_Norm;
+end
+
+ChyList_Norm=1-(ChyList-min(ChyList))./(max(ChyList)-min(ChyList));
+
+
+if(any(isnan(ChyList_Norm)))
+   [~,srtIdx]=sort(ChyList,'ascend');
+   ChyList= (srtIdx-min(srtIdx))./(max(srtIdx)-min(srtIdx));
+else
+   ChyList=ChyList_Norm;
+end
+
 
 % if(plotFigs)
 %     figure(999);
