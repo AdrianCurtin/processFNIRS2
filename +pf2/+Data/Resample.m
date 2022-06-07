@@ -77,15 +77,15 @@ addParameter(p,'polyDegree',1,validScalarPosNum);
 parse(p,varargin{:});
 
 fNIR=p.Results.fNIR;
-segLength=p.Results.segmentLength;
-blLength=p.Results.blLength;
-blfNIR=p.Results.blfNIR;
+segLength=p.Results.segmentLength; % How long is each segment, ie: 1 sample
+blLength=p.Results.blLength; % how long is the baseline
+blfNIR=p.Results.blfNIR; % a baseline fNIR struct
 %getPolyAvg=p.Results.getPolyAvg;
-centerOnT0=p.Results.centerOnT0;
-timeOutMode=p.Results.timeOutMode;
-nanRejectionLevel=p.Results.nanRejectionLevel;
-averageAux=p.Results.averageAux;
-polyDegree=p.Results.polyDegree;
+centerOnT0=p.Results.centerOnT0; % should the resample include t=0 as the start point
+timeOutMode=p.Results.timeOutMode; % should time include or center on a point (ex: t=1 := t[0.051...1.4999]
+nanRejectionLevel=p.Results.nanRejectionLevel; % number of NaNs in segment to entirely reject it
+averageAux=p.Results.averageAux; % Also average/ resample the Aux channels
+polyDegree=p.Results.polyDegree; % degree for polyfit
 
 
 if(~isstruct(fNIR))
