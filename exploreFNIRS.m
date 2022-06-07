@@ -2115,6 +2115,7 @@ for chIdx=1:numOpt
                       if(~isempty(data2plot.(bioM))&&isfield(data2plot,bioM))
                           h=plot(curFigH.subH{curSy,curSx},dataTime,data2plot.(bioM)(:,ch),'color',cIndex(curUgroupIdx,:));
                           set(h,'Tag',getFormattedTrialString(curFNIRS{i}));
+
                           if(ExFNIRS.settings.plot_grandaverage||~isempty(curFigH.legendHandles{curSy,curSx}.h{curUgroupIdx}))
                               if(~isempty(h))
                                  set(h.Annotation.LegendInformation,'IconDisplayStyle','off'); 

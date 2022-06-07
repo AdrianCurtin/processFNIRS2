@@ -224,6 +224,11 @@ while(ischar(lineF))
        baseline=nan(1000,numVar);
        blLineCount=0;
     end
+     if(contains(lineF, 'Baseline Started'))
+         lineF=fgetl(fid); %Get Next Line
+         continue;
+     end
+    
     if(contains(lineF, 'Baseline end'))
         baseline(isnan(baseline(:,1)),:)=[]; %trim NaN rows;
         baseline(baseline(:,1)<=0,:)=[]; %remove markerrows and zero rows
