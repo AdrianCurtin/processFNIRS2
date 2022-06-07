@@ -375,7 +375,7 @@ varargout={};
 
 if(~isempty(data))
     if(~isfield(fData,'fchMask')||(isfield(fData,'fchMask')&&isempty(fData.fchMask)))
-        fData.fchMask=true(1,curProbe.numOptodes);
+        fData.fchMask=true(1,curProbe.NumOptodes);
     end
     numOptodes=curProbe.NumOptodes;
     channelNumbers=curProbe.TableCh.OptodeNumber;

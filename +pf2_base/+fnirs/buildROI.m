@@ -140,7 +140,9 @@ elseif(isstruct(x)&&strcmpi(fieldToUse,'oxy')&&isfield(x,'HbO')&&~isempty(x.HbO)
 			if(isfield(x,(validFields{field_ind}))&&~isempty(x.(validFields{field_ind})))
 				x_roi=x.(validFields{field_ind})(:,ch_index);
 				roi_out.ROI.(validFields{field_ind})=mergeAndRun(roi_func_handle,x_roi',removeNanChannels,varargin);
-			end
+            else
+               error('invalid fields'); 
+            end
         end
         roi_out.ROI.info=table({ch_index},{'oxy'},'RowNames',roi_names,'VariableNames',{'Optodes','Type'});
     elseif(iscell(ch_index))
@@ -149,7 +151,9 @@ elseif(isstruct(x)&&strcmpi(fieldToUse,'oxy')&&isfield(x,'HbO')&&~isempty(x.HbO)
 				if(isfield(x,(validFields{field_ind}))&&~isempty(x.(validFields{field_ind})))
 					x_roi=x.(validFields{field_ind})(:,ch_index{roi_ind});
 					roi_out.ROI.(validFields{field_ind})(:,roi_ind)=mergeAndRun(roi_func_handle,x_roi',removeNanChannels,varargin);
-				end
+				else
+                   error('invalid fields'); 
+                end
             end
             if(roi_ind==1)
                 roi_out.ROI.info=table(ch_index(roi_ind),{'oxy'},'RowNames',roi_names(roi_ind),'VariableNames',{'Optodes','Type'});
@@ -167,6 +171,7 @@ function out=mergeAndRun(func_handle,x_roi,removeNanChannels,varg)
     len_x_roi=size(x_roi,2);
 
     if(removeNanChannels)
+        %Removed NAN vals before processing
         nnz_x=sum(~isnan(x_roi),2)==0;
         rm_ch=sum(nnz_x);
         x_roi=x_roi(~nnz_x,:);
@@ -197,10 +202,10 @@ function out=mergeAndRun(func_handle,x_roi,removeNanChannels,varg)
         out=func_handle(x_roi,varg{:});
     end
     
-    if(size(x_roi,2)~=length(out))
+    if(len_x_roi~=length(out))
        warning('Size mismatch during ROI calculation\n');
        if(length(out)<=1||isempty(out))
-          out=nan(size(x_roi,2)); 
+          out=nan(1,len_x_roi); 
        end
     end
 

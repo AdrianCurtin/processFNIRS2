@@ -376,7 +376,7 @@ while(numDataCols~=numDevCols)
 end
 
 if(~isfield(PF2.GUIPF2.data,'fchMask')||(isfield(PF2.GUIPF2.data,'fchMask')&&isempty(PF2.GUIPF2.data.fchMask)))
-    PF2.GUIPF2.data.fchMask=true(1,length(setF.device.Probe{1}.ChannelList));
+    PF2.GUIPF2.data.fchMask=true(1,size(setF.device.Probe{1}.TableOpt,1));
 end
 
 numOptodes=curProbe.NumOptodes;

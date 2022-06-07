@@ -174,6 +174,19 @@ HbO=HbR;
 HbDiff=HbR;
 HbTotal=HbR;
 CBSI=HbR;
+raw=nan(numSegs,size(fNIR.raw,2));
+
+if(pf2_base.isnestedfield(fNIR,'ROI.HbO'))
+    if(isfield(fNIR,'ROI.info'))
+        numROIs=size(fNIR.ROI.info,1);
+        HbR_roi=nan(numSegs,numROIs);
+        HbO_roi=HbR_roi;
+        HbDiff_roi=HbR_roi;
+        HbTotal_roi=HbR_roi;
+        CBSI_roi=HbR_roi; 
+    end
+    
+end
 %raw=nan(size(numSegs,size(fNIR.raw,2)));
 
 if(getPolyAvg)
@@ -305,9 +318,9 @@ end
 
 
 ptime=zeros(numSegs,1);
-for i=0:numSegs-1
+for segIdx=0:numSegs-1
     
-    t1=times(i+1); %get the current segment start time
+    t1=times(segIdx+1); %get the current segment start time
     ind_init=ind;  %get the index
     ind_2=ind;
     
@@ -321,14 +334,14 @@ for i=0:numSegs-1
         % and ind_2 is the one before that
         ind=ind+1;
         ind_2=ind-1;
-        fTimeInd(ind_2)=i;
+        fTimeInd(ind_2)=segIdx;
     end
     
-    if(i==0&&numSegs==1&&isnan(fTimeInd(ind_2))&&fTime(ind)<(t1+segLength))
+    if(segIdx==0&&numSegs==1&&isnan(fTimeInd(ind_2))&&fTime(ind)<(t1+segLength))
         blLength=nan; %way of marking segment invalid
         ind_2=find(fTime==max(fTime(fTime<(t1+segLength))));
-        i=1;
-    elseif(i==0||(isnan(fTimeInd(ind_2)))) %TODO make this check so that it operates even if zero is slightly before
+        segIdx=1;
+    elseif(segIdx==0||(isnan(fTimeInd(ind_2)))) %TODO make this check so that it operates even if zero is slightly before
         continue;
     end
     
@@ -358,8 +371,8 @@ for i=0:numSegs-1
                     outFNIR.Aux.(curFieldName)=nan(size(times,1),size(curField,2));
                 end
 
-                outFNIR.Aux.(curFieldName)(i,:)=nanmean(curField(indexStart:indexEnd,:),1);
-                outFNIR.Aux.(curFieldName)(i,1)=t1-segLength+timeOutModeEnd*segLength+timeOutModeMid*segLength/2;
+                outFNIR.Aux.(curFieldName)(segIdx,:)=nanmean(curField(indexStart:indexEnd,:),1);
+                outFNIR.Aux.(curFieldName)(segIdx,1)=t1-segLength+timeOutModeEnd*segLength+timeOutModeMid*segLength/2;
             end
         end
     end
@@ -370,53 +383,58 @@ for i=0:numSegs-1
     nanCheckValid=validCh(nanCheck);
     
     if(calcROI)
-        nanCheck_roi=(sum(isnan(fHbR_roi(ind_init:ind_2,:)),1)/(ind_2-ind_init+1))<=nanRejectionLevel;     %calculate percentage of invalid values in task
+        try
+            nanCheck_roi=(sum(isnan(fHbR_roi(ind_init:ind_2,:)),1)/(ind_2-ind_init+1))<=nanRejectionLevel;     %calculate percentage of invalid values in task
+        catch
+            nanCheck_roi=false(size(fHbR_roi,2));
+            warning('Mismatch in ROI times');
+        end
         nanCheckValid_roi=validCh_roi(nanCheck_roi);
     end
     
     if(blLength>0)
-        HbR(i,nanCheckValid)=nanmean(fHbR(ind_init:ind_2,nanCheck),1)-blHbR(nanCheck);
-        HbO(i,nanCheckValid)=nanmean(fHbO(ind_init:ind_2,nanCheck),1)-blHbO(nanCheck);
-        HbDiff(i,nanCheckValid)=nanmean(fHbDiff(ind_init:ind_2,nanCheck),1)-blHbDiff(nanCheck);
-        HbTotal(i,nanCheckValid)=nanmean(fHbTotal(ind_init:ind_2,nanCheck),1)-blHbTotal(nanCheck);
-        CBSI(i,nanCheckValid)=nanmean(fCBSI(ind_init:ind_2,nanCheck),1)-blCBSI(nanCheck);
-        raw(i,:)=nanmean(fraw(ind_init:ind_2,:),1);
+        HbR(segIdx,nanCheckValid)=nanmean(fHbR(ind_init:ind_2,nanCheck),1)-blHbR(nanCheck);
+        HbO(segIdx,nanCheckValid)=nanmean(fHbO(ind_init:ind_2,nanCheck),1)-blHbO(nanCheck);
+        HbDiff(segIdx,nanCheckValid)=nanmean(fHbDiff(ind_init:ind_2,nanCheck),1)-blHbDiff(nanCheck);
+        HbTotal(segIdx,nanCheckValid)=nanmean(fHbTotal(ind_init:ind_2,nanCheck),1)-blHbTotal(nanCheck);
+        CBSI(segIdx,nanCheckValid)=nanmean(fCBSI(ind_init:ind_2,nanCheck),1)-blCBSI(nanCheck);
+        raw(segIdx,:)=nanmean(fraw(ind_init:ind_2,:),1);
     elseif(isnan(blLength))
-        HbR(i,nanCheckValid)=nan;
-        HbO(i,nanCheckValid)=nan;
-        HbDiff(i,nanCheckValid)=nan;
-        HbTotal(i,nanCheckValid)=nan;
-        CBSI(i,nanCheckValid)=nan;
-        raw(i,:)=nan;
+        HbR(segIdx,nanCheckValid)=nan;
+        HbO(segIdx,nanCheckValid)=nan;
+        HbDiff(segIdx,nanCheckValid)=nan;
+        HbTotal(segIdx,nanCheckValid)=nan;
+        CBSI(segIdx,nanCheckValid)=nan;
+        raw(segIdx,:)=nan;
     else
-        HbR(i,nanCheckValid)=nanmean(fHbR(ind_init:ind_2,nanCheck),1);
-        HbO(i,nanCheckValid)=nanmean(fHbO(ind_init:ind_2,nanCheck),1);
-        HbDiff(i,nanCheckValid)=nanmean(fHbDiff(ind_init:ind_2,nanCheck),1);
-        HbTotal(i,nanCheckValid)=nanmean(fHbTotal(ind_init:ind_2,nanCheck),1);
-        CBSI(i,nanCheckValid)=nanmean(fCBSI(ind_init:ind_2,nanCheck),1);
-        raw(i,:)=nanmean(fraw(ind_init:ind_2,:),1);
+        HbR(segIdx,nanCheckValid)=nanmean(fHbR(ind_init:ind_2,nanCheck),1);
+        HbO(segIdx,nanCheckValid)=nanmean(fHbO(ind_init:ind_2,nanCheck),1);
+        HbDiff(segIdx,nanCheckValid)=nanmean(fHbDiff(ind_init:ind_2,nanCheck),1);
+        HbTotal(segIdx,nanCheckValid)=nanmean(fHbTotal(ind_init:ind_2,nanCheck),1);
+        CBSI(segIdx,nanCheckValid)=nanmean(fCBSI(ind_init:ind_2,nanCheck),1);
+        raw(segIdx,:)=nanmean(fraw(ind_init:ind_2,:),1);
     end
     
     
     if(calcROI)
         if(blLength>0)
-            HbR_roi(i,nanCheckValid_roi)=nanmean(fHbR_roi(ind_init:ind_2,nanCheck_roi),1)-blHbR_roi(nanCheck_roi);
-            HbO_roi(i,nanCheckValid_roi)=nanmean(fHbO_roi(ind_init:ind_2,nanCheck_roi),1)-blHbO_roi(nanCheck_roi);
-            HbDiff_roi(i,nanCheckValid_roi)=nanmean(fHbDiff_roi(ind_init:ind_2,nanCheck_roi),1)-blHbDiff_roi(nanCheck_roi);
-            HbTotal_roi(i,nanCheckValid_roi)=nanmean(fHbTotal_roi(ind_init:ind_2,nanCheck_roi),1)-blHbTotal_roi(nanCheck_roi);
-            CBSI_roi(i,nanCheckValid_roi)=nanmean(fCBSI_roi(ind_init:ind_2,nanCheck_roi),1)-blCBSI_roi(nanCheck_roi);
+            HbR_roi(segIdx,nanCheckValid_roi)=nanmean(fHbR_roi(ind_init:ind_2,nanCheck_roi),1)-blHbR_roi(nanCheck_roi);
+            HbO_roi(segIdx,nanCheckValid_roi)=nanmean(fHbO_roi(ind_init:ind_2,nanCheck_roi),1)-blHbO_roi(nanCheck_roi);
+            HbDiff_roi(segIdx,nanCheckValid_roi)=nanmean(fHbDiff_roi(ind_init:ind_2,nanCheck_roi),1)-blHbDiff_roi(nanCheck_roi);
+            HbTotal_roi(segIdx,nanCheckValid_roi)=nanmean(fHbTotal_roi(ind_init:ind_2,nanCheck_roi),1)-blHbTotal_roi(nanCheck_roi);
+            CBSI_roi(segIdx,nanCheckValid_roi)=nanmean(fCBSI_roi(ind_init:ind_2,nanCheck_roi),1)-blCBSI_roi(nanCheck_roi);
         elseif(isnan(blLength))
-            HbR_roi(i,nanCheckValid_roi)=nan;
-            HbO_roi(i,nanCheckValid_roi)=nan;
-            HbDiff_roi(i,nanCheckValid_roi)=nan;
-            HbTotal_roi(i,nanCheckValid_roi)=nan;
-            CBSI_roi(i,nanCheckValid_roi)=nan;
+            HbR_roi(segIdx,nanCheckValid_roi)=nan;
+            HbO_roi(segIdx,nanCheckValid_roi)=nan;
+            HbDiff_roi(segIdx,nanCheckValid_roi)=nan;
+            HbTotal_roi(segIdx,nanCheckValid_roi)=nan;
+            CBSI_roi(segIdx,nanCheckValid_roi)=nan;
         else
-            HbR_roi(i,nanCheckValid_roi)=nanmean(fHbR_roi(ind_init:ind_2,nanCheck_roi),1);
-            HbO_roi(i,nanCheckValid_roi)=nanmean(fHbO_roi(ind_init:ind_2,nanCheck_roi),1);
-            HbDiff_roi(i,nanCheckValid_roi)=nanmean(fHbDiff_roi(ind_init:ind_2,nanCheck_roi),1);
-            HbTotal_roi(i,nanCheckValid_roi)=nanmean(fHbTotal_roi(ind_init:ind_2,nanCheck_roi),1);
-            CBSI_roi(i,nanCheckValid_roi)=nanmean(fCBSI_roi(ind_init:ind_2,nanCheck_roi),1);
+            HbR_roi(segIdx,nanCheckValid_roi)=nanmean(fHbR_roi(ind_init:ind_2,nanCheck_roi),1);
+            HbO_roi(segIdx,nanCheckValid_roi)=nanmean(fHbO_roi(ind_init:ind_2,nanCheck_roi),1);
+            HbDiff_roi(segIdx,nanCheckValid_roi)=nanmean(fHbDiff_roi(ind_init:ind_2,nanCheck_roi),1);
+            HbTotal_roi(segIdx,nanCheckValid_roi)=nanmean(fHbTotal_roi(ind_init:ind_2,nanCheck_roi),1);
+            CBSI_roi(segIdx,nanCheckValid_roi)=nanmean(fCBSI_roi(ind_init:ind_2,nanCheck_roi),1);
         end
     end
     
@@ -429,21 +447,21 @@ for i=0:numSegs-1
             if(getPolyAvg)
                 ch=validCh(chIdx);
                 pFitTime=fSegtime-min(fSegtime);
-                phbr(i,ch,:)=mpolyfit(pFitTime,fHbR(validIdx,chIdx),polyDegree);
-                phbo(i,ch,:)=mpolyfit(pFitTime,fHbO(validIdx,chIdx),polyDegree);
-                poxy(i,ch,:)=mpolyfit(pFitTime,fHbDiff(validIdx,chIdx),polyDegree);
-                ptotal(i,ch,:)=mpolyfit(pFitTime,fHbTotal(validIdx,chIdx),polyDegree);
-                pcbsi(i,ch,:)=mpolyfit(pFitTime,fCBSI(validIdx,chIdx),polyDegree);
-                ptime(i)=nanmean(fSegtime);
+                phbr(segIdx,ch,:)=mpolyfit(pFitTime,fHbR(validIdx,chIdx),polyDegree);
+                phbo(segIdx,ch,:)=mpolyfit(pFitTime,fHbO(validIdx,chIdx),polyDegree);
+                poxy(segIdx,ch,:)=mpolyfit(pFitTime,fHbDiff(validIdx,chIdx),polyDegree);
+                ptotal(segIdx,ch,:)=mpolyfit(pFitTime,fHbTotal(validIdx,chIdx),polyDegree);
+                pcbsi(segIdx,ch,:)=mpolyfit(pFitTime,fCBSI(validIdx,chIdx),polyDegree);
+                ptime(segIdx)=nanmean(fSegtime);
                 
                 tseg=[min(pFitTime),(max(pFitTime)-min(pFitTime))/2,max(pFitTime)]-min(pFitTime);
 
                 
-                phbrfit(i,ch,:)=polyval(reshape(phbr(i,ch,:),[polyDegree+1,1,1]),tseg);
-                phbofit(i,ch,:)=polyval(reshape(phbo(i,ch,:),[polyDegree+1,1,1]),tseg);
-                poxyfit(i,ch,:)=polyval(reshape(poxy(i,ch,:),[polyDegree+1,1,1]),tseg);
-                ptotalfit(i,ch,:)=polyval(reshape(ptotal(i,ch,:),[polyDegree+1,1,1]),tseg);
-                pcbsifit(i,ch,:)=polyval(reshape(pcbsi(i,ch,:),[polyDegree+1,1,1]),tseg);
+                phbrfit(segIdx,ch,:)=polyval(reshape(phbr(segIdx,ch,:),[polyDegree+1,1,1]),tseg);
+                phbofit(segIdx,ch,:)=polyval(reshape(phbo(segIdx,ch,:),[polyDegree+1,1,1]),tseg);
+                poxyfit(segIdx,ch,:)=polyval(reshape(poxy(segIdx,ch,:),[polyDegree+1,1,1]),tseg);
+                ptotalfit(segIdx,ch,:)=polyval(reshape(ptotal(segIdx,ch,:),[polyDegree+1,1,1]),tseg);
+                pcbsifit(segIdx,ch,:)=polyval(reshape(pcbsi(segIdx,ch,:),[polyDegree+1,1,1]),tseg);
                 
             end
         end
@@ -461,30 +479,32 @@ end
 
 if(calcROI&&exist('HbR_roi'))
     outFNIR.ROI=fNIR.ROI;
+
+    
+
+    
+    outFNIR.ROI.HbR=HbR_roi(1:end,:);
+    outFNIR.ROI.HbO=HbO_roi(1:end,:);
+    outFNIR.ROI.HbDiff=HbDiff_roi(1:end,:);
+    outFNIR.ROI.HbTotal=HbTotal_roi(1:end,:);
+    outFNIR.ROI.CBSI=CBSI_roi(1:end,:);
+    
     hbo_field_length=size(outFNIR.HbO,1);
-    roi_field_length=size(HbR_roi,1);
+    roi_field_length=size(outFNIR.ROI.HbR,1);
     field_diff=hbo_field_length-roi_field_length; %Fix for it being different?
     
-    outFNIR.ROI.HbR=nan(hbo_field_length,size(HbR_roi,2));
-    outFNIR.ROI.HbO=outFNIR.ROI.HbR;
-    outFNIR.ROI.HbDiff=outFNIR.ROI.HbR;
-    outFNIR.ROI.HbTotal=outFNIR.ROI.HbR;
-    outFNIR.ROI.CBSI=outFNIR.ROI.HbR;
-    
-    outFNIR.ROI.HbR=HbR_roi;
-    outFNIR.ROI.HbO=HbO_roi;
-    outFNIR.ROI.HbDiff=HbDiff_roi;
-    outFNIR.ROI.HbTotal=HbTotal_roi;
-    outFNIR.ROI.CBSI=CBSI_roi;
+    if(~field_diff==0)
+        warning('Mismatch in ROI times');
+    end
 end
 
 validFields=pf2_base.pf2_getFNIRSfields();
 fdataFields=fields(fNIR);  % Copy known fields
-for i=1:length(fdataFields)
-   memberIdx=ismember(validFields,fdataFields{i});
-   if(any(memberIdx)&&~strcmp(fdataFields{i},'time')...
-           &&~strcmp(fdataFields{i},'fs')&&~strcmp(fdataFields{i},'ROI')&&~strcmp(fdataFields{i},'Aux'))
-        outFNIR.(validFields{memberIdx})=fNIR.(fdataFields{i});
+for fieldIdx=1:length(fdataFields)
+   memberIdx=ismember(validFields,fdataFields{fieldIdx});
+   if(any(memberIdx)&&~strcmp(fdataFields{fieldIdx},'time')...
+           &&~strcmp(fdataFields{fieldIdx},'fs')&&~strcmp(fdataFields{fieldIdx},'ROI')&&~strcmp(fdataFields{fieldIdx},'Aux'))
+        outFNIR.(validFields{memberIdx})=fNIR.(fdataFields{fieldIdx});
    end
 end
 
