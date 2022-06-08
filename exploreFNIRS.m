@@ -285,222 +285,10 @@ if(isempty(ExFNIRS.data))
     error('Must supply data!');
 end
 
-fprintf('Examining experimental data array\n');
-
-numEx=length(ExFNIRS.data);
-fsArray=nan(numEx);
-for i=numEx:-1:1
-    %if(rem(i,100)==0)
-          fprintf('record %i of %i\n',i,numEx);
-    %end
-    if(isempty(ExFNIRS.data{i}))
-        ExFNIRS.data(i)=[];
-        continue;
-    end
-    if(isfield(ExFNIRS.data{i},'time'))
-       fsArray(i)=median(diff(ExFNIRS.data{i}.time)); 
-    end
-    
-    if( ExFNIRS.settings.timeShiftTo0)
-        ExFNIRS.data{i}=pf2.Data.SetT0(ExFNIRS.data{i},min(ExFNIRS.data{i}.time));
-    end
-    
-    if(isfield(ExFNIRS.data{i},'info'))
-        ExFNIRS.data{i}.info.rowID=i;
-    end
-end
-
-estimatedFS=nanmedian(fsArray(:));
-
-subIdAuto=1;
-
-fprintf('Building experimental data array\n');
-numEx=length(ExFNIRS.data);
-for i=1:length(numEx)
-    fprintf('Preprocessing record %i of %i\n',i,numEx);
-
-   if((~isfield(ExFNIRS.data{i},'raw')&&~isfield(ExFNIRS.data{i},'HbO'))||(length(ExFNIRS.data{i}.time)==1&&(isnan(ExFNIRS.data{i}.time)))||sum(sum(~isnan(ExFNIRS.data{i}.raw(:,2:end)),1),2)==0) %info only
-       ExFNIRS.data{i}.time=nan;
-       ExFNIRS.data{i}.info.missingFNIRS=1;
-   else
-       ExFNIRS.data{i}.info.missingFNIRS=0;
-       
-       if(~isfield(ExFNIRS.data{i}.info,'Group')||isempty(ExFNIRS.data{i}.info.Group))
-           ExFNIRS.data{i}.info.Group='Missing';
-       end
-       
-       if(~isfield(ExFNIRS.data{i}.info,'SubjectID')||isempty(ExFNIRS.data{i}.info.SubjectID))
-           ExFNIRS.data{i}.info.SubjectID=sprintf('Missing%i',subIdAuto);
-           subIdAuto=subIdAuto+1;
-       end
-       
-       if(~isfield(ExFNIRS.data{i}.info,'Subgroup')||isempty(ExFNIRS.data{i}.info.Subgroup))
-           ExFNIRS.data{i}.info.Subgroup='Missing';
-       end
-       
-       if(~isfield(ExFNIRS.data{i}.info,'Session')||isempty(ExFNIRS.data{i}.info.Session))
-           ExFNIRS.data{i}.info.Session='Missing';
-       end
-       
-       if(~isfield(ExFNIRS.data{i}.info,'Trial')||isempty(ExFNIRS.data{i}.info.Trial))
-           ExFNIRS.data{i}.info.Trial='Missing';
-       end
-       
-       if(~isfield(ExFNIRS.data{i}.info,'Block')||isempty(ExFNIRS.data{i}.info.Block))
-           ExFNIRS.data{i}.info.Block='Missing';
-       end
-       
-       if(~isfield(ExFNIRS.data{i}.info,'Condition')||isempty(ExFNIRS.data{i}.info.Condition))
-           ExFNIRS.data{i}.info.Condition='Missing';
-       end
-   end
-end
-
-fprintf('Building Info Table:\n');
-ExFNIRS.dataTable=BuildSegmentInfoTable(ExFNIRS.data);
 
 
-ExFNIRS.settings.updateOnChange=get(handles.checkbox_auto_update,'Value');
+initializeGUIvalues(handles);
 
-
-set(handles.popupmenu_info_field,'String',ExFNIRS.dataTable.Properties.VariableNames);
-set(handles.popupmenu_info_field,'Value',length(ExFNIRS.dataTable.Properties.VariableNames));
-strs=get(handles.popupmenu_info_field,'String');
-val=get(handles.popupmenu_info_field,'Value');
-selStr=strs{val};
-ExFNIRS.settings.curInfoStr=selStr;
-
-set(handles.popupmenu_groupby_info_field,'String',ExFNIRS.dataTable.Properties.VariableNames);
-set(handles.popupmenu_groupby_info_field,'Value',1);
-strs=get(handles.popupmenu_groupby_info_field,'String');
-val=get(handles.popupmenu_groupby_info_field,'Value');
-selStr=strs{val};
-ExFNIRS.settings.curInfoGroupBy=selStr;
-
-popupmenu_groupby_info_field_Callback([], [], handles); %update fieldbox
-
-
-
-segInfoVars={'SubjectID','Group','Subgroup','Session','Trial','Block','Condition'};
-
-
-for v =1:length(segInfoVars)
-   if(~ismember(segInfoVars{v},ExFNIRS.dataTable.Properties.VariableNames))
-        ExFNIRS.dataTable.(segInfoVars{v})=strings(size(ExFNIRS.dataTable,1),1);
-        ExFNIRS.dataTable.(segInfoVars{v})(:,1)='Missing';
-   elseif(isnumeric(ExFNIRS.dataTable.(segInfoVars{v})(1)))
-       nIdx=isnan(ExFNIRS.dataTable.(segInfoVars{v}));
-       if(any(nIdx))
-          warning('Missing value to deal with'); 
-       end
-       %ExFNIRS.dataTable.(segInfoVars{v})(nIdx)=
-   elseif(isstring(ExFNIRS.dataTable.(segInfoVars{v})(1)))
-       nIdx=strcmp(ExFNIRS.dataTable.(segInfoVars{v}),'');
-       ExFNIRS.dataTable.(segInfoVars{v})(nIdx)='Missing'; 
-   end
-end
-
-
-%pf2('UseDeviceCFG','device_fNIR1200.cfg');
-pf2('blLength',0); %use global mean for import
-
-%ExFNIRS.settings=[];
-
-ExFNIRS.settings.plotby=[];
-
-ExFNIRS.settings.plotby.SubjectID=get(handles.checkbox_subjectID_plotby,'Value');
-ExFNIRS.settings.plotby.Group=get(handles.checkbox_group_plotby,'Value');
-ExFNIRS.settings.plotby.Session=get(handles.checkbox_session_plotby,'Value');
-ExFNIRS.settings.plotby.Trial=get(handles.checkbox_trial_plotby,'Value');
-ExFNIRS.settings.plotby.Condition=get(handles.checkbox_condition_plotby,'Value');
-ExFNIRS.settings.plotby.Block=get(handles.checkbox_block_plotby,'Value');
-ExFNIRS.settings.plotby.InfoGroupBy=get(handles.checkbox_block_plotby,'Value');
-
-ExFNIRS.settings.plot_grandaverage_feature='Mean';
-ExFNIRS.settings.plot_grandaverage=get(handles.checkbox_plot_grandaverage,'Value');
-ExFNIRS.settings.plot_individual=get(handles.checkbox_plot_all_data,'Value');
-ExFNIRS.settings.plot_error=get(handles.checkbox_plot_error,'Value');
-ExFNIRS.settings.plot_error_multiply=str2num(get(handles.edit_error_multiplier,'String'));
-ExFNIRS.settings.plot_task_lines=get(handles.checkbox_mark_task,'Value');
-idx=get(handles.popupmenu_errorbar_style,'Value');
-strs=get(handles.popupmenu_errorbar_style,'String');
-ExFNIRS.settings.plot_error_style=strs{idx};
-idx=get(handles.popupmenu_errorbar_feature,'Value');
-strs=get(handles.popupmenu_errorbar_feature,'String');
-ExFNIRS.settings.plot_error_feature=strs{idx};
-
-ExFNIRS.settings.plot_legend_mode=2; %1 none %2 last fig %3 all
-
-ExFNIRS.settings.grandavg_resample_size=estimatedFS;
-set(handles.edit_grandavg_resample_size,'String',sprintf('%.3f',ExFNIRS.settings.grandavg_resample_size));
-%ExFNIRS.settings.code_missing=get(handles.checkbox_code_nan,'Value');
-
-ExFNIRS.settings.plot_bar_ga=get(handles.checkbox_plot_barchart_ga,'Value');
-ExFNIRS.settings.plot_bar_all=get(handles.checkbox_plot_barchart_all_points,'Value');
-ExFNIRS.settings.plot_bar_err_mult=str2double(get(handles.edit_bar_error_multiplier,'String'));
-ExFNIRS.settings.plot_bar_err_feature='SEM';
-ExFNIRS.settings.plot_bar_err=get(handles.checkbox_plot_barchart_error,'Value');
-ExFNIRS.settings.plot_bar_feature='Mean';
-
-ExFNIRS.settings.plot_scatter_err=get(handles.checkbox_plot_scatter_error,'Value');
-ExFNIRS.settings.plot_scatter_err_mult=str2double(get(handles.edit_scatter_error_multiplier,'String'));
-ExFNIRS.settings.plot_scatter_nonparametric=get(handles.checkbox_plot_scatter_nonparametric,'Value');
-ExFNIRS.settings.plot_scatter_line=get(handles.checkbox_plot_scatter_line,'Value');
-idx=get(handles.popupmenu_scatter_error_feature,'Value');
-strs=get(handles.popupmenu_scatter_error_feature,'String');
-ExFNIRS.settings.plot_scatter_err_feature=strs{idx};
-ExFNIRS.settings.plot_scatter_extend=get(handles.checkbox_plot_scatter_extend,'Value');
-idx=get(handles.popupmenu_scatter_error_style,'Value');
-strs=get(handles.popupmenu_scatter_error_style,'String');
-ExFNIRS.settings.plot_scatter_error_style=strs{idx};
-ExFNIRS.settings.plot_scatter_flipxy=get(handles.checkbox_plot_scatter_flipxy,'Value');
-
-ExFNIRS.settings.LME_enable=get(handles.checkbox_LME_enable,'Value');
-ExFNIRS.settings.LME_all_interactions=get(handles.checkbox_LME_all_interactions,'Value');
-ExFNIRS.settings.LME_info_covariate=get(handles.checkbox_LME_info_covariate,'Value');
-
-ExFNIRS.settings.export_replace_missing_9999=get(handles.checkbox_export_9999,'Value');
-
-ExFNIRS.settings.use_group=get(handles.checkbox_use_group,'Value');
-if(ExFNIRS.settings.use_group)
-    set(handles.listbox_group,'Enable','on');
-    set(handles.listbox_subgroup,'Enable','off');
-else
-    set(handles.listbox_group,'Enable','off');
-    set(handles.listbox_subgroup,'Enable','on');
-end
-
-ExFNIRS.settings.ylim_manual=get(handles.checkbox_ylim_manual,'Value');
-ExFNIRS.settings.ylim_fixed=get(handles.checkbox_ylim_fixed,'Value');
-ExFNIRS.settings.ylim_manual_min=str2num(get(handles.edit_ylim_min,'String'));
-ExFNIRS.settings.ylim_manual_max=str2num(get(handles.edit_ylim_max,'String'));
-
-ExFNIRS.settings.guiColor=ones(10,3);
-ExFNIRS.settings.use_gui_color=get(handles.checkbox_gui_colors,'Value');
-
-[exF_folder,name,ext] = fileparts(mfilename('fullpath'));
-loadGUIcolors(sprintf('%s/prefs/%s',exF_folder,'exploreFNIRS_defaultColors.csv'),handles);
-
-idx=get(handles.popupmenu_colors,'Value');
-strs=get(handles.popupmenu_colors,'String');
-ExFNIRS.settings.cmap=str2func(strs{idx});
-
-PopulateGUIfields(ExFNIRS.dataTable,handles);
-strsRaw=get(handles.listbox_raw_methods,'String');
-strsOxy=get(handles.listbox_oxy_methods,'String');
-
-ExFNIRS.processedData=cell(length(strsOxy)*length(strsRaw),3);
-ExFNIRS.numProcessed=0;
-
-if(isfield(ExFNIRS,'UpdateNeeded')&&ExFNIRS.UpdateNeeded==4)
-    ExFNIRS.UpdateNeeded=3;
-end
-
-if(ExFNIRS.settings.updateOnChange)
-    updateSelectedTable(handles);
-else
-    flagForUpdate(3,handles);
-end
 
 
 % UIWAIT makes exploreFNIRS wait for user response (see UIRESUME)
@@ -1379,7 +1167,8 @@ selectedStrs=get(handles.listbox_block,'Value');
 selectedBlock=strs(selectedStrs,:);
 if(ismember('Block',ExFNIRS.dataTable.Properties.VariableNames))
     if(isnumeric(ExFNIRS.dataTable.('Block')))
-        selectedBlock=str2num(selectedBlock);
+        
+        selectedBlock=str2double(selectedBlock);
     else
        if(~iscell(selectedBlock))
            selectedBlock={selectedBlock};
@@ -1479,6 +1268,11 @@ sessionColIdx=find(strcmp('Session',ExFNIRS.dataTable.Properties.VariableNames))
 conditionColIdx=find(strcmp('Condition',ExFNIRS.dataTable.Properties.VariableNames));
 trialColIdx=find(strcmp('Trial',ExFNIRS.dataTable.Properties.VariableNames));
 blockColIdx=find(strcmp('Block',ExFNIRS.dataTable.Properties.VariableNames));
+
+if(~isfield(ExFNIRS.settings,'plotby')||isempty(ExFNIRS.settings.plotby))
+    initializeGUIvalues(handles);
+    
+end
 
 if(ExFNIRS.settings.use_group)
     gPlotByGroup=[ExFNIRS.settings.plotby.Group,0];
@@ -2088,7 +1882,7 @@ for chIdx=1:numOpt
                           
                        case 'Aux'
                            data2plot=curFNIRS{i}.Aux;
-                           if(isfield(data2plot,bioM)&&ndims(data2plot.(bioM)(:,ch))>1) %if has its own time use that
+                           if(isfield(data2plot,bioM)&&size(data2plot.(bioM),2)>1) %if has its own time use that
                                dataTime=data2plot.(bioM)(:,1);
                                data2plot.(bioM)=data2plot.(bioM)(:,2); 
                            elseif(isfield(data2plot,'time')) %otherwise use aux time
@@ -2903,6 +2697,232 @@ end
 writeLogFile(logFileName,pathname);
 
 fprintf('Data exported to %s\n',sprintf('%s%s',pathname,file));
+
+
+function initializeGUIvalues(handles)
+% function sets an initializes values based on GUI settings
+    global ExFNIRS;
+
+    fprintf('Examining experimental data array\n');
+
+numEx=length(ExFNIRS.data);
+fsArray=nan(numEx);
+for i=numEx:-1:1
+    %if(rem(i,100)==0)
+          fprintf('record %i of %i\n',i,numEx);
+    %end
+    if(isempty(ExFNIRS.data{i}))
+        ExFNIRS.data(i)=[];
+        continue;
+    end
+    if(isfield(ExFNIRS.data{i},'time'))
+       fsArray(i)=median(diff(ExFNIRS.data{i}.time)); 
+    end
+    
+    if( ExFNIRS.settings.timeShiftTo0)
+        ExFNIRS.data{i}=pf2.Data.SetT0(ExFNIRS.data{i},min(ExFNIRS.data{i}.time));
+    end
+    
+    if(isfield(ExFNIRS.data{i},'info'))
+        ExFNIRS.data{i}.info.rowID=i;
+    end
+end
+
+estimatedFS=nanmedian(fsArray(:));
+
+subIdAuto=1;
+
+fprintf('Building experimental data array\n');
+numEx=length(ExFNIRS.data);
+for i=1:length(numEx)
+    fprintf('Preprocessing record %i of %i\n',i,numEx);
+
+   if((~isfield(ExFNIRS.data{i},'raw')&&~isfield(ExFNIRS.data{i},'HbO'))||(length(ExFNIRS.data{i}.time)==1&&(isnan(ExFNIRS.data{i}.time)))||sum(sum(~isnan(ExFNIRS.data{i}.raw(:,2:end)),1),2)==0) %info only
+       ExFNIRS.data{i}.time=nan;
+       ExFNIRS.data{i}.info.missingFNIRS=1;
+   else
+       ExFNIRS.data{i}.info.missingFNIRS=0;
+       
+       if(~isfield(ExFNIRS.data{i}.info,'Group')||isempty(ExFNIRS.data{i}.info.Group))
+           ExFNIRS.data{i}.info.Group='Missing';
+       end
+       
+       if(~isfield(ExFNIRS.data{i}.info,'SubjectID')||isempty(ExFNIRS.data{i}.info.SubjectID))
+           ExFNIRS.data{i}.info.SubjectID=sprintf('Missing%i',subIdAuto);
+           subIdAuto=subIdAuto+1;
+       end
+       
+       if(~isfield(ExFNIRS.data{i}.info,'Subgroup')||isempty(ExFNIRS.data{i}.info.Subgroup))
+           ExFNIRS.data{i}.info.Subgroup='Missing';
+       end
+       
+       if(~isfield(ExFNIRS.data{i}.info,'Session')||isempty(ExFNIRS.data{i}.info.Session))
+           ExFNIRS.data{i}.info.Session='Missing';
+       end
+       
+       if(~isfield(ExFNIRS.data{i}.info,'Trial')||isempty(ExFNIRS.data{i}.info.Trial))
+           ExFNIRS.data{i}.info.Trial='Missing';
+       end
+       
+       if(~isfield(ExFNIRS.data{i}.info,'Block')||isempty(ExFNIRS.data{i}.info.Block))
+           ExFNIRS.data{i}.info.Block='Missing';
+       end
+       
+       if(~isfield(ExFNIRS.data{i}.info,'Condition')||isempty(ExFNIRS.data{i}.info.Condition))
+           ExFNIRS.data{i}.info.Condition='Missing';
+       end
+   end
+end
+
+
+ExFNIRS.settings.plotby=[];
+ExFNIRS.settings.plotby.SubjectID=get(handles.checkbox_subjectID_plotby,'Value');
+ExFNIRS.settings.plotby.Group=get(handles.checkbox_group_plotby,'Value');
+ExFNIRS.settings.plotby.Session=get(handles.checkbox_session_plotby,'Value');
+ExFNIRS.settings.plotby.Trial=get(handles.checkbox_trial_plotby,'Value');
+ExFNIRS.settings.plotby.Condition=get(handles.checkbox_condition_plotby,'Value');
+ExFNIRS.settings.plotby.Block=get(handles.checkbox_block_plotby,'Value');
+ExFNIRS.settings.plotby.InfoGroupBy=get(handles.checkbox_block_plotby,'Value');
+
+fprintf('Building Info Table:\n');
+ExFNIRS.dataTable=BuildSegmentInfoTable(ExFNIRS.data);
+
+
+ExFNIRS.settings.updateOnChange=get(handles.checkbox_auto_update,'Value');
+
+
+set(handles.popupmenu_info_field,'String',ExFNIRS.dataTable.Properties.VariableNames);
+set(handles.popupmenu_info_field,'Value',length(ExFNIRS.dataTable.Properties.VariableNames));
+strs=get(handles.popupmenu_info_field,'String');
+val=get(handles.popupmenu_info_field,'Value');
+selStr=strs{val};
+ExFNIRS.settings.curInfoStr=selStr;
+
+set(handles.popupmenu_groupby_info_field,'String',ExFNIRS.dataTable.Properties.VariableNames);
+set(handles.popupmenu_groupby_info_field,'Value',1);
+strs=get(handles.popupmenu_groupby_info_field,'String');
+val=get(handles.popupmenu_groupby_info_field,'Value');
+selStr=strs{val};
+ExFNIRS.settings.curInfoGroupBy=selStr;
+
+popupmenu_groupby_info_field_Callback([], [], handles); %update fieldbox
+
+
+
+segInfoVars={'SubjectID','Group','Subgroup','Session','Trial','Block','Condition'};
+
+
+for v =1:length(segInfoVars)
+   if(~ismember(segInfoVars{v},ExFNIRS.dataTable.Properties.VariableNames))
+        ExFNIRS.dataTable.(segInfoVars{v})=strings(size(ExFNIRS.dataTable,1),1);
+        ExFNIRS.dataTable.(segInfoVars{v})(:,1)='Missing';
+   elseif(isnumeric(ExFNIRS.dataTable.(segInfoVars{v})(1)))
+       nIdx=isnan(ExFNIRS.dataTable.(segInfoVars{v}));
+       if(any(nIdx))
+          warning('Missing value to deal with'); 
+       end
+       %ExFNIRS.dataTable.(segInfoVars{v})(nIdx)=
+   elseif(isstring(ExFNIRS.dataTable.(segInfoVars{v})(1)))
+       nIdx=strcmp(ExFNIRS.dataTable.(segInfoVars{v}),'');
+       ExFNIRS.dataTable.(segInfoVars{v})(nIdx)='Missing'; 
+   end
+end
+
+
+%pf2('UseDeviceCFG','device_fNIR1200.cfg');
+pf2('blLength',0); %use global mean for import
+
+%ExFNIRS.settings=[];
+
+
+
+
+ExFNIRS.settings.plot_grandaverage_feature='Mean';
+ExFNIRS.settings.plot_grandaverage=get(handles.checkbox_plot_grandaverage,'Value');
+ExFNIRS.settings.plot_individual=get(handles.checkbox_plot_all_data,'Value');
+ExFNIRS.settings.plot_error=get(handles.checkbox_plot_error,'Value');
+ExFNIRS.settings.plot_error_multiply=str2num(get(handles.edit_error_multiplier,'String'));
+ExFNIRS.settings.plot_task_lines=get(handles.checkbox_mark_task,'Value');
+idx=get(handles.popupmenu_errorbar_style,'Value');
+strs=get(handles.popupmenu_errorbar_style,'String');
+ExFNIRS.settings.plot_error_style=strs{idx};
+idx=get(handles.popupmenu_errorbar_feature,'Value');
+strs=get(handles.popupmenu_errorbar_feature,'String');
+ExFNIRS.settings.plot_error_feature=strs{idx};
+
+ExFNIRS.settings.plot_legend_mode=2; %1 none %2 last fig %3 all
+
+ExFNIRS.settings.grandavg_resample_size=estimatedFS;
+set(handles.edit_grandavg_resample_size,'String',sprintf('%.3f',ExFNIRS.settings.grandavg_resample_size));
+%ExFNIRS.settings.code_missing=get(handles.checkbox_code_nan,'Value');
+
+ExFNIRS.settings.plot_bar_ga=get(handles.checkbox_plot_barchart_ga,'Value');
+ExFNIRS.settings.plot_bar_all=get(handles.checkbox_plot_barchart_all_points,'Value');
+ExFNIRS.settings.plot_bar_err_mult=str2double(get(handles.edit_bar_error_multiplier,'String'));
+ExFNIRS.settings.plot_bar_err_feature='SEM';
+ExFNIRS.settings.plot_bar_err=get(handles.checkbox_plot_barchart_error,'Value');
+ExFNIRS.settings.plot_bar_feature='Mean';
+
+ExFNIRS.settings.plot_scatter_err=get(handles.checkbox_plot_scatter_error,'Value');
+ExFNIRS.settings.plot_scatter_err_mult=str2double(get(handles.edit_scatter_error_multiplier,'String'));
+ExFNIRS.settings.plot_scatter_nonparametric=get(handles.checkbox_plot_scatter_nonparametric,'Value');
+ExFNIRS.settings.plot_scatter_line=get(handles.checkbox_plot_scatter_line,'Value');
+idx=get(handles.popupmenu_scatter_error_feature,'Value');
+strs=get(handles.popupmenu_scatter_error_feature,'String');
+ExFNIRS.settings.plot_scatter_err_feature=strs{idx};
+ExFNIRS.settings.plot_scatter_extend=get(handles.checkbox_plot_scatter_extend,'Value');
+idx=get(handles.popupmenu_scatter_error_style,'Value');
+strs=get(handles.popupmenu_scatter_error_style,'String');
+ExFNIRS.settings.plot_scatter_error_style=strs{idx};
+ExFNIRS.settings.plot_scatter_flipxy=get(handles.checkbox_plot_scatter_flipxy,'Value');
+
+ExFNIRS.settings.LME_enable=get(handles.checkbox_LME_enable,'Value');
+ExFNIRS.settings.LME_all_interactions=get(handles.checkbox_LME_all_interactions,'Value');
+ExFNIRS.settings.LME_info_covariate=get(handles.checkbox_LME_info_covariate,'Value');
+
+ExFNIRS.settings.export_replace_missing_9999=get(handles.checkbox_export_9999,'Value');
+
+ExFNIRS.settings.use_group=get(handles.checkbox_use_group,'Value');
+if(ExFNIRS.settings.use_group)
+    set(handles.listbox_group,'Enable','on');
+    set(handles.listbox_subgroup,'Enable','off');
+else
+    set(handles.listbox_group,'Enable','off');
+    set(handles.listbox_subgroup,'Enable','on');
+end
+
+ExFNIRS.settings.ylim_manual=get(handles.checkbox_ylim_manual,'Value');
+ExFNIRS.settings.ylim_fixed=get(handles.checkbox_ylim_fixed,'Value');
+ExFNIRS.settings.ylim_manual_min=str2num(get(handles.edit_ylim_min,'String'));
+ExFNIRS.settings.ylim_manual_max=str2num(get(handles.edit_ylim_max,'String'));
+
+ExFNIRS.settings.guiColor=ones(10,3);
+ExFNIRS.settings.use_gui_color=get(handles.checkbox_gui_colors,'Value');
+
+[exF_folder,name,ext] = fileparts(mfilename('fullpath'));
+loadGUIcolors(sprintf('%s/prefs/%s',exF_folder,'exploreFNIRS_defaultColors.csv'),handles);
+
+idx=get(handles.popupmenu_colors,'Value');
+strs=get(handles.popupmenu_colors,'String');
+ExFNIRS.settings.cmap=str2func(strs{idx});
+
+PopulateGUIfields(ExFNIRS.dataTable,handles);
+strsRaw=get(handles.listbox_raw_methods,'String');
+strsOxy=get(handles.listbox_oxy_methods,'String');
+
+ExFNIRS.processedData=cell(length(strsOxy)*length(strsRaw),3);
+ExFNIRS.numProcessed=0;
+
+if(isfield(ExFNIRS,'UpdateNeeded')&&ExFNIRS.UpdateNeeded==4)
+    ExFNIRS.UpdateNeeded=3;
+end
+
+if(ExFNIRS.settings.updateOnChange)
+    updateSelectedTable(handles);
+else
+    flagForUpdate(3,handles);
+end
+
 
 
 
