@@ -598,21 +598,36 @@ function [fTimeInd,timeSeries]=getTimeIdx(times_in,segLength,centerTime)
         % ie: the time series includes the point centerTime, (or would if
         % samples around that time were collected
 
-    t1=times_in(1);
-    te=times_in(end);
 
-    tRange_in=te-t1;
+ 
+    t1=times_in(1);
+    %te=times_in(end);
+
+    times_in=times_in(:);
+
+    %tRange_in=te-t1;
 
     if(nargin<3) % just use min time
         centerTime=t1;
     end
 
+   
+
     minSegTime=centerTime+floor((t1-centerTime)/segLength)*segLength;
-    maxSegTime=centerTime+floor((te-centerTime)/segLength)*segLength;
+    % minimum SegTime is the first value that meets the crieria
+    %       t0_rs = centerTime+segLength*N  (where N is some number of samples
+    %       and t0_sample > t0_rs  but t0_sample < t0_rs +segLength
+    
+    %maxSegTime=centerTime+floor((te-centerTime)/segLength)*segLength;
 
-    fTimeInd=[floor((times_in(:)-minSegTime)/segLength)+1];
+    fTimeInd=[floor((times_in-minSegTime)/segLength+1+1e-10)];
+    % 1e-10 helps fix conditions where floor returns n-1 instead of n
+    % fTimeInd(end) is the highest value here, faster than max()
+    
+    maxSegTime=minSegTime+(fTimeInd(end)-1)*segLength;
 
-    timeSeries=[minSegTime:segLength:minSegTime+(fTimeInd(end)-1)*segLength]';
+
+    timeSeries=[minSegTime:segLength:maxSegTime]';
 
     
 end

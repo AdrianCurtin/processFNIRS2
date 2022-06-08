@@ -1605,7 +1605,7 @@ global ExFNIRS
 pf2_base.closeProgressHandles();
 
 
-fprintf('ExploreFNIRS\nProcessing Group %i of %i\n',1,max(gbyIdx));
+fprintf('ExploreFNIRS - Processing Groups\n');
 %hF=ProgressHandles.h.hF;
 
 numSegs2Process=size(ExFNIRS.selectedTable,1);
@@ -1619,7 +1619,7 @@ ExFNIRS.gbyFlat.gbyIndex=gbyIdx;
 
 
 for i=1:max(gbyIdx)
-    fprintf('ExploreFNIRS\nProcessing Group %i of %i\n',i,max(gbyIdx));
+    fprintf('Processing Group %i of %i\n',i,max(gbyIdx));
     
     ExFNIRS.gby(i).gbyTables=ExFNIRS.selectedTable(gbyIdx==i,:); 
     ExFNIRS.gby(i).gbyFNIRS=ExFNIRS.gbyFlat.gbyFNIRS(gbyIdx==i,:);
