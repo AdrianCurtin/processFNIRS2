@@ -1556,7 +1556,7 @@ if(ExFNIRS.UpdateNeeded==2||~isfield(ExFNIRS,'curPreprocessedFNIR'))
 
     for i=1:numSegs2Process
         
-       fprintf('ExploreFNIRS\nResampling and baselining fNIRS %i of %i\n',i,numSegs2Process);
+       fprintf('Resampling and baselining fNIRS %i of %i\n',i,numSegs2Process);
        
        if(ExFNIRS.settings.use_baseline)
             ExFNIRS.curPreprocessedFNIR.baseline{i}=pf2.Data.Split(ExFNIRS.curPreprocessedFNIR.fNIR{i},ExFNIRS.settings.baseline_start,ExFNIRS.settings.baseline_end); %baselineining is handled in processing section
@@ -1567,18 +1567,18 @@ if(ExFNIRS.UpdateNeeded==2||~isfield(ExFNIRS,'curPreprocessedFNIR'))
             if(isfield(ExFNIRS.curPreprocessedFNIR.gbyFNIRS_blk{i},'segmentTimes'))
                 ExFNIRS.curPreprocessedFNIR.gbyFNIRS_blk{i}.segmentTimes=ExFNIRS.curPreprocessedFNIR.gbyFNIRS_blk{i}.segmentTimes+ExFNIRS.settings.block_start;
             else
-               z=1; 
+               warning('Missing segment times for some reason')
             end
             
             if(isnan(ExFNIRS.curPreprocessedFNIR.gbyFNIRS_blk{i}.time))
-               z=1; 
+               warning('Time isNaN for some reason')
             end
             ExFNIRS.curPreprocessedFNIR.gbyFNIRS{i}=pf2.Data.Resample(ExFNIRS.curPreprocessedFNIR.gbyFNIRS{i}, ExFNIRS.settings.grandavg_resample_size,'centerOnT0',true,'timeOutMode','start','blfNIR',ExFNIRS.curPreprocessedFNIR.baseline{i},'averageAux',true);
             ExFNIRS.curPreprocessedFNIR.gbyFNIRS{i}.time=ExFNIRS.curPreprocessedFNIR.gbyFNIRS{i}.time+ExFNIRS.settings.block_start; %change time so that 0 is start of block
             if(isfield(ExFNIRS.curPreprocessedFNIR.gbyFNIRS{i},'segmentTimes'))
                 ExFNIRS.curPreprocessedFNIR.gbyFNIRS{i}.segmentTimes=ExFNIRS.curPreprocessedFNIR.gbyFNIRS{i}.segmentTimes+ExFNIRS.settings.block_start;
             else
-               z=1; 
+               warning('Missing segment times for some reason')
             end
        else
             ExFNIRS.curPreprocessedFNIR.baseline{i}=[];
@@ -2082,7 +2082,7 @@ for chIdx=1:numOpt
                               error('ROI data must be calculated using a build ROI step');
                            end
                           if(~isempty(curFNIRS{i})&&isfield(curFNIRS{i},'ROI'))
-                           data2plot=curFNIRS{i}.ROI;
+                            data2plot=curFNIRS{i}.ROI;
                           else
                              data2plot=[]; 
                           end

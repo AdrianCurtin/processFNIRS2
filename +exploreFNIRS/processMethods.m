@@ -1,6 +1,6 @@
 function processMethods(rawMethodStr,oxyMethodStr)
 global ExFNIRS
-global ProgressHandles
+%global ProgressHandles
 
 if(isempty(rawMethodStr))
    processOxyOnly=true; 
@@ -46,11 +46,11 @@ if(~any(curRawMatchIdx&curOxyMatchIdx))
     oxyMethodStr_label=oxyMethodStr;
     rawMethodStr_label(rawMethodStr_label=='_')='-';
     oxyMethodStr_label(oxyMethodStr_label=='_')='-';
-    fprintf('ExploreFNIRS\nProcessing Method %s x %s %i of %i\n',rawMethodStr_label,oxyMethodStr_label,1,numData);
+    %fprintf('ExploreFNIRS\nProcessing Method %s x %s %i of %i\n',rawMethodStr_label,oxyMethodStr_label,1,numData);
     %hF=ProgressHandles.h.hF;
     
     for i=1:numData
-       fprintf('ExploreFNIRS\nProcessing Method %s x %s %i of %i\n',rawMethodStr_label,oxyMethodStr_label,i,numData);
+       fprintf('ExploreFNIRS - Processing Method %s x %s %i of %i\n',rawMethodStr_label,oxyMethodStr_label,i,numData);
        
        if(~isempty(data{i})&&length(data{i}.time)>1)
            if(processOxyOnly)

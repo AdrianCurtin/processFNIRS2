@@ -231,7 +231,13 @@ if(blLength>0) % if baseline is present
         end
 
         if(calcROI)
-            fB=blfNIR.ROI.(curB);
+
+            if(pf2_base.isnestedfield(blfNIR,'ROI.curB'))
+                fB=blfNIR.ROI.(curB);
+            else
+                warning('ROI mismatch: ROI is not defined in baseline file');
+                calcROI=false;
+            end
 
             if(size(fB,2)~=numROI)
                 warning('ROI mismatch: ROI as defined in baseline not present in main fNIRS segment, calculations not performed');
@@ -542,7 +548,7 @@ for fieldIdx=1:length(fdataFields)
    end
 end
 
-outFNIR.segmentTimes=[times_start',times_end'];
+outFNIR.segmentTimes=[times_start,times,times_end];
 
 if(~isempty(outFNIR.segmentTimes))
     if(strcmp(timeOutMode,'start'))
@@ -598,16 +604,11 @@ function [fTimeInd,timeSeries]=getTimeIdx(times_in,segLength,centerTime)
     tRange_in=te-t1;
 
     if(nargin<3) % just use min time
-        minSegTime=t1;
-        maxSegTime=te-rem(tRange_in,segLength);
-    else 
-        %minSegTime=t1-rem(t1,segLength); % if centerTime=0
-
-        % if 
-
-        minSegTime=centerTime+floor((t1-centerTime)/segLength)*segLength;
-        maxSegTime=centerTime+floor((te-centerTime)/segLength)*segLength;
+        centerTime=t1;
     end
+
+    minSegTime=centerTime+floor((t1-centerTime)/segLength)*segLength;
+    maxSegTime=centerTime+floor((te-centerTime)/segLength)*segLength;
 
     fTimeInd=[floor((times_in(:)-minSegTime)/segLength)+1];
 
@@ -623,15 +624,23 @@ function [rsData] = resample_internal(rsData_in,fTimeInd,numCh,numSegs,nanReject
     % nanRejectionLevel defines how many nans are allowed before rejecting
     % the segment
 
-        % This throws some issues with ~95 million samples, maybe a rounding
-        % issue with accumarray?
+        % variable names and sizes
+        %   fTimeInd: t x 1
+        %   rsData_in: t x N
+        %   fTimeInd_numCh t*N x 1
+        %   fB_count: s*N x 1
+        %   rsData: s x N
     
     nTime=length(fTimeInd);
     fTimeInd_numCh=repmat(fTimeInd,[numCh,1]);
     fTimeInd_numCh=fTimeInd_numCh+numSegs*repelem([0:numCh-1]',nTime,1);
 
-
+try
     fB_isNA=accumarray(fTimeInd_numCh,isnan(rsData_in(:)));
+catch
+    rsData=[];
+    return;
+end
     fB_count=accumarray(fTimeInd_numCh,ones(size(fTimeInd_numCh)));
 
     % Check edge case where last sample does not include last index, pad
