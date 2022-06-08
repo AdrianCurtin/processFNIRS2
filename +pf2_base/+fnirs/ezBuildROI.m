@@ -3,7 +3,7 @@ function roi_out=ezBuildROI(fNIR,funcString,varargin)
 %   this function takes an fNIR struct and extracts already assigned values from 
 %	the .ROI field
 
-%	A welldefined ROI field will have a table with the names of each ROI in the rownames
+%	A well-defined ROI field will have a table with the names of each ROI in the rownames
 % 	and a single column with the Optodes for each ROI
 
 %	ex:	
@@ -12,9 +12,9 @@ function roi_out=ezBuildROI(fNIR,funcString,varargin)
 %	ex2:
 %	myOptodes={[1,2,3,4],[10,11,12]};
 %	myROInames={'thisROI','thatROI'};
-%	fNIR.info=table(myOptodex,'VariableNames',{'Optode'},'RowNames',myROInames);
+%	fNIR.info=table(myOptodes,'VariableNames',{'Optode'},'RowNames',myROInames);
 
-%	Weaklydefined ROIs can also be used
+%	Weakly-defined ROIs can also be used
 %		a cell array of optode numbers will be interpreted as each optode
 %		and automatically converted to a table format with names ROI1,ROI2,...ROIn
 %	ex: fNIR.info=cell({1,2,3,4},[7,8,9,10]};

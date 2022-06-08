@@ -115,13 +115,19 @@ fNIR.time=round(fNIR.time,5);
 minfTime=min(fNIR.time);
 maxfTime=max(fNIR.time);
 
+fTime=fNIR.time;
 
 if(~isstruct(blfNIR)&&~isempty(blLength)&&blLength>0)
+    % if given a specific baseline length (and no struct, create baseline
+    % from times given)
     blfNIR=getFNIRS(fNIR,min(fNIR.time),min(fNIR.time)+blLength); 
 elseif(isstruct(blfNIR))
+    % if using a baseline struct
     if(~isempty(blfNIR.time)&&~any(isnan(blfNIR.time))&&isfield(blfNIR,'fs'))
+        %if time is provided, use all of provided time
         blLength=max(blfNIR.time)-min(blfNIR.time)+1/blfNIR.fs; %Baseline length in time
     elseif(~isempty(blLength)&&~isfield(blfNIR,'empty')&&blLength==0&&~isempty(blfNIR)&&~any(isnan(blfNIR.time))&&isfield(blfNIR,'fs'))
+        % else estimate from sampling rate
         blLength=1/blfNIR.fs;
     else
        warning('Entire Baseline is invalid');
@@ -131,13 +137,14 @@ elseif(blLength==0)
     blLength=[];
 end
 
-if(nargout>1)
+if(nargout>1) %provide poly fit only if two arguments are present
     getPolyAvg=true;
 elseif(nargout<=1)
     getPolyAvg=false;
 end
 
 if(~isfield(fNIR,'HbR')&&isfield(fNIR,'raw'))
+    % out of principle we don't resample the raw data
     error('Raw data averaging not supported');
 elseif(~isfield(fNIR,'HbR')&&~isfield(fNIR,'raw'))
     warning('No fNIRS data');
@@ -150,44 +157,28 @@ end
 
 if(isfield(fNIR,'raw')&&isempty(fNIR.raw))
     fNIR.raw=nan(size(fNIR.HbR));
+    %prevent resampling of raw
 end
 
 if(centerOnT0) % foces time blocks to start from t=0
-    times=(0:segLength:(maxfTime+segLength))';
-    
-    if(min(fNIR.time)<0)
-        newMinTime=(minfTime-segLength);
-        times=[fliplr(0:-segLength:newMinTime)';times(2:end)];
-    end
-    
-    times=times(times>=(min(fNIR.time)-segLength));
-    times=times(times<=(max(fNIR.time)));
-else
-    times=((min(fNIR.time)):segLength:(max(fNIR.time)+segLength))';
+    [fTimeInd,times]=getTimeIdx(fTime,segLength,0);
+else % start at min time
+    [fTimeInd,times]=getTimeIdx(fTime,segLength);
 end
 
+minSegTime=times(1);
+maxSegTime=times(end);
 
 numSegs=length(times);
 
-HbR=nan(numSegs,numCh);
-HbO=HbR;
-HbDiff=HbR;
-HbTotal=HbR;
-CBSI=HbR;
-raw=nan(numSegs,size(fNIR.raw,2));
-
-if(pf2_base.isnestedfield(fNIR,'ROI.HbO'))
-    if(isfield(fNIR,'ROI.info'))
-        numROIs=size(fNIR.ROI.info,1);
-        HbR_roi=nan(numSegs,numROIs);
-        HbO_roi=HbR_roi;
-        HbDiff_roi=HbR_roi;
-        HbTotal_roi=HbR_roi;
-        CBSI_roi=HbR_roi; 
-    end
-    
+if(pf2_base.isnestedfield(fNIR,'ROI.HbR')&&~isempty(fNIR.ROI.HbR))
+    calcROI=true;
+    numROI=size(fNIR.ROI.HbR,2);
+else
+    calcROI=false;
+    numROI=0;
 end
-%raw=nan(size(numSegs,size(fNIR.raw,2)));
+
 
 if(getPolyAvg)
     phbr=nan(numSegs,numCh,polyDegree+1);
@@ -215,97 +206,68 @@ else
 end
 
 
-if(blLength>0)
-    blNanCheck=sum(isnan(blfNIR.HbR),1)/length(blfNIR.time)<nanRejectionLevel; %calculate percentage of invalid values in baseline
+if(blLength>0) % if baseline is present
+    bioMlist={'HbO','HbR','HbDiff','HbTotal','CBSI'};
 
-    blRejectedCount=sum(~blNanCheck);
-    if(blRejectedCount>1)
-        warning('Baseline Period in %i channels was invalid',blRejectedCount); 
-    end
-    validCh=find(blNanCheck==1);
-    
-    blHbR=nanmean(blfNIR.HbR(:,validCh),1);
-    blHbO=nanmean(blfNIR.HbO(:,validCh),1);
-    blHbDiff=nanmean(blfNIR.HbDiff(:,validCh),1);
-    blHbTotal=nanmean(blfNIR.HbTotal(:,validCh),1);
-    blCBSI=nanmean(blfNIR.CBSI(:,validCh),1);
-    
-    if(isempty(blHbR))
-        blHbR=nan;
-    end
-    
-    if(isempty(blHbO))
-        blHbO=nan;
-    end
-    
-    if(isempty(blHbDiff))
-        blHbDiff=nan;
-    end
-    
-    if(isempty(blHbTotal))
-        blHbTotal=nan;
-    end
-    if(isempty(blCBSI))
-        blCBSI=nan;
-    end
-    
-    if(pf2_base.isnestedfield(blfNIR,'ROI.HbO'))
-        blNanCheck_roi=sum(isnan(blfNIR.ROI.HbR),1)/length(blfNIR.time)<nanRejectionLevel; %calculate percentage of invalid values in baseline
+    for b = 1:length(bioMlist)
+        curB=bioMlist{b};
+        fB=blfNIR.(curB);
+   
+        blNanCheck=sum(isnan(fB),1)/length(fB)<nanRejectionLevel; %calculate percentage of invalid values in baseline
 
-        blRejectedCount_roi=sum(~blNanCheck_roi);
-        if(blRejectedCount_roi>1)
-            warning('ROI Baseline Period in %i channels was invalid',blRejectedCount_roi); 
-        end
-        validCh_roi=find(blNanCheck_roi==1);
-
-        blHbR_roi=nanmean(blfNIR.ROI.HbR(:,validCh_roi),1);
-        blHbO_roi=nanmean(blfNIR.ROI.HbO(:,validCh_roi),1);
-        blHbDiff_roi=nanmean(blfNIR.ROI.HbDiff(:,validCh_roi),1);
-        blHbTotal_roi=nanmean(blfNIR.ROI.HbTotal(:,validCh_roi),1);
-        blCBSI_roi=nanmean(blfNIR.ROI.CBSI(:,validCh_roi),1);
+        blRejectedCount=sum(~blNanCheck);
         
-        if(pf2_base.isnestedfield(fNIR,'ROI.HbO')&&size(blfNIR.ROI.HbO,2)==size(fNIR.ROI.HbO,2))
+        if(blRejectedCount>1)
+            warning('Baseline Period in %i channels was invalid',blRejectedCount); 
+        end
+        
+        validCh=find(blNanCheck==1);
+
+        blfNIR.(curB)=mean(fB,1,'omitnan');
+        blfNIR.(curB)(~blNanCheck)=nan;
+
+        if(isempty(blfNIR.(curB)))
+            blfNIR.(curB)=nan;
+        end
+
+        if(calcROI)
+            fB=blfNIR.ROI.(curB);
+
+            if(size(fB,2)~=numROI)
+                warning('ROI mismatch: ROI as defined in baseline not present in main fNIRS segment, calculations not performed');
+                calcROI=false;
+                continue;
+            end
+
+            blNanCheck_roi=sum(isnan(fB),1)/length(fB)<nanRejectionLevel; %calculate percentage of invalid values in baseline
+
+            blRejectedCount_roi=sum(~blNanCheck_roi);
+            if(blRejectedCount_roi>1)
+                warning('ROI Baseline Period in %i channels was invalid',blRejectedCount_roi); 
+            end
+            validCh_roi=find(blNanCheck_roi==1);
             
-            calcROI=true;
-        else
-            warning('ROI mismatch: ROI as defined in baseline not present in main fNIRS segment, calculations not performed');
-            calcROI=false;
+            blfNIR.ROI.(curB)=mean(fB,1,'omitnan');
+            blfNIR.ROI.(curB)(~blNanCheck)=nan;
+    
+            if(isempty(blfNIR.ROI.(curB)))
+                blfNIR.ROI.(curB)=nan;
+            end
         end
-        
-    else
-        calcROI=false; 
-    end
+    end  
 else
     validCh=1:numCh;
-    if(pf2_base.isnestedfield(fNIR,'ROI.HbO'))
-       calcROI=true;
-       validCh_roi=1:size(fNIR.ROI.HbO,2);
+    if(calcROI)
+       validCh_roi=1:numROI;
     else
-        calcROI=false;
+        numROI=0;
     end
 end
 
-ind=1;
-fTime=fNIR.time;
-fTimeInd=nan(size(fNIR.time));
-maxFtime=length(fTime);
 
-fHbR=fNIR.HbR(:,validCh);
-fHbO=fNIR.HbO(:,validCh);
-fHbDiff=fNIR.HbDiff(:,validCh);
-fHbTotal=fNIR.HbTotal(:,validCh);
-fCBSI=fNIR.CBSI(:,validCh);
 fraw=fNIR.raw;
 
-if(calcROI)
-    fHbR_roi=fNIR.ROI.HbR(:,validCh_roi);
-    fHbO_roi=fNIR.ROI.HbO(:,validCh_roi);
-    fHbDiff_roi=fNIR.ROI.HbDiff(:,validCh_roi);
-    fHbTotal_roi=fNIR.ROI.HbTotal(:,validCh_roi);
-    fCBSI_roi=fNIR.ROI.CBSI(:,validCh_roi);
-end
-
-if(strcmp(timeOutMode,'start'))
+if(strcmp(timeOutMode,'start')) %default
     timeOutModeMid=false;
     timeOutModeEnd=false;
 elseif(strcmp(timeOutMode,'end'))
@@ -316,187 +278,256 @@ else %Return midpoint
     timeOutModeEnd=false;
 end
 
+if(timeOutModeMid)
+    times_start=times-segLength/2;
+    times_end=times+segLength/2-(1e-10);
+elseif(timeOutModeEnd)
+    times_start=times-segLength+(1e-10);
+    times_end=times;
+else
+    times_start=times;
+    times_end=times+segLength-1e-10;
+end
 
-ptime=zeros(numSegs,1);
-for segIdx=0:numSegs-1
-    
-    t1=times(segIdx+1); %get the current segment start time
-    ind_init=ind;  %get the index
-    ind_2=ind;
-    
-    if(ind>maxFtime) %if the index is bigger than the max time, we're done
-        continue;
-    end
-    
-    while(ind<=maxFtime&&fTime(ind)<t1) %if the index is less than the max time and less than the start time
-        % keep increasing until ind until it marks the segment just
-        % slightly after t1
-        % and ind_2 is the one before that
-        ind=ind+1;
-        ind_2=ind-1;
-        fTimeInd(ind_2)=segIdx;
-    end
-    
-    if(segIdx==0&&numSegs==1&&isnan(fTimeInd(ind_2))&&fTime(ind)<(t1+segLength))
-        blLength=nan; %way of marking segment invalid
-        ind_2=find(fTime==max(fTime(fTime<(t1+segLength))));
-        segIdx=1;
-    elseif(segIdx==0||(isnan(fTimeInd(ind_2)))) %TODO make this check so that it operates even if zero is slightly before
-        continue;
-    end
-    
+minSegTime=times_start(1);
+maxSegTime=times_start(end);
 
-    
-    if(averageAux&&~isempty(fNIR.Aux))
-        auxFields=fields(fNIR.Aux);
-        for f=1:length(auxFields)
-            curFieldName=auxFields{f};
-            curField=fNIR.Aux.(curFieldName);
-            if(isstruct(curField)||iscell(curField)||istable(curField))
-                if(~isfield(curField,'t')||~isfield(curField,'time'))
-                    outFNIR.Aux.(curFieldName)=curField;
-                else
-                    warning('embedded aux field times not supported yet');
-                    outFNIR.Aux.(curFieldName)=curField;
-                end
-            elseif(size(curField,2)==1)
-                outFNIR.Aux.(curFieldName)=curField;
+%calculate index for each sample
+%fTimeInd=floor((fTime-minfTime-rem(fTime-minfTime,segLength))/segLength)+1;
+nTime=length(fTimeInd);
 
-            elseif(size(curField,2)>1) %Assume first column is time and is synchronized with fNIRS
-                curFieldTime=curField(:,1);
-                indexStart=find(curFieldTime>=t1-segLength,1);
-                indexEnd=find(curFieldTime<t1,1,'last');
-                
-                if(~isfield(outFNIR.Aux,curFieldName))
-                    outFNIR.Aux.(curFieldName)=nan(size(times,1),size(curField,2));
-                end
 
-                outFNIR.Aux.(curFieldName)(segIdx,:)=nanmean(curField(indexStart:indexEnd,:),1);
-                outFNIR.Aux.(curFieldName)(segIdx,1)=t1-segLength+timeOutModeEnd*segLength+timeOutModeMid*segLength/2;
-            end
-        end
-    end
-        
-    
-    
-    nanCheck=(sum(isnan(fHbR(ind_init:ind_2,:)),1)/(ind_2-ind_init+1))<=nanRejectionLevel;     %calculate percentage of invalid values in task
-    nanCheckValid=validCh(nanCheck);
-    
-    if(calcROI)
-        try
-            nanCheck_roi=(sum(isnan(fHbR_roi(ind_init:ind_2,:)),1)/(ind_2-ind_init+1))<=nanRejectionLevel;     %calculate percentage of invalid values in task
-        catch
-            nanCheck_roi=false(size(fHbR_roi,2));
-            warning('Mismatch in ROI times');
-        end
-        nanCheckValid_roi=validCh_roi(nanCheck_roi);
-    end
-    
+if(calcROI)
+    %fTimeInd_numROI=repmat(fTimeInd,[numROI,1]);
+    %fTimeInd_numROI=fTimeInd_numROI+numSegs*repelem([0:numROI-1]',nTime,1);
+
+    outFNIR.ROI.info=fNIR.ROI.info;
+end
+
+
+ptime=zeros(numSegs,1); %polynomial time
+
+bioMlist={'HbO','HbR','HbDiff','HbTotal','CBSI'};
+
+for b = 1:length(bioMlist)
+    curB=bioMlist{b};
+    fB=fNIR.(curB);
+
+    fB_resample=resample_internal(fB,fTimeInd,numCh,numSegs,nanRejectionLevel);
+
     if(blLength>0)
-        HbR(segIdx,nanCheckValid)=nanmean(fHbR(ind_init:ind_2,nanCheck),1)-blHbR(nanCheck);
-        HbO(segIdx,nanCheckValid)=nanmean(fHbO(ind_init:ind_2,nanCheck),1)-blHbO(nanCheck);
-        HbDiff(segIdx,nanCheckValid)=nanmean(fHbDiff(ind_init:ind_2,nanCheck),1)-blHbDiff(nanCheck);
-        HbTotal(segIdx,nanCheckValid)=nanmean(fHbTotal(ind_init:ind_2,nanCheck),1)-blHbTotal(nanCheck);
-        CBSI(segIdx,nanCheckValid)=nanmean(fCBSI(ind_init:ind_2,nanCheck),1)-blCBSI(nanCheck);
-        raw(segIdx,:)=nanmean(fraw(ind_init:ind_2,:),1);
+        outFNIR.(curB)=fB_resample-repmat(blfNIR.(curB),[numSegs,1]);
     elseif(isnan(blLength))
-        HbR(segIdx,nanCheckValid)=nan;
-        HbO(segIdx,nanCheckValid)=nan;
-        HbDiff(segIdx,nanCheckValid)=nan;
-        HbTotal(segIdx,nanCheckValid)=nan;
-        CBSI(segIdx,nanCheckValid)=nan;
-        raw(segIdx,:)=nan;
+        outFNIR.(curB)=nan(size([numCh,numSegs]));
     else
-        HbR(segIdx,nanCheckValid)=nanmean(fHbR(ind_init:ind_2,nanCheck),1);
-        HbO(segIdx,nanCheckValid)=nanmean(fHbO(ind_init:ind_2,nanCheck),1);
-        HbDiff(segIdx,nanCheckValid)=nanmean(fHbDiff(ind_init:ind_2,nanCheck),1);
-        HbTotal(segIdx,nanCheckValid)=nanmean(fHbTotal(ind_init:ind_2,nanCheck),1);
-        CBSI(segIdx,nanCheckValid)=nanmean(fCBSI(ind_init:ind_2,nanCheck),1);
-        raw(segIdx,:)=nanmean(fraw(ind_init:ind_2,:),1);
+        outFNIR.(curB)=fB_resample;
     end
-    
-    
-    if(calcROI)
+
+    if(getPolyAvg)
+        pFit.(curB)=nan(size([numCh,numSegs,polyDegree+1]));
+        bioFitVal=sprintf('%s_val',curB);
+        pFit.(bioFitVal)=nan(size([numCh,numSegs]));
+        
+        
+        for chIdx=1:length(validCh)
+            ch=validCh(chIdx);
+            validIdx=~isnan(fB(:,ch));
+            for segIdx=1:numSegs
+                tSeg=validIdx&fTimeInd==segIdx;
+                tSegTimeRem=fTime(tSeg)-times_start(segIdx);
+                
+                pFit.(bioFitVal)(segIdx,ch,1:polyDegree+1)=mpolyfit(tSegTimeRem,fB(tSeg,ch),polyDegree);
+                pFit.(curB)(segIdx,ch)=polyval(reshape(pFit.(bioFitVal)(segIdx,ch,:),[polyDegree+1,1,1]),times_end(segIdx)-segLength/2);
+            end
+        end
+
         if(blLength>0)
-            HbR_roi(segIdx,nanCheckValid_roi)=nanmean(fHbR_roi(ind_init:ind_2,nanCheck_roi),1)-blHbR_roi(nanCheck_roi);
-            HbO_roi(segIdx,nanCheckValid_roi)=nanmean(fHbO_roi(ind_init:ind_2,nanCheck_roi),1)-blHbO_roi(nanCheck_roi);
-            HbDiff_roi(segIdx,nanCheckValid_roi)=nanmean(fHbDiff_roi(ind_init:ind_2,nanCheck_roi),1)-blHbDiff_roi(nanCheck_roi);
-            HbTotal_roi(segIdx,nanCheckValid_roi)=nanmean(fHbTotal_roi(ind_init:ind_2,nanCheck_roi),1)-blHbTotal_roi(nanCheck_roi);
-            CBSI_roi(segIdx,nanCheckValid_roi)=nanmean(fCBSI_roi(ind_init:ind_2,nanCheck_roi),1)-blCBSI_roi(nanCheck_roi);
+            pFit.(curB)=pFit.(curB)-repmat(blfNIR.(curB),[numSegs,1]);
         elseif(isnan(blLength))
-            HbR_roi(segIdx,nanCheckValid_roi)=nan;
-            HbO_roi(segIdx,nanCheckValid_roi)=nan;
-            HbDiff_roi(segIdx,nanCheckValid_roi)=nan;
-            HbTotal_roi(segIdx,nanCheckValid_roi)=nan;
-            CBSI_roi(segIdx,nanCheckValid_roi)=nan;
+            pFit.(curB)=nan(size([numCh,numSegs]));
         else
-            HbR_roi(segIdx,nanCheckValid_roi)=nanmean(fHbR_roi(ind_init:ind_2,nanCheck_roi),1);
-            HbO_roi(segIdx,nanCheckValid_roi)=nanmean(fHbO_roi(ind_init:ind_2,nanCheck_roi),1);
-            HbDiff_roi(segIdx,nanCheckValid_roi)=nanmean(fHbDiff_roi(ind_init:ind_2,nanCheck_roi),1);
-            HbTotal_roi(segIdx,nanCheckValid_roi)=nanmean(fHbTotal_roi(ind_init:ind_2,nanCheck_roi),1);
-            CBSI_roi(segIdx,nanCheckValid_roi)=nanmean(fCBSI_roi(ind_init:ind_2,nanCheck_roi),1);
+            %pFit.(curB)=pFit.(curB);
         end
     end
-    
-    for chIdx=1:length(validCh)  
 
-        validIdx=(~isnan(fHbR(:,chIdx)).*ismembc([1:length(fHbR(:,1))], [ind_init:ind_2])')==1;
-        fSegtime=fTime(validIdx);
-        
-        if(any(validIdx))
-            if(getPolyAvg)
+    if(calcROI)
+        fB=fNIR.ROI.(curB);
+
+        fB_resample=resample_internal(fB,fTimeInd,numROI,numSegs,nanRejectionLevel);
+
+        if(blLength>0)
+            outFNIR.ROI.(curB)=fB_resample-repmat(blfNIR.ROI.(curB),[numSegs,1]);
+        elseif(isnan(blLength))
+            outFNIR.ROI.(curB)=nan(size([numROI,numSegs]));
+        else
+            outFNIR.ROI.(curB)=fB_resample;
+        end
+
+        if(getPolyAvg)
+            pFit.ROI.(curB)=nan(size([numCh,numSegs,polyDegree+1]));
+            bioFitVal=sprintf('%s_val',curB);
+            pFit.ROI.(bioFitVal)=nan(size([numCh,numSegs]));
+            
+            
+            for chIdx=1:length(validCh)
                 ch=validCh(chIdx);
-                pFitTime=fSegtime-min(fSegtime);
-                phbr(segIdx,ch,:)=mpolyfit(pFitTime,fHbR(validIdx,chIdx),polyDegree);
-                phbo(segIdx,ch,:)=mpolyfit(pFitTime,fHbO(validIdx,chIdx),polyDegree);
-                poxy(segIdx,ch,:)=mpolyfit(pFitTime,fHbDiff(validIdx,chIdx),polyDegree);
-                ptotal(segIdx,ch,:)=mpolyfit(pFitTime,fHbTotal(validIdx,chIdx),polyDegree);
-                pcbsi(segIdx,ch,:)=mpolyfit(pFitTime,fCBSI(validIdx,chIdx),polyDegree);
-                ptime(segIdx)=nanmean(fSegtime);
-                
-                tseg=[min(pFitTime),(max(pFitTime)-min(pFitTime))/2,max(pFitTime)]-min(pFitTime);
-
-                
-                phbrfit(segIdx,ch,:)=polyval(reshape(phbr(segIdx,ch,:),[polyDegree+1,1,1]),tseg);
-                phbofit(segIdx,ch,:)=polyval(reshape(phbo(segIdx,ch,:),[polyDegree+1,1,1]),tseg);
-                poxyfit(segIdx,ch,:)=polyval(reshape(poxy(segIdx,ch,:),[polyDegree+1,1,1]),tseg);
-                ptotalfit(segIdx,ch,:)=polyval(reshape(ptotal(segIdx,ch,:),[polyDegree+1,1,1]),tseg);
-                pcbsifit(segIdx,ch,:)=polyval(reshape(pcbsi(segIdx,ch,:),[polyDegree+1,1,1]),tseg);
-                
+                validIdx=~isnan(fB(:,ch));
+                for segIdx=1:numSegs
+                    tSeg=validIdx&fTimeInd==segIdx;
+                    tSegTimeRem=fTime(tSeg)-times_start(segIdx);
+                    
+                    pFit.(bioFitVal)(segIdx,ch,1:polyDegree+1)=mpolyfit(tSegTimeRem,fB(tSeg,ch),polyDegree);
+                    pFit.(curB)(segIdx,ch)=polyval(reshape(pFit.(bioFitVal)(segIdx,ch,:),[polyDegree+1,1,1]),times_end(segIdx)-segLength/2);
+                end
+            end
+    
+            if(blLength>0)
+                pFit.(curB)=pFit.(curB)-repmat(blfNIR.(curB),[numSegs,1]);
+            elseif(isnan(blLength))
+                pFit.(curB)=nan(size([numCh,numSegs]));
+            else
+                %pFit.(curB)=pFit.(curB);
             end
         end
     end
 end
 
-outFNIR.HbR=HbR(1:end-1,:);
-outFNIR.HbO=HbO(1:end-1,:);
-outFNIR.HbDiff=HbDiff(1:end-1,:);
-outFNIR.HbTotal=HbTotal(1:end-1,:);
-outFNIR.CBSI=CBSI(1:end-1,:);
-if(exist('raw','var'))
-    outFNIR.raw=raw(1:end,:);
-end
+if(averageAux&&~isempty(fNIR.Aux))
+    auxFields=fields(fNIR.Aux);
 
-if(calcROI&&exist('HbR_roi'))
-    outFNIR.ROI=fNIR.ROI;
+    % Attempts to resample any field (and align with fNIRS)
+        % criteria:
+        %   1) field is same length as fNIR (and greater than 1)
+        %       uses fNIR time as reference
+        %   2) Aux contains own time field
+        %       uses Aux time as reference
+        %   3) Aux contains column which is time
+        %   4) Aux contains table column t or 'time' which contains time
 
-    
+    auxFieldsSize=nan(size(auxFields,1),2);
+    auxFieldHasTime=false(size(auxFields));
+    auxFieldIsTable=false(size(auxFields));
+    auxFieldIsArray=false(size(auxFields));
+    auxFieldIsStruct=false(size(auxFields));
 
-    
-    outFNIR.ROI.HbR=HbR_roi(1:end,:);
-    outFNIR.ROI.HbO=HbO_roi(1:end,:);
-    outFNIR.ROI.HbDiff=HbDiff_roi(1:end,:);
-    outFNIR.ROI.HbTotal=HbTotal_roi(1:end,:);
-    outFNIR.ROI.CBSI=CBSI_roi(1:end,:);
-    
-    hbo_field_length=size(outFNIR.HbO,1);
-    roi_field_length=size(outFNIR.ROI.HbR,1);
-    field_diff=hbo_field_length-roi_field_length; %Fix for it being different?
-    
-    if(~field_diff==0)
-        warning('Mismatch in ROI times');
+    validTimeFields={'time','t','Time'};
+
+    for f=1:length(auxFields)
+        curFieldName=auxFields{f};
+        curField=fNIR.Aux.(curFieldName);
+
+        t_aux=[];
+        t_ind=[];
+
+        auxFieldIsTable(f)=istable(curField);
+        auxFieldIsStruct(f)=isstruct(curField);
+        auxFieldIsArray(f)=isnumeric(curField)||islogical(curField);
+
+        if(auxFieldIsTable(f)||auxFieldIsArray(f))
+            auxFieldsSize(f,[1:2])=size(curField);
+        end
+
+        if(auxFieldIsTable(f)&&~isempty(intersect(validTimeFields,curField.Properties.VariableNames)))
+            timeTableVar=intersect(validTimeFields,curField.Properties.VariableNames);
+            t_aux=curField.(timeTableVar{1}){:};
+            t_ind=[];
+            auxFieldHasTime(f)=true;
+            auxVarNames=curField.Properties.VariableNames;
+            auxVarNames(ismember(auxVarNames,validTimeFields))=[];
+
+        elseif(auxFieldIsStruct(f))&&any(isfield(curField,validTimeFields))
+            timeStructVar=validTimeFields(isfield(curField,validTimeFields));
+            t_aux=curField.(timeStructVar{1});
+            t_ind=[];
+            auxFieldHasTime(f)=true;
+            auxVarNames=fields(curField);
+            auxVarNames(ismember(auxVarNames,validTimeFields))=[];
+
+        elseif(auxFieldIsArray(f)&&all(diff(curField(:,1))>0)&&length(curField(:,1))>1)
+            possibleTimeField=all(diff(curField(:,1))>0); %time must increase only
+            t_aux=curField(:,1);
+            t_ind=[];
+            auxFieldHasTime(f)=true;
+            nAuxChan=size(curField,2)-1;
+        else
+            auxFieldHasTime(f)=false;
+        end
+
+        if(~auxFieldHasTime(f)&&auxFieldsSize(f,1)==nTime) % Match for fNIR time
+            warning('Non-explicit match for Aux resampling, please use Aux.time variable or ''time'' table column ');
+            t_aux=fNIR.time;
+            t_ind=fTimeInd; % Just use fNIR time
+            nAuxChan=auxFieldsSize(f,2);
+        end
+
+        if(isempty(t_aux))
+            fprintf('Unable to average signal .Aux.%s, no matched time found\n',curFieldName);
+            continue;
+        end
+
+        if(isempty(t_ind)) % if not using fNIR time, we have to figure out where time is logically
+            %calculate index for each sample
+
+            [t_ind,t_aux_resample]=getTimeIdx(t_aux,segLength,minfTime);
+            
+        end
+
+        n_aux_time=length(t_ind);
+        numSegs_aux=max(t_ind);
+
+        if(auxFieldIsArray(f))
+
+            auxDat=curField(:);
+            auxDat_resample=resample_internal(auxDat,t_ind,nAuxChan,numSegs_aux,nanRejectionLevel);
+
+            if(auxFieldHasTime(f))
+                auxDat_resample(:,1)=t_aux_resample;
+            end
+
+            outFNIR.Aux.(curFieldName)=auxDat_resample;
+            
+        elseif(auxFieldIsTable(f))
+            outFNIR.Aux.(curFieldName)=table(t_aux_resample,'VariableNames',{'time'});
+            for var=1:length(auxVarNames)
+                curVarName=auxVarNames{var};
+                curVar=curField.(curVarName){:};
+
+                if(isnumeric(curVar)&&any(size(curVar)==length(n_aux_time)))
+
+                    if(size(curVar,1)~=n_aux_time) % already know at least one dimension matches
+                        curVar=curVar';
+                    end
+
+                    nAuxChan=size(curVar,2);
+
+                    auxDat=curVar(:);
+                    auxDat_resample=resample_internal(auxDat,t_ind,nAuxChan,numSegs_aux,nanRejectionLevel);
+
+        
+                    outFNIR.Aux.(curFieldName).(curVarName)=auxDat_resample;
+                end
+            end
+        elseif(auxFieldIsStruct(f))
+            outFNIR.Aux.(curFieldName).time=t_aux_resample;
+            for var=1:length(auxVarNames)
+                curVarName=auxVarNames{var};
+                curVar=curField.(curVarName);
+                curVar=curVar(:);
+
+                if(isnumeric(curVar)&&any(size(curVar)==length(n_aux_time)))
+                    nAuxChan=size(curVar,2);
+
+                    auxDat=curVar(:);
+                    auxDat_resample=resample_internal(auxDat,t_ind,nAuxChan,numSegs_aux,nanRejectionLevel);
+        
+                    outFNIR.Aux.(curFieldName).(curVarName)=auxDat_resample;
+                end
+            end
+        end
+
     end
 end
+
 
 validFields=pf2_base.pf2_getFNIRSfields();
 fdataFields=fields(fNIR);  % Copy known fields
@@ -508,16 +539,16 @@ for fieldIdx=1:length(fdataFields)
    end
 end
 
-times=times(1:size(outFNIR.HbR,1),:);
-outFNIR.segmentTimes=[times,times+segLength/2,times+segLength];
+outFNIR.segmentTimes=[times_start',times_end'];
 
 if(~isempty(outFNIR.segmentTimes))
     if(strcmp(timeOutMode,'start'))
-        outFNIR.time=outFNIR.segmentTimes(1:end,1); %returns effective "sample point" at midpoint of segmentTimes
+        outFNIR.time=outFNIR.segmentTimes(:,1); %returns effective "sample point" as startpoint of segmentTimes
     elseif(strcmp(timeOutMode,'end'))
-        outFNIR.time=outFNIR.segmentTimes(1:end,3); %returns effective "sample point" at midpoint of segmentTimes
+        outFNIR.time=outFNIR.segmentTimes(:,2); %returns effective "sample point" as endpoint of segmentTimes
     else %Return midpoint
-        outFNIR.time=outFNIR.segmentTimes(1:end,2); %returns effective "sample point" at midpoint of segmentTimes
+        outFNIR.time=time; %mean(outFNIR.segmentTimes,2); %returns effective "sample point" as midpoint of segmentTimes
+        % should match times variable
     end
 else
    outFNIR.time=[]; 
@@ -549,6 +580,69 @@ if(getPolyAvg) % returns a time X channel X coefficient array
 else
     pFit=[];
 end
+
+end
+
+function [fTimeInd,timeSeries]=getTimeIdx(times_in,segLength,centerTime)
+    % Returns the time indicies for a time series times_in
+    % sampled by segmentLength and "centered" with a point at centerTime
+        % ie: the time series includes the point centerTime, (or would if
+        % samples around that time were collected
+
+    t1=times_in(1);
+    te=times_in(end);
+
+    tRange_in=te-t1;
+
+    if(nargin<3) % just use min time
+        minSegTime=t1;
+        maxSegTime=te-rem(tRange_in,segLength);
+    else 
+        %minSegTime=t1-rem(t1,segLength); % if centerTime=0
+
+        % if 
+
+        minSegTime=centerTime+floor((t1-centerTime)/segLength)*segLength;
+        maxSegTime=centerTime+floor((te-centerTime)/segLength)*segLength;
+    end
+
+    fTimeInd=[floor((times_in(:)-minSegTime)/segLength)+1];
+
+    timeSeries=[minSegTime:segLength:minSegTime+(fTimeInd(end)-1)*segLength]';
+
+    
+end
+
+function [rsData] = resample_internal(rsData_in,fTimeInd,numCh,numSegs,nanRejectionLevel)
+    % resamples data according to the values in fTimeInd(sample indicies)
+    % numCh defines the original number of channels
+    
+    % nanRejectionLevel defines how many nans are allowed before rejecting
+    % the segment
+
+        % This throws some issues with ~95 million samples, maybe a rounding
+        % issue with accumarray?
+    
+    nTime=length(fTimeInd);
+    fTimeInd_numCh=repmat(fTimeInd,[numCh,1]);
+    fTimeInd_numCh=fTimeInd_numCh+numSegs*repelem([0:numCh-1]',nTime,1);
+
+    fB_isNA=accumarray(fTimeInd_numCh,isnan(rsData_in(:)));
+    fB_count=accumarray(fTimeInd_numCh,ones(size(fTimeInd_numCh)));
+
+    % Check edge case where last sample does not include last index, pad
+    % with 0s
+    diffCheck=(numCh*numSegs)-length(fB_isNA);
+    if(diffCheck>0)
+        fB_isNA=[fB_isNA;zeros([diffCheck,1])];
+        fB_count=[fB_count;zeros([diffCheck,1])];
+    end
+
+    fB_nanCheck= reshape(fB_isNA./fB_count,[numCh,numSegs])<=nanRejectionLevel;
+
+    rsData=reshape(accumarray(fTimeInd_numCh,rsData_in(:),[numCh*numSegs',1],@(x)nanmean(x)),[numSegs,numCh]);
+
+    rsData(~fB_nanCheck)=NaN;
 
 end
 

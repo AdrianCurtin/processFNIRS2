@@ -1,3 +1,6 @@
 *.asv
 sampledata/sampleNIR_CH.mat
 *.mexw64
+*.DS_Store
+.DS_Store
+
