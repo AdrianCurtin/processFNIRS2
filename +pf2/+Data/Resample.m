@@ -122,8 +122,8 @@ end
 
 fNIR.time=round(fNIR.time,5);
 
-minfTime=min(fNIR.time);
-maxfTime=max(fNIR.time);
+%minfTime=min(fNIR.time);
+%maxfTime=max(fNIR.time);
 
 fTime=fNIR.time;
 
@@ -176,8 +176,8 @@ end
 
 [fTimeInd,times]=getTimeIdx(fTime,segLength,centerOnTime);
 
-minSegTime=times(1);
-maxSegTime=times(end);
+%minSegTime=times(1);
+%maxSegTime=times(end);
 
 numSegs=length(times);
 
