@@ -2392,7 +2392,9 @@ for i=1:size(sH,1)
                 end
 
                 if(ExFNIRS.settings.plot_task_lines)
-                    pf2_base.external.vline(sH{i,b}.subH{y,x},[ExFNIRS.settings.baseline_start,ExFNIRS.settings.baseline_end],{'--k','HandleVisibility','off'});
+                    if(ExFNIRS.settings.use_baseline)
+                        pf2_base.external.vline(sH{i,b}.subH{y,x},[ExFNIRS.settings.baseline_start,ExFNIRS.settings.baseline_end],{'--k','HandleVisibility','off'});
+                    end
                     pf2_base.external.vline(sH{i,b}.subH{y,x},[ExFNIRS.settings.block_start,ExFNIRS.settings.block_end],{'--r','HandleVisibility','off'});
                 end
                 

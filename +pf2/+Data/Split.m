@@ -324,6 +324,7 @@ else
                        outfNIR.ROI.HbR=outfNIR.ROI.HbR-nanmean(fNIR.ROI.HbR(blIndexStart:blIndexEnd,:),1);
                        outfNIR.ROI.CBSI=outfNIR.ROI.CBSI-nanmean(fNIR.ROI.CBSI(blIndexStart:blIndexEnd,:),1);
                        outfNIR.ROI.HbDiff=outfNIR.ROI.HbDiff-nanmean(fNIR.ROI.HbDiff(blIndexStart:blIndexEnd,:),1);
+                       outfNIR.ROI.HbTotal=outfNIR.ROI.HbTotal-nanmean(fNIR.ROI.HbTotal(blIndexStart:blIndexEnd,:),1);
                     end
                     %end
             end

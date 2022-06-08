@@ -232,11 +232,12 @@ if(blLength>0) % if baseline is present
 
         if(calcROI)
 
-            if(pf2_base.isnestedfield(blfNIR,'ROI.curB'))
+            if(pf2_base.isnestedfield(blfNIR,strcat('ROI.',+curB)))
                 fB=blfNIR.ROI.(curB);
             else
                 warning('ROI mismatch: ROI is not defined in baseline file');
                 calcROI=false;
+                continue;
             end
 
             if(size(fB,2)~=numROI)
@@ -254,7 +255,7 @@ if(blLength>0) % if baseline is present
             validCh_roi=find(blNanCheck_roi==1);
             
             blfNIR.ROI.(curB)=mean(fB,1,'omitnan');
-            blfNIR.ROI.(curB)(~blNanCheck)=nan;
+            blfNIR.ROI.(curB)(~blNanCheck_roi)=nan;
     
             if(isempty(blfNIR.ROI.(curB)))
                 blfNIR.ROI.(curB)=nan;
