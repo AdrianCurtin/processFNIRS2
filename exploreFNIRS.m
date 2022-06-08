@@ -1037,6 +1037,9 @@ else
     flagForUpdate(2,handles);
 end
 
+exploreFNIRS.plotExTimeline();
+
+
 
 % --- Executes during object creation, after setting all properties.
 function edit_baseline_start_CreateFcn(hObject, eventdata, handles)
@@ -1069,6 +1072,9 @@ else
     flagForUpdate(2,handles);
 end
 
+exploreFNIRS.plotExTimeline();
+
+
 % --- Executes during object creation, after setting all properties.
 function edit_baseline_end_CreateFcn(hObject, eventdata, handles)
 % hObject    handle to edit_baseline_end (see GCBO)
@@ -1094,6 +1100,14 @@ global ExFNIRS
 ExFNIRS.settings.block_start=str2num(get(handles.edit_block_start,'String'));
 set(handles.edit_block_start,'String',sprintf('%.2f',ExFNIRS.settings.block_start));
 
+exploreFNIRS.plotExTimeline();
+
+
+if(ExFNIRS.settings.updateOnChange)
+    updateSelectedTable(handles);
+else
+    flagForUpdate(2,handles);
+end
 
 
 % --- Executes during object creation, after setting all properties.
@@ -1122,6 +1136,8 @@ global ExFNIRS
 ExFNIRS.settings.block_end=str2num(get(handles.edit_block_end,'String'));
 set(handles.edit_block_end,'String',sprintf('%.2f',ExFNIRS.settings.block_end));
 
+exploreFNIRS.plotExTimeline();
+
 % --- Executes during object creation, after setting all properties.
 function edit_block_end_CreateFcn(hObject, eventdata, handles)
 % hObject    handle to edit_block_end (see GCBO)
@@ -1147,6 +1163,7 @@ function edit_plot_start_Callback(hObject, eventdata, handles)
 global ExFNIRS
 ExFNIRS.settings.plot_start=str2num(get(handles.edit_plot_start,'String'));
 set(handles.edit_plot_start,'String',sprintf('%.2f',ExFNIRS.settings.plot_start));
+exploreFNIRS.plotExTimeline();
 
 
 % --- Executes during object creation, after setting all properties.
@@ -1174,6 +1191,7 @@ function edit_plot_end_Callback(hObject, eventdata, handles)
 global ExFNIRS
 ExFNIRS.settings.plot_end=str2num(get(handles.edit_plot_end,'String'));
 set(handles.edit_plot_end,'String',sprintf('%.2f',ExFNIRS.settings.plot_end));
+exploreFNIRS.plotExTimeline();
 
 % --- Executes during object creation, after setting all properties.
 function edit_plot_end_CreateFcn(hObject, eventdata, handles)
