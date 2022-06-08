@@ -107,15 +107,6 @@ yticks(ytickVals);
 ytLabels={'Plot View','Baseline Period','Task Block Period','Temporal Resample','Barchart Resample'};
 yticklabels(ytLabels(srtIdx));
 
-vers='0.3a';
-versInfo=sprintf('Explore fNIRS v%s\n',vers);
-
-if(nargout==0)
-   fprintf(versInfo);
-else
-    versInfoString=versInfo;
-end
-
 end
 
 function plotPeriodicSample(startTime,endTime,centerTime,sigHeight,sigAmp,rsLen,weight,style)
