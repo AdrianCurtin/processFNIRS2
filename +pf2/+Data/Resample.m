@@ -145,7 +145,7 @@ end
 
 if(~isfield(fNIR,'HbR')&&isfield(fNIR,'raw'))
     % out of principle we don't resample the raw data
-    error('Raw data averaging not supported');
+    warning('Raw data averaging not supported');
 elseif(~isfield(fNIR,'HbR')&&~isfield(fNIR,'raw'))
     warning('No fNIRS data');
     outFNIR=fNIR;
@@ -155,10 +155,10 @@ else
     numCh=size(fNIR.HbR,2); 
 end
 
-if(isfield(fNIR,'raw')&&isempty(fNIR.raw))
-    fNIR.raw=nan(size(fNIR.HbR));
+%if(isfield(fNIR,'raw')&&isempty(fNIR.raw))
+    %fNIR.raw=nan(size(fNIR.HbR));
     %prevent resampling of raw
-end
+%end
 
 if(centerOnT0) % foces time blocks to start from t=0
     [fTimeInd,times]=getTimeIdx(fTime,segLength,0);
@@ -265,8 +265,6 @@ else
 end
 
 
-fraw=fNIR.raw;
-
 if(strcmp(timeOutMode,'start')) %default
     timeOutModeMid=false;
     timeOutModeEnd=false;
@@ -289,8 +287,8 @@ else
     times_end=times+segLength-1e-10;
 end
 
-minSegTime=times_start(1);
-maxSegTime=times_start(end);
+%minSegTime=times_start(1);
+%maxSegTime=times_start(end);
 
 %calculate index for each sample
 %fTimeInd=floor((fTime-minfTime-rem(fTime-minfTime,segLength))/segLength)+1;
@@ -307,21 +305,26 @@ end
 
 ptime=zeros(numSegs,1); %polynomial time
 
-bioMlist={'HbO','HbR','HbDiff','HbTotal','CBSI'};
+bioMlist={'raw','HbO','HbR','HbDiff','HbTotal','CBSI'};
 
 for b = 1:length(bioMlist)
     curB=bioMlist{b};
+
+    isRaw=strcmpi(curB,'raw');
     fB=fNIR.(curB);
+
+    numCh=size(fB,2);
 
     fB_resample=resample_internal(fB,fTimeInd,numCh,numSegs,nanRejectionLevel);
 
-    if(blLength>0)
+    if(~isempty(blLength)&&blLength>0&&~isRaw)
         outFNIR.(curB)=fB_resample-repmat(blfNIR.(curB),[numSegs,1]);
-    elseif(isnan(blLength))
+    elseif(~isempty(blLength)&&isnan(blLength)&&~isRaw)
         outFNIR.(curB)=nan(size([numCh,numSegs]));
     else
         outFNIR.(curB)=fB_resample;
     end
+
 
     if(getPolyAvg)
         pFit.(curB)=nan(size([numCh,numSegs,polyDegree+1]));
@@ -341,23 +344,23 @@ for b = 1:length(bioMlist)
             end
         end
 
-        if(blLength>0)
+        if(~isempty(blLength)&&blLength>0&&~isRaw)
             pFit.(curB)=pFit.(curB)-repmat(blfNIR.(curB),[numSegs,1]);
-        elseif(isnan(blLength))
+        elseif(~isempty(blLength)&&isnan(blLength)&&~isRaw)
             pFit.(curB)=nan(size([numCh,numSegs]));
         else
             %pFit.(curB)=pFit.(curB);
         end
     end
 
-    if(calcROI)
+    if(calcROI&&~isRaw)
         fB=fNIR.ROI.(curB);
 
         fB_resample=resample_internal(fB,fTimeInd,numROI,numSegs,nanRejectionLevel);
 
-        if(blLength>0)
+        if(~isempty(blLength)&&blLength>0)
             outFNIR.ROI.(curB)=fB_resample-repmat(blfNIR.ROI.(curB),[numSegs,1]);
-        elseif(isnan(blLength))
+        elseif(~isempty(blLength)&&isnan(blLength))
             outFNIR.ROI.(curB)=nan(size([numROI,numSegs]));
         else
             outFNIR.ROI.(curB)=fB_resample;
@@ -381,9 +384,9 @@ for b = 1:length(bioMlist)
                 end
             end
     
-            if(blLength>0)
+            if(~isempty(blLength)&&blLength>0)
                 pFit.(curB)=pFit.(curB)-repmat(blfNIR.(curB),[numSegs,1]);
-            elseif(isnan(blLength))
+            elseif(~isempty(blLength)&&isnan(blLength))
                 pFit.(curB)=nan(size([numCh,numSegs]));
             else
                 %pFit.(curB)=pFit.(curB);
@@ -626,6 +629,7 @@ function [rsData] = resample_internal(rsData_in,fTimeInd,numCh,numSegs,nanReject
     nTime=length(fTimeInd);
     fTimeInd_numCh=repmat(fTimeInd,[numCh,1]);
     fTimeInd_numCh=fTimeInd_numCh+numSegs*repelem([0:numCh-1]',nTime,1);
+
 
     fB_isNA=accumarray(fTimeInd_numCh,isnan(rsData_in(:)));
     fB_count=accumarray(fTimeInd_numCh,ones(size(fTimeInd_numCh)));
