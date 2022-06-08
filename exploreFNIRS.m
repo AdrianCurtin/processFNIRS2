@@ -2451,12 +2451,23 @@ if(~isempty(labelstring))
 end
 h=title(figHandle,labelstring);
 
-function h=suptitle_with_space(labelstring)
+function h=suptitle_with_space(axHandle,labelstring)
 
-if(~isempty(labelstring))
-    labelstring(labelstring=='_')=' ';
+if(nargin<2)
+    labelstring=axHandle;
+
+    if(~isempty(labelstring))
+        labelstring(labelstring=='_')=' ';
+    end
+    h=pf2_base.external.suptitle(labelstring);
+else
+    if(~isempty(labelstring))
+        labelstring(labelstring=='_')=' ';
+    end
+    h=pf2_base.external.suptitle(axHandle,labelstring);
 end
-h=pf2_base.external.suptitle(labelstring);
+
+
 
 
     
