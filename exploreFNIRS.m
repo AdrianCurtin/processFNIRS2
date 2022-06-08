@@ -20,7 +20,7 @@ function varargout = exploreFNIRS(varargin) % exploreFNIRS(data,timeShiftTo0,blS
 %	Implement units in plots (currently just assumes uM)
 %	Implement efficiency plots
 %	Implement post-hoc for LME
-%	Implement GLM approach for tepmoral data
+%	Implement GLM approach for temporal data
 %	Implement region of interest grouping for channels
 %	Implement more flexible LME model options
 %	Better/3D parametric plots

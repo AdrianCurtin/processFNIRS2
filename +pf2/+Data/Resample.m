@@ -170,11 +170,11 @@ end
     %prevent resampling of raw
 %end
 
-if(~isnan(centerOnTime)) % foces time blocks to start from t=0
-    [fTimeInd,times]=getTimeIdx(fTime,segLength,centerOnTime);
-else % start at min time
-    [fTimeInd,times]=getTimeIdx(fTime,segLength);
+if(isnan(centerOnTime))  % foces time blocks to start from t=0 or if undefined, just start from where they started from
+    centerOnTime=min(fTime);
 end
+
+[fTimeInd,times]=getTimeIdx(fTime,segLength,centerOnTime);
 
 minSegTime=times(1);
 maxSegTime=times(end);
@@ -487,8 +487,9 @@ if(averageAux&&~isempty(fNIR.Aux))
 
         if(isempty(t_ind)) % if not using fNIR time, we have to figure out where time is logically
             %calculate index for each sample
+            
 
-            [t_ind,t_aux_resample]=getTimeIdx(t_aux,segLength,minfTime);
+            [t_ind,t_aux_resample]=getTimeIdx(t_aux,segLength,centerOnTime);
             
         end
 
