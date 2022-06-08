@@ -89,8 +89,8 @@ plotPeriodicSample(plotStart,plotEnd,0,temporalHeight,sigAmp,grandavg_resample_s
 
 
 % Plot barchart/block signal
-plotPeriodicSample(minStart,maxEnd,0,barchartHeight,sigAmp,blk_resample_size,sigWeight/4,{'lineStyle','--','Color',[40,40,40]/255});
-plotPeriodicSample(plotStart,plotEnd,0,barchartHeight,sigAmp,blk_resample_size,sigWeight,{'Color',[150,30,178]/255});
+plotPeriodicSample(minStart,maxEnd,blockStart,barchartHeight,sigAmp,blk_resample_size,sigWeight/4,{'lineStyle','--','Color',[40,40,40]/255});
+plotPeriodicSample(plotStart,plotEnd,blockStart,barchartHeight,sigAmp,blk_resample_size,sigWeight,{'Color',[150,30,178]/255});
 
 
 
@@ -136,15 +136,18 @@ function plotPeriodicSample(startTime,endTime,centerTime,sigHeight,sigAmp,rsLen,
     end
 
     %startTime=startTime-rem(startTime,rsLen);
-    startTime=centerTime+floor((startTime-centerTime)/rsLen)*rsLen;
+    startTimePlt=centerTime+floor((startTime-centerTime)/rsLen)*rsLen;
+    if(startTimePlt<startTime)
+        startTimePlt=startTimePlt+rsLen;
+    end
 
-    sigLen=ceil((endTime-startTime)/rsLen);
+    sigLen=ceil((endTime-startTimePlt)/rsLen)+(rem(endTime-startTimePlt,rsLen)==0);
     idx=1:sigLen;
     yPoints= sigHeight-sigAmp/2+ones(1,sigLen)*sigAmp.*(rem(idx,2)==0);
     yPoints=repelem(yPoints,2);
     yPoints(1)=[];
     yPoints(end+1)=yPoints(1);
-    xPoints=startTime+(idx-1)*rsLen;
+    xPoints=startTimePlt+(idx-1)*rsLen;
     xPoints=repelem(xPoints,2);
 
     plot(xPoints,yPoints,style{:},'lineWidth',weight);

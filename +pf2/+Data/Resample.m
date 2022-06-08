@@ -73,6 +73,7 @@ addParameter(p,'timeOutMode','start',validTimeOutMode);
 addParameter(p,'nanRejectionLevel',0.7,validScalarPosNum);
 addParameter(p,'averageAux',false,@islogical);
 addParameter(p,'polyDegree',1,validScalarPosNum);
+addParameter(p,'centerOnTime',NaN,@isnumeric);
 
 parse(p,varargin{:});
 
@@ -82,6 +83,15 @@ blLength=p.Results.blLength; % how long is the baseline
 blfNIR=p.Results.blfNIR; % a baseline fNIR struct
 %getPolyAvg=p.Results.getPolyAvg;
 centerOnT0=p.Results.centerOnT0; % should the resample include t=0 as the start point
+centerOnTime=p.Results.centerOnTime;
+
+if(centerOnT0)
+    centerOnTime=0;
+end
+if(isempty(centerOnTime))
+    centerOnTime=nan;
+end
+
 timeOutMode=p.Results.timeOutMode; % should time include or center on a point (ex: t=1 := t[0.051...1.4999]
 nanRejectionLevel=p.Results.nanRejectionLevel; % number of NaNs in segment to entirely reject it
 averageAux=p.Results.averageAux; % Also average/ resample the Aux channels
@@ -160,8 +170,8 @@ end
     %prevent resampling of raw
 %end
 
-if(centerOnT0) % foces time blocks to start from t=0
-    [fTimeInd,times]=getTimeIdx(fTime,segLength,0);
+if(~isnan(centerOnTime)) % foces time blocks to start from t=0
+    [fTimeInd,times]=getTimeIdx(fTime,segLength,centerOnTime);
 else % start at min time
     [fTimeInd,times]=getTimeIdx(fTime,segLength);
 end
