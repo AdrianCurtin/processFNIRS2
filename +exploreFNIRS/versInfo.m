@@ -1,7 +1,7 @@
 function versInfoString=versInfo()
 
-vers='0.2a';
-versInfo=sprintf('Explore fNIRS v%s',vers);
+vers='0.3a';
+versInfo=sprintf('Explore fNIRS v%s\n',vers);
 
 if(nargout==0)
    fprintf(versInfo);
