@@ -1225,6 +1225,8 @@ else
     flagForUpdate(2,handles);
 end
 
+exploreFNIRS.plotExTimeline();
+
 
 
 % --- Executes during object creation, after setting all properties.
@@ -3589,6 +3591,9 @@ if(ExFNIRS.settings.updateOnChange)
 else
    flagForUpdate(2,handles); 
 end
+
+exploreFNIRS.plotExTimeline();
+
 
 % --- Executes during object creation, after setting all properties.
 function edit_grandavg_resample_size_CreateFcn(hObject, eventdata, handles)

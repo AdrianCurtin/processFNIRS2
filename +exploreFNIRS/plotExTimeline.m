@@ -72,20 +72,20 @@ end
 
 ylim([0,1]);
 
-pf2_base.external.vline([ExFNIRS.settings.block_start,ExFNIRS.settings.block_end],{'--r','HandleVisibility','off'});
+pf2_base.external.vline([ExFNIRS.settings.block_start,ExFNIRS.settings.block_end],{'--k','HandleVisibility','off'});
 
 
 pf2_base.external.vline([ExFNIRS.settings.plot_start,ExFNIRS.settings.plot_end],{'--b','HandleVisibility','off'});
 
 if(blEnabled)
-    pf2_base.external.vline([ExFNIRS.settings.baseline_start,ExFNIRS.settings.baseline_end],{'--k','HandleVisibility','off'});
+    pf2_base.external.vline([ExFNIRS.settings.baseline_start,ExFNIRS.settings.baseline_end],{'--r','HandleVisibility','off'});
     
 end 
 
 % Plot temporal signal
-plotPeriodicSample(minStart,maxEnd,0,temporalHeight,sigAmp,grandavg_resample_size,sigWeight/4,{'Color',[40,40,40]/255});
+plotPeriodicSample(minStart,maxEnd,blockStart,temporalHeight,sigAmp,grandavg_resample_size,sigWeight/4,{'Color',[40,40,40]/255});
 
-plotPeriodicSample(plotStart,plotEnd,0,temporalHeight,sigAmp,grandavg_resample_size,sigWeight/2,{'Color',[50,200,78]/255});
+plotPeriodicSample(plotStart,plotEnd,blockStart,temporalHeight,sigAmp,grandavg_resample_size,sigWeight/2,{'Color',[50,200,78]/255});
 
 
 % Plot barchart/block signal
