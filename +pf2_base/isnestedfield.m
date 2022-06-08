@@ -11,39 +11,30 @@ if(nargin<=1)
 else
 
     fieldParts=strsplit(nestedFieldString,'.');
-    curPartName=fieldParts{1};
-    
-    %if(isstruct(var))
-        isvalidfield=any(isfield(var,curPartName))||any(isprop(var,curPartName));
+    for i=1:length(fieldParts)
         
+        curPartName=fieldParts{i};
+        if(isnumeric(var)||isstring(var)||islogical(var))%gone too deep or too shallow
+            isvalidfield=false;
+        elseif(istable(var))
+            isvalidfield=ismember(curPartName,var.Properties.VariableNames);
+        else
+            isvalidfield=isfield(var,curPartName)|(~istable(var)&isprop(var,curPartName));
+        end
+        
+        
+
         if(isempty(isvalidfield)||~isvalidfield)
             isvalidfield=false;
             return;
-        else
-            for i=2:length(fieldParts)
-                var=var.(curPartName);
-                curPartName=fieldParts{i};
-                
-                if(istable(var))
-                    isvalidfield=ismember(curPartName,var.Properties.VariableNames);
-                    
-                else
-                    isvalidfield=isfield(var,curPartName)|(~istable(var)&isprop(var,curPartName));
-                end
-                
-                
-
-                if(isempty(isvalidfield)||~isvalidfield)
-                    isvalidfield=false;
-                    return;
-                end
-            end
         end
+
+        var=var.(curPartName);
+    end
+end
         
         
   
 
 end
 
-
-end

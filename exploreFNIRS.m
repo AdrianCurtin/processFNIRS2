@@ -1882,11 +1882,28 @@ for chIdx=1:numOpt
                           
                        case 'Aux'
                            data2plot=curFNIRS{i}.Aux;
-                           if(isfield(data2plot,bioM)&&size(data2plot.(bioM),2)>1) %if has its own time use that
+                           if(pf2_base.isnestedfield(data2plot.(bioM),'time')) %otherwise use aux time
+                               if(istable(data2plot.(bioM)))
+                                    dataTime=data2plot.(bioM).time;
+                                    
+                                    varNames=data2plot.(bioM).Properties.VariableNames;
+                                    timeIdx=ismember(varNames,'time');
+                                    data2plot.(bioM)=data2plot.(bioM)(:,~timeIdx);
+                                    data2plot.(bioM)=data2plot.(bioM){:,ch}; 
+                                
+                               else
+                                     dataTime=data2plot.(bioM).time;
+                                     varNames=fields(data2plot.(bioM));
+                                     timeIdx=ismember(varNames,'time');
+                                     firstVar=find(~timeIdx);
+                                     data2plot.(bioM)=data2plot.(bioM).(varNames{firstVar(1)});
+                               end
+                               
+                           elseif(isfield(data2plot,bioM)&&size(data2plot.(bioM),2)>1) %if has its own time use that
                                dataTime=data2plot.(bioM)(:,1);
                                data2plot.(bioM)=data2plot.(bioM)(:,2); 
-                           elseif(isfield(data2plot,'time')) %otherwise use aux time
-                               dataTime=data2plot.time;
+                           elseif(isfield(data2plot,'time'))
+                               dataTime=data2plot.time;  %or fnirs time
                            else
                                dataTime=curFNIRS{i}.time;  %or fnirs time
                            end

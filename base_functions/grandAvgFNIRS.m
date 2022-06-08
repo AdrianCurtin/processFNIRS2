@@ -171,9 +171,12 @@ for i=1:numfSeg % Resample and find max/min and num channels
         possibleFieldSizes=nan(size(possibleFields));
         
         temp=[];
-        for(pf_ind=1:length(possibleFields)) 
-            temp(pf_ind)=~istable(FNIRScellArray{i}.Aux.(possibleFields{pf_ind}))&&~isstruct(FNIRScellArray{i}.Aux.(possibleFields{pf_ind}))&&~iscell(FNIRScellArray{i}.Aux.(possibleFields{pf_ind}))&&~isempty(FNIRScellArray{i}.Aux.(possibleFields{pf_ind}))...
-                &&~strcmp(possibleFields{pf_ind},'time')&&~strcmp(possibleFields{pf_ind},'t'); 
+        for(pf_ind=1:length(possibleFields))
+            temp(pf_ind)=~isempty(FNIRScellArray{i}.Aux.(possibleFields{pf_ind}))...
+                &&~isstruct(FNIRScellArray{i}.Aux.(possibleFields{pf_ind}))...
+                &&~iscell(FNIRScellArray{i}.Aux.(possibleFields{pf_ind}))...
+                &&~strcmp(possibleFields{pf_ind},'time')...
+                &&~strcmp(possibleFields{pf_ind},'t'); 
             possibleFieldSizes(pf_ind)=size(FNIRScellArray{i}.Aux.(possibleFields{pf_ind}),2);
         end
         auxFields=[auxFields;possibleFields(temp==1)];
@@ -270,9 +273,10 @@ end
 
 
 if(averageAux)
+    auxFieldSizes(auxFieldSizes>1)=auxFieldSizes-1; % remove anticipated time column from var count (for all but single column data)
     for aux=1:length(auxFields)
             curAuxField=auxFields{aux};
-            outGA.Aux.(curAuxField).data=nan(length(outGA.time),auxFieldSizes(aux)-1,numfSeg);
+            outGA.Aux.(curAuxField).data=nan(length(outGA.time),auxFieldSizes(aux),numfSeg);
     end
 end
 
@@ -306,10 +310,31 @@ for i=1:numfSeg
                 curAuxField=char(auxFields(aux));
                 if(ismember(curAuxField,curSegAuxFields))
                         try
-                            auxTimes=round(curFNIR.Aux.(curAuxField)(:,1),4);
+                            if(pf2_base.isnestedfield(curFNIR.Aux.(curAuxField),'time'))
+                                auxTimes=round(curFNIR.Aux.(curAuxField).time,4);
+                                nonTimeColsIdx=~ismember(curFNIR.Aux.(curAuxField).Properties.VariableNames,'time');
+                            elseif(size(curFNIR.Aux.(curAuxField),2)>1)
+                                % Array, time is first position
+                                auxTimes=round(curFNIR.Aux.(curAuxField)(:,1),4);
+                                nonTimeColsIdx=[2:size(curFNIR.Aux.(curAuxField),2)];
+                            elseif(isfield(curFNIR.Aux,'time'))
+                                auxTimes=round(curFNIR.Aux.time,4);
+                                nonTimeColsIdx=1;
+                            elseif(size(curFNIR.Aux.(curAuxField),1)==length(curFNIR.time))
+                                auxTimes=rndTimesIdx;
+                                nonTimeColsIdx=1;
+                            end
+                            
                             [auxValidT,auxValidIdx]=ismember(rndTimesIdx(:,1),auxTimes);
-                            auxValidIdx(auxValidIdx==0)=[];
-                            outGA.Aux.(curAuxField).data(auxValidT==1,:,i)=curFNIR.Aux.(curAuxField)(auxValidIdx,2:end,1);
+                            auxValidIdx(auxValidIdx==0)=[]; 
+                            
+                            if(~isempty(auxValidIdx))
+                                if(~istable(curFNIR.Aux.(curAuxField)))
+                                    outGA.Aux.(curAuxField).data(auxValidT==1,:,i)=curFNIR.Aux.(curAuxField)(auxValidIdx,nonTimeColsIdx);
+                                else
+                                    outGA.Aux.(curAuxField).data(auxValidT==1,:,i)=curFNIR.Aux.(curAuxField){auxValidIdx,nonTimeColsIdx};
+                                end
+                            end
                         catch
                             warning('Mismatch between sampling of aux time and fNIRS time');
                             outGA.Aux.(curAuxField).data(validT==1,:,i)=nan;

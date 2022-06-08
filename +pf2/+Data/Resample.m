@@ -449,7 +449,10 @@ if(averageAux&&~isempty(fNIR.Aux))
 
         if(auxFieldIsTable(f)&&~isempty(intersect(validTimeFields,curField.Properties.VariableNames)))
             timeTableVar=intersect(validTimeFields,curField.Properties.VariableNames);
-            t_aux=curField.(timeTableVar{1}){:};
+            t_aux=curField.(timeTableVar{1});
+            if(iscell(t_aux))
+                t_aux=t_aux{1};
+            end
             t_ind=[];
             auxFieldHasTime(f)=true;
             auxVarNames=curField.Properties.VariableNames;
@@ -511,7 +514,10 @@ if(averageAux&&~isempty(fNIR.Aux))
             outFNIR.Aux.(curFieldName)=table(t_aux_resample,'VariableNames',{'time'});
             for var=1:length(auxVarNames)
                 curVarName=auxVarNames{var};
-                curVar=curField.(curVarName){:};
+                curVar=curField.(curVarName);
+                if(iscell(curVar))
+                    curVar=curVar{:};
+                end
 
                 if(isnumeric(curVar)&&any(size(curVar)==length(n_aux_time)))
 
