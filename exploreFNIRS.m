@@ -1539,12 +1539,12 @@ end
 function preprocessFNIRSData()
 global ExFNIRS
 if(ExFNIRS.UpdateNeeded==2||~isfield(ExFNIRS,'curPreprocessedFNIR'))
-    
-    pf2_base.closeProgressHandles();
+    exploreFNIRS.plotExTimeline();
+    %pf2_base.closeProgressHandles();
 
      numSegs2Process=size(ExFNIRS.curProcessedData,1);
 
-    fprintf('ExploreFNIRS\nResampling and baselining fNIRS %i of %i\n',1,numSegs2Process);
+    fprintf('ExploreFNIRS - Resampling and baselining fNIRS\n');
     %hF=ProgressHandles.h.hF;
 
    
@@ -1571,7 +1571,7 @@ if(ExFNIRS.UpdateNeeded==2||~isfield(ExFNIRS,'curPreprocessedFNIR'))
             end
             
             if(isnan(ExFNIRS.curPreprocessedFNIR.gbyFNIRS_blk{i}.time))
-               warning('Time isNaN for some reason')
+               warning('Time is NaN for some reason')
             end
             ExFNIRS.curPreprocessedFNIR.gbyFNIRS{i}=pf2.Data.Resample(ExFNIRS.curPreprocessedFNIR.gbyFNIRS{i}, ExFNIRS.settings.grandavg_resample_size,'centerOnT0',true,'timeOutMode','start','blfNIR',ExFNIRS.curPreprocessedFNIR.baseline{i},'averageAux',true);
             ExFNIRS.curPreprocessedFNIR.gbyFNIRS{i}.time=ExFNIRS.curPreprocessedFNIR.gbyFNIRS{i}.time+ExFNIRS.settings.block_start; %change time so that 0 is start of block
