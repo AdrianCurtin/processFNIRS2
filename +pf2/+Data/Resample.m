@@ -468,7 +468,7 @@ if(averageAux&&~isempty(fNIR.Aux))
             t_aux=curField(:,1);
             t_ind=[];
             auxFieldHasTime(f)=true;
-            nAuxChan=size(curField,2)-1;
+            nAuxChan=size(curField,2);
         else
             auxFieldHasTime(f)=false;
         end

@@ -135,7 +135,7 @@ function plotPeriodicSample(startTime,endTime,centerTime,sigHeight,sigAmp,rsLen,
     sigLen=ceil((endTime-startTimePlt)/rsLen)+(rem(endTime-startTimePlt,rsLen)==0);
     idx=1:sigLen;
 
-    xPoints=startTimePlt+(idx-1)*rsLen;
+    xPoints=round(startTimePlt+(idx-1)*rsLen,5);
 
     offset0=rem(find(xPoints==centerTime)+1,2);
 

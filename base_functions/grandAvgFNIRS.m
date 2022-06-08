@@ -272,7 +272,7 @@ end
 if(averageAux)
     for aux=1:length(auxFields)
             curAuxField=auxFields{aux};
-            outGA.Aux.(curAuxField).data=nan(length(outGA.time)-1,auxFieldSizes(aux)-1,numfSeg);
+            outGA.Aux.(curAuxField).data=nan(length(outGA.time),auxFieldSizes(aux)-1,numfSeg);
     end
 end
 
@@ -299,11 +299,17 @@ for i=1:numfSeg
         curSegAuxFields=fields(curFNIR.Aux);
         
         if(~isempty(curSegAuxFields))
+
+            rndTimesIdx=round(FNIRScellArray{i}.timeIdx,4);
+
             for aux=1:numAuxFields
                 curAuxField=char(auxFields(aux));
                 if(ismember(curAuxField,curSegAuxFields))
                         try
-                            outGA.Aux.(curAuxField).data(validT==1,:,i)=curFNIR.Aux.(curAuxField)(FNIRScellArray{i}.timeIdx(validT==1,2),2:end,1);
+                            auxTimes=round(curFNIR.Aux.(curAuxField)(:,1),4);
+                            [auxValidT,auxValidIdx]=ismember(rndTimesIdx(:,1),auxTimes);
+                            auxValidIdx(auxValidIdx==0)=[];
+                            outGA.Aux.(curAuxField).data(auxValidT==1,:,i)=curFNIR.Aux.(curAuxField)(auxValidIdx,2:end,1);
                         catch
                             warning('Mismatch between sampling of aux time and fNIRS time');
                             outGA.Aux.(curAuxField).data(validT==1,:,i)=nan;
@@ -379,7 +385,7 @@ end
 if(averageAux)
     for aux=1:numAuxFields
         if(showProgress)
-            waitbar(b/length(bioMs),hF,sprintf('grandAvgFNIRS\nAveraging Auxillary Data %i of %i',b,length(bioMs)));
+            fprintf('grandAvgFNIRS\nAveraging Auxillary Data %i of %i',b,length(bioMs));
         end
             
             curAuxField=char(auxFields(aux));
