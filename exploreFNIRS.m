@@ -7624,6 +7624,7 @@ switch (ExFNIRS.settings.ChannelMode)
         if(isempty(uAux))
             warning('No ROIs present in data');
             set(handles.popupmenu_ChannelMode,'Value',1);
+            setExChannelMode('fNIR',handles,false);
         else
             %uROI=unique(uROI{:},'rows');
 
@@ -7674,7 +7675,7 @@ switch (ExFNIRS.settings.ChannelMode)
         
         auxNames={};
         for i=1:length(ExFNIRS.data)
-            if(pf2_base.isnestedfield(ExFNIRS.data{i},'Aux'))
+            if(pf2_base.isnestedfield(ExFNIRS.data{i},'Aux')&&~isempty(ExFNIRS.data{i}.Aux))
                 curAuxNames=fields(ExFNIRS.data{i}.Aux);
                 if(any(~ismember(curAuxNames,auxNames)))
                     for auxnum=1:size(curAuxNames,1)
@@ -7690,6 +7691,7 @@ switch (ExFNIRS.settings.ChannelMode)
         if(isempty(auxNames))
             warning('No Auxillary channels present in data');
             set(handles.popupmenu_ChannelMode,'Value',1);
+            setExChannelMode('fNIR',handles,false);
         else
             %uROI=unique(uROI{:},'rows');
 
