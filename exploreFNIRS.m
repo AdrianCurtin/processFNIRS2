@@ -2919,9 +2919,10 @@ ExFNIRS.settings.use_gui_color=get(handles.checkbox_gui_colors,'Value');
 [exF_folder,name,ext] = fileparts(mfilename('fullpath'));
 loadGUIcolors(sprintf('%s/prefs/%s',exF_folder,'exploreFNIRS_defaultColors.csv'),handles);
 
+set(handles.popupmenu_colors,'String',exploreFNIRS.helper.listColormaps('qualitative'));
 idx=get(handles.popupmenu_colors,'Value');
 strs=get(handles.popupmenu_colors,'String');
-ExFNIRS.settings.cmap=str2func(strs{idx});
+ExFNIRS.settings.cmap=exploreFNIRS.helper.getColormap(strs{idx});
 
 PopulateGUIfields(ExFNIRS.dataTable,handles);
 strsRaw=get(handles.listbox_raw_methods,'String');
@@ -5007,7 +5008,7 @@ function popupmenu_colors_Callback(hObject, eventdata, handles)
 global ExFNIRS
 idx=get(handles.popupmenu_colors,'Value');
 strs=get(handles.popupmenu_colors,'String');
-ExFNIRS.settings.cmap=str2func(strs{idx});
+ExFNIRS.settings.cmap=exploreFNIRS.helper.getColormap(strs{idx});
 
 % --- Executes during object creation, after setting all properties.
 function popupmenu_colors_CreateFcn(hObject, eventdata, handles)
