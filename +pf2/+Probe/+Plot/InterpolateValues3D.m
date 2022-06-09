@@ -1,6 +1,6 @@
 function [ h, imgOut ] = InterpolateValues3D(varargin)
 
-%pf2.Data.Plot.InterpolatValues3D
+%pf2.Probe.Plot.InterpolateValues3D
 %
 % Uses an imagemap to change the color of each cell based on data2plot
 % fNIR is a data structure that contains the fNIRS structure info, 
