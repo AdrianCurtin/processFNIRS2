@@ -17,11 +17,11 @@ for file={'CPAnalysis' 'WPAnalysis' 'FWT_PO' 'FWT2_PO' 'IWT_PO' ...
       'FWT_TI' 'IWT_TI' ...
       'FMIPT' 'IMIPT' ...
       'FAIPT' 'IAIPT' 'LMIRefineSeq' 'MedRefineSeq'}
-  
-  isfunc=@(var) exist(var,'file')==3;
-  funcExist=cellfun(isfunc,file);
+  m_or_mex_filepath=which(file{1});
+  funcExist=exist(file{1},'file')==3;
 
   if ~any(funcExist)
+    fprintf('Could not find MEX file for %s!\n',file{1});
     MEX_OK = 0;
     break;
   end
