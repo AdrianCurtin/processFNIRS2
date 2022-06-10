@@ -2,6 +2,10 @@ function InstallMEX
 
 global WAVELABPATH
 
+%pause;
+
+
+
 MEX_OK = 1;
 
 % Check if all the MEX files are installed
@@ -14,6 +18,7 @@ for file={'CPAnalysis' 'WPAnalysis' 'FWT_PO' 'FWT2_PO' 'IWT_PO' ...
       'FMIPT' 'IMIPT' ...
       'FAIPT' 'IAIPT' 'LMIRefineSeq' 'MedRefineSeq'}
   
+  isfunc=@(var) exist(var,'file')==3;
   funcExist=cellfun(isfunc,file);
 
   if ~any(funcExist)
