@@ -105,7 +105,11 @@ if(~isempty(blfNIR)&&~isstruct(blfNIR)&&isnumeric(blfNIR))
 end
 
 if(~isfield(fNIR,'time')&&isfield(fNIR,'raw'))
-    fNIR.time=fNIR.raw(:,1);
+    if(~isempty(fNIR.raw))
+        fNIR.time=fNIR.raw(:,1);
+    else
+        fNIR.time=[];
+    end
 end
 
 if(isempty(fNIR.time))
