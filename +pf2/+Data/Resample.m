@@ -466,7 +466,7 @@ if(averageAux&&~isempty(fNIR.Aux))
             auxVarNames=fields(curField);
             auxVarNames(ismember(auxVarNames,validTimeFields))=[];
 
-        elseif(auxFieldIsArray(f)&&all(diff(curField(:,1))>0)&&length(curField(:,1))>1)
+        elseif(auxFieldIsArray(f)&&~isempty(curField)&&length(curField(:,1))>1)&&all(diff(curField(:,1))>0)
             possibleTimeField=all(diff(curField(:,1))>0); %time must increase only
             t_aux=curField(:,1);
             t_ind=[];
