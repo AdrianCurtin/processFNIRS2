@@ -337,7 +337,7 @@ for b = 1:length(bioMlist)
     if(~isempty(blLength)&&blLength>0&&~isRaw)
         outFNIR.(curB)=fB_resample-repmat(blfNIR.(curB),[numSegs,1]);
     elseif(~isempty(blLength)&&isnan(blLength)&&~isRaw)
-        outFNIR.(curB)=nan(size([numCh,numSegs]));
+        outFNIR.(curB)=nan([numCh,numSegs]);
     else
         outFNIR.(curB)=fB_resample;
     end

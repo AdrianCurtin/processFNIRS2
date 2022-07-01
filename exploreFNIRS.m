@@ -1369,7 +1369,7 @@ if(ExFNIRS.UpdateNeeded==2||~isfield(ExFNIRS,'curPreprocessedFNIR'))
     ExFNIRS.curPreprocessedFNIR.gbyFNIRS_blk=cell(size(ExFNIRS.curProcessedData));
 
     for i=1:numSegs2Process
-        
+
        fprintf('Resampling and baselining fNIRS %i of %i\n',i,numSegs2Process);
        
        if(ExFNIRS.settings.use_baseline)
