@@ -344,9 +344,9 @@ for b = 1:length(bioMlist)
 
 
     if(getPolyAvg)
-        pFit.(curB)=nan(size([numCh,numSegs,polyDegree+1]));
+        pFit.(curB)=nan([numCh,numSegs,polyDegree+1]);
         bioFitVal=sprintf('%s_val',curB);
-        pFit.(bioFitVal)=nan(size([numCh,numSegs]));
+        pFit.(bioFitVal)=nan([numCh,numSegs]);
         
         
         for chIdx=1:length(validCh)
@@ -364,7 +364,7 @@ for b = 1:length(bioMlist)
         if(~isempty(blLength)&&blLength>0&&~isRaw)
             pFit.(curB)=pFit.(curB)-repmat(blfNIR.(curB),[numSegs,1]);
         elseif(~isempty(blLength)&&isnan(blLength)&&~isRaw)
-            pFit.(curB)=nan(size([numCh,numSegs]));
+            pFit.(curB)=nan([numCh,numSegs]);
         else
             %pFit.(curB)=pFit.(curB);
         end
@@ -378,15 +378,15 @@ for b = 1:length(bioMlist)
         if(~isempty(blLength)&&blLength>0)
             outFNIR.ROI.(curB)=fB_resample-repmat(blfNIR.ROI.(curB),[numSegs,1]);
         elseif(~isempty(blLength)&&isnan(blLength))
-            outFNIR.ROI.(curB)=nan(size([numROI,numSegs]));
+            outFNIR.ROI.(curB)=nan([numROI,numSegs]);
         else
             outFNIR.ROI.(curB)=fB_resample;
         end
 
         if(getPolyAvg)
-            pFit.ROI.(curB)=nan(size([numCh,numSegs,polyDegree+1]));
+            pFit.ROI.(curB)=nan([numCh,numSegs,polyDegree+1]);
             bioFitVal=sprintf('%s_val',curB);
-            pFit.ROI.(bioFitVal)=nan(size([numCh,numSegs]));
+            pFit.ROI.(bioFitVal)=nan([numCh,numSegs]);
             
             
             for chIdx=1:length(validCh)
@@ -404,7 +404,7 @@ for b = 1:length(bioMlist)
             if(~isempty(blLength)&&blLength>0)
                 pFit.(curB)=pFit.(curB)-repmat(blfNIR.(curB),[numSegs,1]);
             elseif(~isempty(blLength)&&isnan(blLength))
-                pFit.(curB)=nan(size([numCh,numSegs]));
+                pFit.(curB)=nan([numCh,numSegs]);
             else
                 %pFit.(curB)=pFit.(curB);
             end
