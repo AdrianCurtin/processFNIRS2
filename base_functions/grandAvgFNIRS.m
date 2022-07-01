@@ -47,6 +47,8 @@ segUnits=cell(size(FNIRScellArray));
 segSampleTimes=nan(size(FNIRScellArray));
 segSampleCount=nan(size(FNIRScellArray));
 segROIpresent=false(size(FNIRScellArray));
+
+removedIdx=false(size(FNIRScellArray));
 for i=length(FNIRScellArray):-1:1 
     if(isempty(FNIRScellArray{i})||sum(~isnan(FNIRScellArray{i}.time))==0) % Empty Case
         FNIRScellArray(i)=[];
@@ -55,6 +57,7 @@ for i=length(FNIRScellArray):-1:1
         hierarchyVars(i,:)=[];
         segROIpresent(i)=[];
         segUnits(i)=[];
+        removedIdx(i)=true;
     elseif(~isfield(FNIRScellArray{i},'fs')&&isfield(FNIRScellArray{i},'time')) % Missing sampling frequency
         FNIRScellArray{i}.time=round(FNIRScellArray{i}.time,5);
         if(timeAlign)
@@ -75,6 +78,7 @@ for i=length(FNIRScellArray):-1:1
         segROIpresent(i)=[];
         segUnits(i)=[];
         warning('Cannot use groups which have no time info');
+        removedIdx(i)=true;
     elseif(timeAlign)   % Force time alignment
         FNIRScellArray{i}.time=round(FNIRScellArray{i}.time,5);
         FNIRScellArray{i}.time=FNIRScellArray{i}.time-min(FNIRScellArray{i}.time);
@@ -403,6 +407,18 @@ for b=1:length(bioMs) % reshape and get final statistics
             outGA.ROI.(curBioM).N=permute(sum(~isnan(hAvg.ROI.(curBioM).Mean),1),[2,3,1]);
             outGA.ROI.(curBioM).SD=permute(std(hAvg.ROI.(curBioM).Mean,0,1,'omitnan'),[2,3,1]);
             outGA.ROI.(curBioM).SEM=outGA.ROI.(curBioM).SD./sqrt(outGA.ROI.(curBioM).N);
+
+            if(any(removedIdx))
+                temp=outGA.ROI.(curBioM).data;
+                outGA.ROI.(curBioM).data=nan([size(temp,1),size(temp,2),size(removedIdx,1)]);
+                outGA.ROI.(curBioM).data(:,:,~removedIdx)=temp;
+            end
+        end
+
+        if(any(removedIdx))
+            temp=outGA.(curBioM).data;
+            outGA.(curBioM).data=nan([size(temp,1),size(temp,2),size(removedIdx,1)]);
+            outGA.(curBioM).data(:,:,~removedIdx)=temp;
         end
 end
 
@@ -432,6 +448,12 @@ if(averageAux)
         outGA.Aux.(curAuxField).N=permute(sum(~isnan(hAvg.Aux.(curAuxField).Mean),1),[2,3,1]);
         outGA.Aux.(curAuxField).SD=permute(std(hAvg.Aux.(curAuxField).Mean,0,1,'omitnan'),[2,3,1]);
         outGA.Aux.(curAuxField).SEM=outGA.Aux.(curAuxField).SD./sqrt(outGA.Aux.(curAuxField).N);
+
+        if(any(removedIdx))
+            temp=outGA.Aux.(curAuxField).data;
+            outGA.Aux.(curAuxField).data=nan([size(temp,1),size(temp,2),size(removedIdx,1)]);
+            outGA.Aux.(curAuxField).data(:,:,~removedIdx)=temp;
+        end
     end
 
 end

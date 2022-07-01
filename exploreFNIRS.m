@@ -3046,13 +3046,13 @@ for g=1:length(gbyTables)
                 chNum=channels(c);
                 for t=1:numBarGATimes
                     if(ismember(curBarGA.time(t),times))
-                   if(numTimes==1)
-                      varName=sprintf('%s_Opt%i',curBioM,chNum); 
-                   else
-                      varName=sprintf('%s_Opt%i_t%.0f',curBioM,chNum,curBarGA.time(t)); 
-                   end
-                   varName(varName=='-')='_';
-                   tempTable.(varName)(tempTable{:,'missingFNIRS'}==0,1)=permute(curBarGA.(curBioM).data(t,chNum,:),[3,1,2]);
+                       if(numTimes==1)
+                          varName=sprintf('%s_Opt%i',curBioM,chNum); 
+                       else
+                          varName=sprintf('%s_Opt%i_t%.0f',curBioM,chNum,curBarGA.time(t)); 
+                       end
+                       varName(varName=='-')='_';
+                       tempTable.(varName)(tempTable{:,'missingFNIRS'}==0,1)=permute(curBarGA.(curBioM).data(t,chNum,:),[3,1,2]);
                     end
                 end
             end
