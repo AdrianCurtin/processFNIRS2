@@ -191,11 +191,11 @@ end
 
 
 if(getPolyAvg)
-    phbr=nan(numSegs,numCh,polyDegree+1);
-    phbo=nan(numSegs,numCh,polyDegree+1);
-    poxy=nan(numSegs,numCh,polyDegree+1);
-    ptotal=nan(numSegs,numCh,polyDegree+1);
-    pcbsi=nan(numSegs,numCh,polyDegree+1);
+    phbr=nan([numSegs,numCh,polyDegree+1]);
+    phbo=nan([numSegs,numCh,polyDegree+1]);
+    poxy=nan([numSegs,numCh,polyDegree+1]);
+    ptotal=nan([numSegs,numCh,polyDegree+1]);
+    pcbsi=nan([numSegs,numCh,polyDegree+1]);
     
     phbrfit=nan(numSegs,numCh,3);
     phbofit=nan(numSegs,numCh,3);
@@ -337,16 +337,16 @@ for b = 1:length(bioMlist)
     if(~isempty(blLength)&&blLength>0&&~isRaw)
         outFNIR.(curB)=fB_resample-repmat(blfNIR.(curB),[numSegs,1]);
     elseif(~isempty(blLength)&&isnan(blLength)&&~isRaw)
-        outFNIR.(curB)=nan(size([numCh,numSegs]));
+        outFNIR.(curB)=nan([numSegs,numCh]);
     else
         outFNIR.(curB)=fB_resample;
     end
 
 
     if(getPolyAvg)
-        pFit.(curB)=nan(size([numCh,numSegs,polyDegree+1]));
+        pFit.(curB)=nan([numSegs,numCh,polyDegree+1]);
         bioFitVal=sprintf('%s_val',curB);
-        pFit.(bioFitVal)=nan(size([numCh,numSegs]));
+        pFit.(bioFitVal)=nan([numSegs,numCh]);
         
         
         for chIdx=1:length(validCh)
@@ -364,7 +364,7 @@ for b = 1:length(bioMlist)
         if(~isempty(blLength)&&blLength>0&&~isRaw)
             pFit.(curB)=pFit.(curB)-repmat(blfNIR.(curB),[numSegs,1]);
         elseif(~isempty(blLength)&&isnan(blLength)&&~isRaw)
-            pFit.(curB)=nan(size([numCh,numSegs]));
+            pFit.(curB)=nan([numSegs,numCh]);
         else
             %pFit.(curB)=pFit.(curB);
         end
@@ -378,15 +378,15 @@ for b = 1:length(bioMlist)
         if(~isempty(blLength)&&blLength>0)
             outFNIR.ROI.(curB)=fB_resample-repmat(blfNIR.ROI.(curB),[numSegs,1]);
         elseif(~isempty(blLength)&&isnan(blLength))
-            outFNIR.ROI.(curB)=nan(size([numROI,numSegs]));
+            outFNIR.ROI.(curB)=nan([numSegs,numROI]);
         else
             outFNIR.ROI.(curB)=fB_resample;
         end
 
         if(getPolyAvg)
-            pFit.ROI.(curB)=nan(size([numCh,numSegs,polyDegree+1]));
+            pFit.ROI.(curB)=nan([numSegs,numCh,polyDegree+1]);
             bioFitVal=sprintf('%s_val',curB);
-            pFit.ROI.(bioFitVal)=nan(size([numCh,numSegs]));
+            pFit.ROI.(bioFitVal)=nan([numSegs,numCh]);
             
             
             for chIdx=1:length(validCh)
@@ -404,7 +404,7 @@ for b = 1:length(bioMlist)
             if(~isempty(blLength)&&blLength>0)
                 pFit.(curB)=pFit.(curB)-repmat(blfNIR.(curB),[numSegs,1]);
             elseif(~isempty(blLength)&&isnan(blLength))
-                pFit.(curB)=nan(size([numCh,numSegs]));
+                pFit.(curB)=nan([numSegs,numCh]);
             else
                 %pFit.(curB)=pFit.(curB);
             end
@@ -472,7 +472,7 @@ if(averageAux&&~isempty(fNIR.Aux))
             auxVarNames=fields(curField);
             auxVarNames(ismember(auxVarNames,validTimeFields))=[];
 
-        elseif(auxFieldIsArray(f)&&all(diff(curField(:,1))>0)&&length(curField(:,1))>1)
+        elseif(auxFieldIsArray(f)&&~isempty(curField)&&length(curField(:,1))>1)&&all(diff(curField(:,1))>0)
             possibleTimeField=all(diff(curField(:,1))>0); %time must increase only
             t_aux=curField(:,1);
             t_ind=[];
