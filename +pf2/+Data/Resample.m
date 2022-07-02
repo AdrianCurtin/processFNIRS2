@@ -433,8 +433,14 @@ if(averageAux&&~isempty(fNIR.Aux))
     validTimeFields={'time','t','Time'};
 
     for f=1:length(auxFields)
+        
         curFieldName=auxFields{f};
         curField=fNIR.Aux.(curFieldName);
+
+        if(isempty(curField))
+            fprintf('Unable to average signal .Aux.%s, no data present\n',curFieldName);
+            continue;
+        end
 
         t_aux=[];
         t_ind=[];
