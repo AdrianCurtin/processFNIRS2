@@ -545,15 +545,71 @@ if(averageAux&&~isempty(fNIR.Aux))
             for var=1:length(auxVarNames)
                 curVarName=auxVarNames{var};
                 curVar=curField.(curVarName);
-                curVar=curVar(:);
 
-                if(isnumeric(curVar)&&any(size(curVar)==length(n_aux_time)))
-                    nAuxChan=size(curVar,2);
+                if(~istable(curVar))
+                    curVar=curVar(:);
+    
+                    if(isnumeric(curVar)&&any(size(curVar)==(n_aux_time)))
+                        nAuxChan=size(curVar,2);
+    
+                        auxDat=curVar(:);
+                        auxDat_resample=resample_internal(auxDat,t_ind,nAuxChan,numSegs_aux,nanRejectionLevel);
+            
+                        outFNIR.Aux.(curFieldName).(curVarName)=auxDat_resample;
+                    end
+                else
+                    numericIdx=false(1,size(curVar,2));
+                    szNumeric=zeros(1,size(curVar,2));
+                    for c=1:size(curVar,2)
+                        numericIdx(c)=isnumeric(curVar{:,c});
+                        szNumeric(c)=numericIdx(c).*max(size(curVar{1,c},2));
+                    end
+                    tempTbl=curVar(:,numericIdx);
 
-                    auxDat=curVar(:);
-                    auxDat_resample=resample_internal(auxDat,t_ind,nAuxChan,numSegs_aux,nanRejectionLevel);
-        
-                    outFNIR.Aux.(curFieldName).(curVarName)=auxDat_resample;
+                    len=size(tempTbl,1);
+    
+                    if(~isempty(tempTbl)&&any(len==(n_aux_time)))
+                        
+                        rsArr=table2array(tempTbl);
+                        nAuxChan=size(rsArr,2);
+                        
+    
+                        auxDat=rsArr(:);
+                        auxDat_resample=resample_internal(auxDat,t_ind,nAuxChan,numSegs_aux,nanRejectionLevel);
+
+                        if(any(szNumeric>1))
+                            oldNames=curVar.Properties.VariableNames(numericIdx);
+                            numNames=length(oldNames);
+                            newVarOut={};
+                            szNumeric_2=szNumeric(numericIdx);
+                            newNamesIdx=find(szNumeric_2>1);
+                            
+                            prevIdx=1;
+                            for nNum=1:length(newNamesIdx)
+                                curIdx=newNamesIdx(nNum);
+                                if(curIdx>prevIdx)
+                                    newVarOut=[newVarOut,oldNames(prevIdx:(curIdx-1))];
+                                    prevIdx=curIdx+1;
+                                end
+                                newVarNames{nNum}=cell(1,szNumeric_2(newNamesIdx(nNum)));
+
+                                for nVarPart=1:szNumeric_2(newNamesIdx(nNum))
+                                    newVarNames{nNum}{nVarPart}=sprintf('%s_%i',oldNames{newNamesIdx(nNum)},nVarPart);
+                                end
+                                newVarOut=[newVarOut,newVarNames{nNum}];
+                            end
+                            if(max(newNamesIdx)<numNames)
+                                newVarOut=[newVarOut,oldNames(max(newNamesIdx)+1:end)];
+                            end
+                            newVarNames=newVarOut;
+                        else
+                            newVarNames=curVar.Properties.VariableNames(numericIdx);
+                        end
+
+
+                        auxDat_rsTable=array2table(auxDat_resample,'VariableNames',newVarNames);
+                        outFNIR.Aux.(curFieldName).(curVarName)=auxDat_rsTable;
+                    end
                 end
             end
         end
