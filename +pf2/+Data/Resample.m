@@ -72,6 +72,7 @@ addParameter(p,'centerOnT0',false,@islogical);
 addParameter(p,'timeOutMode','start',validTimeOutMode);
 addParameter(p,'nanRejectionLevel',0.7,validScalarPosNum);
 addParameter(p,'averageAux',false,@islogical);
+addParameter(p,'flattenAux',false,@islogical);
 addParameter(p,'polyDegree',1,validScalarPosNum);
 addParameter(p,'centerOnTime',NaN,@isnumeric);
 
@@ -95,6 +96,7 @@ end
 timeOutMode=p.Results.timeOutMode; % should time include or center on a point (ex: t=1 := t[0.051...1.4999]
 nanRejectionLevel=p.Results.nanRejectionLevel; % number of NaNs in segment to entirely reject it
 averageAux=p.Results.averageAux; % Also average/ resample the Aux channels
+flattenAux=p.Results.flattenAux; % Unroll nested Aux data into tables within the Aux struct, also map times to non-time columns
 polyDegree=p.Results.polyDegree; % degree for polyfit
 
 
@@ -421,9 +423,7 @@ if(averageAux&&~isempty(fNIR.Aux))
         %   3) Aux contains column which is time
         %   4) Aux contains table column t or 'time' which contains time
 
-    outFNIR.Aux=recursiveAuxResample(fNIR.Aux,segLength,centerOnTime,fNIR.time,fTimeInd,nanRejectionLevel);
-
-    
+    outFNIR.Aux=recursiveAuxResample(fNIR.Aux,flattenAux,segLength,centerOnTime,fNIR.time,fTimeInd,nanRejectionLevel);
 end
 
 
@@ -481,10 +481,10 @@ end
 
 end
 
-function [outAuxStruct] = recursiveAuxResample(aux_in,segLength,centerOnTime,nir_time,fTimeInd,nanRejectionLevel,parent_time_in,parentTimeInd)
+function [outAuxStruct] = recursiveAuxResample(aux_in,flattenAux,segLength,centerOnTime,nir_time,fTimeInd,nanRejectionLevel,parent_time_in,parentTimeInd)
     auxFields=fields(aux_in);
 
-    if(nargin<7)
+    if(nargin<8)
         parent_time_in=[];
         parentTimeInd=[];
     end
@@ -550,7 +550,7 @@ function [outAuxStruct] = recursiveAuxResample(aux_in,segLength,centerOnTime,nir
         end
         
 
-        if(auxFieldIsArray(f))
+        if(auxFieldIsArray(f)&&auxFieldsSize(f,1)>1)
             % If the field is an array, we use external time in this order
             %   1) local struct
             %   2) parent struct
@@ -626,7 +626,7 @@ function [outAuxStruct] = recursiveAuxResample(aux_in,segLength,centerOnTime,nir
         
 
         % if it is a table
-        elseif(auxFieldIsTable(f))
+        elseif(auxFieldIsTable(f)&&auxFieldsSize(f,1)>1)
             
             auxVarNames=curField.Properties.VariableNames;
             timeTableVar=intersect(validTimeFields,curField.Properties.VariableNames);
@@ -692,7 +692,7 @@ function [outAuxStruct] = recursiveAuxResample(aux_in,segLength,centerOnTime,nir
                 curVarName=auxVarNames{var};
                 curVar=curField.(curVarName);
 
-                disp(curVarName)
+                %disp(curVarName)
 
                 %datetime conversion/resample
                 isDateTimeType=isdatetime(curVar);
@@ -733,17 +733,19 @@ function [outAuxStruct] = recursiveAuxResample(aux_in,segLength,centerOnTime,nir
                     auxDat=rsArr(:);
                     auxDat_resample=resample_internal(auxDat,t_ind,nAuxChan_col,numSegs_aux,nanRejectionLevel);
 
-                    %numCols=length(numericIdx);
+                    if(flattenAux)
+                    numCols=length(numericIdx);
 
-                    %if(numCols>1)
-                    %    newVarNames=cell(size(numericIdx));
-                    %
-                     %   for nName=1:length(newVarNames)
-                     %       newVarNames{nName}=sprintf('%s_%i',curVarName,nName);
-                     %   end
-                    %else
-                    %    newVarNames={curVarName};
-                    %end
+                        if(numCols>1)
+                            newVarNames=cell(size(numericIdx));
+                        
+                           for nName=1:length(newVarNames)
+                               newVarNames{nName}=sprintf('%s_%i',curVarName,nName);
+                            end
+                        else
+                            newVarNames={curVarName};
+                        end
+                    end
 
                     if(isDateTimeType)
                         auxDat_resample=duration(0,0,auxDat_resample)+t0;
@@ -752,15 +754,29 @@ function [outAuxStruct] = recursiveAuxResample(aux_in,segLength,centerOnTime,nir
                         auxDat_resample=duration(0,0,auxDat_resample);
                     end
 
-                    
-                    %auxDat_rsTable=array2table(auxDat_resample,'VariableNames',newVarNames);
-                    outAuxStruct.(curFieldName).(curVarName)=auxDat_resample;
+                    if(flattenAux)
+                        auxDat_rsTable=array2table(auxDat_resample,'VariableNames',newVarNames);
+                        outAuxStruct.(curFieldName).(newVarNames)=auxDat_resample;
+                    else
+                        outAuxStruct.(curFieldName).(curVarName)=auxDat_resample;
+                    end
                 end
             end
 
     
         elseif(auxFieldIsStruct(f))
-            outAuxStruct.(curFieldName)=recursiveAuxResample(aux_in.(curFieldName),segLength,centerOnTime,nir_time,fTimeInd,nanRejectionLevel,local_time,localTimeInd);
+            if(~flattenAux)
+                outAuxStruct.(curFieldName)=recursiveAuxResample(aux_in.(curFieldName),segLength,centerOnTime,nir_time,fTimeInd,nanRejectionLevel,local_time,localTimeInd);
+            else
+                struct2unpack=recursiveAuxResample(aux_in.(curFieldName),segLength,centerOnTime,nir_time,fTimeInd,nanRejectionLevel,local_time,localTimeInd);
+
+                fields2assign=fields(struct2unpack);
+                for f2=1:length(fields2assign) 
+                    subFieldName=fields2assign{f2};
+                    newFieldName=sprintf('%s$%s',curFieldName,subFieldName);
+                    outAuxStruct.(newFieldName)=struct2unpack.(subFieldName);
+                end
+            end
         else
             %if its not one of these, just dont bother resampling
             outAuxStruct.(curFieldName)=curField;
