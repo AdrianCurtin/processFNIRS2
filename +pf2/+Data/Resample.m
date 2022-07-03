@@ -424,6 +424,7 @@ if(averageAux&&~isempty(fNIR.Aux))
         %   4) Aux contains table column t or 'time' which contains time
 
     outFNIR.Aux=recursiveAuxResample(fNIR.Aux,flattenAux,segLength,centerOnTime,fNIR.time,fTimeInd,nanRejectionLevel);
+    outFNIR.Aux.flattened=flattenAux;
 end
 
 
@@ -756,7 +757,7 @@ function [outAuxStruct] = recursiveAuxResample(aux_in,flattenAux,segLength,cente
 
                     if(flattenAux)
                         auxDat_rsTable=array2table(auxDat_resample,'VariableNames',newVarNames);
-                        outAuxStruct.(curFieldName).(newVarNames)=auxDat_resample;
+                        outAuxStruct.(curFieldName)=[outAuxStruct.(curFieldName),auxDat_rsTable];
                     else
                         outAuxStruct.(curFieldName).(curVarName)=auxDat_resample;
                     end
@@ -766,14 +767,14 @@ function [outAuxStruct] = recursiveAuxResample(aux_in,flattenAux,segLength,cente
     
         elseif(auxFieldIsStruct(f))
             if(~flattenAux)
-                outAuxStruct.(curFieldName)=recursiveAuxResample(aux_in.(curFieldName),segLength,centerOnTime,nir_time,fTimeInd,nanRejectionLevel,local_time,localTimeInd);
+                outAuxStruct.(curFieldName)=recursiveAuxResample(aux_in.(curFieldName),false,segLength,centerOnTime,nir_time,fTimeInd,nanRejectionLevel,local_time,localTimeInd);
             else
-                struct2unpack=recursiveAuxResample(aux_in.(curFieldName),segLength,centerOnTime,nir_time,fTimeInd,nanRejectionLevel,local_time,localTimeInd);
+                struct2unpack=recursiveAuxResample(aux_in.(curFieldName),true,segLength,centerOnTime,nir_time,fTimeInd,nanRejectionLevel,local_time,localTimeInd);
 
                 fields2assign=fields(struct2unpack);
                 for f2=1:length(fields2assign) 
                     subFieldName=fields2assign{f2};
-                    newFieldName=sprintf('%s$%s',curFieldName,subFieldName);
+                    newFieldName=sprintf('%s_%s',curFieldName,subFieldName);
                     outAuxStruct.(newFieldName)=struct2unpack.(subFieldName);
                 end
             end
