@@ -489,8 +489,6 @@ function [outAuxStruct] = recursiveAuxResample(aux_in,segLength,centerOnTime,nir
         parentTimeInd=[];
     end
 
-    
-
     % Attempts to resample any field (and align with fNIRS)
         % criteria:
         %   1) field is same length as fNIR (and greater than 1)
@@ -519,6 +517,7 @@ function [outAuxStruct] = recursiveAuxResample(aux_in,segLength,centerOnTime,nir
     else
         local_time=aux_in.(validTimeFields{cur_time_ind});
         [localTimeInd,localTime_resample]=getTimeIdx(local_time,segLength,centerOnTime);
+        outAuxStruct.(validTimeFields{cur_time_ind})=localTime_resample;
     end
 
     szLocalTime(:)=size(local_time);
@@ -544,7 +543,7 @@ function [outAuxStruct] = recursiveAuxResample(aux_in,segLength,centerOnTime,nir
 
         auxFieldIsTable(f)=istable(curField);
         auxFieldIsStruct(f)=isstruct(curField);
-        auxFieldIsArray(f)=isnumeric(curField)||islogical(curField);
+        auxFieldIsArray(f)=isnumeric(curField)||islogical(curField)||isduration(curField)||isdatetime(curField);
 
         if(auxFieldIsTable(f)||auxFieldIsArray(f))
             auxFieldsSize(f,[1:2])=size(curField);
@@ -556,6 +555,16 @@ function [outAuxStruct] = recursiveAuxResample(aux_in,segLength,centerOnTime,nir
             %   1) local struct
             %   2) parent struct
             %   3) nir_struct
+
+            isDateTimeType=isdatetime(curField);
+            isDurationType=isduration(curField);
+
+            if(isDateTimeType)
+                t0=datetime(2020,1,1);
+                curField=seconds(curField-t0);
+            elseif(isDurationType)
+                curField=seconds(curField);
+            end
             
             auxFieldHasTime(f)=false;
             % if time is present in local struct and time matches, use that
@@ -596,7 +605,7 @@ function [outAuxStruct] = recursiveAuxResample(aux_in,segLength,centerOnTime,nir
                 [t_ind,t_aux_resample]=getTimeIdx(t_aux,segLength,centerOnTime);
             end
     
-            n_aux_time=length(t_ind);
+            
             numSegs_aux=max(t_ind);
 
             auxDat=curField(:);
@@ -604,6 +613,13 @@ function [outAuxStruct] = recursiveAuxResample(aux_in,segLength,centerOnTime,nir
 
             if(auxFieldHasTime(f))
                 auxDat_resample(:,1)=t_aux_resample;
+            end
+
+            if(isDateTimeType)
+                auxDat_resample=duration(0,0,auxDat_resample)+t0;
+                auxDat_resample.Format='yyyy-MM-dd hh:mm:ss.SSS';
+            elseif(isDurationType)
+                auxDat_resample=duration(0,0,auxDat_resample);
             end
 
             outAuxStruct.(curFieldName)=auxDat_resample;
@@ -678,12 +694,26 @@ function [outAuxStruct] = recursiveAuxResample(aux_in,segLength,centerOnTime,nir
 
                 disp(curVarName)
 
+                %datetime conversion/resample
+                isDateTimeType=isdatetime(curVar);
+                isDurationType=isduration(curVar);
+    
+                if(isDateTimeType)
+                    t0=datetime(2020,1,1);
+                    curVar=seconds(curVar-t0);
+                elseif(isDurationType)
+                    curVar=seconds(curVar);
+                end
+
                 % Count number of columns within each variable
                 numericIdx=false(1,size(curVar,2));
+                dateTimeIdx=false(1,size(curVar,2));
+                durationIdx=false(1,size(curVar,2));
                 %szNumeric=zeros(1,size(curVar,2));
                 for c=1:size(curVar,2)
                     % check if the column is numeric
                     numericIdx(c)=isnumeric(curVar(:,c))||islogical(curVar(:,c));
+                    
                     %szNumeric(c)=numericIdx(c).*max(size(curVar(1,c),2));
                 end
                 tempTbl=curVar(:,numericIdx);
@@ -703,16 +733,23 @@ function [outAuxStruct] = recursiveAuxResample(aux_in,segLength,centerOnTime,nir
                     auxDat=rsArr(:);
                     auxDat_resample=resample_internal(auxDat,t_ind,nAuxChan_col,numSegs_aux,nanRejectionLevel);
 
-                    numCols=length(numericIdx);
+                    %numCols=length(numericIdx);
 
-                    if(numCols>1)
-                        newVarNames=cell(size(numericIdx));
+                    %if(numCols>1)
+                    %    newVarNames=cell(size(numericIdx));
+                    %
+                     %   for nName=1:length(newVarNames)
+                     %       newVarNames{nName}=sprintf('%s_%i',curVarName,nName);
+                     %   end
+                    %else
+                    %    newVarNames={curVarName};
+                    %end
 
-                        for nName=1:length(newVarNames)
-                            newVarNames{nName}=sprintf('%s_%i',curVarName,nName);
-                        end
-                    else
-                        newVarNames={curVarName};
+                    if(isDateTimeType)
+                        auxDat_resample=duration(0,0,auxDat_resample)+t0;
+                        auxDat_resample.Format='yyyy-MM-dd hh:mm:ss.SSS';
+                    elseif(isDurationType)
+                        auxDat_resample=duration(0,0,auxDat_resample);
                     end
 
                     
@@ -729,11 +766,6 @@ function [outAuxStruct] = recursiveAuxResample(aux_in,segLength,centerOnTime,nir
             outAuxStruct.(curFieldName)=curField;
         end
     end
-
-
-end
-
-function [outTable]=resampleAuxTable(times_in,table_in)
 
 
 end
