@@ -64,7 +64,7 @@ if(~any(curRawMatchIdx&curOxyMatchIdx))
                data{i}=pf2(data{i});
            end
            data{i}=pf2.Data.ApplyChannelMask(data{i});
-           data{i}=pf2.Data.Resample(data{i},ExFNIRS.settings.grandavg_resample_size,'centerOnT0',true,'timeOutMode','end','averageAux',false);
+           data{i}=pf2.Data.Resample(data{i},ExFNIRS.settings.grandavg_resample_size,'centerOnT0',true,'timeOutMode','end','averageAux',false,'flattenAux',true);
        end
     end
     try
