@@ -7052,11 +7052,14 @@ switch (ExFNIRS.settings.ChannelMode)
         set(handles.pushbutton_biomarker_select_all,'Enable','on');
         set(handles.pushbutton_biomarker_select_none,'Enable','on');
         set(handles.listbox_optode,'Enable','on');
-            set(handles.pushbutton_optodes_select_all,'Enable','on');
-            set(handles.pushbutton_optodes_select_none,'Enable','on');
+        set(handles.pushbutton_optodes_select_all,'Enable','on');
+        set(handles.pushbutton_optodes_select_none,'Enable','on');
+        
         
         set(handles.listbox_optode,'String',uOpt);
         set(handles.listbox_optode,'Value',1);
+        set(handles.listbox_optode,'UserData',[]);
+
         set(handles.listbox_biomarker,'String',{'HbO','HbR','HbDiff','HbTotal','CBSI'});
         
         set(handles.pushbutton_lme_plot_topo,'Enable','on');
@@ -7102,8 +7105,6 @@ switch (ExFNIRS.settings.ChannelMode)
             %uROI=unique(uROI{:},'rows');
 
             
-
-
             if(initROI) % standaradize all ROIs on first load
                 [uROInames,b,c]=unique(roiNames);
                 uROInames=roiNames(b);
@@ -7128,8 +7129,7 @@ switch (ExFNIRS.settings.ChannelMode)
                 ExFNIRS.currentROI=uROI;
             end
 
-            
-
+           
 
             set(handles.text_optode_label,'String','ROI');
             set(handles.text_biomarker_label,'String','BioMarker');
@@ -7143,6 +7143,8 @@ switch (ExFNIRS.settings.ChannelMode)
 
             set(handles.listbox_optode,'String',uROInames);
             set(handles.listbox_optode,'Value',1);
+            set(handles.listbox_optode,'UserData',[]);
+
             set(handles.listbox_biomarker,'String',{'HbO','HbR','HbDiff','HbTotal','CBSI'});
             set(handles.pushbutton_lme_plot_topo,'Enable','on');
         end
@@ -7153,7 +7155,7 @@ switch (ExFNIRS.settings.ChannelMode)
             auxNames={}; %ex: hrv_data
             uAux={};
             auxVarNames={}; %ex: bpm
-    
+            cacheAuxVarNames={};
     
             fprintf('Scanning Aux fields...\n');
     
@@ -7167,8 +7169,11 @@ switch (ExFNIRS.settings.ChannelMode)
     
                             if(istable(curField))
                                 auxNames=[auxNames,curAuxNames{auxf}];
+                                
     
                                 curTableVars=curField.Properties.VariableNames;
+                                cacheAuxVarNames{auxf}=curTableVars;
+
                                 for auxnum=1:size(curField,2)
                                     newVarNamesIdx=~ismember(curTableVars,auxVarNames);
                                     if(any(newVarNamesIdx))
@@ -7181,14 +7186,44 @@ switch (ExFNIRS.settings.ChannelMode)
                     end
                 end
             end
-    
-            auxVarNamesNoTime=auxVarNames(~strcmp(auxVarNames,'time'));
 
-            initAux=true;
+            [uAuxNames,b,c]=unique(auxNames);
+            uAuxNames=auxNames(b);
+
+            [uAuxVarNames,b,c]=unique(auxVarNames);
+            uAuxVarNames=auxVarNames(b);
+
+            auxVarTable=array2table(nan([length(uAuxNames),length(uAuxVarNames)]),'VariableNames',uAuxVarNames,'RowNames',uAuxNames);
+
+            for sIdx=1:length(uAuxNames)
+                %for vIdx=1:length(auxVarNames)
+                curVarNames=cacheAuxVarNames{sIdx};
+                varExistsIdx=ismember(uAuxVarNames,curVarNames);
+                if(any(varExistsIdx))
+                    varIdx=find(varExistsIdx);
+                    for vI=1:length(varIdx)
+                        curIdx=varIdx(vI);
+                        curVarName=curVarNames{curIdx};
+                        
+                        auxVarTable{sIdx,curVarName}=vI;
+                    end
+                end
+                %end
+            end
+
+
+            ExFNIRS.currentAux.auxVarTable=auxVarTable;
+            
+            
         else
-            auxNames=ExFNIRS.currentAux.auxNames;
-            auxVarNames=ExFNIRS.currentAux.auxVarNames;
+            
+            auxVarTable=ExFNIRS.currentAux.auxVarTable;
+            uAuxNames=auxVarTable.Properties.RowNames;
+            uAuxVarNames=auxVarTable.Properties.VariableNames;
         end
+
+        auxVarNamesNoTime=auxVarNames(~strcmp(auxVarNames,'time'));
+
 
 
         if(isempty(auxNames)||isempty(auxVarNamesNoTime))
@@ -7196,26 +7231,7 @@ switch (ExFNIRS.settings.ChannelMode)
             set(handles.popupmenu_ChannelMode,'Value',1);
             setExChannelMode('fNIR',handles,false,false);
         else
-            %uROI=unique(uROI{:},'rows');
 
-            [uAuxNames,b,c]=unique(auxNames);
-            uAuxNames=auxNames(b);
-
-            [uAuxVarNames,b,c]=unique(auxVarNames);
-            uAuxVarNames=auxVarNames(b);
-      
-
-
-            if(initAux) % standaradize all ROIs on first load
-                ExFNIRS.currentAux.auxNames=auxNames;
-                ExFNIRS.currentAux.auxVarNames=auxVarNames;
-                 fprintf(2,'************\nStandardizing all Aux fields..\n********\n');
-                  %for i=1:length(ExFNIRS.data)
-                  %    if(pf2_base.isnestedfield(ExFNIRS.data{i},'raw')&&~isempty(ExFNIRS.data{i}))
-                         %ExFNIRS.data{i}.ROI.info=uAux;
-                   %   end
-                  %end
-            end
  
             set(handles.text_optode_label,'String','Aux');
             set(handles.text_biomarker_label,'String','Aux Signal');
@@ -7226,6 +7242,7 @@ switch (ExFNIRS.settings.ChannelMode)
             set(handles.pushbutton_biomarker_select_all,'Enable','on');
             set(handles.pushbutton_biomarker_select_none,'Enable','on');
             set(handles.listbox_optode,'String',uAuxVarNames);
+            set(handles.listbox_optode,'UserData',auxVarTable);          
             set(handles.listbox_optode,'Value',1);
             set(handles.listbox_biomarker,'Value',1);
             set(handles.listbox_biomarker,'String',uAuxNames);
