@@ -26,11 +26,28 @@ selBioM=get(handles.listbox_biomarker,'Value');
 selectedBioM=biomStrs(selBioM);
 numBioM=length(selBioM);
 
+
+
 optStrs=get(handles.listbox_optode,'String');
 selOpt=get(handles.listbox_optode,'Value');
 selectedOptStr=optStrs(selOpt',:);
 %selectedOpt=str2num(selectedOpt);
-selectedOpt=selOpt;
+
+if(strcmp(exSettings.ChannelMode,'Aux'))
+    if(length(selectedBioM)>1)
+        error('Not supported yet!')
+    end
+    auxTable=get(handles.listbox_optode,'UserData');
+    selectedOpt=nan(length(selOpt));
+    for sI=1:length(selOpt)
+        selectedOpt(sI)=auxTable{selectedBioM,selectedOptStr{sI}};
+    end
+    
+else
+    selectedOpt=selOpt;
+end
+
+
 numOpt=length(selectedOpt);
 
 if(numOpt==0||numGroups==0||numBioM==0)
@@ -272,6 +289,8 @@ for chIdx=1:numOpt
                            curFigH.legendHandles{curSy,curSx}.h=cell(numUgroups,1);
                        end
                    end
+
+                   plotAsTable=false;
                    
                    switch exSettings.ChannelMode
                        case 'fNIR'
@@ -293,11 +312,12 @@ for chIdx=1:numOpt
                            if(pf2_base.isnestedfield(data2plot.(bioM),'time')) %otherwise use aux time
                                if(istable(data2plot.(bioM)))
                                     dataTime=data2plot.(bioM).time;
-                                    
-                                    varNames=data2plot.(bioM).Properties.VariableNames;
-                                    timeIdx=ismember(varNames,'time');
-                                    data2plot.(bioM)=data2plot.(bioM)(:,~timeIdx);
-                                    data2plot.(bioM)=data2plot.(bioM){:,ch}; 
+                                    plotAsTable=true;
+                                    %=data2plot.(bioM).Properties.VariableNames;
+                                    %timeIdx=ismember(varNames,'time');
+                                    %data2plot.(bioM)=data2plot.(bioM)(:,~timeIdx);
+                                    %data2plot.(bioM)=data2plot.(bioM){:,ch}; 
+
                                 
                                else
                                      dataTime=data2plot.(bioM).time;
@@ -319,8 +339,12 @@ for chIdx=1:numOpt
                    end
                    
                   if(plotGroupByBioM)
-                      if(~isempty(data2plot))
-                          h=plot(curFigH.subH{curSy,curSx},dataTime,data2plot.(bioM)(:,ch),'color',cIndex(b,:));
+                      if(~isempty(data2plot)&&isfield(data2plot,bioM))
+                          if(~plotAsTable)
+                            h=plot(curFigH.subH{curSy,curSx},dataTime,data2plot.(bioM)(:,ch),'color',cIndex(b,:));
+                          else
+                            h=plot(curFigH.subH{curSy,curSx},dataTime,data2plot.(bioM){:,ch},'color',cIndex(b,:));
+                          end
                           set(h,'Tag',getFormattedTrialString(curFNIRS{i}));
                           if(exSettings.plot_grandaverage||~isempty(curFigH.legendHandles{curSy,curSx}.h{b}))
                             set(h.Annotation.LegendInformation,'IconDisplayStyle','off'); 
@@ -330,7 +354,11 @@ for chIdx=1:numOpt
                       end
                   else
                       if(~isempty(data2plot.(bioM))&&isfield(data2plot,bioM))
-                          h=plot(curFigH.subH{curSy,curSx},dataTime,data2plot.(bioM)(:,ch),'color',cIndex(curUgroupIdx,:));
+                          if(~plotAsTable)
+                            h=plot(curFigH.subH{curSy,curSx},dataTime,data2plot.(bioM)(:,ch),'color',cIndex(curUgroupIdx,:));
+                          else
+                            h=plot(curFigH.subH{curSy,curSx},dataTime,data2plot.(bioM){:,ch},'color',cIndex(curUgroupIdx,:));
+                          end
                           set(h,'Tag',getFormattedTrialString(curFNIRS{i}));
 
                           if(exSettings.plot_grandaverage||~isempty(curFigH.legendHandles{curSy,curSx}.h{curUgroupIdx}))
