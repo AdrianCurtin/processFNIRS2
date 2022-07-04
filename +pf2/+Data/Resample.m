@@ -1059,7 +1059,7 @@ function [outAuxStruct] = recursiveAuxFlatten(aux_in,nir_time,parent_time_in)
 
                 len=size(tempTbl,1);
 
-                if(~isempty(tempTbl)&&any(len==(t_aux)))
+                if(~isempty(tempTbl)&&any(len==size(t_aux)))
                     
                     if(istable(tempTbl))
                         rsArr=table2array(tempTbl);
