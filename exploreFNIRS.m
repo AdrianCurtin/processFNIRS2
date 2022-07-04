@@ -4890,62 +4890,74 @@ switch (ExFNIRS.settings.ChannelMode)
             cacheAuxVarNames={};
     
             fprintf('Scanning Aux fields...\n');
-    
-            for i=1:length(ExFNIRS.data)
-                if(pf2_base.isnestedfield(ExFNIRS.data{i},'Aux'))
-                    curAuxNames=fields(ExFNIRS.data{i}.Aux);
-                    if(any(~ismember(curAuxNames,auxNames)))
-                        
-                        for auxf=1:length(curAuxNames)
-                            curField=ExFNIRS.data{i}.Aux.(curAuxNames{auxf});
-    
-                            if(istable(curField))
-                                auxNames=[auxNames,curAuxNames{auxf}];
-                                
-    
-                                curTableVars=curField.Properties.VariableNames;
-                                cacheAuxVarNames{auxf}=curTableVars;
 
-                                for auxnum=1:size(curField,2)
-                                    newVarNamesIdx=~ismember(curTableVars,auxVarNames);
-                                    if(any(newVarNamesIdx))
-                                        auxVarNames=[auxVarNames,curTableVars(newVarNamesIdx)];
-                                    end
+            if(pf2_base.isnestedfield(ExFNIRS,'curPreprocessedFNIR.fNIR')&&~isempty(ExFNIRS.curPreprocessedFNIR.fNIR))
+    
+                for i=1:length(ExFNIRS.curPreprocessedFNIR.fNIR)
+                    if(pf2_base.isnestedfield(ExFNIRS.curPreprocessedFNIR.fNIR{i},'Aux'))
+                        curAuxNames=fields(ExFNIRS.curPreprocessedFNIR.fNIR{i}.Aux);
+                        if(any(~ismember(curAuxNames,auxNames)))
+                            
+                            for auxf=1:length(curAuxNames)
+                                curField=ExFNIRS.curPreprocessedFNIR.fNIR{i}.Aux.(curAuxNames{auxf});
+        
+                                if(istable(curField))
+                                    auxNames=[auxNames,curAuxNames{auxf}];
                                     
+        
+                                    curTableVars=curField.Properties.VariableNames;
+                                    cacheAuxVarNames{auxf}=curTableVars;
+    
+                                    for auxnum=1:size(curField,2)
+                                        newVarNamesIdx=~ismember(curTableVars,auxVarNames);
+                                        if(any(newVarNamesIdx))
+                                            auxVarNames=[auxVarNames,curTableVars(newVarNamesIdx)];
+                                        end
+                                        
+                                    end
                                 end
                             end
                         end
                     end
                 end
-            end
-
-            [uAuxNames,b,c]=unique(auxNames);
-            uAuxNames=auxNames(b);
-
-            [uAuxVarNames,b,c]=unique(auxVarNames);
-            uAuxVarNames=auxVarNames(b);
-
-            auxVarTable=array2table(nan([length(uAuxNames),length(uAuxVarNames)]),'VariableNames',uAuxVarNames,'RowNames',uAuxNames);
-
-            for sIdx=1:length(uAuxNames)
-                %for vIdx=1:length(auxVarNames)
-                curVarNames=cacheAuxVarNames{sIdx};
-                varExistsIdx=ismember(uAuxVarNames,curVarNames);
-                if(any(varExistsIdx))
-                    varIdx=find(varExistsIdx);
-                    for vI=1:length(varIdx)
-                        curIdx=varIdx(vI);
-                        curVarName=curVarNames{curIdx};
-                        
-                        auxVarTable{sIdx,curVarName}=vI;
+    
+                [uAuxNames,b,c]=unique(auxNames);
+                uAuxNames=auxNames(b);
+    
+                [uAuxVarNames,b,c]=unique(auxVarNames);
+                uAuxVarNames=auxVarNames(b);
+    
+                auxVarTable=array2table(nan([length(uAuxNames),length(uAuxVarNames)]),'VariableNames',uAuxVarNames,'RowNames',uAuxNames);
+    
+                for sIdx=1:length(uAuxNames)
+                    %for vIdx=1:length(auxVarNames)
+                    curVarNames=cacheAuxVarNames{sIdx};
+                    varExistsIdx=ismember(uAuxVarNames,curVarNames);
+                    if(any(varExistsIdx))
+                        varIdx=find(varExistsIdx);
+                        for vI=1:length(varIdx)
+                            curIdx=varIdx(vI);
+                            curVarName=curVarNames{curIdx};
+                            
+                            auxVarTable{sIdx,curVarName}=vI;
+                        end
                     end
+
+                    timeIdx=auxVarTable{sIdx,'time'};
+                    auxVarTable{sIdx,auxVarTable{sIdx,:}>timeIdx}=auxVarTable{sIdx,auxVarTable{sIdx,:}>timeIdx}-1;
+                    
+                    %end
                 end
-                %end
+
+                auxVarTable(:,'time')=[];
+    
+    
+                ExFNIRS.currentAux.auxVarTable=auxVarTable;
+                uAuxNames=auxVarTable.Properties.RowNames;
+                uAuxVarNames=auxVarTable.Properties.VariableNames;
+            else
+                warning('fNIRS data must be processed at least once first in order to flatten Aux data');
             end
-
-
-            ExFNIRS.currentAux.auxVarTable=auxVarTable;
-            
             
         else
             
