@@ -415,50 +415,59 @@ for b = 1:length(bioMlist)
     end
 end
 
-if(averageAux&&~isempty(fNIR.Aux))
-    % Attempts to resample any field (and align with fNIRS)
-        % criteria:
-        %   1) field is same length as fNIR (and greater than 1)
-        %       uses fNIR time as reference
-        %   2) Aux contains own time field
-        %       uses Aux time as reference
-        %   3) Aux contains column which is time
-        %   4) Aux contains table column t or 'time' which contains time
-
-    outFNIR.Aux=recursiveAuxResample(fNIR.Aux,flattenAux,segLength,centerOnTime,fNIR.time,fTimeInd,nanRejectionLevel);
-    if(isfield(fNIR.Aux,'flattened'))
-        outFNIR.Aux.flattened=flattenAux||fNIR.Aux.flattened;
-    else
-        outFNIR.Aux.flattened=flattenAux;
-    end
-else
-    outFNIR.Aux=fNIR.Aux;
-end
-
-if(trimAux&&~isempty(outFNIR.Aux))
-    validTimeFields={'time','t','Time'};
-
-    if(outFNIR.Aux.flattened)
-        auxTrimFields=fields(outFNIR.Aux);
-
-        for atIdx=1:length(auxTrimFields)
-            curVar=outFNIR.Aux.(auxTrimFields{atIdx});
- 
-            if(istable(curVar))
-                curTableVarNames=curVar.Properties.VariableNames;
-                cur_time_ind=find(~isempty(intersect(validTimeFields,curTableVarNames)));
-                t2trim=curVar{:,cur_time_ind};
-                minftime=times_start(1);
-                maxftime=times_end(end);
-                t2trim_idx=t2trim>minftime&t2trim<maxftime;
-                outFNIR.Aux.(auxTrimFields{atIdx})=curVar(t2trim_idx,:);
-            end
+if(~isempty(fNIR.Aux))
+    if(averageAux)
+        % Attempts to resample any field (and align with fNIRS)
+            % criteria:
+            %   1) field is same length as fNIR (and greater than 1)
+            %       uses fNIR time as reference
+            %   2) Aux contains own time field
+            %       uses Aux time as reference
+            %   3) Aux contains column which is time
+            %   4) Aux contains table column t or 'time' which contains time
+    
+        outFNIR.Aux=recursiveAuxResample(fNIR.Aux,flattenAux,segLength,centerOnTime,fNIR.time,fTimeInd,nanRejectionLevel);
+        if(isfield(fNIR.Aux,'flattened'))
+            outFNIR.Aux.flattened=flattenAux||fNIR.Aux.flattened;
+        else
+            outFNIR.Aux.flattened=flattenAux;
         end
-        
+    elseif(flattenAux) %flatten without averaging
+        outFNIR.Aux=recursiveAuxFlatten(fNIR.Aux,fNIR.time);
+        if(isfield(fNIR.Aux,'flattened'))
+            outFNIR.Aux.flattened=flattenAux||fNIR.Aux.flattened;
+        else
+            outFNIR.Aux.flattened=flattenAux;
+        end
     else
-         error('Trimming requires Aux series to be flattened first!');
+        outFNIR.Aux=fNIR.Aux;
     end
 
+    if(trimAux)
+        validTimeFields={'time','t','Time'};
+    
+        if(outFNIR.Aux.flattened)
+            auxTrimFields=fields(outFNIR.Aux);
+    
+            for atIdx=1:length(auxTrimFields)
+                curVar=outFNIR.Aux.(auxTrimFields{atIdx});
+     
+                if(istable(curVar))
+                    curTableVarNames=curVar.Properties.VariableNames;
+                    cur_time_ind=find(~isempty(intersect(validTimeFields,curTableVarNames)));
+                    t2trim=curVar{:,cur_time_ind};
+                    minftime=times_start(1);
+                    maxftime=times_end(end);
+                    t2trim_idx=t2trim>minftime&t2trim<maxftime;
+                    outFNIR.Aux.(auxTrimFields{atIdx})=curVar(t2trim_idx,:);
+                end
+            end
+            
+        else
+             error('Trimming requires Aux series to be flattened first!');
+        end
+    
+    end
 end
 
 
@@ -653,11 +662,7 @@ function [outAuxStruct] = recursiveAuxResample(aux_in,flattenAux,segLength,cente
             auxDat_resample=resample_internal(auxDat,t_ind,nAuxChan,numSegs_aux,nanRejectionLevel);
 
             if(auxFieldHasTime(f))
-                if(flattenAux)
-                    auxDat_resample(:,1)=t_aux_resample;
-                else
-                    auxDat_resample(:,1)=t_aux_resample;
-                end
+                auxDat_resample(:,1)=t_aux_resample;
             end
 
             if(isDateTimeType)
@@ -849,6 +854,259 @@ function [outAuxStruct] = recursiveAuxResample(aux_in,flattenAux,segLength,cente
             end
         else
             %if its not one of these, just dont bother resampling
+            outAuxStruct.(curFieldName)=curField;
+        end
+    end
+
+
+end
+
+function [outAuxStruct] = recursiveAuxFlatten(aux_in,nir_time,parent_time_in)
+    auxFields=fields(aux_in);
+
+    if(nargin<3)
+        parent_time_in=[];
+    end
+
+    % Attempts to resample any field (and align with fNIRS)
+        % criteria:
+        %   1) field is same length as fNIR (and greater than 1)
+        %       uses fNIR time as reference
+        %   2) Aux contains own time field
+        %       uses Aux time as reference
+        %   3) Aux contains column which is time
+        %   4) Aux contains table column t or 'time' which contains time
+
+    auxFieldsSize=nan(size(auxFields,1),2);
+    auxFieldHasTime=false(size(auxFields));
+    auxFieldIsTable=false(size(auxFields));
+    auxFieldIsArray=false(size(auxFields));
+    auxFieldIsStruct=false(size(auxFields));
+    auxFieldIsEmpty=false(size(auxFields));
+
+    if(isfield(aux_in,'flattened')&&aux_in.flattened)
+        alreadyFlattened=true;
+    else
+        alreadyFlattened=false;
+    end
+
+
+
+    validTimeFields={'time','t','Time'};
+
+    cur_time_ind=find(~isempty(intersect(validTimeFields,auxFields)));
+
+    if(isempty(cur_time_ind))
+        local_time=[];
+        localTimeInd=[];
+    else
+        local_time=aux_in.(validTimeFields{cur_time_ind});
+        outAuxStruct.(validTimeFields{cur_time_ind})=local_time;
+    end
+
+    szLocalTime(:)=size(local_time);
+    szParentTime(:)=size(parent_time_in);
+    szNIRTime(:)=size(nir_time);
+
+
+    % look through each aux field for times
+    for f=1:length(auxFields)
+        
+        curFieldName=auxFields{f};
+        curField=aux_in.(curFieldName);
+
+        if(isempty(curField))
+            auxFieldIsEmpty(f)=true;
+            outAuxStruct.(curFieldName)=curField;
+            continue;
+        end
+
+        t_aux=[];
+        t_ind=[];
+
+        auxFieldIsTable(f)=istable(curField);
+        auxFieldIsStruct(f)=isstruct(curField);
+        auxFieldIsArray(f)=isnumeric(curField)||islogical(curField)||isduration(curField)||isdatetime(curField);
+
+        if(auxFieldIsTable(f)||auxFieldIsArray(f))
+            auxFieldsSize(f,[1:2])=size(curField);
+        end
+        
+
+        if(auxFieldIsArray(f)&&auxFieldsSize(f,1)>1&&~alreadyFlattened)
+            % If the field is an array, we use external time in this order
+            %   1) local struct
+            %   2) parent struct
+            %   3) nir_struct
+            
+            auxFieldHasTime(f)=false;
+            % if time is present in local struct and time matches, use that
+            if(~isempty(local_time)&&auxFieldsSize(f,1)==szLocalTime(1))
+                 t_aux=local_time;
+            % if time is present in parent struct and time matches, use that
+            elseif(~isempty(parent_time_in)&&auxFieldsSize(f,1)==szParentTime(1))
+                t_aux=parent_time_in;
+            % if time is present in nir and time matches, use that, but warn
+            elseif(~isempty(nir_time)&&auxFieldsSize(f,1)==szNIRTime(1))
+                t_aux=nir_time;
+                warning('Non-explicit match for Aux resampling, please use Aux.time variable or ''time'' table column ');
+            else % maybe if the first column is constantly incrementing we use that?
+
+                possibleTimeField=all(diff(curField(:,1)>0));
+                if(possibleTimeField)
+                    t_aux=curField(:,1);
+                    auxFieldHasTime(f)=true;
+                    warning('Non-explicit match for Aux resampling, please use Aux.time variable or ''time'' table column ');
+                else
+                    %fprintf('Unable to resample this field!');
+                    outAuxStruct.(curFieldName)=['Unable to align this field!'];
+                    
+                    continue;
+                end
+            end
+
+            nAuxChan=size(curField,2);
+          
+
+            newVarNames={};
+            for nV=1:(nAuxChan-auxFieldHasTime(f))
+                newVarNames{nV}=sprintf('val%i',nV);
+            end
+
+            if(auxFieldHasTime(f))
+                newVarNames=['time',newVarNames(:)];
+                auxDat_rsTable=array2table(curField,'VariableNames',newVarNames);
+                outAuxStruct.(curFieldName)=auxDat_rsTable;
+            else
+                outAuxStruct.(curFieldName)=table(t_aux,'VariableNames',{'time'});
+                auxDat_rsTable=array2table(curField,'VariableNames',newVarNames);
+                outAuxStruct.(curFieldName)=[outAuxStruct.(curFieldName),auxDat_rsTable];
+            end
+            
+        
+
+        % if it is a table
+        elseif(auxFieldIsTable(f)&&auxFieldsSize(f,1)>1)
+            
+            auxVarNames=curField.Properties.VariableNames;
+            timeTableVar=intersect(validTimeFields,curField.Properties.VariableNames);
+
+            if(~isempty(timeTableVar))
+                t_aux=curField.(timeTableVar{1});
+                if(iscell(t_aux)&&~isempty(t_aux))
+                    t_aux=t_aux{1};
+                end
+                
+                auxFieldHasTime(f)=true;
+                curTimeNames=auxVarNames(ismember(auxVarNames,validTimeFields));
+                auxVarNames(ismember(auxVarNames,validTimeFields))=[];
+            elseif(~isempty(local_time)&&auxFieldsSize(f,1)==szLocalTime(1)&&~alreadyFlattened)
+                 t_aux=local_time;
+                % if time is present in parent struct and time matches, use that
+            elseif(~isempty(parent_time_in)&&auxFieldsSize(f,1)==szParentTime(1)&&~alreadyFlattened)
+                t_aux=parent_time_in;
+                
+            % if time is present in nir and time matches, use that, but warn
+            elseif(~isempty(nir_time)&&auxFieldsSize(f,1)==szNIRTime(1)&&~alreadyFlattened)
+                t_aux=nir_time;
+                
+                warning('Non-explicit match for Aux time variable alignment, please use Aux.time variable or ''time'' table column ');
+            else % maybe if the first column is constantly incrementing we use that?
+
+                
+                possibleTimeField=isnumeric(curField(:,1))&&all(diff(curField(:,1)>0));
+                if(possibleTimeField&&~alreadyFlattened)
+                    t_aux=curField(:,1);
+                    auxFieldHasTime(f)=true;
+                    warning('Non-explicit match for Aux time variable alignment, please use Aux.time variable or ''time'' table column ');
+                else
+                    %fprintf('Unable to resample this field!');
+                    if(~alreadyFlattened)
+                        outAuxStruct.(curFieldName)=['Unable to resample this field!'];
+                    else
+                        outAuxStruct.(curFieldName)=curField;
+                    end
+                    
+                    continue;
+                end
+            end
+
+            
+
+            
+            outAuxStruct.(curFieldName)=table(t_aux,'VariableNames',curTimeNames);
+            
+
+            
+
+            % run through table variables
+            for var=1:length(auxVarNames)
+            
+                curVarName=auxVarNames{var};
+                curVar=curField.(curVarName);
+
+                
+                % Count number of columns within each variable
+                numericIdx=false(1,size(curVar,2));
+                %szNumeric=zeros(1,size(curVar,2));
+                for c=1:size(curVar,2)
+                    % check if the column is numeric
+                    numericIdx(c)=isnumeric(curVar(:,c))||islogical(curVar(:,c));
+                    
+                    %szNumeric(c)=numericIdx(c).*max(size(curVar(1,c),2));
+                end
+                tempTbl=curVar(:,numericIdx);
+
+                len=size(tempTbl,1);
+
+                if(~isempty(tempTbl)&&any(len==(t_aux)))
+                    
+                    if(istable(tempTbl))
+                        rsArr=table2array(tempTbl);
+                    else
+                        rsArr=tempTbl;
+                    end
+                   
+                    auxDat_resample=rsArr;
+
+                    
+                    numCols=length(numericIdx);
+
+                    if(numCols>1)
+                        newVarNames=cell(size(numericIdx));
+                    
+                       for nName=1:length(newVarNames)
+                           newVarNames{nName}=sprintf('%s_%i',curVarName,nName);
+                        end
+                    else
+                        newVarNames={curVarName};
+                    end
+                    
+
+                  
+
+                  
+                    auxDat_rsTable=array2table(auxDat_resample,'VariableNames',newVarNames);
+                    outAuxStruct.(curFieldName)=[outAuxStruct.(curFieldName),auxDat_rsTable];
+                    
+                end
+            end
+
+    
+        elseif(auxFieldIsStruct(f))
+            
+            struct2unpack=recursiveAuxFlatten(aux_in.(curFieldName),nir_time,local_time);
+
+            fields2assign=fields(struct2unpack);
+            for f2=1:length(fields2assign) 
+                subFieldName=fields2assign{f2};
+                newFieldName=sprintf('%s_%s',curFieldName,subFieldName);
+                outAuxStruct.(newFieldName)=struct2unpack.(subFieldName);
+            end
+            
+        else
+            %if its not one of these, just dont bother resampling or
+            %unpacking
             outAuxStruct.(curFieldName)=curField;
         end
     end
