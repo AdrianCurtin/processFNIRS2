@@ -157,13 +157,14 @@ segmentTimesArr=[];
 
 auxFields(1)="";
 auxFieldSizes=[];
+auxFieldVarNames={};
 
 for i=1:numfSeg % Resample and find max/min and num channels
     if(resample)
         if(centerOnT0)
-            FNIRScellArray{i}=pf2.Data.Resample(FNIRScellArray{i},resampleSize,'centerOnT0',centerOnT0,'timeOutMode','start','averageAux',true);
+            FNIRScellArray{i}=pf2.Data.Resample(FNIRScellArray{i},resampleSize,'centerOnT0',centerOnT0,'timeOutMode','start','averageAux',true,'flattenAux',true,'trimAux',true);
         else
-            FNIRScellArray{i}=pf2.Data.Resample(FNIRScellArray{i},resampleSize,'centerOnT0',centerOnT0,'averageAux',true);
+            FNIRScellArray{i}=pf2.Data.Resample(FNIRScellArray{i},resampleSize,'centerOnT0',centerOnT0,'averageAux',true,'flattenAux',true,'trimAux',true);
         end
         segmentTimesArr=[segmentTimesArr;FNIRScellArray{i}.segmentTimes];
     elseif(isfield(FNIRScellArray{i},'segmentTimes'))
@@ -174,17 +175,18 @@ for i=1:numfSeg % Resample and find max/min and num channels
         possibleFields=fields(FNIRScellArray{i}.Aux);
         possibleFieldSizes=nan(size(possibleFields));
         
-        temp=[];
+        temp=false(size(possibleFields));
         for(pf_ind=1:length(possibleFields))
-            temp(pf_ind)=~isempty(FNIRScellArray{i}.Aux.(possibleFields{pf_ind}))...
-                &&~isstruct(FNIRScellArray{i}.Aux.(possibleFields{pf_ind}))...
-                &&~iscell(FNIRScellArray{i}.Aux.(possibleFields{pf_ind}))...
-                &&~strcmp(possibleFields{pf_ind},'time')...
-                &&~strcmp(possibleFields{pf_ind},'t'); 
+            curField=FNIRScellArray{i}.Aux.(possibleFields{pf_ind});
             possibleFieldSizes(pf_ind)=size(FNIRScellArray{i}.Aux.(possibleFields{pf_ind}),2);
+            if(~isempty(curField)&&istable(curField)&&contains('time',curField.Properties.VariableNames))
+                temp(pf_ind)=true;
+                
+            end
         end
         auxFields=[auxFields;possibleFields(temp==1)];
         auxFieldSizes=[auxFieldSizes;possibleFieldSizes(temp==1)];
+
     end
     
     minFtime=min(FNIRScellArray{i}.time);
@@ -277,7 +279,7 @@ end
 
 
 if(averageAux)
-    auxFieldSizes(auxFieldSizes>1)=auxFieldSizes-1; % remove anticipated time column from var count (for all but single column data)
+    auxFieldSizes(auxFieldSizes>1)=auxFieldSizes(auxFieldSizes>1)-1; % remove anticipated time column from var count (for all but single column data)
     for aux=1:length(auxFields)
             curAuxField=auxFields{aux};
             outGA.Aux.(curAuxField).data=nan(length(outGA.time),auxFieldSizes(aux),numfSeg);
@@ -314,9 +316,35 @@ for i=1:numfSeg
                 curAuxField=char(auxFields(aux));
                 if(ismember(curAuxField,curSegAuxFields))
                         try
+                            if(isstring(curFNIR.Aux.(curAuxField))||ischar(curFNIR.Aux.(curAuxField))||isempty(curFNIR.Aux.(curAuxField))...
+                                    ||(~istable(curFNIR.Aux.(curAuxField))&&all(size(curFNIR.Aux.(curAuxField))==[1,1])))
+                                %outGA.Aux.(curAuxField)=[];
+                                continue;
+                            end
                             if(pf2_base.isnestedfield(curFNIR.Aux.(curAuxField),'time'))
                                 auxTimes=round(curFNIR.Aux.(curAuxField).time,4);
                                 nonTimeColsIdx=~ismember(curFNIR.Aux.(curAuxField).Properties.VariableNames,'time');
+                                
+
+                                tableFields=curFNIR.Aux.(curAuxField).Properties.VariableNames;
+                                numericTimeColsIdx=false(size(tableFields));
+                                for fType=1:length(tableFields)
+                                    curVar=curFNIR.Aux.(curAuxField).(tableFields{fType});
+                                    if(isduration(curVar))
+                                        curFNIR.Aux.(curAuxField).(tableFields{fType})=seconds(curFNIR.Aux.(curAuxField).(tableFields{fType}));
+                                        numericTimeColsIdx(fType)=true;
+                                    else
+                                        numericTimeColsIdx(fType)=isnumeric(curVar)||islogical(curVar);
+
+                                        if(~numericTimeColsIdx(fType))
+                                            curFNIR.Aux.(curAuxField).(tableFields{fType})=nan(size(curFNIR.Aux.(curAuxField).(tableFields{fType})));
+                                            numericTimeColsIdx(fType)=true;
+
+                                        end
+                                    end
+                                end
+
+                                nonTimeColsIdx=nonTimeColsIdx&numericTimeColsIdx;
                             elseif(size(curFNIR.Aux.(curAuxField),2)>1)
                                 % Array, time is first position
                                 auxTimes=round(curFNIR.Aux.(curAuxField)(:,1),4);
@@ -324,9 +352,9 @@ for i=1:numfSeg
                             elseif(isfield(curFNIR.Aux,'time'))
                                 auxTimes=round(curFNIR.Aux.time,4);
                                 nonTimeColsIdx=1;
-                            elseif(size(curFNIR.Aux.(curAuxField),1)==length(curFNIR.time))
-                                auxTimes=rndTimesIdx;
-                                nonTimeColsIdx=1;
+                            else
+                                outGA.Aux.(curAuxField).data(validT==1,:,i)=nan;
+                                continue;
                             end
                             
                             [auxValidT,auxValidIdx]=ismember(rndTimesIdx(:,1),auxTimes);
@@ -337,6 +365,10 @@ for i=1:numfSeg
                                     outGA.Aux.(curAuxField).data(auxValidT==1,:,i)=curFNIR.Aux.(curAuxField)(auxValidIdx,nonTimeColsIdx);
                                 else
                                     outGA.Aux.(curAuxField).data(auxValidT==1,:,i)=curFNIR.Aux.(curAuxField){auxValidIdx,nonTimeColsIdx};
+                                    if(~isfield(outGA.Aux.(curAuxField),'varNames'))
+                                        temp_curVarNames=curFNIR.Aux.(curAuxField).Properties.VariableNames;
+                                        outGA.Aux.(curAuxField).varNames=temp_curVarNames(~contains(temp_curVarNames,'time'));
+                                    end
                                 end
                             end
                         catch

@@ -518,10 +518,14 @@ if(~isfield(ExFNIRS,'UpdateNeeded'))
 end
 
 if(UpdateNeeded>0)
-    if(ExFNIRS.UpdateNeeded<UpdateNeeded)
-        ExFNIRS.UpdateNeeded=UpdateNeeded; %2 indicates fNIRS data needs to be reprocessed as well
+    if(ExFNIRS.UpdateNeeded<UpdateNeeded)  % 1 indicates that table just needs to be arranged and averaged
+        ExFNIRS.UpdateNeeded=UpdateNeeded; %2 indicates fNIRS data needs to be resampled as well
                                            % 3 indicates fNIRS must be
-                                           % reprocessed entirely
+                                           % reprocessed entirely 
+                                           %     (ie new method)
+                                           % 4 indicates that entire
+                                           % dataset/ data table needs to
+                                           % be reproduced      
     end
     set(handles.pushbutton_process_selection,'BackgroundColor','Red');
     updateSelectedTable(handles,false);
@@ -1374,9 +1378,9 @@ if(ExFNIRS.UpdateNeeded==2||~isfield(ExFNIRS,'curPreprocessedFNIR'))
        
        if(ExFNIRS.settings.use_baseline)
             ExFNIRS.curPreprocessedFNIR.baseline{i}=pf2.Data.Split(ExFNIRS.curPreprocessedFNIR.fNIR{i},ExFNIRS.settings.baseline_start,ExFNIRS.settings.baseline_end); %baselineining is handled in processing section
-            ExFNIRS.curPreprocessedFNIR.gbyFNIRS_blk{i}=pf2.Data.Resample(ExFNIRS.curPreprocessedFNIR.gbyFNIRS{i}, ExFNIRS.settings.barchart_resample_size,'centerOnTime',ExFNIRS.settings.block_start,'timeOutMode','start','blfNIR',ExFNIRS.curPreprocessedFNIR.baseline{i},'averageAux',true,'flattenAux',true);
+            ExFNIRS.curPreprocessedFNIR.gbyFNIRS_blk{i}=pf2.Data.Resample(ExFNIRS.curPreprocessedFNIR.gbyFNIRS{i}, ExFNIRS.settings.barchart_resample_size,'centerOnTime',ExFNIRS.settings.block_start,'timeOutMode','start','blfNIR',ExFNIRS.curPreprocessedFNIR.baseline{i},'averageAux',true,'flattenAux',true,'trimAux',true);
             
-            ExFNIRS.curPreprocessedFNIR.gbyFNIRS{i}=pf2.Data.Resample(ExFNIRS.curPreprocessedFNIR.gbyFNIRS{i}, ExFNIRS.settings.grandavg_resample_size,'centerOnTime',ExFNIRS.settings.block_start,'timeOutMode','start','blfNIR',ExFNIRS.curPreprocessedFNIR.baseline{i},'averageAux',true,'flattenAux',true);
+            ExFNIRS.curPreprocessedFNIR.gbyFNIRS{i}=pf2.Data.Resample(ExFNIRS.curPreprocessedFNIR.gbyFNIRS{i}, ExFNIRS.settings.grandavg_resample_size,'centerOnTime',ExFNIRS.settings.block_start,'timeOutMode','start','blfNIR',ExFNIRS.curPreprocessedFNIR.baseline{i},'averageAux',true,'flattenAux',true,'trimAux',true);
             ExFNIRS.curPreprocessedFNIR.gbyFNIRS{i}.time=ExFNIRS.curPreprocessedFNIR.gbyFNIRS{i}.time+ExFNIRS.settings.block_start; %change time so that 0 is start of block
        else
             ExFNIRS.curPreprocessedFNIR.baseline{i}=[];
@@ -1386,10 +1390,10 @@ if(ExFNIRS.UpdateNeeded==2||~isfield(ExFNIRS,'curPreprocessedFNIR'))
        end
     end
 
-    
+    ExFNIRS.UpdateNeeded=true; % mark that data was preprocesed, but not averaged into groups
 else
 
-    ExFNIRS.UpdateNeeded=true; % mark that data was preprocesed
+    ExFNIRS.UpdateNeeded=true; % mark that data was preprocesed, but not averaged into groups
 end
 
 function processSelectedTable(handles,sellFullIdx,gbyIdx)
@@ -1464,11 +1468,11 @@ function processCurrentFunction(handles)
 
 global ExFNIRS
 
-if(ExFNIRS.UpdateNeeded==4)
+if(ExFNIRS.UpdateNeeded==4) % 4 indicates that everything needs to be changed
     error('Dataset has been updated, please close and repoen ExFNIRS');
 end
 
-if(ExFNIRS.UpdateNeeded==3)
+if(ExFNIRS.UpdateNeeded==3) % 3 indicates that data needs to be reprocessed
 
 strsRaw=get(handles.listbox_raw_methods,'String');
 selectedStrs=get(handles.listbox_raw_methods,'Value');
@@ -1497,7 +1501,7 @@ set(handles.listbox_oxy_methods,'Value',find(iOxy));
 set(handles.listbox_raw_methods,'String',strsRaw);
 set(handles.listbox_raw_methods,'Value',find(iRaw));
 
-ExFNIRS.UpdateNeeded=2;
+ExFNIRS.UpdateNeeded=2; % 2 indicates that data needs to be resampled
 
 end
 
@@ -1588,7 +1592,7 @@ function pushbutton_plot_temporal_Callback(hObject, eventdata, handles)
 
 global ExFNIRS
 
-if(ExFNIRS.UpdateNeeded)
+if(ExFNIRS.UpdateNeeded) 
     updateSelectedTable(handles);
 end
 
@@ -3080,25 +3084,43 @@ for g=1:length(gbyTables)
     end
     
      if(exportAux&&isfield(curBarGA,'Aux'))
-         warning('To-do add AUX fields to export wide'); % trouble is syncing up timing between each
-%         curAuxFields=fields(curBarGA.Aux);
-%         for aux=1:length(curAuxFields)
-%            curAuxName=curAuxFields{aux};
-%            curAux= curBarGA.Aux.(curAuxName);
-%            numAuxCh=size(curAux.data,2);
-%            if(numAuxCh==1)
-%                 newAuxName=sprintf('aux_%s',curAuxName);
-%                 tempTable.(newAuxName)(:,1)=nan;
-%                 tempTable.(newAuxName)(tempTable{:,'missingFNIRS'}==0,1)=permute(curAux.data(tDataIdx,1,:),[3,1,2]);
-%            else
-%                for ch=1:numAuxCh
-%                    newAuxName=sprintf('aux_%s_%i',curAuxName,ch);
-%                    tempTable.(newAuxName)(:,1)=nan;
-%                    tempTable.(newAuxName)(tempTable{:,'missingFNIRS'}==0,1)=permute(curAux.data(tDataIdx,ch,:),[3,1,2]);
-%                end
-%            end
-% 
-%         end
+         %warning('To-do add AUX fields to export wide'); % trouble is syncing up timing between each
+         
+         curAuxFields=fields(curBarGA.Aux);
+         for aux=1:length(curAuxFields)
+            curAuxName=curAuxFields{aux};
+            curAux= curBarGA.Aux.(curAuxName);
+            numAuxCh=size(curAux.data,2);
+
+            if(isfield(curAux,'varNames'))
+                curVarNames=curAux.varNames;
+            else
+                curVarNames={};
+            end
+
+            for ch=1:numAuxCh
+                if(numAuxCh==1)
+                    newAuxName=sprintf('aux_%s',curAuxName);
+                elseif(isempty(curVarNames))
+                    newAuxName=sprintf('aux_%s_%i',curAuxName,ch);
+                else
+                    newAuxName=sprintf('aux_%s_%s',curAuxName,curVarNames{ch});
+                end
+
+                for t=1:numBarGATimes
+                    if(ismember(curBarGA.time(t),times))
+                       if(numTimes==1)
+                          varName=sprintf('%s',newAuxName); 
+                       else
+                          varName=sprintf('%s_t%.0f',newAuxName,curBarGA.time(t)); 
+                       end
+                       varName(varName=='-')='_';
+                       tempTable.(varName)(tempTable{:,'missingFNIRS'}==0,1)=permute(curAux.data(t,ch,:),[3,1,2]);
+                    end
+                end
+            end
+            
+         end
      end
     
     mergedTables=mergeTables(mergedTables,tempTable);
@@ -3244,27 +3266,37 @@ for g=1:length(gbyTables)
         end
 
         if(exportAux&&isfield(curBarGA,'Aux'))
-            curAuxFields=fields(curBarGA.Aux);
-            for aux=1:length(curAuxFields)
-               curAuxName=curAuxFields{aux};
-               curAux= curBarGA.Aux.(curAuxName);
-               numAuxCh=size(curAux.data,2);
-               if(numAuxCh==1)
-                    newAuxName=sprintf('aux_%s',curAuxName);
-                    tempTable.(newAuxName)(:,1)=nan;
-                    tempTable.(newAuxName)(tempTable{:,'missingFNIRS'}==0,1)=permute(curAux.data(tDataIdx,1,:),[3,1,2]);
-                    tempTable.(newAuxName)(tempTable{:,'missingFNIRS'}==1,1)=nan;
-               else
-                   for ch=1:numAuxCh
-                       newAuxName=sprintf('aux_%s_%i',curAuxName,ch);
+             curAuxFields=fields(curBarGA.Aux);
+             for aux=1:length(curAuxFields)
+                curAuxName=curAuxFields{aux};
+                curAux= curBarGA.Aux.(curAuxName);
+                numAuxCh=size(curAux.data,2);
+    
+                if(isfield(curAux,'varNames'))
+                    curVarNames=curAux.varNames;
+                else
+                    curVarNames={};
+                end
+    
+                for ch=1:numAuxCh
+                    if(numAuxCh==1)
+                        newAuxName=sprintf('aux_%s',curAuxName);
+                    elseif(isempty(curVarNames))
+                        newAuxName=sprintf('aux_%s_%i',curAuxName,ch);
+                    else
+                        newAuxName=sprintf('aux_%s_%s',curAuxName,curVarNames{ch});
+                    end
+
                        tempTable.(newAuxName)(:,1)=nan;
                        tempTable.(newAuxName)(tempTable{:,'missingFNIRS'}==0,1)=permute(curAux.data(tDataIdx,ch,:),[3,1,2]);
                        tempTable.(newAuxName)(tempTable{:,'missingFNIRS'}==1,1)=nan;
-                   end
-               end
+                   
+                end
 
             end
+
         end
+
 
         mergedTables=mergeTables(mergedTables,tempTable);
     end
