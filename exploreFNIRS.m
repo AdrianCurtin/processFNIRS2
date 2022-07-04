@@ -1600,630 +1600,9 @@ if(~isfield(ExFNIRS,'gby'))
     warning('No groups match selection criteria');
     return;
 end
-curInfoGroup=ExFNIRS.settings.curInfoGroup;
 
-gbyVars=ExFNIRS.groupByVars;
-if(~isempty(curInfoGroup)&&~strcmp(curInfoGroup,'(Time)'))
-    [ismem,idx]=ismember(curInfoGroup,gbyVars);
-    if(ismem)
-        gbyVars(idx)=[];
-        useCurInfoGroup=true;
-    else
-        useCurInfoGroup=false;
-    end
-else
-    useCurInfoGroup=false;
-end
+exploreFNIRS.plot.temporal(ExFNIRS.gby,ExFNIRS.groupByVars,ExFNIRS.settings,handles);
 
-
-numGroups=length(ExFNIRS.gby);
-
-biomStrs=get(handles.listbox_biomarker,'String');
-selBioM=get(handles.listbox_biomarker,'Value');
-selectedBioM=biomStrs(selBioM);
-numBioM=length(selBioM);
-
-optStrs=get(handles.listbox_optode,'String');
-selOpt=get(handles.listbox_optode,'Value');
-selectedOptStr=optStrs(selOpt',:);
-%selectedOpt=str2num(selectedOpt);
-selectedOpt=selOpt;
-numOpt=length(selectedOpt);
-
-if(numOpt==0||numGroups==0||numBioM==0)
-    return;
-end
-
-if(ExFNIRS.settings.ylim_fixed)
-    ExFNIRS.settings.ylim_fixed_min=inf;
-    ExFNIRS.settings.ylim_fixed_max=-inf;
-end
-
-curInfoGby=cell(0);
-
-for g=1:numGroups
-    gbyStrs{g}='';
-   if(~isempty(ExFNIRS.gby(g).gbyTables))
-       for i=1:length(gbyVars)
-           gbyStrs{g}=sprintf('%s%s:%s,',gbyStrs{g},gbyVars{i},num2strOrNot(ExFNIRS.gby(g).gbyTables.(gbyVars{i})(1)));
-       end 
-       if(useCurInfoGroup)
-           curInfoGby{g}=num2strOrNot(ExFNIRS.gby(g).gbyTables.(curInfoGroup)(1));
-       end
-   end 
-   if(~isempty(gbyStrs{g}))
-        gbyStrs{g}(end)='';
-   end
-end
-
-[uCurInfoG,firstCurIdx,uCurIdx]=unique(cellstr(curInfoGby));
-
-numCurInfoG=length(uCurInfoG);
-
-numUgroups=length(unique(cellstr(gbyStrs)));
-
-uCurGIdxCount=nan(size(uCurIdx));
-for i =1:numCurInfoG
-    uCurGIdxCount(uCurIdx==i)=1:sum(uCurIdx==i);
-end
-
-if(numUgroups==1)
-    num2Plot=numBioM;
-    plotGroupByBioM=true;
-    bioColorTable=table2cell(pf2_base.getBioColors());
-    cIndex=[];
-    for i=1:length(bioColorTable)
-        cIndex(i,:)=bioColorTable{i};
-    end
-else
-    num2Plot=numUgroups;
-    plotGroupByBioM=false;
-    if(ExFNIRS.settings.use_gui_color)
-        cIndex=ExFNIRS.settings.guiColor(1:numUgroups,:);
-    else
-        cIndex=ExFNIRS.settings.cmap(numUgroups);%linspecer(num2Plot,'qualitative');
-    end
-end
-
-
-errorFeature=ExFNIRS.settings.plot_error_feature;
-errMulitply=ExFNIRS.settings.plot_error_multiply;
-plotFeature=ExFNIRS.settings.plot_grandaverage_feature;
-
-if(strcmp(plotFeature,'Count')&&ExFNIRS.settings.plot_grandaverage)
-  plotFeature='N';
-  plotCount=true;
-else
-    plotCount=false;
-end
-
-
-if(~plotGroupByBioM)
-    if(numOpt>1&&numCurInfoG>1)
-        xType='channels';
-        yType='groupby';
-        figType='bioM';
-        numSubX=numOpt;
-        numSubY=numCurInfoG;
-    elseif(numOpt==1&&numCurInfoG>1)
-        xType='bioM';
-        yType='groupby';
-        figType='';
-        numSubX=numBioM;
-        numSubY=numCurInfoG;
-    elseif(numCurInfoG<=1&&numOpt>1)
-        xType='channels';
-        yType='bioM';
-        figType='';
-        numSubX=numOpt;
-        numSubY=numBioM;
-    else
-        xType='bioM';
-        yType='';
-        figType='';
-        numSubX=numBioM;
-        numSubY=1;
-    end
-else %plot with biomarkers embedded
-    if(numOpt>=1&&numCurInfoG>1)
-        xType='channels';
-        yType='groupby';
-        figType='';
-        numSubX=numOpt;
-        numSubY=numCurInfoG;
-    elseif(numCurInfoG<=1&&numOpt>1)
-        xType='channels';
-        yType='';
-        figType='';
-        numSubX=numOpt;
-        numSubY=1;
-    else
-        xType='';
-        yType='';
-        figType='';
-        numSubX=1;
-        numSubY=1;
-    end
-end
-
-
-
-switch(figType)
-    case 'bioM'
-        for i=1:numBioM
-            sH{i,1}.h=figure(900+i);
-            clf(sH{i,1}.h);
-            dcm_obj = datacursormode(sH{i,1}.h);
-            set(dcm_obj,'UpdateFcn',@myDataTipUpdateFcn);
-            for s=1:(numSubX*numSubY)
-                xInd=rem(s,numSubX);
-                if(xInd==0)
-                    xInd=numSubX;
-                end
-                h=subplot(numSubY,numSubX,s,'Parent',sH{i,1}.h);
-                if(ExFNIRS.settings.plot_temporal_y0)
-                    yh=plot([ExFNIRS.settings.plot_start,ExFNIRS.settings.plot_end],[0,0],'k');
-                    set(yh,'HandleVisibility','off');
-                end
-                sH{i,1}.subH{floor((s-1)/numSubX)+1,xInd}=h;
-                legend(h, 'off');
-            end
-            multiPlot=true;
-        end
-    otherwise
-        sH{1,1}.h=figure(900);
-        clf(sH{1,1}.h);
-        dcm_obj = datacursormode(sH{1,1}.h);
-        set(dcm_obj,'UpdateFcn',@myDataTipUpdateFcn);
-        for s=1:(numSubX*numSubY)
-            xInd=rem(s,numSubX);
-            if(xInd==0)
-                xInd=numSubX;
-            end
-            h=subplot(numSubY,numSubX,s);
-            if(ExFNIRS.settings.plot_temporal_y0)
-                yh=plot([ExFNIRS.settings.plot_start,ExFNIRS.settings.plot_end],[0,0],'k');
-                set(yh,'HandleVisibility','off');
-            end
-            sH{1,1}.subH{floor((s-1)/numSubX)+1,xInd}=h;
-            legend(h, 'off');
-        end
-        multiPlot=false;
-end
-
-curSx=1;
-curSy=1;
-curFigIdx=[1,1];
-
-for chIdx=1:numOpt
-    ch=selectedOpt(chIdx);
-    gStrs=cell(num2Plot,1);
-    for b=1:numBioM
-        bioM=selectedBioM(b);
-        if(iscell(bioM))
-            bioM=bioM{1};
-        end
-        
-        if(~plotGroupByBioM)
-            gStrs=cell(num2Plot,1);
-        end
-        
-        hGrandErr1=cell(num2Plot,1);
-        hGrandErr2=cell(num2Plot,1);
-        
-        for g=1:numGroups
-            if(useCurInfoGroup)
-                curGroupInfoIdx=uCurIdx(g);
-                curUgroupIdx=uCurGIdxCount(g);
-            else
-                curGroupInfoIdx=1;
-                curUgroupIdx=g;
-            end
-            
-            
-            if(strcmp(figType,'bioM'))
-                curFigH=sH{b,1};
-            else
-               curFigH=sH{1,1}; 
-            end
-            
-            switch(xType)
-                case 'channels'
-                    curSx=chIdx;
-                case 'bioM'
-                    curSx=b;
-                case 'groupby'
-                    curSx=curGroupInfoIdx;
-            end
-                
-            switch(yType)
-                case 'channels'
-                    curSy=chIdx;
-                case 'bioM'
-                    curSy=b;
-                case 'groupby'
-                    curSy=curGroupInfoIdx;
-            end
-            
-            if(curSy==numSubY&&curSx==numSubX)
-                lastSubplot=true;
-            else
-                lastSubplot=false;
-            end
-            
-            curFNIRS=ExFNIRS.gby(g).gbyFNIRS;
-            curGrand=ExFNIRS.gby(g).gbyGrand;
-            
-            
-            hold(curFigH.subH{curSy,curSx},'on');
-            if(ExFNIRS.settings.plot_individual&&~plotCount)
-               for i=1:length(curFNIRS)
-                   if(~isfield(curFNIRS{i},'HbO'))
-                       continue;
-                   end
-                   if(~isfield(curFigH,'legendHandles'))
-                       if(plotGroupByBioM)
-                            curFigH.legendHandles{curSy,curSx}.h=cell(numBioM,1);
-                       else
-                           curFigH.legendHandles{curSy,curSx}.h=cell(numUgroups,1);
-                       end
-                   end
-                   
-                   switch ExFNIRS.settings.ChannelMode
-                       case 'fNIR'
-                           data2plot=curFNIRS{i};
-                           dataTime=curFNIRS{i}.time;
-                       case 'ROI'
-                           if(~pf2_base.isnestedfield(curGrand,'ROI.HbO.data'))
-                              error('ROI data must be calculated using a build ROI step');
-                           end
-                          if(~isempty(curFNIRS{i})&&isfield(curFNIRS{i},'ROI'))
-                            data2plot=curFNIRS{i}.ROI;
-                          else
-                             data2plot=[]; 
-                          end
-                          dataTime=curFNIRS{i}.time;
-                          
-                       case 'Aux'
-                           data2plot=curFNIRS{i}.Aux;
-                           if(pf2_base.isnestedfield(data2plot.(bioM),'time')) %otherwise use aux time
-                               if(istable(data2plot.(bioM)))
-                                    dataTime=data2plot.(bioM).time;
-                                    
-                                    varNames=data2plot.(bioM).Properties.VariableNames;
-                                    timeIdx=ismember(varNames,'time');
-                                    data2plot.(bioM)=data2plot.(bioM)(:,~timeIdx);
-                                    data2plot.(bioM)=data2plot.(bioM){:,ch}; 
-                                
-                               else
-                                     dataTime=data2plot.(bioM).time;
-                                     varNames=fields(data2plot.(bioM));
-                                     timeIdx=ismember(varNames,'time');
-                                     firstVar=find(~timeIdx);
-                                     data2plot.(bioM)=data2plot.(bioM).(varNames{firstVar(1)});
-                               end
-                               
-                           elseif(isfield(data2plot,bioM)&&size(data2plot.(bioM),2)>1) %if has its own time use that
-                               dataTime=data2plot.(bioM)(:,1);
-                               data2plot.(bioM)=data2plot.(bioM)(:,2); 
-                           elseif(isfield(data2plot,'time'))
-                               dataTime=data2plot.time;  %or fnirs time
-                           else
-                               dataTime=curFNIRS{i}.time;  %or fnirs time
-                           end
-                           
-                   end
-                   
-                  if(plotGroupByBioM)
-                      if(~isempty(data2plot))
-                          h=plot(curFigH.subH{curSy,curSx},dataTime,data2plot.(bioM)(:,ch),'color',cIndex(b,:));
-                          set(h,'Tag',getFormattedTrialString(curFNIRS{i}));
-                          if(ExFNIRS.settings.plot_grandaverage||~isempty(curFigH.legendHandles{curSy,curSx}.h{b}))
-                            set(h.Annotation.LegendInformation,'IconDisplayStyle','off'); 
-                          end
-                          gStrs{b}=selectedBioM{b};
-                          curFigH.legendHandles{curSy,curSx}.h{b}=h;
-                      end
-                  else
-                      if(~isempty(data2plot.(bioM))&&isfield(data2plot,bioM))
-                          h=plot(curFigH.subH{curSy,curSx},dataTime,data2plot.(bioM)(:,ch),'color',cIndex(curUgroupIdx,:));
-                          set(h,'Tag',getFormattedTrialString(curFNIRS{i}));
-
-                          if(ExFNIRS.settings.plot_grandaverage||~isempty(curFigH.legendHandles{curSy,curSx}.h{curUgroupIdx}))
-                              if(~isempty(h))
-                                 set(h.Annotation.LegendInformation,'IconDisplayStyle','off'); 
-                              end
-                          end
-                          gStrs{curUgroupIdx}=gbyStrs{g}; 
-                          curFigH.legendHandles{curSy,curSx}.h{curUgroupIdx}=h;
-                      end
-                  end
-                  
-                  
-                  
-                  hold on;
-               end
-            end
-
-            if(ExFNIRS.settings.plot_grandaverage)
-                  switch(ExFNIRS.settings.ChannelMode)
-                      case 'fNIR'
-                          data2plot=curGrand.(bioM);
-                      case 'ROI'
-                          if(~pf2_base.isnestedfield(curGrand,'ROI.HbO.data'))
-                              warning('ROI data must be calculated using a build ROI step');
-                              data2plot=[];
-                          else
-                            data2plot=curGrand.ROI.(bioM);
-                          end
-                      case 'Aux'
-                            data2plot=curGrand.Aux.(bioM);
-                            %if(ndims(data2plot)>1)
-                            %    data2plot=data2plot(:,2);
-                            %end
-                            
-                  end
-                  
-                  
-                  if(~isempty(data2plot))
-                      if(plotGroupByBioM)
-                          hGrand=plot(curFigH.subH{curSy,curSx},curGrand.time,data2plot.(plotFeature)(:,ch),'LineWidth',3,'color',cIndex(b,:));
-                      else
-                          hGrand=plot(curFigH.subH{curSy,curSx},curGrand.time,data2plot.(plotFeature)(:,ch),'LineWidth',3,'color',cIndex(curUgroupIdx,:));
-                      end
-
-                      if(numUgroups>1||numBioM==1)&&~isempty(gbyStrs{g})
-                           gStrs{curUgroupIdx}=gbyStrs{g}; 
-                           set(hGrand,'Tag',sprintf('%s: %s',plotFeature,gStrs{curUgroupIdx}));
-                           curFigH.legendHandles{curSy,curSx}.hG{curUgroupIdx}=hGrand;
-                      elseif(~multiPlot)
-                           gStrs{b}=selectedBioM{b};
-                           set(hGrand,'Tag',sprintf('%s: %s',plotFeature,gStrs{b}));
-                           curFigH.legendHandles{curSy,curSx}.hG{b}=hGrand;
-                      end
-                  end
-                  
-                  
-            end
-            
-            if(ExFNIRS.settings.plot_error&&~plotCount)
-                errStyle=ExFNIRS.settings.plot_error_style;
-                plotShaded=false;
-                
-                switch(errStyle)
-                    case 'Dashed'
-                        errStyle='--';
-                        lineWidth=2;
-                    case 'Fine'
-                        errStyle='-';
-                        lineWidth=0.5;
-                    case 'Shaded'
-                        errStyle='-';
-                        lineWidth=0.5;
-                        plotShaded=true;
-                    otherwise
-                        error('Unspecified error style');
-                end
-                     
-                if(plotGroupByBioM)
-                    errColor=cIndex(b,:);
-                    errColor=errColor+(1-errColor)*0.55;
-                else
-                    errColor=cIndex(curUgroupIdx,:);
-                    errColor=errColor+(1-errColor)*0.55;
-                end
-                
-                switch ExFNIRS.settings.ChannelMode
-                    case 'fNIR'
-                        data2plot=curGrand.(bioM);
-                    case 'ROI'
-                        if(pf2_base.isnestedfield(curGrand,'ROI.HbO'))
-                        data2plot=curGrand.ROI.(bioM);
-                        else
-                           data2plot=[]; 
-                        end
-                    case 'Aux'
-                        data2plot=curGrand.Aux.(bioM);
-                end
-                
-                if(~isempty(data2plot))
-                    if(strcmp(errorFeature,'MaxMin'))
-                      upperError=data2plot.Max(:,ch);
-                      lowerError=data2plot.Min(:,ch);
-                    else
-                      upperError=data2plot.(plotFeature)(:,ch)+data2plot.(errorFeature)(:,ch)*errMulitply;
-                      lowerError=data2plot.(plotFeature)(:,ch)-data2plot.(errorFeature)(:,ch)*errMulitply;
-                    end
-
-
-                    if(plotShaded)
-                          errAlpha=0.15;
-                          yPatch=[lowerError',fliplr(upperError')];
-                          xPatch=[curGrand.time',fliplr(curGrand.time')];
-                          xPatch(isnan(yPatch))=[];
-                          yPatch(isnan(yPatch))=[];
-
-                          hPatch=patch(curFigH.subH{curSy,curSx},xPatch,yPatch,-1,'facecolor',errColor,'edgecolor','none','facealpha',errAlpha);
-                          if(~isempty(hPatch))
-                              set(hPatch,'HitTest','off');
-                              set(hPatch,'HandleVisibility','off');
-
-                              set(hPatch.Annotation.LegendInformation,'IconDisplayStyle','off'); 
-                          end
-                    end
-
-                    if(plotGroupByBioM)
-                          hGrandErr1{b}=plot(curFigH.subH{curSy,curSx},curGrand.time,upperError,'lineStyle',errStyle,'LineWidth',lineWidth,'color',errColor);
-                          hGrandErr2{b}=plot(curFigH.subH{curSy,curSx},curGrand.time,lowerError,'lineStyle',errStyle,'LineWidth',lineWidth,'color',errColor);
-                          set(hGrandErr1{b}.Annotation.LegendInformation,'IconDisplayStyle','off'); 
-                          set(hGrandErr2{b}.Annotation.LegendInformation,'IconDisplayStyle','off');
-                          curFigH.legendHandles{curSy,curSx}.hE{b}=hGrandErr1{b};
-                    else
-                          hGrandErr1{g}=plot(curFigH.subH{curSy,curSx},curGrand.time,upperError,'lineStyle',errStyle,'LineWidth',lineWidth,'color',errColor);
-                          hGrandErr2{g}=plot(curFigH.subH{curSy,curSx},curGrand.time,lowerError,'lineStyle',errStyle,'LineWidth',lineWidth,'color',errColor);
-                          set(hGrandErr1{g}.Annotation.LegendInformation,'IconDisplayStyle','off'); 
-                          set(hGrandErr2{g}.Annotation.LegendInformation,'IconDisplayStyle','off'); 
-                          curFigH.legendHandles{curSy,curSx}.hE{g}=hGrandErr1{g};
-                    end
-
-
-
-                    if(~plotGroupByBioM)
-                       gAerrStrs{g}=sprintf('%s: %s',errorFeature,gbyStrs{g}); 
-                       set(hGrandErr1{g},'Tag',gAerrStrs{g});
-                       set(hGrandErr2{g},'Tag',gAerrStrs{g});
-                    else
-                       gAerrStrs{b}=sprintf('%s: %s',errorFeature,selectedBioM{b}); 
-                       set(hGrandErr1{b},'Tag',gAerrStrs{b});
-                       set(hGrandErr2{b},'Tag',gAerrStrs{b});
-                    end
-                end
-            end
-            
-            switch ExFNIRS.settings.ChannelMode
-                case 'fNIR'
-                    chNamePart=sprintf('Opt. %i',ch);
-                    chNamePartLong=sprintf('Optode %i',ch);
-                case 'ROI'
-                    chNamePart=selectedOptStr{chIdx};
-                    chNamePartLong=sprintf('ROI: %s',selectedOptStr{chIdx});
-                case 'Aux'
-                    chNamePart='Aux:';
-                    chNamePartLong=sprintf('Aux: %s',bioM);
-            end
-            
-            if(~plotGroupByBioM) 
-                if(~strcmp(ExFNIRS.settings.ChannelMode,'Aux'))
-                    ylbl=sprintf('\\Delta[%s] (\\muM)',bioM);
-                else
-                    ylbl=sprintf('%s',bioM);
-                end
-                if(plotCount)
-                    ylbl=(sprintf('N %s',ylbl));
-                end
-                if(ExFNIRS.settings.plot_error)
-                    ylbl=(sprintf('%s (%s)',ylbl,ExFNIRS.settings.plot_error_feature));
-                end
-                ylbl=(sprintf('%s %s',chNamePart,ylbl));
-            elseif(plotGroupByBioM)
-                if(~strcmp(ExFNIRS.settings.ChannelMode,'Aux'))
-                    ylbl=sprintf('\\Delta[X] (\\muM)');
-                else
-                    ylbl=sprintf('Multiple signals');
-                end
-                if(plotCount)
-                    ylbl=(sprintf('N %s',ylbl));
-                end
-                if(ExFNIRS.settings.plot_error)
-                    ylbl=(sprintf('%s (%s)',ylbl,ExFNIRS.settings.plot_error_feature));
-                end
-                ylbl=(sprintf('%s %s',chNamePart,ylbl));
-                
-                
-            end
-            
-            switch(xType)
-                case 'channels'
-                    title_with_space(curFigH.subH{curSy,curSx},chNamePartLong);
-                case 'bioM'
-                    title_with_space(curFigH.subH{curSy,curSx},bioM);
-                case 'groupby'
-                    title_with_space(curFigH.subH{curSy,curSx},uCurInfoG{curGroupInfoIdx});
-                otherwise 
-            end
-            
-            switch(yType)
-                case 'channels'
-                    ylbl={chNamePartLong;ylbl};
-                case 'bioM'
-                    ylbl={bioM;ylbl};
-                case 'groupby'
-                    ylbl={uCurInfoG{curGroupInfoIdx};ylbl};
-                otherwise 
-            end
-            ylabel_with_space(curFigH.subH{curSy,curSx},ylbl);
-            
-        if(ExFNIRS.settings.ylim_fixed)
-            xlim(curFigH.subH{curSy,curSx},[ExFNIRS.settings.plot_start,ExFNIRS.settings.plot_end]);
-            ylim(curFigH.subH{curSy,curSx},'auto');
-            cylim=ylim(curFigH.subH{curSy,curSx});
-            ExFNIRS.settings.ylim_fixed_min=min(ExFNIRS.settings.ylim_fixed_min,cylim(1));
-            ExFNIRS.settings.ylim_fixed_max=max(ExFNIRS.settings.ylim_fixed_max,cylim(2));
-        elseif(ExFNIRS.settings.ylim_manual&&~plotCount)
-            ylim(curFigH.subH{curSy,curSx},[ExFNIRS.settings.ylim_manual_min,ExFNIRS.settings.ylim_manual_max]);
-        else
-            ylim(curFigH.subH{curSy,curSx},'auto');
-        end
-
-        curYlim=ylim(curFigH.subH{curSy,curSx});
-        if(plotCount)
-            ExFNIRS.settings.ylim_fixed_min=0;
-            ylim(curFigH.subH{curSy,curSx},[0,curYlim(2)]);
-        end
-
-
-        end
-        
-
-    end
-end
-
-if(plotCount)
-    ExFNIRS.settings.ylim_fixed_min=0;
-end
-
-
-for i=1:size(sH,1)
-    for b=1:size(sH,2)
-        for x=1:numSubX
-            for y=1:numSubY
-                xlabel_with_space(sH{i,b}.subH{y,x},'Time (s)');
-                xlim(sH{i,b}.subH{y,x},[ExFNIRS.settings.plot_start,ExFNIRS.settings.plot_end]);
-                
-                if(ExFNIRS.settings.ylim_fixed)
-                    ylim(sH{i,b}.subH{y,x},[ExFNIRS.settings.ylim_fixed_min,ExFNIRS.settings.ylim_fixed_max]);
-                end
-
-                if(ExFNIRS.settings.plot_legend_mode==3||(ExFNIRS.settings.plot_legend_mode==2&&(x==numSubX&&y==numSubY)))
-                    if(ExFNIRS.settings.plot_grandaverage)
-                        curHandles=curFigH.legendHandles{curSy,curSx}.hG;
-                    elseif(ExFNIRS.settings.plot_individual)
-                        curHandles=curFigH.legendHandles{curSy,curSx}.h;
-                    elseif(ExFNIRS.settings.plot_error)
-                        curHandles=curFigH.legendHandles{curSy,curSx}.hE;
-                    end
-                    legendGFXstrs=cell(0);
-                    for h=1:length(curHandles)
-                       if(~isempty(gStrs{h}))
-                           %set(curHandles{h}.Annotation.LegendInformation,'IconDisplayStyle','on'); 
-                           legendGFXstrs(h)=gStrs(h);
-                       else
-
-                       end
-                    end
-                    legend(sH{i,b}.subH{y,x},legendGFXstrs(:)','Location', 'Best');
-                end
-
-                if(ExFNIRS.settings.plot_task_lines)
-                    if(ExFNIRS.settings.use_baseline)
-                        pf2_base.external.vline(sH{i,b}.subH{y,x},[ExFNIRS.settings.baseline_start,ExFNIRS.settings.baseline_end],{'--k','HandleVisibility','off'});
-                    end
-                    pf2_base.external.vline(sH{i,b}.subH{y,x},[ExFNIRS.settings.block_start,ExFNIRS.settings.block_end],{'--r','HandleVisibility','off'});
-                end
-                
-                hold(sH{i,b}.subH{y,x},'off');
-            end
-        end
-        
-        addDebugAnnotation(sH{i,b}.h);
-        switch(figType)
-            case 'bioM'
-                suptitle_with_space(sH{i,b}.h,selectedBioM{i});
-            otherwise
-                
-        end
-    end
-end
 
 function h=xlabel_with_space(figHandle,labelstring)
 if(nargin<2)
@@ -2302,17 +1681,6 @@ th.HorizontalAlignment='left';
 th.VerticalAlignment='bottom';
 curPos=th.Position;
 
-
-function possibleStr=num2strOrNot(possibleStr)
-if(iscell(possibleStr))
-    for i=1:length(possibleStr)
-       if(~ischar(possibleStr{i})&&isnumeric(possibleStr{i}))
-            possibleStr{i}=num2str(possibleStr{i}); 
-       end
-    end
-elseif(~ischar(possibleStr)&&isnumeric(possibleStr))
-    possibleStr=num2str(possibleStr);
-end
 
 
 
@@ -7643,8 +7011,17 @@ global ExFNIRS
 idx=get(handles.popupmenu_ChannelMode,'Value');
 setExChannelMode(ExFNIRS.settings.ChannelModes{idx,2},handles);
 
-function setExChannelMode(modeStr,handles,initROI)
+function setExChannelMode(modeStr,handles,initROI,initAux,initOPT)
 % sets the channel mode and changes GUI to match
+
+if(nargin<5)
+    initOPT=false;
+end
+
+if(nargin<4)
+    initAux=false;
+end
+
 
 if(nargin<3)
     initROI=false;
@@ -7655,13 +7032,19 @@ ExFNIRS.settings.ChannelMode=modeStr;
 
 switch (ExFNIRS.settings.ChannelMode)
     case 'fNIR'
-        uOpt=[];
-        for i=1:length(ExFNIRS.data)
-            if(isfield(ExFNIRS.data{i},'channels'))
-                uOpt=[uOpt;ExFNIRS.data{i}.channels(:)];
+        if(initOPT||~isfield(ExFNIRS,'currentOpt'))
+            uOpt=[];
+            for i=1:length(ExFNIRS.data)
+                if(isfield(ExFNIRS.data{i},'channels'))
+                    uOpt=[uOpt;ExFNIRS.data{i}.channels(:)];
+                end
             end
+            uOpt=sort(unique(uOpt));
+
+            ExFNIRS.currentOpt=uOpt;
+        else
+            uOpt=ExFNIRS.currentOpt;
         end
-        uOpt=sort(unique(uOpt));
 
         set(handles.text_optode_label,'String','Optode');
         set(handles.text_biomarker_label,'String','BioMarker');
@@ -7678,64 +7061,74 @@ switch (ExFNIRS.settings.ChannelMode)
         
         set(handles.pushbutton_lme_plot_topo,'Enable','on');
     case 'ROI'
-        uAux={};
-        auxNames={};
-        for i=1:length(ExFNIRS.data)
-            if(pf2_base.isnestedfield(ExFNIRS.data{i},'ROI.info'))
-                curAuxNames=ExFNIRS.data{i}.ROI.info.Properties.RowNames;
-                if(any(~ismember(curAuxNames,auxNames)))
-                    for auxnum=1:size(ExFNIRS.data{i}.ROI.info,1)
-                        if(~ismember(curAuxNames{auxnum},auxNames))
-                            if(isempty(ExFNIRS.data{i}.ROI.info.Properties.RowNames{auxnum}))
-                                newRoiName=sprintf('ROI%i',auxnum+length(rowNames));
-                                auxNames=[auxNames,{newRoiName}];
-                                ExFNIRS.data{i}.ROI.info.Properties.RowNames{auxnum}=newRoiName;
-                            else
-                                auxNames=[auxNames,ExFNIRS.data{i}.ROI.info.Properties.RowNames(auxnum)];
+
+        if(initROI||~isfield(ExFNIRS,'currentROI')) % standaradize all ROIs on first load
+
+            initROI=true;
+            fprintf('Scanning ROI fields...\n');
+    
+            uROI={};
+            roiNames={};
+            for i=1:length(ExFNIRS.data)
+                if(pf2_base.isnestedfield(ExFNIRS.data{i},'ROI.info'))
+                    curROInames=ExFNIRS.data{i}.ROI.info.Properties.RowNames;
+                    if(any(~ismember(curROInames,roiNames)))
+                        for roinum=1:size(ExFNIRS.data{i}.ROI.info,1)
+                            if(~ismember(curROInames{roinum},roiNames))
+                                if(isempty(ExFNIRS.data{i}.ROI.info.Properties.RowNames{roinum}))
+                                    newRoiName=sprintf('ROI%i',roinum+length(rowNames));
+                                    roiNames=[roiNames,{newRoiName}];
+                                    ExFNIRS.data{i}.ROI.info.Properties.RowNames{roinum}=newRoiName;
+                                else
+                                    roiNames=[roiNames,ExFNIRS.data{i}.ROI.info.Properties.RowNames(roinum)];
+                                end
+                                ExFNIRS.data{i}.ROI.info.DeviceCfg(:)={ExFNIRS.data{i}.info.probename};
+                                uROI=[uROI;ExFNIRS.data{i}.ROI.info(roinum,:)];
                             end
-                            ExFNIRS.data{i}.ROI.info.DeviceCfg(:)={ExFNIRS.data{i}.info.probename};
-                            uAux=[uAux;ExFNIRS.data{i}.ROI.info(auxnum,:)];
                         end
                     end
                 end
-                
-                
-                
             end
+        else
+            uROI=ExFNIRS.currentROI;
+            uROInames=uROI.Properties.RowNames;
         end
-        if(isempty(uAux))
+        
+        if(isempty(uROI))
             warning('No ROIs present in data');
             set(handles.popupmenu_ChannelMode,'Value',1);
-            setExChannelMode('fNIR',handles,false);
+            setExChannelMode('fNIR',handles,false,false);
         else
             %uROI=unique(uROI{:},'rows');
 
-            [uROInames,b,c]=unique(auxNames);
-            uROInames=auxNames(b);
-            uAux=uAux(b,:);
-
+            
 
 
             if(initROI) % standaradize all ROIs on first load
+                [uROInames,b,c]=unique(roiNames);
+                uROInames=roiNames(b);
+                uROI=uROI(b,:);
+
                 fprintf(2,'************\nStandardizing all ROI fields..\n********\n');
                 for i=1:length(ExFNIRS.data)
                     if(pf2_base.isnestedfield(ExFNIRS.data{i},'raw')&&~isempty(ExFNIRS.data{i}))
                         if(~pf2_base.isnestedfield(ExFNIRS.data{i},'ROI.info'))
-                            ExFNIRS.data{i}.ROI.info=uAux;
+                            ExFNIRS.data{i}.ROI.info=uROI;
                         else
-                            for roi_idx=1:size(uAux,1)
-                               roi_name=uAux.Row(roi_idx);
+                            for roi_idx=1:size(uROI,1)
+                               roi_name=uROI.Row(roi_idx);
                                if(~contains(ExFNIRS.data{i}.ROI.info.Row,roi_name))
-                                   ExFNIRS.data{i}.ROI.info=[ExFNIRS.data{i}.ROI.info;uAux(roi_idx,:)];
+                                   ExFNIRS.data{i}.ROI.info=[ExFNIRS.data{i}.ROI.info;uROI(roi_idx,:)];
                                end
                             end
                             
                         end
                     end
                 end
+                ExFNIRS.currentROI=uROI;
             end
 
-            ExFNIRS.currentROI=uAux;
+            
 
 
             set(handles.text_optode_label,'String','ROI');
@@ -7754,54 +7147,85 @@ switch (ExFNIRS.settings.ChannelMode)
             set(handles.pushbutton_lme_plot_topo,'Enable','on');
         end
     case 'Aux'
+
+        if(initAux||~isfield(ExFNIRS,'currentAux'))
         
-        auxNames={};
-        for i=1:length(ExFNIRS.data)
-            if(pf2_base.isnestedfield(ExFNIRS.data{i},'Aux')&&~isempty(ExFNIRS.data{i}.Aux))
-                curAuxNames=fields(ExFNIRS.data{i}.Aux);
-                if(any(~ismember(curAuxNames,auxNames)))
-                    for auxnum=1:size(curAuxNames,1)
-                        if(~ismember(curAuxNames{auxnum},auxNames))
-                            auxNames=[auxNames,curAuxNames{auxnum}];
+            auxNames={}; %ex: hrv_data
+            uAux={};
+            auxVarNames={}; %ex: bpm
+    
+    
+            fprintf('Scanning Aux fields...\n');
+    
+            for i=1:length(ExFNIRS.data)
+                if(pf2_base.isnestedfield(ExFNIRS.data{i},'Aux'))
+                    curAuxNames=fields(ExFNIRS.data{i}.Aux);
+                    if(any(~ismember(curAuxNames,auxNames)))
+                        
+                        for auxf=1:length(curAuxNames)
+                            curField=ExFNIRS.data{i}.Aux.(curAuxNames{auxf});
+    
+                            if(istable(curField))
+                                auxNames=[auxNames,curAuxNames{auxf}];
+    
+                                curTableVars=curField.Properties.VariableNames;
+                                for auxnum=1:size(curField,2)
+                                    newVarNamesIdx=~ismember(curTableVars,auxVarNames);
+                                    if(any(newVarNamesIdx))
+                                        auxVarNames=[auxVarNames,curTableVars(newVarNamesIdx)];
+                                    end
+                                    
+                                end
+                            end
                         end
                     end
                 end
             end
+    
+            auxVarNamesNoTime=auxVarNames(~strcmp(auxVarNames,'time'));
+
+            initAux=true;
+        else
+            auxNames=ExFNIRS.currentAux.auxNames;
+            auxVarNames=ExFNIRS.currentAux.auxVarNames;
         end
-        
-        
-        if(isempty(auxNames))
-            warning('No Auxillary channels present in data');
+
+
+        if(isempty(auxNames)||isempty(auxVarNamesNoTime))
+            warning('No Auxillary channels or data present in data');
             set(handles.popupmenu_ChannelMode,'Value',1);
-            setExChannelMode('fNIR',handles,false);
+            setExChannelMode('fNIR',handles,false,false);
         else
             %uROI=unique(uROI{:},'rows');
 
             [uAuxNames,b,c]=unique(auxNames);
             uAuxNames=auxNames(b);
+
+            [uAuxVarNames,b,c]=unique(auxVarNames);
+            uAuxVarNames=auxVarNames(b);
       
 
 
-%             if(initROI) % standaradize all ROIs on first load
-%                 fprintf(2,'************\nStandardizing all ROI fields..\n********\n');
-%                 for i=1:length(ExFNIRS.data)
-%                     if(pf2_base.isnestedfield(ExFNIRS.data{i},'raw')&&~isempty(ExFNIRS.data{i}))
-%                        ExFNIRS.data{i}.ROI.info=uAux;
-%                     end
-%                 end
-%             end
-
-          %  ExFNIRS.currentROI=uAux;
-
+            if(initAux) % standaradize all ROIs on first load
+                ExFNIRS.currentAux.auxNames=auxNames;
+                ExFNIRS.currentAux.auxVarNames=auxVarNames;
+                 fprintf(2,'************\nStandardizing all Aux fields..\n********\n');
+                  %for i=1:length(ExFNIRS.data)
+                  %    if(pf2_base.isnestedfield(ExFNIRS.data{i},'raw')&&~isempty(ExFNIRS.data{i}))
+                         %ExFNIRS.data{i}.ROI.info=uAux;
+                   %   end
+                  %end
+            end
+ 
             set(handles.text_optode_label,'String','Aux');
             set(handles.text_biomarker_label,'String','Aux Signal');
-            set(handles.listbox_optode,'Enable','off');
-            set(handles.pushbutton_optodes_select_all,'Enable','off');
-            set(handles.pushbutton_optodes_select_none,'Enable','off');
+            set(handles.listbox_optode,'Enable','on');
+            set(handles.pushbutton_optodes_select_all,'Enable','on');
+            set(handles.pushbutton_optodes_select_none,'Enable','on');
             set(handles.listbox_biomarker,'Enable','on');
             set(handles.pushbutton_biomarker_select_all,'Enable','on');
             set(handles.pushbutton_biomarker_select_none,'Enable','on');
-            set(handles.listbox_optode,'String',{'Aux'});
+            set(handles.listbox_optode,'String',uAuxVarNames);
             set(handles.listbox_optode,'Value',1);
             set(handles.listbox_biomarker,'Value',1);
             set(handles.listbox_biomarker,'String',uAuxNames);
