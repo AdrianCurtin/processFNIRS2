@@ -26,6 +26,20 @@ selOpt=get(handles.listbox_optode,'Value');
 selectedOptStr=optStrs(selOpt',:);
 numOpt=length(selOpt);
 
+if(strcmp(exSettings.ChannelMode,'Aux'))
+    if(length(selectedBioM)>1)
+        error('Not supported yet!')
+    end
+    auxTable=get(handles.listbox_optode,'UserData');
+    selectedOpt=nan(length(selOpt));
+    for sI=1:length(selOpt)
+        selectedOpt(sI)=auxTable{selectedBioM,selectedOptStr{sI}};
+    end
+    
+else
+    selectedOpt=selOpt;
+end
+
 if(numOpt==0||numGroups==0||numBioM==0)
     return;
 end
@@ -147,7 +161,7 @@ numCharts=length(subplotHandles);
 
 
 for chIdx=1:numOpt
-    ch=selOpt(chIdx);
+    ch=selectedOpt(chIdx);
     %legendGFXhandles{1}=[];
     %legendGFXstrs{1}=cell(0);
     if(plotGroupByBioM)
@@ -376,6 +390,18 @@ for chIdx=1:numOpt
             ylim([min(ylimLower-0.1*yrange,0),max(ylimUpper+0.1*yrange,0)]);
         end
         
+        switch exSettings.ChannelMode
+            case 'fNIR'
+                chNamePart=sprintf('Opt. %i',ch);
+                chNamePartLong=sprintf('Optode %i',ch);
+            case 'ROI'
+                chNamePart=selectedOptStr{chIdx};
+                chNamePartLong=sprintf('ROI: %s',selectedOptStr{chIdx});
+            case 'Aux'
+                chNamePart=selectedOptStr{chIdx};
+                chNamePartLong=sprintf('Aux: %s %s',selectedOptStr{chIdx},bioM);
+        end
+        
         if(numBioM==1||numUgroups>1)  
             if(numBioM==1)
                 bioM=selectedBioM(curChart);
@@ -383,7 +409,9 @@ for chIdx=1:numOpt
                     bioM=bioM{1};
                 end
                 if(plotCount)
-                    ylabel_with_space(sprintf('%s \\Delta[%s] (\\muM)',plotFeature,bioM));
+                    ylabel_with_space(sprintf('%s [%s]',plotFeature,bioM));
+                elseif(strcmp(exSettings.ChannelMode,'Aux'))
+                    ylabel_with_space(sprintf('%s %s %s +/- (%s)',plotFeature,bioM,chNamePart,errorFeature));
                 else
                     ylabel_with_space(sprintf('%s \\Delta[%s] (\\muM)  +/- (%s)',plotFeature,bioM,errorFeature));
                 end
@@ -393,7 +421,9 @@ for chIdx=1:numOpt
                     bioM=bioM{1};
                 end
                 if(plotCount)
-                    ylabel_with_space(sprintf('%s \\Delta[%s] (\\muM)',plotFeature,bioM));
+                    ylabel_with_space(sprintf('%s [%s]',plotFeature,bioM));
+                elseif(strcmp(exSettings.ChannelMode,'Aux'))
+                    ylabel_with_space(sprintf('%s %s %s +/- (%s)',plotFeature,bioM,chNamePart,errorFeature));
                 else
                     ylabel_with_space(sprintf('%s \\Delta[%s] (\\muM)  +/- (%s)',plotFeature,bioM,errorFeature));
                 end
@@ -401,7 +431,9 @@ for chIdx=1:numOpt
             end
         elseif(numBioM==b)
             if(plotCount)
-                ylabel_with_space(sprintf('%s \\Delta[%s] (\\muM)',plotFeature,'X'));
+                ylabel_with_space(sprintf('%s [%s]',plotFeature,'X'));
+            elseif(strcmp(exSettings.ChannelMode,'Aux'))
+                    ylabel_with_space(sprintf('%s Aux +/- (%s)',plotFeature,errorFeature));
             else
                 ylabel_with_space(sprintf('%s \\Delta[%s] (\\muM)  +/- (%s)',plotFeature,'X',errorFeature));
             end
@@ -414,7 +446,7 @@ for chIdx=1:numOpt
             case 'ROI'
                 title_with_space(sprintf('ROI: %s',optStrs{ch}));
             case 'Aux'
-                title_with_space(sprintf('Aux: %s', bioM));
+                title_with_space(chNamePartLong);
         end
         
         if(useCurInfoGroup&&numChartTimes==1)

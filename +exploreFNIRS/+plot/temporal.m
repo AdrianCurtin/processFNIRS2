@@ -556,8 +556,6 @@ for chIdx=1:numOpt
                     ylbl=(sprintf('%s (%s)',ylbl,exSettings.plot_error_feature));
                 end
                 ylbl=(sprintf('%s %s',chNamePart,ylbl));
-                
-                
             end
             
             switch(xType)

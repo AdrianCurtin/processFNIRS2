@@ -68,7 +68,7 @@ if(~any(curRawMatchIdx&curOxyMatchIdx))
        end
     end
     try
-    close(hF);
+        close(hF);
     catch
         
     end
