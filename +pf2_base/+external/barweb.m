@@ -1,4 +1,4 @@
-function handles = barweb(barvalues, errors, width, groupnames, bw_title, bw_xlabel, bw_ylabel, bw_colormap, gridstatus, bw_legend, error_sides, legend_type)
+function handles = barweb(barvalues, errors, width, groupnames, bw_title, bw_xlabel, bw_ylabel, bw_colormap, gridstatus, bw_legend, error_sides, legend_type,hideBar)
 
 %
 % Usage: handles = barweb(barvalues, errors, width, groupnames, bw_title, bw_xlabel, bw_ylabel, bw_colormap, gridstatus, bw_legend, error_sides, legend_type)
@@ -112,6 +112,12 @@ elseif nargin == 11
 	legend_type = 'plot';
 end
 
+if(nargin<12)
+    hideBar=false;
+    % show point instead of bar (with errorbars)
+    % not implemented yet
+end
+
 
 change_axis = 0;
 ymax = 0;
@@ -140,7 +146,12 @@ else
 	end
 	
 	% Plot bars
-	handles.bars = bar(barvalues, width,'edgecolor','k', 'linewidth', 2);
+    if(~hideBar)
+	    handles.bars = bar(barvalues, width,'edgecolor','k', 'linewidth', 2);
+    else
+        handles.bars = bar(barvalues, width,'edgecolor','k', 'linewidth', 2);
+        handles.bars.visible=false;
+    end
 	hold on
 	if ~isempty(bw_colormap)
 		colormap(bw_colormap);
