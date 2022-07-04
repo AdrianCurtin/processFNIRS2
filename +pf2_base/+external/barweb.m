@@ -116,6 +116,10 @@ end
 change_axis = 0;
 ymax = 0;
 
+if(isempty(errors))
+    errors=nan(size(barvalues));
+end
+
 if size(barvalues,1) ~= size(errors,1) || size(barvalues,2) ~= size(errors,2)
 	error('barvalues and errors matrix must be of same dimension');
 else
