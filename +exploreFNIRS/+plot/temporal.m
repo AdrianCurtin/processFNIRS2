@@ -290,7 +290,7 @@ for chIdx=1:numOpt
                        end
                    end
 
-                   plotAsTable=false;
+                   
                    
                    switch exSettings.ChannelMode
                        case 'fNIR'
@@ -312,7 +312,7 @@ for chIdx=1:numOpt
                            if(pf2_base.isnestedfield(data2plot.(bioM),'time')) %otherwise use aux time
                                if(istable(data2plot.(bioM)))
                                     dataTime=data2plot.(bioM).time;
-                                    plotAsTable=true;
+                                    
                                     %=data2plot.(bioM).Properties.VariableNames;
                                     %timeIdx=ismember(varNames,'time');
                                     %data2plot.(bioM)=data2plot.(bioM)(:,~timeIdx);
@@ -336,6 +336,12 @@ for chIdx=1:numOpt
                                dataTime=curFNIRS{i}.time;  %or fnirs time
                            end
                            
+                   end
+
+                   if(isfield(data2plot,bioM))
+                    plotAsTable=istable(data2plot.(bioM));
+                   else
+                    plotAsTable=false;
                    end
                    
                   if(plotGroupByBioM)
