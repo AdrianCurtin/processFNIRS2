@@ -677,6 +677,8 @@ function [outAuxStruct] = recursiveAuxResample(aux_in,flattenAux,segLength,cente
     
                 [t_ind,t_aux_resample]=getTimeIdx(t_aux,segLength,centerOnTime);
                 outAuxStruct.(curFieldName)=table(t_aux_resample,'VariableNames',curTimeNames);
+            elseif(flattenAux)
+                outAuxStruct.(curFieldName)=table(t_aux_resample,'VariableNames',curTimeNames);
             else
                 outAuxStruct.(curFieldName)=table();
             end
@@ -735,7 +737,7 @@ function [outAuxStruct] = recursiveAuxResample(aux_in,flattenAux,segLength,cente
                     auxDat_resample=resample_internal(auxDat,t_ind,nAuxChan_col,numSegs_aux,nanRejectionLevel);
 
                     if(flattenAux)
-                    numCols=length(numericIdx);
+                        numCols=length(numericIdx);
 
                         if(numCols>1)
                             newVarNames=cell(size(numericIdx));
@@ -792,6 +794,10 @@ function [fTimeInd,timeSeries]=getTimeIdx(times_in,segLength,centerTime)
     % sampled by segmentLength and "centered" with a point at centerTime
         % ie: the time series includes the point centerTime, (or would if
         % samples around that time were collected
+
+    if(any(diff(times_in)<0))
+        error('Time series should be increasing in order to resample!');
+    end
 
 
  
