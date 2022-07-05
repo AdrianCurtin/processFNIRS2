@@ -125,12 +125,9 @@ else
 	end
 	
 	% Plot bars
-    if(~hideBar)
-	    handles.bars = bar(barvalues, width,'edgecolor','k', 'linewidth', 2);
-    else
-        handles.bars = bar(barvalues, width,'edgecolor','k', 'linewidth', 2);
-        handles.bars.visible=false;
-    end
+    % (even if invisible, we use for the xpoints)
+    handles.bars = bar(barvalues, width,'edgecolor','k', 'linewidth', 2);
+    
 	hold on
 	if ~isempty(bw_colormap)
 		colormap(bw_colormap);
@@ -148,24 +145,52 @@ else
 %         barvalues=[barvalues;barvalues];
 %     end
     
-	% Plot errors
+	% Plot errors + assign colors
 	for i = 1:numbars 
         x = bsxfun(@plus, handles.bars(i).XData, [handles.bars(i).XOffset]'); 
+
         if ~isempty(bw_colormap)
-                newI=rem(i,length(bw_colormap(:,1)));
-                if(newI==0)
-                    newI=length(bw_colormap(:,1));
-                end
-                handles.bars(i).FaceColor=bw_colormap(newI,:); 
-                if(length(bw_legend)>=i&&~isempty(bw_legend{i}))
-                    set(handles.bars(i),'Tag',bw_legend{i});
-                end
+            newI=rem(i,length(bw_colormap(:,1)));
+            if(newI==0)
+                newI=length(bw_colormap(:,1));
+            end
+            curColor=bw_colormap(newI,:);
+        else
+            curColor=[0,0,0];
         end
-        handles.errors(i) = errorbar(x, barvalues(:,i), errors(:,i)*BottomError,errors(:,i), 'k', 'linestyle', 'none', 'linewidth', 1); 
+        
+        if(hideBar)
+            handles.errors(i) = errorbar(x, barvalues(:,i), errors(:,i)*BottomError,errors(:,i), 'Color',curColor, 'linestyle', 'none', 'linewidth', 3); 
+        else
+            handles.errors(i) = errorbar(x, barvalues(:,i), errors(:,i)*BottomError,errors(:,i), k, 'linestyle', 'none', 'linewidth', 1); 
+        end
+
         if(length(bw_legend)>=i&&~isempty(bw_legend{i}))
             set(handles.errors(i),'Tag',bw_legend{i});
         end
         set(handles.errors(i),'HandleVisibility','off');
+
+        if ~isempty(bw_colormap)&&~hideBar
+                handles.bars(i).FaceColor=curColor;
+                if(length(bw_legend)>=i&&~isempty(bw_legend{i}))
+                    set(handles.bars(i),'Tag',bw_legend{i});
+                end
+        elseif(hideBar)
+            set(handles.bars(i),'Visible',false);
+
+            if ~isempty(bw_colormap)
+              
+                handles.statpoints(i)=plot(x(1),barvalues(1,i),'Marker','.');
+                handles.statpoints(i).MarkerSize=32;
+                handles.statpoints(i).MarkerEdgeColor=curColor; 
+                handles.statpoints(i).MarkerFaceColor=curColor; 
+                
+                
+                if(length(bw_legend)>=i&&~isempty(bw_legend{i}))
+                    set(handles.statpoints(i),'Tag',bw_legend{i});
+                end
+            end
+        end
         
         
         nonNanErrors=errors;
