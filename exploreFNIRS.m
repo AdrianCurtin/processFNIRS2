@@ -2245,6 +2245,9 @@ ExFNIRS.settings.plot_individual=get(handles.checkbox_plot_all_data,'Value');
 ExFNIRS.settings.plot_error=get(handles.checkbox_plot_error,'Value');
 ExFNIRS.settings.plot_error_multiply=str2num(get(handles.edit_error_multiplier,'String'));
 ExFNIRS.settings.plot_task_lines=get(handles.checkbox_mark_task,'Value');
+
+set(handles.popupmenu_errorbar_style,'String',{'SEM','SD','MinMax','IQR'});
+
 idx=get(handles.popupmenu_errorbar_style,'Value');
 strs=get(handles.popupmenu_errorbar_style,'String');
 ExFNIRS.settings.plot_error_style=strs{idx};
