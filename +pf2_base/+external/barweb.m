@@ -43,76 +43,55 @@ function handles = barweb(barvalues, errors, width, groupnames, bw_title, bw_xla
 % Get function arguments
 BottomError=true;
 
-if nargin < 2
-	error('Must have at least the first two arguments:  barweb(barvalues, errors, width, groupnames, bw_title, bw_xlabel, bw_ylabel, bw_colormap, gridstatus, bw_legend, barwebtype)');
-elseif nargin == 2
-	width = 1;
-	groupnames = 1:size(barvalues,1);
-	bw_title = [];
-	bw_xlabel = [];
-	bw_ylabel = [];
-	bw_colormap = jet;
-	gridstatus = 'none';
-	bw_legend = [];
-	error_sides = 2;
-	legend_type = 'plot';
-elseif nargin == 3
-	groupnames = 1:size(barvalues,1);
-	bw_title = [];
-	bw_xlabel = [];
-	bw_ylabel = [];
-	bw_colormap = jet;
-	gridstatus = 'none';
-	bw_legend = [];
-	error_sides = 2;
-	legend_type = 'plot';
-elseif nargin == 4
-	bw_title = [];
-	bw_xlabel = [];
-	bw_ylabel = [];
-	bw_colormap = jet;
-	gridstatus = 'none';
-	bw_legend = [];
-	error_sides = 2;
-	legend_type = 'plot';
-elseif nargin == 5
-	bw_xlabel = [];
-	bw_ylabel = [];
-	bw_colormap = jet;
-	gridstatus = 'none';
-	bw_legend = [];
-	error_sides = 2;
-	legend_type = 'plot';
-elseif nargin == 6
-	bw_ylabel = [];
-	bw_colormap = jet;
-	gridstatus = 'none';
-	bw_legend = [];
-	error_sides = 2;
-	legend_type = 'plot';
-elseif nargin == 7
-	bw_colormap = jet;
-	gridstatus = 'none';
-	bw_legend = [];
-	error_sides = 2;
-	legend_type = 'plot';
-elseif nargin == 8
-	gridstatus = 'none';
-	bw_legend = [];
-	error_sides = 2;
-	legend_type = 'plot';
-elseif nargin == 9
-	bw_legend = [];
-	error_sides = 2;
-	legend_type = 'plot';
-elseif nargin == 10
-	error_sides = 2;
-	legend_type = 'plot';
-elseif nargin == 11
-	legend_type = 'plot';
+
+if nargin < 1
+	error('Must have at least the first argument:  barweb(barvalues, errors, width, groupnames, bw_title, bw_xlabel, bw_ylabel, bw_colormap, gridstatus, bw_legend, barwebtype)');
+elseif(nargin<2)
+    errors=[];
+end
+
+if (nargin<3)
+    width=1;
+end
+
+if(nargin<4)
+    groupnames=1:size(barvalues,1);
+end
+
+if(nargin<5)
+    bw_title = [];
+end
+
+if(nargin<6)
+    bw_xlabel=[];
+end
+
+if(nargin<7)
+    bw_ylabel = [];
+end
+
+if(nargin<8)
+    bw_colormap=jet;
+end
+
+if(nargin<9)
+    gridstatus='none';
+end
+
+if(nargin<10)
+    bw_legend = [];
+end
+
+if(nargin<11)
+    error_sides = 2;
 end
 
 if(nargin<12)
+    legend_type = 'plot';
+end
+	
+
+if(nargin<13)
     hideBar=false;
     % show point instead of bar (with errorbars)
     % not implemented yet
