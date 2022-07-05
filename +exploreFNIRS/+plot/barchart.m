@@ -143,6 +143,8 @@ end
 errorFeature=exSettings.plot_bar_err_feature;
 plotFeature=exSettings.plot_bar_feature;
 
+%errorFeature='IQR';
+
 if(strcmp(plotFeature,'Count')&&exSettings.plot_bar_ga)
   plotFeature='N';
   plotCount=true;
@@ -159,21 +161,30 @@ end
 subplotGby=subplotHandles;
 numCharts=length(subplotHandles);
 
+% barChartData 1 x n Groups of cells
+%       i,j,k
+%       i: chartTime/InfoGroup
+%       j: Biomarkers or uGroups
+%       k: 1: summary stat, ie: mean/median
+%          2: lower error bar  ex: std or min
+%          3: upper error bar, ex: std/sem or max
+%          4: lower bound override (force 0:summary stat)
+%           5: upper bound override (can use both to plot IQR instead)
 
 for chIdx=1:numOpt
     ch=selectedOpt(chIdx);
     %legendGFXhandles{1}=[];
     %legendGFXstrs{1}=cell(0);
     if(plotGroupByBioM)
-        barChartData{1}=nan(numCurInfoG,numBioM,3);
+        barChartData{1}=nan(numCurInfoG,numBioM,5);
         num2Plot=numBioM;
     elseif(numUgroups>1)
         for i=1:numBioM
-            barChartData{i}=nan(numChartTimes,numUgroups,3);
+            barChartData{i}=nan(numChartTimes,numUgroups,5);
         end
         num2Plot=numUgroups;
     else
-        barChartData{1}=nan(numCurInfoG,1,3);
+        barChartData{1}=nan(numCurInfoG,1,5);
     
     end
     
@@ -278,14 +289,53 @@ for chIdx=1:numOpt
                   [timeIdx,timeIdxRev]=ismember(round(curGrand.time),barChartTimes);
                   timeIdxRev=timeIdxRev(timeIdxRev>0);
                   ga2plot=data2plot;%curGrand.(bioM);
+                  numErrFeatures=1;
                   if(strcmp(errorFeature,'MaxMin'))
+                      numErrFeatures=2; %min and max)
+
                       if(plotGroupByBioM)
-                          barChartData{curChart}(timeIdxRev+curGroupIdxOffset,b,2)=ga2plot.Max(timeIdx,ch);
-                          barChartData{curChart}(timeIdxRev+curGroupIdxOffset,b,3)=ga2plot.Min(timeIdx,ch);
+                          barChartData{curChart}(timeIdxRev+curGroupIdxOffset,b,2)=ga2plot.Min(timeIdx,ch);
+                          barChartData{curChart}(timeIdxRev+curGroupIdxOffset,b,3)=ga2plot.Max(timeIdx,ch);
+                          
                       else
-                          barChartData{curChart}(timeIdxRev+curGroupIdxOffset,curUgroupIdx,2)=ga2plot.Max(timeIdx,ch);
-                          barChartData{curChart}(timeIdxRev+curGroupIdxOffset,curUgroupIdx,3)=ga2plot.Min(timeIdx,ch);
+                          barChartData{curChart}(timeIdxRev+curGroupIdxOffset,curUgroupIdx,2)=ga2plot.Min(timeIdx,ch);
+                          barChartData{curChart}(timeIdxRev+curGroupIdxOffset,curUgroupIdx,3)=ga2plot.Max(timeIdx,ch);
                       end
+                  
+
+                  elseif(strcmp(errorFeature,'IQR'))
+                      numErrFeatures=5; %min and max) and median
+                      gaQuant=quantile(ga2plot.data(timeIdx,ch,:),3);
+                      iqr=gaQuant(end)-gaQuant(1);
+
+                      gaPlotMin=ga2plot.Min(timeIdx,ch);
+                      gaPlotMax=ga2plot.Min(timeIdx,ch);
+
+                      outlierMax=gaQuant(end)+1.5*iqr;
+                      outlierMin=gaQuant(1)-1.5*iqr;
+
+                      iqrPlotErrMin=max([gaPlotMin,outlierMin]);
+                      iqrPlotErrMax=max([gaPlotMax,outlierMax]);
+                      
+
+                      if(plotGroupByBioM)
+                          barChartData{curChart}(timeIdxRev+curGroupIdxOffset,b,2)=iqrPlotErrMin;
+                          barChartData{curChart}(timeIdxRev+curGroupIdxOffset,b,3)=iqrPlotErrMax;
+
+                          barChartData{curChart}(timeIdxRev+curGroupIdxOffset,b,4)=gaQuant(1);
+                          barChartData{curChart}(timeIdxRev+curGroupIdxOffset,b,5)=gaQuant(end);
+
+                          barChartData{curChart}(timeIdxRev+curGroupIdxOffset,b,6)=ga2plot.Median(timeIdx,ch);
+                      else
+                          barChartData{curChart}(timeIdxRev+curGroupIdxOffset,curUgroupIdx,2)=iqrPlotErrMin;
+                          barChartData{curChart}(timeIdxRev+curGroupIdxOffset,curUgroupIdx,3)=iqrPlotErrMax;
+
+                          barChartData{curChart}(timeIdxRev+curGroupIdxOffset,curUgroupIdx,4)=gaQuant(1);
+                          barChartData{curChart}(timeIdxRev+curGroupIdxOffset,curUgroupIdx,5)=gaQuant(end);
+
+                          barChartData{curChart}(timeIdxRev+curGroupIdxOffset,curUgroupIdx,6)=ga2plot.Median(timeIdx,ch);
+                      end
+                  
                   else
                       if(plotGroupByBioM)
                           barChartData{curChart}(timeIdxRev+curGroupIdxOffset,b,2)=ga2plot.(errorFeature)(timeIdx,ch)*errMulitply;
@@ -363,18 +413,33 @@ for chIdx=1:numOpt
         else
             xBarLabels=barChartTimeStrings;
         end
-    
+        
+        
+
         if(exSettings.plot_bar_err)
-            pf2_base.external.barweb(barChartData{curChart}(:,:,1),barChartData{curChart}(:,:,2),1,xBarLabels, [], [], [], cIndex,[],gAStrs,[],'hide');
-            ylimLower=min(min(barChartData{curChart}(:,:,1)))-max(max(barChartData{curChart}(:,:,2)));
-            ylimUpper=max(max(barChartData{curChart}(:,:,1)))+max(max(barChartData{curChart}(:,:,2)));
+            pf2_base.external.barweb(barChartData{curChart}(:,:,1),barChartData{curChart}(:,:,2:1+numErrFeatures),1,xBarLabels, [], [], [], cIndex,[],gAStrs,[],'hide');
+            
+            if(strcmp(errorFeature,'MaxMin')||strcmp(errorFeature,'IQR'))
+                minValFromBarChart=min(min(barChartData{curChart}(:,:,2)));
+                maxValFromBarChart=max(max(barChartData{curChart}(:,:,3)));
+            else
+                maxValFromBarChart=max(max(barChartData{curChart}(:,:,1)+barChartData{curChart}(:,:,2)));
+                minValFromBarChart=min(min(barChartData{curChart}(:,:,1)-barChartData{curChart}(:,:,2)));
+            end
+            
+            
+            ylimLower=minValFromBarChart;
+            ylimUpper=maxValFromBarChart;
             yrange=ylimUpper-ylimLower;
-            ylim([min(ylimLower-0.1*yrange,0),max(ylimUpper+0.1*yrange,0)]);
+            ylim([ylimLower-0.1*yrange,ylimUpper+0.1*yrange]);
             
         else
+            maxValFromBarChart=max(max(barChartData{curChart}(:,:,1)));
+            minValFromBarChart=min(min(barChartData{curChart}(:,:,1)));
+
             pf2_base.external.barweb(barChartData{curChart}(:,:,1),[],1,xBarLabels, [], [], [], cIndex,[],gAStrs,[],'hide');
-            ylimLower=min(min(barChartData{curChart}(:,:,1)));
-            ylimUpper=max(max(barChartData{curChart}(:,:,1)));
+            ylimLower=minValFromBarChart;
+            ylimUpper=maxValFromBarChart;
             yrange=ylimUpper-ylimLower;
             
         end
