@@ -1,7 +1,7 @@
 function [outStr,pf2ver,dateStr]=pf2version()
 
-pf2ver='v0.4';
-dateStr='June 21 2019';
+pf2ver='v0.7';
+dateStr='July 5 2022';
 
 
 verString=sprintf('processFNIRS2 Release %s\n',pf2ver);

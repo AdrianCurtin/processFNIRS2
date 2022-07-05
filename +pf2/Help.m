@@ -80,7 +80,7 @@ fprintf('\nIf you are having trouble loading processFNIRS2, delete these files a
 
 fprintf('\n');
 fprintf('\nprocessFNIRS2 is free for academic and non-commercial use, but some included code may have other lisences\n');
-fprintf('(c)2020\n');
+fprintf('(c)2022\n');
 fprintf('Contact Dr. Adrian Curtin for more information at adrian.b.curtin@drexel.edu\n');
 
 
