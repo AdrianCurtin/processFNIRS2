@@ -507,15 +507,15 @@ for sH=1:length(subplotHandles)
     if(exSettings.LME_enable&&isfield(subplotGby{sH},'gby'))
         switch (exSettings.ChannelMode)
             case 'fNIR'
-                mergedTables{sH}=mergeGbyTablesLong(subplotGby{sH}.gby,subplotGby{sH}.curBioM,subplotGby{sH}.curCh,barChartTimes,false,false);
+                mergedTables{sH}=exploreFNIRS.export.mergeGbyTablesLong(subplotGby{sH}.gby,subplotGby{sH}.curBioM,subplotGby{sH}.curCh,barChartTimes,false,false);
                 varNameStart='Opt';
         
             case 'ROI'     
-                mergedTables{sH}=mergeGbyTablesLong(subplotGby{sH}.gby,subplotGby{sH}.curBioM,subplotGby{sH}.curCh,barChartTimes,false,true);
+                mergedTables{sH}=exploreFNIRS.export.mergeGbyTablesLong(subplotGby{sH}.gby,subplotGby{sH}.curBioM,subplotGby{sH}.curCh,barChartTimes,false,true);
                 varNameStart='ROI';
         
             case 'Aux'
-                mergedTables{sH}=mergeGbyTablesLong(subplotGby{sH}.gby,subplotGby{sH}.curBioM,subplotGby{sH}.curCh,barChartTimes,true,false);
+                mergedTables{sH}=exploreFNIRS.export.mergeGbyTablesLong(subplotGby{sH}.gby,subplotGby{sH}.curBioM,subplotGby{sH}.curCh,barChartTimes,true,false);
                 varNameStart='aux';
         end
         x=gbyVars;
@@ -1250,4 +1250,15 @@ th.LineStyle='none';
 th.HorizontalAlignment='left';
 th.VerticalAlignment='bottom';
 curPos=th.Position;
+end
+
+function displayLME(lme_mdl)
+%disp(lme_mdl.Forumla);
+fprintf(2,'\nUse These DFs\n');
+[~,~,stats]=fixedEffects(lme_mdl,'DFMethod','satterthwaite');
+disp(stats);
+%disp(lme_mdl.RandomEffects);
+% [~,~,stats]=randomEffects(lme_mdl,'DFMethod','satterthwaite');
+% disp(stats);
+disp(anova(lme_mdl,'DFMethod','satterthwaite'));
 end
