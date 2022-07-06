@@ -123,10 +123,12 @@ if(plotData||plotViolin)
     [jSz,kSz]=size(data_points);
     for j=1:jSz
         for k=1:kSz
-            if(~isempty(data_points{j,k}))
-                [N_v{j,k},y_bin_v{j,k}]=pf2_base.external.myHistogram(data_points{j,k});
+            pdata=data_points{j,k};
+            if(~isempty(pdata))
+                pdata=pdata(:);
+                [N_v{j,k},y_bin_v{j,k}]=pf2_base.external.myHistogram(pdata);
                 if(plotViolin&&useKSD)
-                     [f{j,k}, u{j,k}, bb{j,k}]=ksdensity(data_points{j,k});
+                     [f{j,k}, u{j,k}, bb{j,k}]=ksdensity(pdata);
                      f{j,k}=f{j,k}'/max(f{j,k});
                      u{j,k}=u{j,k}';
                 end
@@ -225,13 +227,16 @@ else
     end
 
 
+    numgroups = size(barvalues, 1); % number of groups
+
 	if size(barvalues,1) == 1
+
 		barvalues = [barvalues; zeros(1,length(barvalues))];
-		errors = [errors; zeros(1,size(barvalues,2))];
+		%errors = [errors; zeros(1,size(barvalues,2))];
 		change_axis = 1;
     end
 
-	numgroups = size(barvalues, 1); % number of groups
+	
 	numbars = size(barvalues, 2); % number of bars in a group
 	if isempty(width)
 		width = 1;
@@ -306,7 +311,7 @@ else
 
             %Replot for non-zero based bars
             if(reDrawAsReactangles)
-                for ii=1:length(x)
+                for ii=1:numgroups
 
                     h1=abs(barUpper(ii,i)-barMids(ii,i));
                     h2=abs(barMids(ii,i)-barLower(ii,i));
@@ -342,7 +347,7 @@ else
         
         
         if(plotData)
-            for ii=1:length(x)
+            for ii=1:numgroups
                 if(plotViolin)
                     % Draw Violin plot with rectangles
                     if(useKSD)
@@ -472,9 +477,9 @@ else
     end
     
     if(numbars==1&&change_axis)
-        xlim([0.25 numgroups-change_axis+0.75]);    
+        xlim([0.25 numgroups+0.75]);    
     else
-        xlim([0.5 numgroups-change_axis+0.5]);
+        xlim([0.5 numgroups+0.5]);
     end
     
 	if strcmp(legend_type, 'axis')

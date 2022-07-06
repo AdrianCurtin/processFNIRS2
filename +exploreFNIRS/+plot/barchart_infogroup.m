@@ -292,6 +292,11 @@ if(exSettings.plot_bar_err)
     if(useCurInfoGroup)
        title_with_space(sprintf('%s by %s',curInfoStr,curInfoGroup)); 
        xlabel_with_space(curInfoGroup);
+    else
+       title_with_space(sprintf('%s',curInfoStr)); 
+
+       xLabGby=strjoin(gbyVars,'x');
+       xlabel_with_space(xLabGby);
     end
 else
     pf2_base.external.barweb(barChartData(:,:,1),[],1,uCurInfoG, [], [], [], cIndex,[],gAStrs,[],'hide',barChartDataPoints);
