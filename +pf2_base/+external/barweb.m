@@ -366,20 +366,24 @@ else
                     n=0;
                     lastIdx=1;
                     for z=1:length(posIdx)
-                        if(posIdx(z)==1)
-                            n=0;
-                            l=z-lastIdx;
-                            if(l)>1
-                                posCount(lastIdx:(z-1))=randperm(l)-1;
-                                lastIdx=z;
+                        if(posIdx(z)>0)
+                            
+                            if(n>0)
+                                posCount(lastIdx:lastIdx+n)=randperm(n+1)-1;
                             end
+                            n=0;
+                            lastIdx=z;
                             
                         else
                             n=n+1;
                         end
                         posCount(z)=n;
                     end
-
+                    if(posCount(end)>0)
+                        l=length(posIdx)-lastIdx;
+                        posCount(lastIdx:length(posIdx))=randperm(l+1)-1;
+                    end
+                    
                     %(posCount-(a_count(b_idx(b_idx2))-1)/2)/maxCount
                     maxCount=max(a_count);
 
