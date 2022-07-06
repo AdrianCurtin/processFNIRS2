@@ -1,4 +1,4 @@
-function handles = barweb(barvalues, errors, width, groupnames, bw_title, bw_xlabel, bw_ylabel, bw_colormap, gridstatus, bw_legend, error_sides, legend_type,error_is_y,data_points,hideBar)
+function handles = barweb(barvalues, errors, width, groupnames, bw_title, bw_xlabel, bw_ylabel, bw_colormap, gridstatus, bw_legend, error_sides, legend_type,data_points,error_is_y,hideBar)
 
 %
 % Usage: handles = barweb(barvalues, errors, width, groupnames, bw_title, bw_xlabel, bw_ylabel, bw_colormap, gridstatus, bw_legend, error_sides, legend_type)
@@ -44,7 +44,8 @@ function handles = barweb(barvalues, errors, width, groupnames, bw_title, bw_xla
 
 % Get function arguments
 BottomError=true;
-
+hideError=false;
+plotFeatureAsPoint=false;
 
 if nargin < 1
 	error('Must have at least the first argument:  barweb(barvalues, errors, width, groupnames, bw_title, bw_xlabel, bw_ylabel, bw_colormap, gridstatus, bw_legend, barwebtype)');
@@ -93,12 +94,16 @@ if(nargin<12)
 end
 
 if(nargin<13)
-    error_is_y=false;
+    data_points=[];
+    plotData=false;
+else
+    plotData=any(~cellfun(@isempty,data_points));
 end
 
 if(nargin<14)
-    dataPoints=[];
+    error_is_y=false;
 end
+
 
 if(nargin<15)
     hideBar=false;
@@ -109,6 +114,12 @@ end
 
 change_axis = 0;
 ymax = 0;
+
+if(all(isnan(barvalues)))
+    %barvalues(:)=0;
+    hideBar=true;
+    hideError=true;
+end
 
 if(isempty(errors))
     errors=nan(size(barvalues));
@@ -133,13 +144,15 @@ else
         errorsUpper=errors(:,:,2);
 
         error_is_y=true;
+
+        hideError=false;
     end
 
     
 
     if(errorVals>2)
         barLower=errors(:,:,3);
-        reDrawAsReactangles=true;
+        reDrawAsReactangles=true&&~hideBar;
         hideBar=true;
     else
         barLower=zeros(size(barvalues));
@@ -155,6 +168,10 @@ else
 
     if(errorVals>4)
         barMids=errors(:,:,5);
+
+        if(~all(barvalues==barMids))
+            plotFeatureAsPoint=true;
+        end
     else
         barMids=barvalues;
     end
@@ -224,10 +241,9 @@ else
             curColor=[0,0,0];
         end
         
-        if(hideBar&&~reDrawAsReactangles)
+        if(hideBar&&~reDrawAsReactangles&&~hideError)
             handles.errors(i) = errorbar(x, barvalues(:,i), errorsLower(:,i), 'Color',curColor, 'linestyle', 'none', 'linewidth', 3); 
-        else
-            % otherwise we draw errors last
+        elseif(~hideError)
             handles.errors(i) = errorbar(x, barvalues(:,i), errorsLower(:,i),errorsUpper(:,i), 'k', 'linestyle', 'none', 'linewidth', 1); 
        
         end
@@ -266,16 +282,23 @@ else
                         end
                     end
 
-                    
+                    if(length(bw_legend)>=i&&~isempty(bw_legend{i}))
+                        set(handles.rectangles(i,ii,1),'Tag',bw_legend{i});
+                        set(handles.rectangles(i,ii,2),'Tag',bw_legend{i});
+                    end
                 end
-                
-            else
+            end
+            
+            if((~hideError&&~reDrawAsReactangles)||plotFeatureAsPoint)
                 if ~isempty(bw_colormap)
                   
-                    handles.statpoints(i)=plot(x(1),barvalues(1,i),'Marker','.');
-                    handles.statpoints(i).MarkerSize=32;
-                    handles.statpoints(i).MarkerEdgeColor=curColor; 
-                    handles.statpoints(i).MarkerFaceColor=curColor; 
+                    handles.statpoints(i)=plot(x,barvalues(:,i),'d');
+
+                    if(reDrawAsReactangles)
+                        handles.statpoints(i).MarkerSize=32;
+                        handles.statpoints(i).MarkerEdgeColor=[0,0,0]; 
+                        handles.statpoints(i).MarkerFaceColor=[0,0,0];         
+                    end
                     
                     
                     if(length(bw_legend)>=i&&~isempty(bw_legend{i}))
@@ -285,12 +308,24 @@ else
             end
         end
         
-        
+        if(plotData)
+            for ii=1:length(x)
+                if(~isempty(data_points{ii,i}))
+                    curBarDataPoints=data_points{ii,i}(:);
+    
+                    curBarDataPoints=[ones(size(curBarDataPoints))*x(ii),curBarDataPoints];
+                    plot(curBarDataPoints(:,1),curBarDataPoints(:,2),'x','Color',[0,0,0]);
+                end
+            end
+        end
 
-        if(length(bw_legend)>=i&&~isempty(bw_legend{i}))
+        if(length(bw_legend)>=i&&~isempty(bw_legend{i})&&~hideError)
             set(handles.errors(i),'Tag',bw_legend{i});
         end
-        set(handles.errors(i),'HandleVisibility','off');
+
+        if(~hideError)
+            set(handles.errors(i),'HandleVisibility','off');
+        end
         
         nonNanErrors=errors;
         nonNanErrors(isnan(errors))=0;

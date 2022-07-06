@@ -26,6 +26,8 @@ selOpt=get(handles.listbox_optode,'Value');
 selectedOptStr=optStrs(selOpt',:);
 numOpt=length(selOpt);
 
+
+
 if(strcmp(exSettings.ChannelMode,'Aux'))
     if(length(selectedBioM)>1)
         error('Not supported yet!')
@@ -142,8 +144,8 @@ end
 
 errorFeature=exSettings.plot_bar_err_feature;
 plotFeature=exSettings.plot_bar_feature;
+plotPoints=exSettings.plot_bar_all;
 
-%errorFeature='IQR';
 
 if(strcmp(plotFeature,'Count')&&exSettings.plot_bar_ga)
   plotFeature='N';
@@ -254,7 +256,7 @@ for chIdx=1:numOpt
                continue; 
             end
             
-            if(exSettings.plot_bar_ga)
+            %if(exSettings.plot_bar_ga)
                   [timeIdx,timeIdxRev]=ismember(round(curGrand.time),barChartTimes);
                   timeIdxRev=timeIdxRev(timeIdxRev>0);
                   
@@ -271,21 +273,43 @@ for chIdx=1:numOpt
                           data2plot=curGrand.Aux.(bioM);
                   end
    
+                  plottingDataPoints=plotPoints;
+                  
                   if(plotGroupByBioM)
-                      barChartData{curChart}(timeIdxRev+curGroupIdxOffset,b,1)=data2plot.(plotFeature)(timeIdx,ch);
+                      if(exSettings.plot_bar_ga)
+                        barChartData{curChart}(timeIdxRev+curGroupIdxOffset,b,1)=data2plot.(plotFeature)(timeIdx,ch);
+                      else
+                        barChartData{curChart}(timeIdxRev+curGroupIdxOffset,b,1)=nan(size(data2plot.(plotFeature)(timeIdx,ch)));
+                      end
+                      barChartDataPoints{curChart}{timeIdxRev+curGroupIdxOffset,b}=[];
                   else
-                      barChartData{curChart}(timeIdxRev+curGroupIdxOffset,curUgroupIdx,1)=data2plot.(plotFeature)(timeIdx,ch);
+                      if(exSettings.plot_bar_ga)
+                            barChartData{curChart}(timeIdxRev+curGroupIdxOffset,curUgroupIdx,1)=data2plot.(plotFeature)(timeIdx,ch);
+                      else
+                            barChartData{curChart}(timeIdxRev+curGroupIdxOffset,curUgroupIdx,1)=nan(size(data2plot.(plotFeature)(timeIdx,ch)));
+                      end
+                      
+                      barChartDataPoints{curChart}{timeIdxRev+curGroupIdxOffset,curUgroupIdx}=[];
                   end
+
+                  if(plotGroupByBioM&&plotPoints)
+                      barChartDataPoints{curChart}{timeIdxRev+curGroupIdxOffset,b}=data2plot.data(timeIdx,ch,:);
+                  elseif(plotPoints)
+                      barChartDataPoints{curChart}{timeIdxRev+curGroupIdxOffset,curUgroupIdx}=data2plot.data(timeIdx,ch,:);
+                  end
+
                   if(numUgroups>1||numBioM==1)
                        gAStrs{curUgroupIdx,curChart}=sprintf('%s',gbyStrs{g}); 
                   elseif(numBioM>1)
                        gAStrs{b,curChart}=sprintf('%s',selectedBioM{b}); 
                   end
-            end
+            %else
+
+            %end
             
             if(exSettings.plot_bar_err&&~plotCount)
                   
-                  errMulitply=exSettings.plot_bar_err_mult;
+                  errMultiply=exSettings.plot_bar_err_mult;
                   [timeIdx,timeIdxRev]=ismember(round(curGrand.time),barChartTimes);
                   timeIdxRev=timeIdxRev(timeIdxRev>0);
                   ga2plot=data2plot;%curGrand.(bioM);
@@ -303,7 +327,7 @@ for chIdx=1:numOpt
                       end
                   
 
-                  elseif(strcmp(errorFeature,'IQR'))
+                  elseif(strcmp(errorFeature,'IQR')||strcmp(errorFeature,'IQR-NoOutliers'))
                       numErrFeatures=5; %min and max) and median
                       gaQuant=quantile(ga2plot.data(timeIdx,ch,:),3);
                       iqr=gaQuant(end)-gaQuant(1);
@@ -311,8 +335,8 @@ for chIdx=1:numOpt
                       gaPlotMin=ga2plot.Min(timeIdx,ch);
                       gaPlotMax=ga2plot.Min(timeIdx,ch);
 
-                      outlierMax=gaQuant(end)+1.5*iqr;
-                      outlierMin=gaQuant(1)-1.5*iqr;
+                      outlierMax=gaQuant(end)+errMultiply*iqr;
+                      outlierMin=gaQuant(1)-errMultiply*iqr;
 
                       iqrPlotErrMin=max([gaPlotMin,outlierMin]);
                       iqrPlotErrMax=max([gaPlotMax,outlierMax]);
@@ -326,6 +350,14 @@ for chIdx=1:numOpt
                           barChartData{curChart}(timeIdxRev+curGroupIdxOffset,b,5)=gaQuant(end);
 
                           barChartData{curChart}(timeIdxRev+curGroupIdxOffset,b,6)=ga2plot.Median(timeIdx,ch);
+
+                          if(strcmp(errorFeature,'IQR'))
+                              dataPointsIdx=(ga2plot.data(timeIdx,ch,:)>iqrPlotErrMax|ga2plot.data(timeIdx,ch,:)<iqrPlotErrMin);
+                              
+                              barChartDataPoints{curChart}{timeIdxRev+curGroupIdxOffset,b}=ga2plot.data(timeIdx,ch,dataPointsIdx);
+
+                              plottingDataPoints=true;
+                          end
                       else
                           barChartData{curChart}(timeIdxRev+curGroupIdxOffset,curUgroupIdx,2)=iqrPlotErrMin;
                           barChartData{curChart}(timeIdxRev+curGroupIdxOffset,curUgroupIdx,3)=iqrPlotErrMax;
@@ -334,13 +366,21 @@ for chIdx=1:numOpt
                           barChartData{curChart}(timeIdxRev+curGroupIdxOffset,curUgroupIdx,5)=gaQuant(end);
 
                           barChartData{curChart}(timeIdxRev+curGroupIdxOffset,curUgroupIdx,6)=ga2plot.Median(timeIdx,ch);
+
+                          if(strcmp(errorFeature,'IQR'))
+                            dataPointsIdx=(ga2plot.data(timeIdx,ch,:)>iqrPlotErrMax|ga2plot.data(timeIdx,ch,:)<iqrPlotErrMin);
+                          
+                            barChartDataPoints{curChart}{timeIdxRev+curGroupIdxOffset,curUgroupIdx}=ga2plot.data(timeIdx,ch,dataPointsIdx);
+
+                            plottingDataPoints=true;
+                          end
                       end
                   
                   else
                       if(plotGroupByBioM)
-                          barChartData{curChart}(timeIdxRev+curGroupIdxOffset,b,2)=ga2plot.(errorFeature)(timeIdx,ch)*errMulitply;
+                          barChartData{curChart}(timeIdxRev+curGroupIdxOffset,b,2)=ga2plot.(errorFeature)(timeIdx,ch)*errMultiply;
                       else
-                          barChartData{curChart}(timeIdxRev+curGroupIdxOffset,curUgroupIdx,2)=ga2plot.(errorFeature)(timeIdx,ch)*errMulitply;
+                          barChartData{curChart}(timeIdxRev+curGroupIdxOffset,curUgroupIdx,2)=ga2plot.(errorFeature)(timeIdx,ch)*errMultiply;
                       end
                   end
                   if(numUgroups>1||numBioM==1)
@@ -367,7 +407,7 @@ for chIdx=1:numOpt
         if(isempty(barChartData{curChart}))
             warning('All data is missing');
             continue;
-        elseif(sum(~isnan(barChartData{curChart}(:,:,1)))==0)
+        elseif(exSettings.plot_bar_ga==1&&all(all(isnan(barChartData{curChart}(:,:,1)))))
             warning('All data is missing');
             continue;
         end
@@ -416,15 +456,27 @@ for chIdx=1:numOpt
         
         
 
-        if(exSettings.plot_bar_err)
-            pf2_base.external.barweb(barChartData{curChart}(:,:,1),barChartData{curChart}(:,:,2:1+numErrFeatures),1,xBarLabels, [], [], [], cIndex,[],gAStrs,[],'hide');
+        if(exSettings.plot_bar_err&&~plotCount)
+            pf2_base.external.barweb(barChartData{curChart}(:,:,1),barChartData{curChart}(:,:,2:1+numErrFeatures),1,xBarLabels, [], [], [], cIndex,[],gAStrs,[],'hide',barChartDataPoints{curChart});
             
-            if(strcmp(errorFeature,'MaxMin')||strcmp(errorFeature,'IQR'))
+            if(strcmp(errorFeature,'MaxMin')||strcmp(errorFeature,'IQR')||strcmp(errorFeature,'IQR-NoOutliers'))
                 minValFromBarChart=min(min(barChartData{curChart}(:,:,2)));
                 maxValFromBarChart=max(max(barChartData{curChart}(:,:,3)));
             else
                 maxValFromBarChart=max(max(barChartData{curChart}(:,:,1)+barChartData{curChart}(:,:,2)));
                 minValFromBarChart=min(min(barChartData{curChart}(:,:,1)-barChartData{curChart}(:,:,2)));
+            end
+
+            if(plottingDataPoints)
+                [jSz,kSz]=size(barChartDataPoints{curChart});
+                for j=1:jSz
+                    for k=1:kSz
+                        if(~isempty(barChartDataPoints{curChart}{j,k}))
+                            maxValFromBarChart=nanmax(maxValFromBarChart,nanmax(barChartDataPoints{curChart}{j,k}));
+                            minValFromBarChart=nanmin(minValFromBarChart,nanmin(barChartDataPoints{curChart}{j,k}));
+                        end
+                    end
+                end
             end
             
             
@@ -473,12 +525,21 @@ for chIdx=1:numOpt
                 if(iscell(bioM))
                     bioM=bioM{1};
                 end
+                
                 if(plotCount)
                     ylabel_with_space(sprintf('%s [%s]',plotFeature,bioM));
                 elseif(strcmp(exSettings.ChannelMode,'Aux'))
-                    ylabel_with_space(sprintf('%s %s %s +/- (%s)',plotFeature,bioM,chNamePart,errorFeature));
+                    if(errMultiply==1)
+                        ylabel_with_space(sprintf('%s %s %s +/- %s',plotFeature,bioM,chNamePart,errorFeature));
+                    else
+                        ylabel_with_space(sprintf('%s %s %s +/- %dx %s',plotFeature,bioM,chNamePart,errMultiply,errorFeature));
+                    end
                 else
-                    ylabel_with_space(sprintf('%s \\Delta[%s] (\\muM)  +/- (%s)',plotFeature,bioM,errorFeature));
+                    if(errMultiply==1)
+                        ylabel_with_space(sprintf('%s \\Delta[%s] (\\muM)  +/- %s',plotFeature,bioM,errorFeature));
+                    else
+                        ylabel_with_space(sprintf('%s \\Delta[%s] (\\muM)  +/- %dx %s',plotFeature,bioM,errMultiply,errorFeature));
+                    end
                 end
             else
                 bioM=selectedBioM(curChart);
@@ -488,9 +549,17 @@ for chIdx=1:numOpt
                 if(plotCount)
                     ylabel_with_space(sprintf('%s [%s]',plotFeature,bioM));
                 elseif(strcmp(exSettings.ChannelMode,'Aux'))
-                    ylabel_with_space(sprintf('%s %s %s +/- (%s)',plotFeature,bioM,chNamePart,errorFeature));
+                    if(errMultiply==1)
+                        ylabel_with_space(sprintf('%s %s %s +/- (%s)',plotFeature,bioM,chNamePart,errorFeature));
+                    else
+                        ylabel_with_space(sprintf('%s %s %s +/- %d*(%s)',plotFeature,bioM,chNamePart,errMultiply,errorFeature));
+                    end
                 else
-                    ylabel_with_space(sprintf('%s \\Delta[%s] (\\muM)  +/- (%s)',plotFeature,bioM,errorFeature));
+                    if(errMultiply==1)
+                        ylabel_with_space(sprintf('%s \\Delta[%s] (\\muM)  +/- (%s)',plotFeature,bioM,errorFeature));
+                    else
+                        ylabel_with_space(sprintf('%s %s %s +/- %dx(%s)',plotFeature,bioM,chNamePart,errMultiply,errorFeature));
+                    end
                 end
                 
             end
