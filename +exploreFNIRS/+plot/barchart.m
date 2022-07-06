@@ -344,12 +344,10 @@ for chIdx=1:numOpt
                       gaPlotMax=max(ga2plot.Max(timeIdx,ch));
 
                       if(contains(errorFeature,'IQR'))
-
-                      
-
                           outlierMax=gaQuant(end)+errMultiply*iqr;
                           outlierMin=gaQuant(1)-errMultiply*iqr;
     
+                          
                           iqrPlotErrMin=max([gaPlotMin,outlierMin]);
                           iqrPlotErrMax=min([gaPlotMax,outlierMax]);
 
@@ -480,15 +478,8 @@ for chIdx=1:numOpt
         if(exSettings.plot_bar_err&&~plotCount)
             pf2_base.external.barweb(barChartData{curChart}(:,:,1),barChartData{curChart}(:,:,2:1+numErrFeatures),1,xBarLabels, [], [], [], cIndex,[],gAStrs,[],'hide',barChartDataPoints{curChart},strcmp(errorFeature,'Violin'));
             
-            if(strcmp(errorFeature,'MaxMin')||strcmp(errorFeature,'IQR')||strcmp(errorFeature,'IQR-NoOutliers')||strcmp(errorFeature,'Violin'))
-                minValFromBarChart=min(min(min(barChartData{curChart}(:,:,2))));
-                maxValFromBarChart=max(max(max(barChartData{curChart}(:,:,3))));
-            else
-                maxValFromBarChart=max(max(max(barChartData{curChart}(:,:,1)+barChartData{curChart}(:,:,2))));
-                minValFromBarChart=min(min(min(barChartData{curChart}(:,:,1)-barChartData{curChart}(:,:,2))));
-            end
 
-            if(plottingDataPoints)
+            if(plottingDataPoints||strcmp(errorFeature,'MaxMin')||strcmp(errorFeature,'IQR')||strcmp(errorFeature,'Violin'))
                 [jSz,kSz]=size(barChartDataPoints{curChart});
                 for j=1:jSz
                     for k=1:kSz
@@ -498,13 +489,25 @@ for chIdx=1:numOpt
                         end
                     end
                 end
+            
+
+            elseif(strcmp(errorFeature,'IQR-NoOutliers'))
+                minValFromBarChart=min(min(min(barChartData{curChart}(:,:,2))));
+                maxValFromBarChart=max(max(max(barChartData{curChart}(:,:,3))));
+            
+
+            else
+                maxValFromBarChart=max(max(max(barChartData{curChart}(:,:,1)+barChartData{curChart}(:,:,2))));
+                minValFromBarChart=min(min(min(barChartData{curChart}(:,:,1)-barChartData{curChart}(:,:,2))));
             end
+
+            
             
             
             ylimLower=minValFromBarChart;
             ylimUpper=maxValFromBarChart;
             yrange=ylimUpper-ylimLower;
-            ylim([ylimLower-0.1*yrange,ylimUpper+0.1*yrange]);
+            
             
         else
             maxValFromBarChart=max(max(barChartData{curChart}(:,:,1)));
@@ -518,14 +521,15 @@ for chIdx=1:numOpt
         end
         
         if(exSettings.ylim_fixed)
-            ylim([min(ylimLower-0.05*yrange,0),max(ylimUpper+0.05*yrange,0)]);
+            %ylim([min(ylimLower-0.05*yrange,0),max(ylimUpper+0.05*yrange,0)]);
+            ylim([ylimLower-0.1*yrange,ylimUpper+0.1*yrange]);
             cylim=ylim;
             exSettings.ylim_fixed_min=min(cylim(1),exSettings.ylim_fixed_min);
             exSettings.ylim_fixed_max=max(cylim(2),exSettings.ylim_fixed_max);
         elseif(exSettings.ylim_manual&&~plotCount)
             ylim([exSettings.ylim_manual_min,exSettings.ylim_manual_max]);
         else
-            ylim([min(ylimLower-0.1*yrange,0),max(ylimUpper+0.1*yrange,0)]);
+            ylim([ylimLower-0.1*yrange,ylimUpper+0.1*yrange]);
         end
         
         switch exSettings.ChannelMode

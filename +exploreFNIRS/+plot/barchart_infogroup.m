@@ -283,7 +283,7 @@ if(exSettings.plot_bar_err)
         ylimLower=min(min(barChartData(:,:,2)));
         ylimUpper=max(max(barChartData(:,:,3)));
         yrange=ylimUpper-ylimLower;
-        ylim([min(ylimLower-0.1*yrange,0),max(ylimUpper+0.1*yrange,0)]);
+        ylim([ylimLower-0.1*yrange,ylimUpper+0.1*yrange]);
         if(errMultiply==1)
             ylabel_with_space(sprintf('%s %s   +/- %s',plotFeature,curInfoStr,errorFeature));
         else
