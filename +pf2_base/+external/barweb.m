@@ -1,4 +1,4 @@
-function handles = barweb(barvalues, errors, width, groupnames, bw_title, bw_xlabel, bw_ylabel, bw_colormap, gridstatus, bw_legend, error_sides, legend_type,data_points,error_is_y,hideBar)
+function handles = barweb(barvalues, errors, width, groupnames, bw_title, bw_xlabel, bw_ylabel, bw_colormap, gridstatus, bw_legend, error_sides, legend_type,data_points,plotViolin,error_is_y,hideBar)
 
 %
 % Usage: handles = barweb(barvalues, errors, width, groupnames, bw_title, bw_xlabel, bw_ylabel, bw_colormap, gridstatus, bw_legend, error_sides, legend_type)
@@ -46,6 +46,10 @@ function handles = barweb(barvalues, errors, width, groupnames, bw_title, bw_xla
 BottomError=true;
 hideError=false;
 plotFeatureAsPoint=false;
+
+plotViolin=true;
+
+
 
 if nargin < 1
 	error('Must have at least the first argument:  barweb(barvalues, errors, width, groupnames, bw_title, bw_xlabel, bw_ylabel, bw_colormap, gridstatus, bw_legend, barwebtype)');
@@ -97,28 +101,54 @@ if(nargin<13)
     data_points=[];
     plotData=false;
 else
-    plotData=any(~cellfun(@isempty,data_points));
+    plotData=any(any(~cellfun(@isempty,data_points)));
 end
 
 if(nargin<14)
+    plotViolin=true;
+end
+
+if(nargin<15)
     error_is_y=false;
 end
 
 
-if(nargin<15)
+if(nargin<16)
     hideBar=false;
     % show point instead of bar (with errorbars)
     % not implemented yet
 end
 
+plotViolin=plotViolin&&plotData;
+
+if(plotData||plotViolin)
+    [jSz,kSz]=size(data_points);
+    for j=1:jSz
+        for k=1:kSz
+            if(~isempty(data_points{j,k}))
+                [N_v{j,k},y_bin_v{j,k}]=pf2_base.external.myHistogram(data_points{j,k});
+            else
+                N_v{j,k}=[];
+                y_bin_v{j,k}=[];
+            end
+        end
+    end
+
+    if(plotViolin)
+        hideBar=true;
+    end
+end
 
 change_axis = 0;
 ymax = 0;
 
 if(all(isnan(barvalues)))
     %barvalues(:)=0;
+    noBarSummaryVal=true;
     hideBar=true;
-    hideError=true;
+    % hide error as well if its not absolute (min max basically)
+else
+    noBarSummaryVal=false;
 end
 
 if(isempty(errors))
@@ -171,6 +201,8 @@ else
 
         if(~all(barvalues==barMids))
             plotFeatureAsPoint=true;
+        else
+            noBarSummaryVal=true;
         end
     else
         barMids=barvalues;
@@ -179,6 +211,10 @@ else
     if(error_is_y)
         errorsLower=barvalues-errorsLower;
         errorsUpper=errorsUpper-barvalues;
+    elseif(hideBar)
+        % if error is not absolute and we're hiding the bar, SEM and SD
+        % mean nothing
+        hideError=true;
     end
 
 
@@ -290,14 +326,18 @@ else
             end
             
             if((~hideError&&~reDrawAsReactangles)||plotFeatureAsPoint)
-                if ~isempty(bw_colormap)
-                  
+                if ~isempty(bw_colormap)                 
                     handles.statpoints(i)=plot(x,barvalues(:,i),'d');
 
-                    if(reDrawAsReactangles)
-                        handles.statpoints(i).MarkerSize=32;
+                else      
+                    if(noBarSummaryVal)
+                        handles.statpoints(i).MarkerSize=8;
+                        handles.statpoints(i).MarkerEdgeColor=curColor; 
+                        handles.statpoints(i).MarkerFaceColor=curColor;  
+                    else
+                        handles.statpoints(i).MarkerSize=8;
                         handles.statpoints(i).MarkerEdgeColor=[0,0,0]; 
-                        handles.statpoints(i).MarkerFaceColor=[0,0,0];         
+                        handles.statpoints(i).MarkerFaceColor=[0,0,0];   
                     end
                     
                     
@@ -307,14 +347,62 @@ else
                 end 
             end
         end
+
+        %plotViolin=false;
         
         if(plotData)
             for ii=1:length(x)
-                if(~isempty(data_points{ii,i}))
-                    curBarDataPoints=data_points{ii,i}(:);
+                if(plotViolin)
+
+                    binVals=(N_v{ii,i})/max((N_v{ii,i}))*barW;
+
+                    ybin_width=mean(diff(y_bin_v{ii,i}));
+                    xVals=ones(size(y_bin_v{ii,i}))*x(ii);
+
+                    for b=1:length(xVals)
+
+                        hBin=rectangle('position',[x(ii)-binVals(b)/2,y_bin_v{ii,i}(b)-ybin_width/2,binVals(b), ybin_width]);
+                        if ~isempty(bw_colormap)
+                            hBin.FaceColor=curColor; 
+                            hBin.LineWidth=0.1; 
+                        end
+                        set(hBin,'HandleVisibility','off');
+                    end
+
+
+                elseif(~isempty(data_points{ii,i}))
+                    curBarDataPoints=sort(data_points{ii,i}(:));
+                     curBarDataPoints=curBarDataPoints(~isnan(curBarDataPoints));
+                    xVals=ones(size(curBarDataPoints))*x(ii);
+
+                   
+
+                    [a_count,b_idx]=histc(curBarDataPoints,y_bin_v{ii,i});
+                    b_idx2=b_idx>0;
+                    posIdx=[1;diff(b_idx(b_idx2))>0];
+                    posCount=nan(size(posIdx));
+                    n=0;
+                    for z=1:length(posIdx)
+                        if(posIdx(z)==1)
+                            n=0;
+                        else
+                            n=n+1;
+                        end
+                        posCount(z)=n;
+                    end
+
+                    %(posCount-(a_count(b_idx(b_idx2))-1)/2)/maxCount
+                    maxCount=max(a_count);
+
+                    xVals(b_idx2)=xVals(b_idx2)+(posCount-(a_count(b_idx(b_idx2))-1)/2)/maxCount*barW*0.8;
     
-                    curBarDataPoints=[ones(size(curBarDataPoints))*x(ii),curBarDataPoints];
-                    plot(curBarDataPoints(:,1),curBarDataPoints(:,2),'x','Color',[0,0,0]);
+                    curBarDataPoints=[xVals,curBarDataPoints];
+
+                    if(noBarSummaryVal)
+                        plot(curBarDataPoints(:,1),curBarDataPoints(:,2),'o','Color',curColor);
+                    else
+                        plot(curBarDataPoints(:,1),curBarDataPoints(:,2),'o','Color',[0,0,0]);
+                    end
                 end
             end
         end

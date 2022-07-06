@@ -440,7 +440,10 @@ for chIdx=1:numOpt
                         lineWidth=0.5;
                         plotShaded=true;
                     otherwise
-                        error('Unspecified error style');
+                        errStyle='-';
+                        lineWidth=0.5;
+                        plotShaded=true;
+                        %error('Unspecified error style');
                 end
                      
                 if(plotGroupByBioM)
