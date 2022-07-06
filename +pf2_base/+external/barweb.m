@@ -48,8 +48,6 @@ hideError=false;
 plotFeatureAsPoint=false;
 
 
-
-
 if nargin < 1
 	error('Must have at least the first argument:  barweb(barvalues, errors, width, groupnames, bw_title, bw_xlabel, bw_ylabel, bw_colormap, gridstatus, bw_legend, barwebtype)');
 elseif(nargin<2)
@@ -119,6 +117,7 @@ if(nargin<16)
 end
 
 plotViolin=plotViolin&&plotData;
+useKSD=true;
 
 if(plotData||plotViolin)
     [jSz,kSz]=size(data_points);
@@ -126,9 +125,15 @@ if(plotData||plotViolin)
         for k=1:kSz
             if(~isempty(data_points{j,k}))
                 [N_v{j,k},y_bin_v{j,k}]=pf2_base.external.myHistogram(data_points{j,k});
+                if(plotViolin&&useKSD)
+                     [f{j,k}, u{j,k}, bb{j,k}]=ksdensity(data_points{j,k});
+                     f{j,k}=f{j,k}'/max(f{j,k});
+                     u{j,k}=u{j,k}';
+                end
             else
                 N_v{j,k}=[];
                 y_bin_v{j,k}=[];
+                s{j,k}=[];
             end
         end
     end
@@ -298,6 +303,8 @@ else
         if(hideBar)
             set(handles.bars(i),'Tag',bw_legend{i});
             set(handles.bars(i),'Visible',false);
+
+            %Replot for non-zero based bars
             if(reDrawAsReactangles)
                 for ii=1:length(x)
 
@@ -332,35 +339,45 @@ else
            
         end
 
-        %plotViolin=false;
+        
         
         if(plotData)
             for ii=1:length(x)
                 if(plotViolin)
+                    % Draw Violin plot with rectangles
+                    if(useKSD)
+                        handles.Violin{ii,i}=fill([f{ii,i}*barW/2+x(ii);flipud(x(ii)-f{ii,i}*barW/2)],[u{ii,i};flipud(u{ii,i})],curColor,'EdgeColor',[0,0,0]);
+                        set(handles.Violin{ii,i},'HandleVisibility','off');
+                    else
 
-                    binVals=(N_v{ii,i})/max((N_v{ii,i}))*barW;
-
-                    ybin_width=mean(diff(y_bin_v{ii,i}));
-                    xVals=ones(size(y_bin_v{ii,i}))*x(ii);
-
-                    for b=1:length(xVals)
-
-                        hBin=rectangle('position',[x(ii)-binVals(b)/2,y_bin_v{ii,i}(b)-ybin_width/2,binVals(b), ybin_width]);
-                        if ~isempty(bw_colormap)
-                            hBin.FaceColor=curColor; 
-                            hBin.LineWidth=0.1; 
+                        binVals=(N_v{ii,i})/max((N_v{ii,i}))*barW;
+    
+                        ybin_width=mean(diff(y_bin_v{ii,i}));
+                        xVals=ones(size(y_bin_v{ii,i}))*x(ii);
+    
+                        for b=1:length(xVals)
+    
+                            hBin=rectangle('position',[x(ii)-binVals(b)/2,y_bin_v{ii,i}(b)-ybin_width/2,binVals(b), ybin_width]);
+                            if ~isempty(bw_colormap)
+                                hBin.FaceColor=curColor; 
+                                hBin.LineWidth=0.1; 
+                            end
+                            set(hBin,'HandleVisibility','off');
                         end
-                        set(hBin,'HandleVisibility','off');
+
                     end
 
 
                 elseif(~isempty(data_points{ii,i}))
+                    %scatter points within violin plot shape
+
                     curBarDataPoints=sort(data_points{ii,i}(:));
-                     curBarDataPoints=curBarDataPoints(~isnan(curBarDataPoints));
+                    curBarDataPoints=curBarDataPoints(~isnan(curBarDataPoints));
                     xVals=ones(size(curBarDataPoints))*x(ii);
 
                    
 
+                    % Randomize arrangments within each violin bin
                     [a_count,b_idx]=histc(curBarDataPoints,y_bin_v{ii,i});
                     b_idx2=b_idx>0;
                     posIdx=[1;diff(b_idx(b_idx2))>0];
@@ -369,13 +386,11 @@ else
                     lastIdx=1;
                     for z=1:length(posIdx)
                         if(posIdx(z)>0)
-                            
                             if(n>0)
                                 posCount(lastIdx:lastIdx+n)=randperm(n+1)-1;
                             end
                             n=0;
                             lastIdx=z;
-                            
                         else
                             n=n+1;
                         end

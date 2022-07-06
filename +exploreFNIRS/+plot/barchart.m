@@ -355,6 +355,7 @@ for chIdx=1:numOpt
                           dataPlotMax_barchart=iqrPlotErrMax;
 
                       else
+                          numErrFeatures=4;
                           dataPlotMin_barchart=gaPlotMin;
                           dataPlotMax_barchart=gaPlotMax;
                       end

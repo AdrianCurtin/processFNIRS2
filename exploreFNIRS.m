@@ -2246,7 +2246,7 @@ ExFNIRS.settings.plot_error=get(handles.checkbox_plot_error,'Value');
 ExFNIRS.settings.plot_error_multiply=str2num(get(handles.edit_error_multiplier,'String'));
 ExFNIRS.settings.plot_task_lines=get(handles.checkbox_mark_task,'Value');
 
-set(handles.popupmenu_errorbar_feature,'String',{'SEM','SD','MaxMin','IQR','IQR-NoOutliers','Violin'});
+set(handles.popupmenu_bar_error_feature,'String',{'SEM','SD','MaxMin','IQR','IQR-NoOutliers','Violin'});
 
 idx=get(handles.popupmenu_errorbar_style,'Value');
 strs=get(handles.popupmenu_errorbar_style,'String');
@@ -2402,6 +2402,8 @@ function popupmenu_errorbar_feature_Callback(hObject, eventdata, handles)
 %        contents{get(hObject,'Value')} returns selected item from popupmenu_errorbar_feature
 
 global ExFNIRS
+
+% Error bar for temporal plots
 idx=get(handles.popupmenu_errorbar_feature,'Value');
 strs=get(handles.popupmenu_errorbar_feature,'String');
 ExFNIRS.settings.plot_error_feature=strs{idx};

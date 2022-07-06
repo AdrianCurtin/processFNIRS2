@@ -81,8 +81,6 @@ errorFeature=exSettings.plot_bar_err_feature;
 plotFeature=exSettings.plot_bar_feature;
 plotPoints=exSettings.plot_bar_all;
 
-errorFeature='Violin'
-    
 
 gAStrs=cell(numUgroups,1);
 gAerrStrs=cell(numUgroups,1);
@@ -101,6 +99,9 @@ end
 barGroup=zeros(numCurInfoG,1);
 
 barChartDataPoints=cell(1,numCurInfoG);
+
+maxDataPoint=[];
+minDataPoint=[];
 
 for g=1:numGroups
     curTable=exGby(g).gbyTables;
@@ -150,84 +151,94 @@ for g=1:numGroups
 
     if(exSettings.plot_bar_ga)
           barChartData(cBarSec,curBarGroup,1)=curHAvg;
-          gAStrs{curBarGroup}=sprintf('%s',uGbyStrs{curBarGroup}); 
+    else
+            barChartData(cBarSec,curBarGroup,1)=nan;
     end
+
+    gAStrs{curBarGroup}=sprintf('%s',uGbyStrs{curBarGroup}); 
 
     if(plotPoints||strcmp(errorFeature,'Violin'))
         barChartDataPoints(cBarSec,curBarGroup)={curDataH};
     end             
 
-    if(exSettings.plot_bar_err)
-        if(~strcmp(plotFeature,'Count'))
 
-          errMultiply=exSettings.plot_bar_err_mult;
-         
-          gaFeat=curHAvg;
+    if(~strcmp(plotFeature,'Count'))
 
-          numErrFeatures=1;
+      errMultiply=exSettings.plot_bar_err_mult;
+     
+      gaFeat=curHAvg;
 
-          
-          
-          if(strcmp(errorFeature,'MaxMin'))
-              numErrFeatures=2; %min and max)
-              curHerr=nanmax(pf2_base.hierarchicalAverage(curData,curTable(:,dataH),@nanmax));
-                  
-              barChartData(cBarSec,curBarGroup,2)=curHerr;
-              curHerr=nanmin(pf2_base.hierarchicalAverage(curData,curTable(:,dataH),@nanmin));
-              barChartData(cBarSec,curBarGroup,3)=curHerr;
-          elseif(strcmp(errorFeature,'SD'))
-              curHerr=nanstd(pf2_base.hierarchicalAverage(curData,curTable(:,dataH),@nanmean));
-              barChartData(cBarSec,curBarGroup,2)=curHerr*errMultiply;
-          elseif(strcmp(errorFeature,'SEM'))
-              curHerr=nanstd(pf2_base.hierarchicalAverage(curData,curTable(:,dataH),@nanmean));
-              curN=length(curDataH);
-              curHerr=curHerr/sqrt(curN);
-              barChartData(cBarSec,curBarGroup,2)=curHerr*errMultiply;
-          elseif(strcmp(errorFeature,'IQR')||strcmp(errorFeature,'IQR-NoOutliers')||strcmp(errorFeature,'Violin'))
-              numErrFeatures=5; %min and max) and median
-              gaQuant=quantile(curDataH,3);
-              iqr=gaQuant(end)-gaQuant(1);
+      numErrFeatures=1;
+
+      if(true)
+            minDataPoint=nanmin([minDataPoint,nanmin(pf2_base.hierarchicalAverage(curData,curTable(:,dataH),@nanmin))]);
+            maxDataPoint=nanmax([maxDataPoint,nanmax(pf2_base.hierarchicalAverage(curData,curTable(:,dataH),@nanmax))]);
+      end
+      
+      if(strcmp(errorFeature,'MaxMin'))
+          numErrFeatures=2; %min and max)
+          curHerr=nanmin(pf2_base.hierarchicalAverage(curData,curTable(:,dataH),@nanmin));
+            
+          barChartData(cBarSec,curBarGroup,2)=curHerr;
+          curHerr=nanmax(pf2_base.hierarchicalAverage(curData,curTable(:,dataH),@nanmax));
+          barChartData(cBarSec,curBarGroup,3)=curHerr;
+      elseif(strcmp(errorFeature,'SD'))
+          curHerr=nanstd(pf2_base.hierarchicalAverage(curData,curTable(:,dataH),@nanmean));
+          barChartData(cBarSec,curBarGroup,2)=curHerr*errMultiply;
+      elseif(strcmp(errorFeature,'SEM'))
+          curHerr=nanstd(pf2_base.hierarchicalAverage(curData,curTable(:,dataH),@nanmean));
+          curN=length(curDataH);
+          curHerr=curHerr/sqrt(curN);
+          barChartData(cBarSec,curBarGroup,2)=curHerr*errMultiply;
+      elseif(strcmp(errorFeature,'IQR')||strcmp(errorFeature,'IQR-NoOutliers')||strcmp(errorFeature,'Violin'))
+          numErrFeatures=5; %min and max) and median
+          gaQuant=quantile(curDataH,3);
+          iqr=gaQuant(end)-gaQuant(1);
+
+          gaPlotMin=min(curDataH);
+          gaPlotMax=max(curDataH);
+
+          if(contains(errorFeature,'IQR'))
+              outlierMax=gaQuant(end)+errMultiply*iqr;
+              outlierMin=gaQuant(1)-errMultiply*iqr;
     
-              gaPlotMin=min(curDataH);
-              gaPlotMax=max(curDataH);
-    
-              if(contains(errorFeature,'IQR'))
-                  outlierMax=gaQuant(end)+errMultiply*iqr;
-                  outlierMin=gaQuant(1)-errMultiply*iqr;
-        
-                  iqrPlotErrMin=max([gaPlotMin,outlierMin]);
-                  iqrPlotErrMax=min([gaPlotMax,outlierMax]);
-    
-                  barChartData(cBarSec,curBarGroup,2)=iqrPlotErrMin;
-                  barChartData(cBarSec,curBarGroup,3)=iqrPlotErrMax;
-              else
+              iqrPlotErrMin=max([gaPlotMin,outlierMin]);
+              iqrPlotErrMax=min([gaPlotMax,outlierMax]);
 
-                barChartData(cBarSec,curBarGroup,2)=gaPlotMin;
-                barChartData(cBarSec,curBarGroup,3)=gaPlotMax;
-             
-              end
-
-              barChartData(cBarSec,curBarGroup,4)=gaQuant(1);
-              barChartData(cBarSec,curBarGroup,5)=gaQuant(end);
+              barChartData(cBarSec,curBarGroup,2)=iqrPlotErrMin;
+              barChartData(cBarSec,curBarGroup,3)=iqrPlotErrMax;
 
               barChartData(cBarSec,curBarGroup,6)=gaQuant(2);
+          else
 
-              if(strcmp(errorFeature,'IQR'))
-                  dataPointsIdx=(curDataH>iqrPlotErrMax|curDataH<iqrPlotErrMin);
-                  
-                  barChartDataPoints(cBarSec,curBarGroup)={curDataH(dataPointsIdx)};
-
-                  plottingDataPoints=true;
-              end
-                  
+            numErrFeatures=4;
+            barChartData(cBarSec,curBarGroup,2)=gaPlotMin;
+            barChartData(cBarSec,curBarGroup,3)=gaPlotMax;
+         
           end
+
+          barChartData(cBarSec,curBarGroup,4)=gaQuant(1);
+          barChartData(cBarSec,curBarGroup,5)=gaQuant(end);
+
           
-          gAErrStrs{curBarGroup}=sprintf('%s',gbyStrs{g});
-        else
-            curHerr=0;
-            barChartData(cBarSec,curBarGroup,2)=curHerr;
-            gAErrStrs{curBarGroup}='';
-        end
+
+          if(strcmp(errorFeature,'IQR'))
+              dataPointsIdx=(curDataH>iqrPlotErrMax|curDataH<iqrPlotErrMin);
+              
+              barChartDataPoints(cBarSec,curBarGroup)={curDataH(dataPointsIdx)};
+
+              plottingDataPoints=true;
+          end
+              
+      end
+      
+      gAErrStrs{curBarGroup}=sprintf('%s',gbyStrs{g});
+    end
+        
+    if(~exSettings.plot_bar_err)
+        curHerr=0;
+  
+        gAErrStrs{curBarGroup}='';
     end
 
 end
@@ -246,7 +257,7 @@ end
 if(exSettings.plot_bar_err)
     pf2_base.external.barweb(barChartData(:,:,1),barChartData(:,:,2:1+numErrFeatures),1,uCurInfoG, [], [], [], cIndex,[],gAStrs,[],'hide',barChartDataPoints,strcmp(errorFeature,'Violin'));
     
-    if(strcmp(errorFeature,'SEM')||strcmp(errorFeature,'SD'))
+    if(strcmp(errorFeature,'SEM')||strcmp(errorFeature,'SD'))&&~plotPoints
         ylimLower=min(min(barChartData(:,:,1)))-max(max(barChartData(:,:,2)));
         ylimUpper=max(max(barChartData(:,:,1)))+max(max(barChartData(:,:,2)));
         yrange=ylimUpper-ylimLower;
@@ -257,10 +268,10 @@ if(exSettings.plot_bar_err)
             ylabel_with_space(sprintf('%s %s   +/- %dx %s',plotFeature,curInfoStr,errMultiply,errorFeature));
         end
     elseif(plotPoints||strcmp(errorFeature,'MaxMin')||strcmp(errorFeature,'Violin')||strcmp(errorFeature,'IQR'))
-        ylimLower=min(min(barChartData(:,:,2)));
-        ylimUpper=max(max(barChartData(:,:,3)));
+         ylimLower=minDataPoint;
+        ylimUpper=maxDataPoint;
         yrange=ylimUpper-ylimLower;
-        ylim([min(ylimLower-0.1*yrange,0),max(ylimUpper+0.1*yrange,0)]);
+        ylim([ylimLower-0.1*yrange,ylimUpper+0.1*yrange]);
         if(errMultiply==1)
             ylabel_with_space(sprintf('%s %s   +/- %s',plotFeature,curInfoStr,errorFeature));
         else
@@ -284,8 +295,14 @@ if(exSettings.plot_bar_err)
     end
 else
     pf2_base.external.barweb(barChartData(:,:,1),[],1,uCurInfoG, [], [], [], cIndex,[],gAStrs,[],'hide',barChartDataPoints);
-    ylimLower=min(min(barChartData(:,:,1)));
-    ylimUpper=max(max(barChartData(:,:,1)));
+
+    if(~plotPoints)
+        ylimLower=min(min(barChartData(:,:,1)));
+        ylimUpper=max(max(barChartData(:,:,1)));
+    else
+        ylimLower=min(min(barChartData(:,:,2)));
+        ylimUpper=max(max(barChartData(:,:,3)));
+    end
     yrange=ylimUpper-ylimLower;
     ylim([min(ylimLower-0.1*yrange,0),max(ylimUpper+0.1*yrange,0)]);
     ylabel_with_space(sprintf('%s %s   +/- (%s)',plotFeature,curInfoStr,errorFeature));
