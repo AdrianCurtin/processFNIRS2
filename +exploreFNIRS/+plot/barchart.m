@@ -2,6 +2,8 @@ function barchart(handles,exSettings,exGby,gbyVars, showBarChart,showTopo)
 
 curInfoGroup=exSettings.curInfoGroup;
 
+gbyVars_original=gbyVars;
+
 if(~isempty(curInfoGroup)&&~strcmp(curInfoGroup,'(Time)'))
     [ismem,idx]=ismember(curInfoGroup,gbyVars);
     if(ismem)
@@ -671,7 +673,7 @@ for sH=1:length(subplotHandles)
                 mergedTables{sH}=exploreFNIRS.export.mergeGbyTablesLong(subplotGby{sH}.gby,subplotGby{sH}.curBioM,subplotGby{sH}.curCh,barChartTimes,true,false);
                 varNameStart='aux';
         end
-        x=gbyVars;
+        x=gbyVars_original;
         curLMEGbyString='';
         mdlPrtString='';
         
@@ -724,7 +726,7 @@ for sH=1:length(subplotHandles)
         dummyCodeStr='reference';
         
         if(strcmp(exSettings.ChannelMode,'Aux'))
-            varName=sprintf('%s_%s',varNameStart,subplotGby{sH}.curBioM{1});
+            varName=sprintf('%s_%s_%s',varNameStart,subplotGby{sH}.curBioM{1},selectedOptStr{(selectedOpt==subplotGby{sH}.curCh)});
         else
             varName=sprintf('%s%i_%s',varNameStart,subplotGby{sH}.curCh,subplotGby{sH}.curBioM{1});
         end
@@ -784,7 +786,7 @@ for sH=1:length(subplotHandles)
                          chName=sprintf('ROI%i_%s',subplotGby{sH}.curCh,optStrs{subplotGby{sH}.curCh});
                          mdlChName=sprintf('ROI%i',subplotGby{sH}.curCh);
                 case 'Aux'
-                        chName=sprintf('%s',subplotGby{sH}.curBioM{1});
+                         chName=sprintf('%s',subplotGby{sH}.curBioM{1});
                          mdlChName=chName;
             end
 

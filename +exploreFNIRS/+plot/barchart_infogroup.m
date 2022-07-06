@@ -3,6 +3,8 @@ function barchart_infogroup(handles,exSettings,exGby,gbyVars)
 global ExFNIRS
 curInfoGroup=exSettings.curInfoGroup;
 
+gbyVars_original=gbyVars;
+
 if(~isempty(curInfoGroup)&&~strcmp(curInfoGroup,'(Time)'))
     [ismem,idx]=ismember(curInfoGroup,gbyVars);
     if(ismem)
@@ -333,7 +335,7 @@ end
 hold off;
    
 if(exSettings.LME_enable)
-    x=gbyVars;
+    x=gbyVars_original;
     curLMEGbyString='';
 
     useAllInteractions=exSettings.LME_all_interactions;
