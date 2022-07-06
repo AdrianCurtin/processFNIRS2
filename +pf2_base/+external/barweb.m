@@ -47,7 +47,6 @@ BottomError=true;
 hideError=false;
 plotFeatureAsPoint=false;
 
-plotViolin=true;
 
 
 
@@ -136,6 +135,8 @@ if(plotData||plotViolin)
 
     if(plotViolin)
         hideBar=true;
+        plotFeatureAsPoint=true;
+        hideError=true;
     end
 end
 
@@ -145,6 +146,7 @@ ymax = 0;
 if(all(isnan(barvalues)))
     %barvalues(:)=0;
     noBarSummaryVal=true;
+    plotFeatureAsPoint=false;
     hideBar=true;
     % hide error as well if its not absolute (min max basically)
 else
@@ -175,7 +177,7 @@ else
 
         error_is_y=true;
 
-        hideError=false;
+        hideError=false||hideError;
     end
 
     
@@ -187,7 +189,7 @@ else
     else
         barLower=zeros(size(barvalues));
         reDrawAsReactangles=false;
-        hideBar=false;
+        hideBar=false||hideBar;
     end
 
     if(errorVals>3)
@@ -325,27 +327,7 @@ else
                 end
             end
             
-            if((~hideError&&~reDrawAsReactangles)||plotFeatureAsPoint)
-                if ~isempty(bw_colormap)                 
-                    handles.statpoints(i)=plot(x,barvalues(:,i),'d');
-
-                else      
-                    if(noBarSummaryVal)
-                        handles.statpoints(i).MarkerSize=8;
-                        handles.statpoints(i).MarkerEdgeColor=curColor; 
-                        handles.statpoints(i).MarkerFaceColor=curColor;  
-                    else
-                        handles.statpoints(i).MarkerSize=8;
-                        handles.statpoints(i).MarkerEdgeColor=[0,0,0]; 
-                        handles.statpoints(i).MarkerFaceColor=[0,0,0];   
-                    end
-                    
-                    
-                    if(length(bw_legend)>=i&&~isempty(bw_legend{i}))
-                        set(handles.statpoints(i),'Tag',bw_legend{i});
-                    end
-                end 
-            end
+           
         end
 
         %plotViolin=false;
@@ -382,9 +364,16 @@ else
                     posIdx=[1;diff(b_idx(b_idx2))>0];
                     posCount=nan(size(posIdx));
                     n=0;
+                    lastIdx=1;
                     for z=1:length(posIdx)
                         if(posIdx(z)==1)
                             n=0;
+                            l=z-lastIdx;
+                            if(l)>1
+                                posCount(lastIdx:(z-1))=randperm(l)-1;
+                                lastIdx=z;
+                            end
+                            
                         else
                             n=n+1;
                         end
@@ -399,11 +388,31 @@ else
                     curBarDataPoints=[xVals,curBarDataPoints];
 
                     if(noBarSummaryVal)
-                        plot(curBarDataPoints(:,1),curBarDataPoints(:,2),'o','Color',curColor);
+                        scatter(curBarDataPoints(:,1),curBarDataPoints(:,2),2,'o','MarkerEdgeColor',curColor);
                     else
-                        plot(curBarDataPoints(:,1),curBarDataPoints(:,2),'o','Color',[0,0,0]);
+                        scatter(curBarDataPoints(:,1),curBarDataPoints(:,2),2,'o','MarkerEdgeColor',[0,0,0]);
                     end
                 end
+            end
+        end
+
+        if(hideBar)
+             if((~hideError&&~reDrawAsReactangles)||plotFeatureAsPoint)
+
+                 handles.statpoints(i)=scatter(x,barvalues(:,i),16,'d','filled','MarkerFaceColor',[0,0,0]);
+                if ~isempty(bw_colormap)                 
+                     
+                    if(noBarSummaryVal)
+                        %handles.statpoints(i).MarkerSize=8;
+                        handles.statpoints(i).MarkerEdgeColor=curColor; 
+                        handles.statpoints(i).MarkerFaceColor=curColor;  
+                    end
+                    
+                    
+                    if(length(bw_legend)>=i&&~isempty(bw_legend{i}))
+                        set(handles.statpoints(i),'Tag',bw_legend{i});
+                    end
+                end 
             end
         end
 

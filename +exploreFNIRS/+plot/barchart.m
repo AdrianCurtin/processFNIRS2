@@ -146,8 +146,6 @@ errorFeature=exSettings.plot_bar_err_feature;
 plotFeature=exSettings.plot_bar_feature;
 plotPoints=exSettings.plot_bar_all;
 
-%errorFeature='IQR-NoOutliers';
-
 
 if(strcmp(plotFeature,'Count')&&exSettings.plot_bar_ga)
   plotFeature='N';
@@ -300,9 +298,9 @@ for chIdx=1:numOpt
                       %barChartDataPoints{curChart}{timeIdxRev+curGroupIdxOffset,curUgroupIdx}=[];
                   end
 
-                  if(plotGroupByBioM&&plotPoints)
+                  if(plotGroupByBioM&&(plotPoints||strcmp(errorFeature,'Violin')))
                       barChartDataPoints{curChart}(timeIdxRev+curGroupIdxOffset,b)={data2plot.data(timeIdx,ch,:)};
-                  elseif(plotPoints)
+                  elseif(plotPoints||strcmp(errorFeature,'Violin'))
                       barChartDataPoints{curChart}(timeIdxRev+curGroupIdxOffset,curUgroupIdx)={data2plot.data(timeIdx,ch,:)};
                   end
 
@@ -322,7 +320,7 @@ for chIdx=1:numOpt
                   timeIdxRev=timeIdxRev(timeIdxRev>0);
                   ga2plot=data2plot;%curGrand.(bioM);
                   numErrFeatures=1;
-                  if(strcmp(errorFeature,'MaxMin'))
+                  if(strcmp(errorFeature,'MaxMin')||strcmp(errorFeature,'Violin'))
                       numErrFeatures=2; %min and max)
 
                       if(plotGroupByBioM)
@@ -341,13 +339,13 @@ for chIdx=1:numOpt
                       iqr=gaQuant(end)-gaQuant(1);
 
                       gaPlotMin=min(ga2plot.Min(timeIdx,ch));
-                      gaPlotMax=max(ga2plot.Min(timeIdx,ch));
+                      gaPlotMax=max(ga2plot.Max(timeIdx,ch));
 
                       outlierMax=gaQuant(end)+errMultiply*iqr;
                       outlierMin=gaQuant(1)-errMultiply*iqr;
 
-                      iqrPlotErrMin=min([gaPlotMin,outlierMin]);
-                      iqrPlotErrMax=max([gaPlotMax,outlierMax]);
+                      iqrPlotErrMin=max([gaPlotMin,outlierMin]);
+                      iqrPlotErrMax=min([gaPlotMax,outlierMax]);
                       
 
                       if(plotGroupByBioM)
@@ -465,9 +463,9 @@ for chIdx=1:numOpt
         
 
         if(exSettings.plot_bar_err&&~plotCount)
-            pf2_base.external.barweb(barChartData{curChart}(:,:,1),barChartData{curChart}(:,:,2:1+numErrFeatures),1,xBarLabels, [], [], [], cIndex,[],gAStrs,[],'hide',barChartDataPoints{curChart});
+            pf2_base.external.barweb(barChartData{curChart}(:,:,1),barChartData{curChart}(:,:,2:1+numErrFeatures),1,xBarLabels, [], [], [], cIndex,[],gAStrs,[],'hide',barChartDataPoints{curChart},strcmp(errorFeature,'Violin'));
             
-            if(strcmp(errorFeature,'MaxMin')||strcmp(errorFeature,'IQR')||strcmp(errorFeature,'IQR-NoOutliers'))
+            if(strcmp(errorFeature,'MaxMin')||strcmp(errorFeature,'IQR')||strcmp(errorFeature,'IQR-NoOutliers')||strcmp(errorFeature,'Violin'))
                 minValFromBarChart=min(min(min(barChartData{curChart}(:,:,2))));
                 maxValFromBarChart=max(max(max(barChartData{curChart}(:,:,3))));
             else
