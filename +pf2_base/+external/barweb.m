@@ -104,7 +104,7 @@ else
 end
 
 if(nargin<14)
-    plotViolin=true;
+    plotViolin=false;
 end
 
 if(nargin<15)
@@ -289,12 +289,14 @@ else
         
         
 
-        if ~isempty(bw_colormap)&&~hideBar
-                handles.bars(i).FaceColor=curColor;
-                if(length(bw_legend)>=i&&~isempty(bw_legend{i}))
-                    set(handles.bars(i),'Tag',bw_legend{i});
-                end
-        elseif(hideBar)
+        if ~isempty(bw_colormap)
+            handles.bars(i).FaceColor=curColor;
+            if(length(bw_legend)>=i&&~isempty(bw_legend{i}))
+                set(handles.bars(i),'Tag',bw_legend{i});
+            end
+        end
+        if(hideBar)
+            set(handles.bars(i),'Tag',bw_legend{i});
             set(handles.bars(i),'Visible',false);
             if(reDrawAsReactangles)
                 for ii=1:length(x)
