@@ -320,7 +320,7 @@ for chIdx=1:numOpt
                   timeIdxRev=timeIdxRev(timeIdxRev>0);
                   ga2plot=data2plot;%curGrand.(bioM);
                   numErrFeatures=1;
-                  if(strcmp(errorFeature,'MaxMin')||strcmp(errorFeature,'Violin'))
+                  if(strcmp(errorFeature,'MaxMin'))
                       numErrFeatures=2; %min and max)
 
                       if(plotGroupByBioM)
@@ -333,7 +333,7 @@ for chIdx=1:numOpt
                       end
                   
 
-                  elseif(strcmp(errorFeature,'IQR')||strcmp(errorFeature,'IQR-NoOutliers'))
+                  elseif(strcmp(errorFeature,'IQR')||strcmp(errorFeature,'IQR-NoOutliers')||strcmp(errorFeature,'Violin'))
                       numErrFeatures=5; %min and max) and median
                       gaQuant=quantile(ga2plot.data(timeIdx,ch,:),3);
                       iqr=gaQuant(end)-gaQuant(1);
@@ -341,21 +341,33 @@ for chIdx=1:numOpt
                       gaPlotMin=min(ga2plot.Min(timeIdx,ch));
                       gaPlotMax=max(ga2plot.Max(timeIdx,ch));
 
-                      outlierMax=gaQuant(end)+errMultiply*iqr;
-                      outlierMin=gaQuant(1)-errMultiply*iqr;
+                      if(contains(errorFeature,'IQR'))
 
-                      iqrPlotErrMin=max([gaPlotMin,outlierMin]);
-                      iqrPlotErrMax=min([gaPlotMax,outlierMax]);
+                      
+
+                          outlierMax=gaQuant(end)+errMultiply*iqr;
+                          outlierMin=gaQuant(1)-errMultiply*iqr;
+    
+                          iqrPlotErrMin=max([gaPlotMin,outlierMin]);
+                          iqrPlotErrMax=min([gaPlotMax,outlierMax]);
+
+                          dataPlotMin_barchart=iqrPlotErrMin;
+                          dataPlotMax_barchart=iqrPlotErrMax;
+
+                      else
+                          dataPlotMin_barchart=gaPlotMin;
+                          dataPlotMax_barchart=gaPlotMax;
+                      end
                       
 
                       if(plotGroupByBioM)
-                          barChartData{curChart}(timeIdxRev+curGroupIdxOffset,b,2)=iqrPlotErrMin;
-                          barChartData{curChart}(timeIdxRev+curGroupIdxOffset,b,3)=iqrPlotErrMax;
+                          barChartData{curChart}(timeIdxRev+curGroupIdxOffset,b,2)=dataPlotMin_barchart;
+                          barChartData{curChart}(timeIdxRev+curGroupIdxOffset,b,3)=dataPlotMax_barchart;
 
                           barChartData{curChart}(timeIdxRev+curGroupIdxOffset,b,4)=gaQuant(1);
                           barChartData{curChart}(timeIdxRev+curGroupIdxOffset,b,5)=gaQuant(end);
 
-                          barChartData{curChart}(timeIdxRev+curGroupIdxOffset,b,6)=ga2plot.Median(timeIdx,ch);
+                          barChartData{curChart}(timeIdxRev+curGroupIdxOffset,b,6)=gaQuant(2);
 
                           if(strcmp(errorFeature,'IQR'))
                               dataPointsIdx=(ga2plot.data(timeIdx,ch,:)>iqrPlotErrMax|ga2plot.data(timeIdx,ch,:)<iqrPlotErrMin);
@@ -365,13 +377,13 @@ for chIdx=1:numOpt
                               plottingDataPoints=true;
                           end
                       else
-                          barChartData{curChart}(timeIdxRev+curGroupIdxOffset,curUgroupIdx,2)=iqrPlotErrMin;
-                          barChartData{curChart}(timeIdxRev+curGroupIdxOffset,curUgroupIdx,3)=iqrPlotErrMax;
+                          barChartData{curChart}(timeIdxRev+curGroupIdxOffset,curUgroupIdx,2)=dataPlotMin_barchart;
+                          barChartData{curChart}(timeIdxRev+curGroupIdxOffset,curUgroupIdx,3)=dataPlotMax_barchart;
 
                           barChartData{curChart}(timeIdxRev+curGroupIdxOffset,curUgroupIdx,4)=gaQuant(1);
                           barChartData{curChart}(timeIdxRev+curGroupIdxOffset,curUgroupIdx,5)=gaQuant(end);
 
-                          barChartData{curChart}(timeIdxRev+curGroupIdxOffset,curUgroupIdx,6)=ga2plot.Median(timeIdx,ch);
+                          barChartData{curChart}(timeIdxRev+curGroupIdxOffset,curUgroupIdx,6)=gaQuant(2);
 
                           if(strcmp(errorFeature,'IQR'))
                             dataPointsIdx=(ga2plot.data(timeIdx,ch,:)>iqrPlotErrMax|ga2plot.data(timeIdx,ch,:)<iqrPlotErrMin);

@@ -80,6 +80,8 @@ end
 errorFeature=exSettings.plot_bar_err_feature;
 plotFeature=exSettings.plot_bar_feature;
 plotPoints=exSettings.plot_bar_all;
+
+errorFeature='Violin'
     
 
 gAStrs=cell(numUgroups,1);
@@ -166,7 +168,7 @@ for g=1:numGroups
 
           
           
-          if(strcmp(errorFeature,'MaxMin')||strcmp(errorFeature,'Violin'))
+          if(strcmp(errorFeature,'MaxMin'))
               numErrFeatures=2; %min and max)
               curHerr=nanmax(pf2_base.hierarchicalAverage(curData,curTable(:,dataH),@nanmax));
                   
@@ -181,7 +183,7 @@ for g=1:numGroups
               curN=length(curDataH);
               curHerr=curHerr/sqrt(curN);
               barChartData(cBarSec,curBarGroup,2)=curHerr*errMultiply;
-          elseif(strcmp(errorFeature,'IQR')||strcmp(errorFeature,'IQR-NoOutliers'))
+          elseif(strcmp(errorFeature,'IQR')||strcmp(errorFeature,'IQR-NoOutliers')||strcmp(errorFeature,'Violin'))
               numErrFeatures=5; %min and max) and median
               gaQuant=quantile(curDataH,3);
               iqr=gaQuant(end)-gaQuant(1);
@@ -189,14 +191,21 @@ for g=1:numGroups
               gaPlotMin=min(curDataH);
               gaPlotMax=max(curDataH);
     
-              outlierMax=gaQuant(end)+errMultiply*iqr;
-              outlierMin=gaQuant(1)-errMultiply*iqr;
+              if(contains(errorFeature,'IQR'))
+                  outlierMax=gaQuant(end)+errMultiply*iqr;
+                  outlierMin=gaQuant(1)-errMultiply*iqr;
+        
+                  iqrPlotErrMin=max([gaPlotMin,outlierMin]);
+                  iqrPlotErrMax=min([gaPlotMax,outlierMax]);
     
-              iqrPlotErrMin=max([gaPlotMin,outlierMin]);
-              iqrPlotErrMax=min([gaPlotMax,outlierMax]);
+                  barChartData(cBarSec,curBarGroup,2)=iqrPlotErrMin;
+                  barChartData(cBarSec,curBarGroup,3)=iqrPlotErrMax;
+              else
 
-              barChartData(cBarSec,curBarGroup,2)=iqrPlotErrMin;
-              barChartData(cBarSec,curBarGroup,3)=iqrPlotErrMax;
+                barChartData(cBarSec,curBarGroup,2)=gaPlotMin;
+                barChartData(cBarSec,curBarGroup,3)=gaPlotMax;
+             
+              end
 
               barChartData(cBarSec,curBarGroup,4)=gaQuant(1);
               barChartData(cBarSec,curBarGroup,5)=gaQuant(end);
