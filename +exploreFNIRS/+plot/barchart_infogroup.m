@@ -81,7 +81,6 @@ errorFeature=exSettings.plot_bar_err_feature;
 plotFeature=exSettings.plot_bar_feature;
 plotPoints=exSettings.plot_bar_all;
     
-errorFeature='IQR-NoOutliers';
 
 gAStrs=cell(numUgroups,1);
 gAerrStrs=cell(numUgroups,1);
