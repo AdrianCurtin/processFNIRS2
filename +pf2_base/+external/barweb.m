@@ -232,7 +232,8 @@ else
 	if size(barvalues,1) == 1
 
 		barvalues = [barvalues; zeros(1,length(barvalues))];
-		%errors = [errors; zeros(1,size(barvalues,2))];
+		errorsLower = [errorsLower; nan(1,size(barvalues,2))];
+        errorsUpper = [errorsUpper; nan(1,size(barvalues,2))];
 		change_axis = 1;
     end
 
