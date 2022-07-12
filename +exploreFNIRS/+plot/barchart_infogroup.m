@@ -67,7 +67,7 @@ if(useInfoAsCategoricalGroup)
         end
 
         if(strcmp(curInfoStr,curInfoGroup))
-            useInfoAsCategoricalGroup=false;
+            %useInfoAsCategoricalGroup=false;
         end
    
     end
@@ -108,7 +108,7 @@ curInfoStrGby=cell(0);
 gbyIdx=nan(numGroups,1);
 
 
-for g=1:numGroups
+for g=numGroups:-1:1
     gbyStrs{g}='';
    if(~isempty(exGby(g).gbyTables))
        for i=1:length(gbyVars)
@@ -117,12 +117,16 @@ for g=1:numGroups
        if(useCurInfoGroup)
            curInfoGby{g}=num2strOrNot(exGby(g).gbyTables.(curInfoGroup)(1));
        end
+       if(~isempty(gbyStrs{g}))
+        gbyStrs{g}(end)='';
+       end
    else
-        curInfoGby{g}='';
+       gbyStrs(g)=[];
+       exGby(g)=[];
+       curInfoGby(g)=[];
+       numGroups=numGroups-1;
    end
-   if(~isempty(gbyStrs{g}))
-    gbyStrs{g}(end)='';
-   end
+   
 end
 
 
@@ -138,8 +142,8 @@ end
 
 
 if(useCurInfoGroup)
-    curInfoGby(isempty(curInfoGby))={""};
-    [uCurInfoG,a,uCurIdx]=unique(curInfoGby);
+    
+    [uCurInfoG,a,uCurIdx]=unique(cellstr(curInfoGby));
     numCurInfoG=length(uCurInfoG);
     barChartData=nan(max(uCurIdx),numUgroups,3);
 else
@@ -188,6 +192,10 @@ for g=1:numGroups
     end
     
     curData=table2array(curData);
+
+    if(isempty(curData))
+        continue;
+    end
     
     if(isstring(curData)||iscategorical(curData)||ischar(curData))
        %warning('Strings and categories return count');
@@ -392,7 +400,7 @@ else
 end
 
 if(exSettings.plot_legend_mode==3||(exSettings.plot_legend_mode==2))
-    if(~isempty(gAStrs)&&~isempty(gAStrs{1}))
+    if(~isempty(gAStrs)&&(~isempty(gAStrs{1})||length(gAStrs)>1))
         legend(gAStrs(:),'Location', 'Best');
         legend boxoff;
     end
@@ -498,13 +506,22 @@ if(iscell(possibleStr))
             possibleStr{i}=char(possibleStr{i});
         elseif(~ischar(possibleStr{i})&&isnumeric(possibleStr{i}))
             possibleStr{i}=num2str(possibleStr{i}); 
-       end
+        elseif(islogical(possibleStr{i})&&possibleStr{i})
+            possibleStr{i}='true';
+        elseif(islogical(possibleStr{i})&&~possibleStr{i})
+            possibleStr{i}='false';
+        end
     end
 elseif(~ischar(possibleStr)&&isnumeric(possibleStr))
     possibleStr=num2str(possibleStr);
 elseif(isstring(possibleStr))
     possibleStr=char(possibleStr);
+elseif(islogical(possibleStr)&&possibleStr)
+    possibleStr='true';
+elseif(islogical(possibleStr)&&~possibleStr)
+    possibleStr='false';
 end
+
     
     if(isempty(possibleStr))
         possibleStr='';
