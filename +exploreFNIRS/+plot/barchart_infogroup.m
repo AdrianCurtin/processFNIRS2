@@ -65,11 +65,6 @@ if(useInfoAsCategoricalGroup)
         if(ismem)
             gbyVars(idx)=[];
         end
-
-        if(strcmp(curInfoStr,curInfoGroup))
-            %useInfoAsCategoricalGroup=false;
-        end
-   
     end
 end
 
@@ -79,6 +74,13 @@ if(useInfoAsCategoricalGroup&&~isempty(uCategoricalVals))
     numOldGroups=numGroups;
     numNewGroups=numGroups*lenUCatVals;
     newExGby=[];
+
+    if(strcmp(curInfoStr,curInfoGroup)&&~strcmp(plotFeature,'Count'))
+        newInfoStr=strcat(curInfoStr,'_');
+        useNewInfoStr=true;
+    else
+        useNewInfoStr=false;
+    end
     for g=1:numGroups
         curTable=exGby(g).gbyTables;
         for j=1:lenUCatVals
@@ -88,14 +90,25 @@ if(useInfoAsCategoricalGroup&&~isempty(uCategoricalVals))
             else
                 temp=curTable{:,curInfoStr};
                 curTable2=curTable;
-                curTable2(:,curInfoStr)=[];
+                curTable2.categoricalLabelStr(:)=uCategoricalVals(j);
                 
-                curTable2.(curInfoStr)=(temp==uCategoricalVals(j));
+                if(useNewInfoStr)
+                    curTable2.(newInfoStr)=(temp==uCategoricalVals(j));
+                else
+                    curTable2(:,curInfoStr)=[];
+                    
+                    curTable2.(curInfoStr)=(temp==uCategoricalVals(j));
+                end
                 newExGby(newIdx).gbyTables=curTable2;
             end
             
         end
     end
+
+    if(useNewInfoStr)
+        curInfoStr=newInfoStr; % has no effect unless both info string and info group are the same
+    end
+
     exGby=newExGby;
     numGroups=numNewGroups;
     gbyVars{end+1}=curInfoStr;
@@ -112,7 +125,11 @@ for g=numGroups:-1:1
     gbyStrs{g}='';
    if(~isempty(exGby(g).gbyTables))
        for i=1:length(gbyVars)
-           gbyStrs{g}=sprintf('%s%s:%s,',gbyStrs{g},gbyVars{i},num2strOrNot(exGby(g).gbyTables.(gbyVars{i})(1)));
+           if(i==length(gbyVars)&&useInfoAsCategoricalGroup&&~strcmp(plotFeature,'Count'))
+               gbyStrs{g}=sprintf('%s%s:%s,',gbyStrs{g},gbyVars{i},num2strOrNot(exGby(g).gbyTables.categoricalLabelStr(1)));
+           else
+               gbyStrs{g}=sprintf('%s%s:%s,',gbyStrs{g},gbyVars{i},num2strOrNot(exGby(g).gbyTables.(gbyVars{i})(1)));
+           end
        end 
        if(useCurInfoGroup)
            curInfoGby{g}=num2strOrNot(exGby(g).gbyTables.(curInfoGroup)(1));
