@@ -19,7 +19,6 @@ if(~isempty(curInfoGroup)&&~strcmp(curInfoGroup,'(Time)'))
         useCurInfoGroup=false;
     end
 else
-        
     useCurInfoGroup=false;
 end
 
@@ -57,6 +56,20 @@ for g=1:numGroups
     if(isstring(curData)||iscategorical(curData)||ischar(curData)||islogical(curData))
        useInfoAsCategoricalGroup=true;
        uCategoricalVals=unique([uCategoricalVals(:);curData(:)]);
+    end
+end
+
+if(useInfoAsCategoricalGroup)
+    if(~isempty(curInfoStr)&&~strcmp(curInfoStr,'(Time)'))
+        [ismem,idx]=ismember(curInfoStr,gbyVars);
+        if(ismem)
+            gbyVars(idx)=[];
+        end
+
+        if(strcmp(curInfoStr,curInfoGroup))
+            useInfoAsCategoricalGroup=false;
+        end
+   
     end
 end
 
@@ -104,7 +117,9 @@ for g=1:numGroups
        if(useCurInfoGroup)
            curInfoGby{g}=num2strOrNot(exGby(g).gbyTables.(curInfoGroup)(1));
        end
-   end 
+   else
+        curInfoGby{g}='';
+   end
    if(~isempty(gbyStrs{g}))
     gbyStrs{g}(end)='';
    end
@@ -123,7 +138,8 @@ end
 
 
 if(useCurInfoGroup)
-    [uCurInfoG,a,uCurIdx]=unique(cellstr(string(curInfoGby)));
+    curInfoGby(isempty(curInfoGby))={""};
+    [uCurInfoG,a,uCurIdx]=unique(curInfoGby);
     numCurInfoG=length(uCurInfoG);
     barChartData=nan(max(uCurIdx),numUgroups,3);
 else
@@ -162,8 +178,6 @@ minDataPoint=[];
 for g=1:numGroups
     curTable=exGby(g).gbyTables;
     curData=curTable(:,curInfoStr);
-    
-    
     
     if(useCurInfoGroup)
         cBarSec=uCurIdx(g); % which section to put the bar in 
@@ -478,13 +492,28 @@ end
 function possibleStr=num2strOrNot(possibleStr)
 if(iscell(possibleStr))
     for i=1:length(possibleStr)
-       if(~ischar(possibleStr{i})&&isnumeric(possibleStr{i}))
+        if(isempty(possibleStr{i}))
+            possibleStr{i}='';
+        elseif(isstring(possibleStr{i}))
+            possibleStr{i}=char(possibleStr{i});
+        elseif(~ischar(possibleStr{i})&&isnumeric(possibleStr{i}))
             possibleStr{i}=num2str(possibleStr{i}); 
        end
     end
 elseif(~ischar(possibleStr)&&isnumeric(possibleStr))
     possibleStr=num2str(possibleStr);
+elseif(isstring(possibleStr))
+    possibleStr=char(possibleStr);
 end
+    
+    if(isempty(possibleStr))
+        possibleStr='';
+    end
+
+if(isempty(possibleStr))
+    possibleStr='';
+end
+
 
 end
 
