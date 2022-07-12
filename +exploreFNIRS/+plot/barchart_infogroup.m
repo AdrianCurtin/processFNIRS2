@@ -3,6 +3,11 @@ function barchart_infogroup(handles,exSettings,exGby,gbyVars)
 global ExFNIRS
 curInfoGroup=exSettings.curInfoGroup;
 
+errorFeature=exSettings.plot_bar_err_feature;
+plotFeature=exSettings.plot_bar_feature;
+plotPoints=exSettings.plot_bar_all;
+
+
 gbyVars_original=gbyVars;
 
 if(~isempty(curInfoGroup)&&~strcmp(curInfoGroup,'(Time)'))
@@ -35,11 +40,60 @@ set(dcm_obj,'UpdateFcn',@myDataTipUpdateFcn);
 
 num2Plot=numGroups;
 
+curInfoStr=exSettings.curInfoStr;
+useInfoAsCategoricalGroup=false;
+uCategoricalVals=[];
+
+subplotGby=[];
+
+for g=1:numGroups
+    curTable=exGby(g).gbyTables;
+    curData=curTable(:,curInfoStr);
+    
+    curData=table2array(curData);
+
+    subplotGby.gby(g)=exGby(g);
+    
+    if(isstring(curData)||iscategorical(curData)||ischar(curData)||islogical(curData))
+       useInfoAsCategoricalGroup=true;
+       uCategoricalVals=unique([uCategoricalVals(:);curData(:)]);
+    end
+end
+
+
+if(useInfoAsCategoricalGroup&&~isempty(uCategoricalVals))
+    lenUCatVals=length(uCategoricalVals);
+    numOldGroups=numGroups;
+    numNewGroups=numGroups*lenUCatVals;
+    newExGby=[];
+    for g=1:numGroups
+        curTable=exGby(g).gbyTables;
+        for j=1:lenUCatVals
+            newIdx=j+(g-1)*lenUCatVals;
+            if(strcmp(plotFeature,'Count'))
+                newExGby(newIdx).gbyTables=curTable(curTable{:,curInfoStr}==uCategoricalVals(j),:);
+            else
+                temp=curTable{:,curInfoStr};
+                curTable2=curTable;
+                curTable2(:,curInfoStr)=[];
+                
+                curTable2.(curInfoStr)=(temp==uCategoricalVals(j));
+                newExGby(newIdx).gbyTables=curTable2;
+            end
+            
+        end
+    end
+    exGby=newExGby;
+    numGroups=numNewGroups;
+    gbyVars{end+1}=curInfoStr;
+end
+
 
 gbyStrs=cell(numGroups,1);
 curInfoGby=cell(0);
-subplotGby=[];
+curInfoStrGby=cell(0);
 gbyIdx=nan(numGroups,1);
+
 
 for g=1:numGroups
     gbyStrs{g}='';
@@ -56,6 +110,7 @@ for g=1:numGroups
    end
 end
 
+
 [uGbyStrs,~,uGroupIdx]=unique(cellstr(gbyStrs));
 numUgroups=length(uGbyStrs);
 
@@ -67,9 +122,7 @@ else
 end
 
 
-
 if(useCurInfoGroup)
-    
     [uCurInfoG,a,uCurIdx]=unique(cellstr(string(curInfoGby)));
     numCurInfoG=length(uCurInfoG);
     barChartData=nan(max(uCurIdx),numUgroups,3);
@@ -79,16 +132,13 @@ else
     numCurInfoG=1;
 end
 
-errorFeature=exSettings.plot_bar_err_feature;
-plotFeature=exSettings.plot_bar_feature;
-plotPoints=exSettings.plot_bar_all;
 
 
 gAStrs=cell(numUgroups,1);
 gAerrStrs=cell(numUgroups,1);
     
  
-curInfoStr=exSettings.curInfoStr;
+
 
 if(exSettings.within_sub_avg_mode==3)
     dataH=ExFNIRS.dataHierarchy;
@@ -105,10 +155,15 @@ barChartDataPoints=cell(1,numCurInfoG);
 maxDataPoint=[];
 minDataPoint=[];
 
+
+
+
+
 for g=1:numGroups
     curTable=exGby(g).gbyTables;
     curData=curTable(:,curInfoStr);
-    subplotGby.gby(g)=exGby(g);
+    
+    
     
     if(useCurInfoGroup)
         cBarSec=uCurIdx(g); % which section to put the bar in 
@@ -121,15 +176,15 @@ for g=1:numGroups
     curData=table2array(curData);
     
     if(isstring(curData)||iscategorical(curData)||ischar(curData))
-       warning('Strings and categories return count');
+       %warning('Strings and categories return count');
        [~,~,curData]=unique(curData);
        plotFeature='Count';
        % return;
     end
 
     if(islogical(curData))
-       warning('boolean/logical values return count ');
-       curData=numeric(curData);
+       %warning('boolean/logical values return count ');
+       curData=double(curData);
     end
     curData(curData==-9999)=nan;
     
@@ -137,6 +192,7 @@ for g=1:numGroups
 
     if(strcmp(plotFeature,'Count'))
         curDataH=pf2_base.hierarchicalAverage(curData,curTable(:,dataH),@nanmean);
+        plotPoints=false;
         curHAvg=length(curDataH);
     elseif(strcmp(plotFeature,'Mean'))
         curDataH=pf2_base.hierarchicalAverage(curData,curTable(:,dataH),@nanmean);
@@ -256,7 +312,7 @@ elseif(all(all(isnan(barChartData(:,:,1))))&&~plotPoints)
     return
 end
 
-if(exSettings.plot_bar_err)
+if(exSettings.plot_bar_err&&~strcmp(plotFeature,'Count'))
     pf2_base.external.barweb(barChartData(:,:,1),barChartData(:,:,2:1+numErrFeatures),1,uCurInfoG, [], [], [], cIndex,[],gAStrs,[],'hide',barChartDataPoints,strcmp(errorFeature,'Violin'));
     
     if(strcmp(errorFeature,'SEM')||strcmp(errorFeature,'SD'))&&~plotPoints
@@ -303,7 +359,8 @@ if(exSettings.plot_bar_err)
 else
     pf2_base.external.barweb(barChartData(:,:,1),[],1,uCurInfoG, [], [], [], cIndex,[],gAStrs,[],'hide',barChartDataPoints);
 
-    if(~plotPoints)
+
+    if(~plotPoints||strcmp(plotFeature,'Count'))
         ylimLower=min(min(barChartData(:,:,1)));
         ylimUpper=max(max(barChartData(:,:,1)));
     else
@@ -312,7 +369,7 @@ else
     end
     yrange=ylimUpper-ylimLower;
     ylim([min(ylimLower-0.1*yrange,0),max(ylimUpper+0.1*yrange,0)]);
-    ylabel_with_space(sprintf('%s %s   +/- (%s)',plotFeature,curInfoStr,errorFeature));
+    ylabel_with_space(sprintf('%s %s',plotFeature,curInfoStr));
     
     if(useCurInfoGroup)
        title_with_space(sprintf('%s by %s',curInfoStr,curInfoGroup)); 
@@ -430,52 +487,6 @@ elseif(~ischar(possibleStr)&&isnumeric(possibleStr))
 end
 
 end
-
-function outStr=getFormattedTrialString(fNIR)
-
-if(~isfield(fNIR,'info'))
-    outStr='Missing Info';
-    return;
-end
-
-outStr='';
-
-subStr=num2strOrNot(fNIR.info.SubjectID);
-groupStr=num2strOrNot(fNIR.info.Group);
-sessionStr=num2strOrNot(fNIR.info.Session);
-conditionStr=num2strOrNot(fNIR.info.Condition);
-trialStr=num2strOrNot(fNIR.info.Trial);
-blockStr=num2strOrNot(fNIR.info.Block);
-
-useID=true&&~isempty(subStr);
-useGroup=true&&~isempty(groupStr);
-useSession=true&&~isempty(sessionStr);
-useCondition=true&&~isempty(conditionStr);
-useTrial=true&&~isempty(trialStr);
-useBlock=true&&~isempty(blockStr);
-
-if(useID)
-    outStr=sprintf('%sSubjectID:%s\n',outStr,subStr);
-end
-if(useGroup)
-    outStr=sprintf('%sGroup:%s\n',outStr,groupStr);
-end
-if(useSession)
-    outStr=sprintf('%sSession:%s\n',outStr,sessionStr);
-end
-if(useCondition)
-    outStr=sprintf('%sCondition:%s\n',outStr,conditionStr);
-end
-if(useTrial)
-    outStr=sprintf('%sTrial:%s\n',outStr,trialStr);
-end
-if(useBlock)
-    outStr=sprintf('%sBlock:%s\n',outStr,blockStr);
-end
-
-outStr(end)='';
-end
-
 
 
 function h=xlabel_with_space(figHandle,labelstring)

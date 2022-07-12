@@ -254,7 +254,7 @@ else
 		colormap(jet);
 	end
 	if ~isempty(bw_legend) && ~strcmp(legend_type, 'axis')&&strcmp(legend_type,'plot')
-		handles.legend = legend(bw_legend, 'location', 'best', 'fontsize',12);
+		handles.legend = legend(bw_legend, 'location', 'best', 'fontsize',12,'fontcolor',[0,0,0]);
 		legend boxoff;
 	else
 		handles.legend = [];
@@ -320,14 +320,14 @@ else
                     baseY1=min([barUpper(ii,i),barMids(ii,i)]);
                     baseY2=min([barMids(ii,i),barLower(ii,i)]);
 
-                    if(h1>0)
+                    if(h1>=0)
                         handles.rectangles(i,ii,1)=rectangle('position',[x(ii)-barW/2,baseY1, barW, h1]);
                         if ~isempty(bw_colormap)
                             handles.rectangles(i,ii,1).FaceColor=curColor; 
                             handles.rectangles(i,ii,1).LineWidth=2; 
                         end
                     end
-                    if(h2>0)
+                    if(h2>=0)
                         handles.rectangles(i,ii,2)=rectangle('position',[x(ii)-barW/2,baseY2, barW, h2]);
                         if ~isempty(bw_colormap)
                             handles.rectangles(i,ii,2).FaceColor=curColor; 
