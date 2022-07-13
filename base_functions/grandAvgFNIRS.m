@@ -357,7 +357,7 @@ for i=1:numfSeg
                                 continue;
                             end
                             
-                            [auxValidT,auxValidIdx]=ismember(rndTimesIdx(:,1),auxTimes);
+                            [auxValidT,auxValidIdx]=ismember(outGA.time,auxTimes);
                             auxValidIdx(auxValidIdx==0)=[]; 
                             
                             if(~isempty(auxValidIdx))
