@@ -177,6 +177,9 @@ numCharts=length(subplotHandles);
 
 barChartDataPoints=cell(1,numUgroups);
 
+minValFromBarChart=inf;
+maxValFromBarChart=-inf;
+
 for chIdx=1:numOpt
     ch=selectedOpt(chIdx);
     %legendGFXhandles{1}=[];
@@ -481,11 +484,12 @@ for chIdx=1:numOpt
 
             if(plottingDataPoints||strcmp(errorFeature,'MaxMin')||strcmp(errorFeature,'IQR')||strcmp(errorFeature,'Violin'))
                 [jSz,kSz]=size(barChartDataPoints{curChart});
+                
                 for j=1:jSz
                     for k=1:kSz
                         if(~isempty(barChartDataPoints{curChart}{j,k}))
-                            maxValFromBarChart=nanmax(maxValFromBarChart,nanmax(barChartDataPoints{curChart}{j,k}));
-                            minValFromBarChart=nanmin(minValFromBarChart,nanmin(barChartDataPoints{curChart}{j,k}));
+                            maxValFromBarChart=nanmax(maxValFromBarChart,nanmax(barChartDataPoints{curChart}{j,k}(:)));
+                            minValFromBarChart=nanmin(minValFromBarChart,nanmin(barChartDataPoints{curChart}{j,k}(:)));
                         end
                     end
                 end

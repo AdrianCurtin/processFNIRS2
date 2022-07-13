@@ -218,6 +218,10 @@ curFigIdx=[1,1];
 
 for chIdx=1:numOpt
     ch=selectedOpt(chIdx);
+    if(isnan(ch))
+        warning('Channel is Nan, variable may not exist in array/table');
+        continue;
+    end
     gStrs=cell(num2Plot,1);
     for b=1:numBioM
         bioM=selectedBioM(b);
@@ -312,6 +316,7 @@ for chIdx=1:numOpt
                            if(pf2_base.isnestedfield(data2plot.(bioM),'time')) %otherwise use aux time
                                if(istable(data2plot.(bioM)))
                                     dataTime=data2plot.(bioM).time;
+                                    data2plot.(bioM).time=[];
                                     
                                     %=data2plot.(bioM).Properties.VariableNames;
                                     %timeIdx=ismember(varNames,'time');
@@ -530,14 +535,14 @@ for chIdx=1:numOpt
                     chNamePartLong=sprintf('ROI: %s',selectedOptStr{chIdx});
                 case 'Aux'
                     chNamePart=selectedOptStr{chIdx};
-                    chNamePartLong=sprintf('Aux: %s %s',selectedOptStr{chIdx},bioM);
+                    chNamePartLong=sprintf('Aux: %s %s',bioM,selectedOptStr{chIdx});
             end
             
             if(~plotGroupByBioM) 
                 if(~strcmp(exSettings.ChannelMode,'Aux'))
                     ylbl=sprintf('\\Delta[%s] (\\muM)',bioM);
                 else
-                    ylbl=sprintf('%s',bioM);
+                    ylbl=sprintf('%s: %s',bioM,selectedOptStr{chIdx});
                 end
                 if(plotCount)
                     ylbl=(sprintf('N %s',ylbl));
@@ -565,7 +570,11 @@ for chIdx=1:numOpt
                 case 'channels'
                     title_with_space(curFigH.subH{curSy,curSx},chNamePartLong);
                 case 'bioM'
-                    title_with_space(curFigH.subH{curSy,curSx},bioM);
+                    if(~strcmp(exSettings.ChannelMode,'Aux'))
+                        title_with_space(curFigH.subH{curSy,curSx},bioM);
+                    else
+                        title_with_space(curFigH.subH{curSy,curSx},sprintf('%s: %s',bioM,selectedOptStr{chIdx}));
+                    end
                 case 'groupby'
                     title_with_space(curFigH.subH{curSy,curSx},uCurInfoG{curGroupInfoIdx});
                 otherwise 

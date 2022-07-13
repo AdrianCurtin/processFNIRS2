@@ -4205,10 +4205,12 @@ switch (ExFNIRS.settings.ChannelMode)
         
                                 if(istable(curField))
                                     auxNames=[auxNames,curAuxNames{auxf}];
-                                    
+                                    auxNames=unique(auxNames);
+
+                                    auxFidx=find(strcmp(curAuxNames{auxf},auxNames));
         
                                     curTableVars=curField.Properties.VariableNames;
-                                    cacheAuxVarNames{auxf}=curTableVars;
+                                    cacheAuxVarNames{auxFidx}=curTableVars;
     
                                     for auxnum=1:size(curField,2)
                                         newVarNamesIdx=~ismember(curTableVars,auxVarNames);
@@ -4234,14 +4236,14 @@ switch (ExFNIRS.settings.ChannelMode)
                 for sIdx=1:length(uAuxNames)
                     %for vIdx=1:length(auxVarNames)
                     curVarNames=cacheAuxVarNames{sIdx};
-                    varExistsIdx=ismember(uAuxVarNames,curVarNames);
+                    [varExistsIdx,varIdxMap]=ismember(uAuxVarNames,curVarNames);
                     if(any(varExistsIdx))
                         varIdx=find(varExistsIdx);
                         for vI=1:length(varIdx)
-                            curIdx=varIdx(vI);
+                            curIdx=varIdxMap(varIdx(vI));
                             curVarName=curVarNames{curIdx};
                             
-                            auxVarTable{sIdx,curVarName}=vI;
+                            auxVarTable{sIdx,curVarName}=curIdx;
                         end
                     end
 
@@ -4268,11 +4270,11 @@ switch (ExFNIRS.settings.ChannelMode)
             uAuxVarNames=auxVarTable.Properties.VariableNames;
         end
 
-        auxVarNamesNoTime=auxVarNames(~strcmp(auxVarNames,'time'));
+        auxVarNamesNoTime=uAuxVarNames(~strcmp(uAuxVarNames,'time'));
 
 
 
-        if(isempty(auxNames)||isempty(auxVarNamesNoTime))
+        if(isempty(uAuxVarNames)||isempty(auxVarNamesNoTime))
             warning('No Auxillary channels or data present in data');
             set(handles.popupmenu_ChannelMode,'Value',1);
             setExChannelMode('fNIR',handles,false,false);

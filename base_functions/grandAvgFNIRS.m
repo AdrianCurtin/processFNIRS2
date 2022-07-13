@@ -367,7 +367,7 @@ for i=1:numfSeg
                                     outGA.Aux.(curAuxField).data(auxValidT==1,:,i)=curFNIR.Aux.(curAuxField){auxValidIdx,nonTimeColsIdx};
                                     if(~isfield(outGA.Aux.(curAuxField),'varNames'))
                                         temp_curVarNames=curFNIR.Aux.(curAuxField).Properties.VariableNames;
-                                        outGA.Aux.(curAuxField).varNames=temp_curVarNames(~contains(temp_curVarNames,'time'));
+                                        outGA.Aux.(curAuxField).varNames=temp_curVarNames(~strcmp(temp_curVarNames,'time'));
                                     end
                                 end
                             end
