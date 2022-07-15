@@ -357,6 +357,7 @@ if(isfield(outfNIR,'Aux')&&splitAux)
         
         if(~isfield(outfNIR.Aux,'flattened'))
             outfNIR.Aux=recursiveAuxFlatten(fNIR.Aux,fNIR.time);
+            outfNIR.Aux.flattened=true;
         end
 
         validTimeFields={'time','t','Time'};
