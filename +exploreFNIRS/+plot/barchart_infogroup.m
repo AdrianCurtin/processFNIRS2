@@ -426,10 +426,15 @@ if(exSettings.plot_legend_mode==3||(exSettings.plot_legend_mode==2))
     end
 end
 
-fprintf('Info Table Values\n');
-for i=1:length(gAStrs(:))
-    fprintf('%s\tMean %.2f\tError: %.2f\n',gAStrs{i},barChartData(1,i,1),barChartData(1,i,2));
+
+fprintf('\nInfo Table Values\n');
+for i=1:size(gAStrs,1)
+    for j=1:length(uCurInfoG)
+        fprintf('%s:%s\tMean %.2f\tError: %.2f\n',gAStrs{i},uCurInfoG{j},barChartData(j,i,1),barChartData(j,i,2));
+    end
+    
 end
+fprintf('\n');
         
 hold off;
    
