@@ -38,10 +38,65 @@ if(~any(curRawMatchIdx&curOxyMatchIdx))
     ExFNIRS.processedData{ExFNIRS.numProcessed+1,1}=rawMethodStr;
     ExFNIRS.processedData{ExFNIRS.numProcessed+1,2}=oxyMethodStr;
     data=ExFNIRS.data;
+
+    numData=length(data);
+    if(~isfield(ExFNIRS,'currentROI')) % standaradize all ROIs on first load
+        fprintf('Scanning ROI fields...\n');
+    
+        uROI={};
+        roiNames={};
+        for i=1:numData
+            if(pf2_base.isnestedfield(data{i},'ROI.info'))
+                curROInames=data{i}.ROI.info.Properties.RowNames;
+                if(any(~ismember(curROInames,roiNames)))
+                    for roinum=1:size(data{i}.ROI.info,1)
+                        if(~ismember(curROInames{roinum},roiNames))
+                            if(isempty(data{i}.ROI.info.Properties.RowNames{roinum}))
+                                newRoiName=sprintf('ROI%i',roinum+length(rowNames));
+                                roiNames=[roiNames,{newRoiName}];
+                                data{i}.ROI.info.Properties.RowNames{roinum}=newRoiName;
+                            else
+                                roiNames=[roiNames,data{i}.ROI.info.Properties.RowNames(roinum)];
+                            end
+                            data{i}.ROI.info.DeviceCfg(:)={data{i}.info.probename};
+                            uROI=[uROI;data{i}.ROI.info(roinum,:)];
+                        end
+                    end
+                end
+            end
+        end
+
+        
+
+        % standaradize all ROIs on first load
+        [uROInames,b,c]=unique(roiNames);
+        uROInames=roiNames(b);
+        uROI=uROI(b,:);
+        uROI.Properties.RowName=uROInames;
+
+        fprintf(2,'************\nStandardizing all ROI fields..\n********\n');
+        for i=1:numData
+            if(pf2_base.isnestedfield(data{i},'raw')&&~isempty(data{i}))
+                if(~pf2_base.isnestedfield(data{i},'ROI.info')||isempty(data{i}.ROI)||isempty(data{i}.ROI.info))
+                    data{i}.ROI.info=uROI;
+                else
+                    for roi_idx=1:size(uROI,1)
+                       roi_name=uROI.Row(roi_idx);
+                       if(~contains(data{i}.ROI.info.Row,roi_name))
+                           data{i}.ROI.info=[data{i}.ROI.info;uROI(roi_idx,:)];
+                       end
+                    end
+                    
+                end
+            end
+        end
+        ExFNIRS.currentROI=uROI;
+        ExFNIRS.data=data;   
+    end
     
     pf2('blLength',0);
     pf2('Raw_Method',rawMethodStr,'Oxy_Method',oxyMethodStr); 
-    numData=length(data);
+    
     rawMethodStr_label=rawMethodStr;
     oxyMethodStr_label=oxyMethodStr;
     rawMethodStr_label(rawMethodStr_label=='_')='-';
@@ -67,11 +122,8 @@ if(~any(curRawMatchIdx&curOxyMatchIdx))
            data{i}=pf2.Data.Resample(data{i},ExFNIRS.settings.grandavg_resample_size,'centerOnT0',true,'timeOutMode','end','averageAux',false,'flattenAux',true);
        end
     end
-    try
-        close(hF);
-    catch
-        
-    end
+
+    
     
     ExFNIRS.processedData{ExFNIRS.numProcessed+1,3}=data;
     ExFNIRS.numProcessed=ExFNIRS.numProcessed+1;

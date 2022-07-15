@@ -4099,6 +4099,7 @@ end
 global ExFNIRS
 ExFNIRS.settings.ChannelMode=modeStr;
 
+
 switch (ExFNIRS.settings.ChannelMode)
     case 'fNIR'
         if(initOPT||~isfield(ExFNIRS,'currentOpt'))
@@ -4136,7 +4137,7 @@ switch (ExFNIRS.settings.ChannelMode)
 
         if(initROI||~isfield(ExFNIRS,'currentROI')) % standaradize all ROIs on first load
 
-            initROI=true;
+            
             fprintf('Scanning ROI fields...\n');
     
             uROI={};
@@ -4161,6 +4162,34 @@ switch (ExFNIRS.settings.ChannelMode)
                     end
                 end
             end
+
+            %if(initROI) % standaradize all ROIs on first load
+            [~,b,c]=unique(roiNames);
+            uROInames=roiNames(b);
+            uROI=uROI(b,:);
+            uROI.Properties.RowNames=uROInames;
+
+            fprintf(2,'************\nStandardizing all ROI fields..\n********\n');
+            for i=1:length(ExFNIRS.data)
+                if(pf2_base.isnestedfield(ExFNIRS.data{i},'raw')&&~isempty(ExFNIRS.data{i}))
+                    if(~pf2_base.isnestedfield(ExFNIRS.data{i},'ROI.info'))
+                        ExFNIRS.data{i}.ROI.info=uROI;
+                    else
+                        for roi_idx=1:size(uROI,1)
+                           roi_name=uROI.Row(roi_idx);
+                           if(~contains(ExFNIRS.data{i}.ROI.info.Row,roi_name))
+                               ExFNIRS.data{i}.ROI.info=[ExFNIRS.data{i}.ROI.info;uROI(roi_idx,:)];
+                           end
+                        end
+                        
+                    end
+                end
+            end
+            ExFNIRS.currentROI=uROI;
+            %end
+             fprintf(2,'************\Standardization Complete!\n********\n');
+
+            
         else
             uROI=ExFNIRS.currentROI;
             uROInames=uROI.Properties.RowNames;
@@ -4171,34 +4200,7 @@ switch (ExFNIRS.settings.ChannelMode)
             set(handles.popupmenu_ChannelMode,'Value',1);
             setExChannelMode('fNIR',handles,false,false);
         else
-            %uROI=unique(uROI{:},'rows');
-
-            
-            if(initROI) % standaradize all ROIs on first load
-                [uROInames,b,c]=unique(roiNames);
-                uROInames=roiNames(b);
-                uROI=uROI(b,:);
-
-                fprintf(2,'************\nStandardizing all ROI fields..\n********\n');
-                for i=1:length(ExFNIRS.data)
-                    if(pf2_base.isnestedfield(ExFNIRS.data{i},'raw')&&~isempty(ExFNIRS.data{i}))
-                        if(~pf2_base.isnestedfield(ExFNIRS.data{i},'ROI.info'))
-                            ExFNIRS.data{i}.ROI.info=uROI;
-                        else
-                            for roi_idx=1:size(uROI,1)
-                               roi_name=uROI.Row(roi_idx);
-                               if(~contains(ExFNIRS.data{i}.ROI.info.Row,roi_name))
-                                   ExFNIRS.data{i}.ROI.info=[ExFNIRS.data{i}.ROI.info;uROI(roi_idx,:)];
-                               end
-                            end
-                            
-                        end
-                    end
-                end
-                ExFNIRS.currentROI=uROI;
-            end
-
-           
+            %uROI=unique(uROI{:},'rows');           
 
             set(handles.text_optode_label,'String','ROI');
             set(handles.text_biomarker_label,'String','BioMarker');

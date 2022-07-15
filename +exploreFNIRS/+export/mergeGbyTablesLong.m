@@ -162,8 +162,9 @@ for g=1:length(gbyTables)
                     end
 
                        tempTable.(newAuxName)(:,1)=nan;
-                       tempTable.(newAuxName)(tempTable{:,'missingAux'}~=1,1)=permute(curAux.data(tDataIdx,ch,:),[3,1,2]);
-                       tempTable.(newAuxName)(tempTable{:,'missingAux'}==1,1)=nan;
+                       tempTable.(newAuxName)(:,1)=permute(curAux.data(tDataIdx,ch,:),[3,1,2]);
+                       %tempTable.(newAuxName)(tempTable{:,'missingAux'}~=1,1)=permute(curAux.data(tDataIdx,ch,:),[3,1,2]);
+                       %tempTable.(newAuxName)(tempTable{:,'missingAux'}==1,1)=nan;
                    
                 end
 
