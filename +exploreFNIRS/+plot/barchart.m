@@ -441,6 +441,7 @@ for chIdx=1:numOpt
                     numX=numBioM;
                     numY=numOpt;
                     subplotGby{curSubplotIdx}=chartGby{curChart};
+                    
                 else
                     curSubplotIdx=chIdx+(numOpt*(curChart-1));
                     numX=1;
@@ -457,8 +458,11 @@ for chIdx=1:numOpt
         if(~showBarChart)
             continue;
         end
-        subplotHandles{curSubplotIdx}=subplot(numX,numY,curSubplotIdx);
         
+        subplotHandles{curSubplotIdx}=subplot(numX,numY,curSubplotIdx);
+        subplotGby{curSubplotIdx}.barChartData=barChartData{curChart};
+        subplotGby{curSubplotIdx}.gAStrs=gAStrs(:);
+
         if(useCurInfoGroup&&numChartTimes>1)
             xBarLabels=cell(numChartTimes*numCurInfoG,1);
             timeStrs=num2str(round(barChartTimes));
@@ -476,6 +480,8 @@ for chIdx=1:numOpt
             xBarLabels=barChartTimeStrings;
         end
         
+        
+        subplotGby{curSubplotIdx}.xBarLabels=xBarLabels;
         
 
         if(exSettings.plot_bar_err&&~plotCount)
@@ -666,6 +672,19 @@ end
  
  
 for sH=1:length(subplotHandles)
+
+    fprintf('\nInfo Table Values\n');
+    curData=subplotGby{sH};
+    for i=1:size(curData.gAStrs,1)
+        for j=1:size(curData.xBarLabels,1)
+            fprintf('%s:%s\tMean %.2f\tError: %.2f\n',curData.gAStrs{i},curData.xBarLabels{j},curData.barChartData(j,i,1),curData.barChartData(j,i,2));
+   
+        end
+        
+    end
+    fprintf('\n');
+
+    
     
     if(exSettings.LME_enable&&isfield(subplotGby{sH},'gby'))
         switch (exSettings.ChannelMode)
