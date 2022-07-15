@@ -81,7 +81,7 @@ blEndTime=p.Results.blEndTime;
 relative=p.Results.relative;
 blfNIR=p.Results.blfNIR;
 
-splitAux=p.Results.splitaux;
+splitAux=p.Results.splitAux;
 
 if(~isstruct(fNIR))
     temp=fNIR;
