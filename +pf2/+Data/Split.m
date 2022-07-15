@@ -365,7 +365,7 @@ if(isfield(outfNIR,'Aux')&&splitAux)
             auxTrimFields=fields(outfNIR.Aux);
     
             for atIdx=1:length(auxTrimFields)
-                curVar=outFNIR.Aux.(auxTrimFields{atIdx});
+                curVar=outfNIR.Aux.(auxTrimFields{atIdx});
      
                 if(istable(curVar))
                     curTableVarNames=curVar.Properties.VariableNames;
@@ -374,7 +374,7 @@ if(isfield(outfNIR,'Aux')&&splitAux)
                     minftime=startTime;
                     maxftime=endTime;
                     t2trim_idx=t2trim>minftime&t2trim<maxftime;
-                    outFNIR.Aux.(auxTrimFields{atIdx})=curVar(t2trim_idx,:);
+                    outfNIR.Aux.(auxTrimFields{atIdx})=curVar(t2trim_idx,:);
                 end
             end
         end
