@@ -107,7 +107,7 @@ for g=1:length(gbyTables)
                           varName=sprintf('%s_Opt%i_t%.0f',curBioM,chNum,curBarGA.time(t)); 
                        end
                        varName(varName=='-')='_';
-                       tempTable.(varName)(tempTable{:,'missingFNIRS'}==0,1)=permute(curBarGA.(curBioM).data(t,chNum,:),[3,1,2]);
+                       tempTable.(varName)(tempTable{:,'missingFNIRS'}~=1,1)=permute(curBarGA.(curBioM).data(t,chNum,:),[3,1,2]);
                     end
                 end
             end
@@ -127,7 +127,7 @@ for g=1:length(gbyTables)
                           varName=sprintf('%s_ROI%i_t%.0f',curBioM,chNum,curBarGA.time(t)); 
                        end
                        varName(varName=='-')='_';
-                       tempTable.(varName)(tempTable{:,'missingFNIRS'}==0,1)=permute(curBarGA.ROI.(curBioM).data(t,chNum,:),[3,1,2]);
+                       tempTable.(varName)(tempTable{:,'missingFNIRS'}~=1,1)=permute(curBarGA.ROI.(curBioM).data(t,chNum,:),[3,1,2]);
                     end
                 end
             end
@@ -166,7 +166,7 @@ for g=1:length(gbyTables)
                           varName=sprintf('%s_t%.0f',newAuxName,curBarGA.time(t)); 
                        end
                        varName(varName=='-')='_';
-                       tempTable.(varName)(tempTable{:,'missingFNIRS'}==0,1)=permute(curAux.data(t,ch,:),[3,1,2]);
+                       tempTable.(varName)(tempTable{:,'missingAux'}~=1,1)=permute(curAux.data(t,ch,:),[3,1,2]);
                     end
                 end
             end

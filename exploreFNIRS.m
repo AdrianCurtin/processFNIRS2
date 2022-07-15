@@ -2172,35 +2172,42 @@ for i=1:length(numEx)
        ExFNIRS.data{i}.info.missingFNIRS=1;
    else
        ExFNIRS.data{i}.info.missingFNIRS=0;
+   end
+
+   if(isfield(ExFNIRS.data{i},'Aux'))
+        ExFNIRS.data{i}.info.emptyAux=isempty(ExFNIRS.data{i}.Aux);
+   else
+        ExFNIRS.data{i}.info.emptyAux=true;
+   end
+   
        
-       if(~isfield(ExFNIRS.data{i}.info,'Group')||isempty(ExFNIRS.data{i}.info.Group))
-           ExFNIRS.data{i}.info.Group='Missing';
-       end
-       
-       if(~isfield(ExFNIRS.data{i}.info,'SubjectID')||isempty(ExFNIRS.data{i}.info.SubjectID))
-           ExFNIRS.data{i}.info.SubjectID=sprintf('Missing%i',subIdAuto);
-           subIdAuto=subIdAuto+1;
-       end
-       
-       if(~isfield(ExFNIRS.data{i}.info,'Subgroup')||isempty(ExFNIRS.data{i}.info.Subgroup))
-           ExFNIRS.data{i}.info.Subgroup='Missing';
-       end
-       
-       if(~isfield(ExFNIRS.data{i}.info,'Session')||isempty(ExFNIRS.data{i}.info.Session))
-           ExFNIRS.data{i}.info.Session='Missing';
-       end
-       
-       if(~isfield(ExFNIRS.data{i}.info,'Trial')||isempty(ExFNIRS.data{i}.info.Trial))
-           ExFNIRS.data{i}.info.Trial='Missing';
-       end
-       
-       if(~isfield(ExFNIRS.data{i}.info,'Block')||isempty(ExFNIRS.data{i}.info.Block))
-           ExFNIRS.data{i}.info.Block='Missing';
-       end
-       
-       if(~isfield(ExFNIRS.data{i}.info,'Condition')||isempty(ExFNIRS.data{i}.info.Condition))
-           ExFNIRS.data{i}.info.Condition='Missing';
-       end
+   if(~isfield(ExFNIRS.data{i}.info,'Group')||isempty(ExFNIRS.data{i}.info.Group))
+       ExFNIRS.data{i}.info.Group='Missing';
+   end
+   
+   if(~isfield(ExFNIRS.data{i}.info,'SubjectID')||isempty(ExFNIRS.data{i}.info.SubjectID))
+       ExFNIRS.data{i}.info.SubjectID=sprintf('Missing%i',subIdAuto);
+       subIdAuto=subIdAuto+1;
+   end
+   
+   if(~isfield(ExFNIRS.data{i}.info,'Subgroup')||isempty(ExFNIRS.data{i}.info.Subgroup))
+       ExFNIRS.data{i}.info.Subgroup='Missing';
+   end
+   
+   if(~isfield(ExFNIRS.data{i}.info,'Session')||isempty(ExFNIRS.data{i}.info.Session))
+       ExFNIRS.data{i}.info.Session='Missing';
+   end
+   
+   if(~isfield(ExFNIRS.data{i}.info,'Trial')||isempty(ExFNIRS.data{i}.info.Trial))
+       ExFNIRS.data{i}.info.Trial='Missing';
+   end
+   
+   if(~isfield(ExFNIRS.data{i}.info,'Block')||isempty(ExFNIRS.data{i}.info.Block))
+       ExFNIRS.data{i}.info.Block='Missing';
+   end
+   
+   if(~isfield(ExFNIRS.data{i}.info,'Condition')||isempty(ExFNIRS.data{i}.info.Condition))
+       ExFNIRS.data{i}.info.Condition='Missing';
    end
 end
 
