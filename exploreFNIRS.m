@@ -1406,15 +1406,15 @@ if(ExFNIRS.UpdateNeeded==2||~isfield(ExFNIRS,'curPreprocessedFNIR'))
        
        if(ExFNIRS.settings.use_baseline)
             ExFNIRS.curPreprocessedFNIR.baseline{i}=pf2.Data.Split(ExFNIRS.curPreprocessedFNIR.fNIR{i},ExFNIRS.settings.baseline_start,ExFNIRS.settings.baseline_end); %baselining is handled in processing section
-            ExFNIRS.curPreprocessedFNIR.gbyFNIRS_blk{i}=pf2.Data.Resample(ExFNIRS.curPreprocessedFNIR.gbyFNIRS{i}, ExFNIRS.settings.barchart_resample_size,'centerOnTime',ExFNIRS.settings.block_start,'timeOutMode','start','blfNIR',ExFNIRS.curPreprocessedFNIR.baseline{i},'averageAux',true,'flattenAux',true,'trimAux',true);
+            ExFNIRS.curPreprocessedFNIR.gbyFNIRS_blk{i}=pf2.Data.Resample(ExFNIRS.curPreprocessedFNIR.gbyFNIRS{i}, ExFNIRS.settings.barchart_resample_size,'centerOnTime',ExFNIRS.settings.block_start,'timeOutMode','start','blfNIR',ExFNIRS.curPreprocessedFNIR.baseline{i},'averageAux',true,'flattenAux',true,'trimAux',false);
             
-            ExFNIRS.curPreprocessedFNIR.gbyFNIRS{i}=pf2.Data.Resample(ExFNIRS.curPreprocessedFNIR.gbyFNIRS{i}, ExFNIRS.settings.grandavg_resample_size,'centerOnTime',ExFNIRS.settings.block_start,'timeOutMode','start','blfNIR',ExFNIRS.curPreprocessedFNIR.baseline{i},'averageAux',true,'flattenAux',true,'trimAux',true);
+            ExFNIRS.curPreprocessedFNIR.gbyFNIRS{i}=pf2.Data.Resample(ExFNIRS.curPreprocessedFNIR.gbyFNIRS{i}, ExFNIRS.settings.grandavg_resample_size,'centerOnTime',ExFNIRS.settings.block_start,'timeOutMode','start','blfNIR',ExFNIRS.curPreprocessedFNIR.baseline{i},'averageAux',true,'flattenAux',true,'trimAux',false);
             ExFNIRS.curPreprocessedFNIR.gbyFNIRS{i}.time=ExFNIRS.curPreprocessedFNIR.gbyFNIRS{i}.time+ExFNIRS.settings.block_start; %change time so that 0 is start of block
        else
             ExFNIRS.curPreprocessedFNIR.baseline{i}=[];
-            ExFNIRS.curPreprocessedFNIR.gbyFNIRS_blk{i}=pf2.Data.Resample(ExFNIRS.curPreprocessedFNIR.gbyFNIRS{i}, ExFNIRS.settings.barchart_resample_size,'centerOnTime',ExFNIRS.settings.block_start,'timeOutMode','start','averageAux',true,'flattenAux',true,'trimAux',true);
+            ExFNIRS.curPreprocessedFNIR.gbyFNIRS_blk{i}=pf2.Data.Resample(ExFNIRS.curPreprocessedFNIR.gbyFNIRS{i}, ExFNIRS.settings.barchart_resample_size,'centerOnTime',ExFNIRS.settings.block_start,'timeOutMode','start','averageAux',true,'flattenAux',true,'trimAux',false);
             
-            ExFNIRS.curPreprocessedFNIR.gbyFNIRS{i}=pf2.Data.Resample(ExFNIRS.curPreprocessedFNIR.gbyFNIRS{i}, ExFNIRS.settings.grandavg_resample_size,'centerOnTime',ExFNIRS.settings.block_start,'timeOutMode','start','averageAux',true,'flattenAux',true,'trimAux',true);
+            ExFNIRS.curPreprocessedFNIR.gbyFNIRS{i}=pf2.Data.Resample(ExFNIRS.curPreprocessedFNIR.gbyFNIRS{i}, ExFNIRS.settings.grandavg_resample_size,'centerOnTime',ExFNIRS.settings.block_start,'timeOutMode','start','averageAux',true,'flattenAux',true,'trimAux',false);
        end
     end
 
