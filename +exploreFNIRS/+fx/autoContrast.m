@@ -395,6 +395,9 @@ end
 
 [~,uNameIdx]=unique(cName);
 
+% UDATE vs. 0 index for unqiue names
+isV0=isV0(uNameIdx);
+
 uNameIdx=sort(uNameIdx);
 for c=1:length(uNameIdx)
     row_idx=uNameIdx(c);

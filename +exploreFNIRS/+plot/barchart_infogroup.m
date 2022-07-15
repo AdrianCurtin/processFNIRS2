@@ -55,6 +55,9 @@ for g=1:numGroups
     
     if(isstring(curData)||iscategorical(curData)||ischar(curData)||islogical(curData))
        useInfoAsCategoricalGroup=true;
+       if(any(ismissing(curData(:))))
+            curData(ismissing(curData))="Missing";
+       end
        uCategoricalVals=unique([uCategoricalVals(:);curData(:)]);
     end
 end
@@ -520,7 +523,11 @@ if(iscell(possibleStr))
         if(isempty(possibleStr{i}))
             possibleStr{i}='';
         elseif(isstring(possibleStr{i}))
-            possibleStr{i}=char(possibleStr{i});
+            if(ismissing(possibleStr{i}))
+                possibleStr{i}='Missing';
+            else
+                possibleStr{i}=sprintf('%s',possibleStr{i})
+            end
         elseif(~ischar(possibleStr{i})&&isnumeric(possibleStr{i}))
             possibleStr{i}=num2str(possibleStr{i}); 
         elseif(islogical(possibleStr{i})&&possibleStr{i})
@@ -532,7 +539,11 @@ if(iscell(possibleStr))
 elseif(~ischar(possibleStr)&&isnumeric(possibleStr))
     possibleStr=num2str(possibleStr);
 elseif(isstring(possibleStr))
-    possibleStr=char(possibleStr);
+    if(ismissing(possibleStr))
+        possibleStr='Missing';
+    else
+        possibleStr=sprintf('%s',possibleStr);
+    end
 elseif(islogical(possibleStr)&&possibleStr)
     possibleStr='true';
 elseif(islogical(possibleStr)&&~possibleStr)
