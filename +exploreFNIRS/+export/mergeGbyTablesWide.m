@@ -166,7 +166,8 @@ for g=1:length(gbyTables)
                           varName=sprintf('%s_t%.0f',newAuxName,curBarGA.time(t)); 
                        end
                        varName(varName=='-')='_';
-                       tempTable.(varName)(tempTable{:,'missingAux'}~=1,1)=permute(curAux.data(t,ch,:),[3,1,2]);
+                       %tempTable.(varName)(tempTable{:,'emptyAux'}~=1,1)=permute(curAux.data(t,ch,:),[3,1,2]);
+                       tempTable.(varName)(:,1)=permute(curAux.data(t,ch,:),[3,1,2]);
                     end
                 end
             end
