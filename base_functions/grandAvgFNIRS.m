@@ -138,8 +138,8 @@ end
 if(sum(segROIpresent)==length(FNIRScellArray))
     calcROI=true;
 elseif(sum(segROIpresent)>0)
-    warning('ROI definitions not present in all segments, ROI regions will not be calculated');
-    calcROI=false;
+    %warning('ROI definitions not present in all segments, ROI regions will not be calculated');
+    calcROI=true;
 else
    calcROI=false; 
 end
@@ -202,7 +202,7 @@ for i=1:numfSeg % Resample and find max/min and num channels
        numCh=size(FNIRScellArray{i}.HbO,2);
     end
     
-    if(calcROI&&size(FNIRScellArray{i}.ROI.info,1)>numROI)
+    if(calcROI&&pf2_base.isnestedfield(FNIRScellArray{i},'ROI.info')&&size(FNIRScellArray{i}.ROI.info,1)>numROI)
         numROI=size(FNIRScellArray{i}.ROI.info,1);
     end
     
@@ -296,13 +296,14 @@ for i=1:numfSeg
         outGA.(curBioM).data(validT==1,1:numfCh,i)=curFNIR.(curBioM)(FNIRScellArray{i}.timeIdx(validT==1,2),:,1);
     end
     
-    if(calcROI)
+    if(calcROI&&pf2_base.isnestedfield(curFNIR,'ROI.HbO'))
         numfCh_roi=size(curFNIR.ROI.HbO,2);
         for b=1:length(bioMs)
             curBioM=bioMs{b};
             outGA.ROI.(curBioM).data(validT==1,1:numfCh_roi,i)=curFNIR.ROI.(curBioM)(FNIRScellArray{i}.timeIdx(validT==1,2),:,1);
-            
         end
+    else
+        numfCh_roi=0;
     end
     
     if(isfield(curFNIR,'Aux')&&averageAux&&~isempty(curFNIR.Aux))

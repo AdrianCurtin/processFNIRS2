@@ -571,9 +571,9 @@ for chIdx=1:numOpt
                     title_with_space(curFigH.subH{curSy,curSx},chNamePartLong);
                 case 'bioM'
                     if(~strcmp(exSettings.ChannelMode,'Aux'))
-                        title_with_space(curFigH.subH{curSy,curSx},bioM);
-                    else
                         title_with_space(curFigH.subH{curSy,curSx},sprintf('%s: %s',bioM,selectedOptStr{chIdx}));
+                    else
+                        title_with_space(curFigH.subH{curSy,curSx},bioM);
                     end
                 case 'groupby'
                     title_with_space(curFigH.subH{curSy,curSx},uCurInfoG{curGroupInfoIdx});
@@ -742,12 +742,15 @@ if(nargin<2)
 end
 
 if(iscell(labelstring))
-    labelstring=labelstring{1};
-end
-
-if(~isempty(labelstring))
+    for i=1:length(labelstring)
+        labelstringTemp=labelstring{i};
+        labelstringTemp(labelstringTemp=='_')=' ';
+        labelstring{i}=labelstringTemp;
+    end
+elseif(~isempty(labelstring))
     labelstring(labelstring=='_')=' ';
 end
+
 h=xlabel(figHandle,labelstring);
 
 end
@@ -759,10 +762,12 @@ if(nargin<2)
 end
 
 if(iscell(labelstring))
-    labelstring=labelstring{1};
-end
-
-if(~isempty(labelstring))
+    for i=1:length(labelstring)
+        labelstringTemp=labelstring{i};
+        labelstringTemp(labelstringTemp=='_')=' ';
+        labelstring{i}=labelstringTemp;
+    end
+elseif(~isempty(labelstring))
     labelstring(labelstring=='_')=' ';
 end
 h=ylabel(figHandle,labelstring);
@@ -775,10 +780,17 @@ if(nargin<2)
     figHandle=gca;
 end
 
-
-if(~isempty(labelstring))
+if(iscell(labelstring))
+    for i=1:length(labelstring)
+        labelstringTemp=labelstring{i};
+        labelstringTemp(labelstringTemp=='_')=' ';
+        labelstring{i}=labelstringTemp;
+    end
+elseif(~isempty(labelstring))
     labelstring(labelstring=='_')=' ';
 end
+
+
 h=title(figHandle,labelstring);
 
 end
