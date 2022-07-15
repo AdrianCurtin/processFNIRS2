@@ -371,6 +371,34 @@ else
               end
            end
        end
+
+       missingFieldsIdx=~ismember(outTable.Properties.VariableNames,curFields);
+
+       if(any(missingFieldsIdx))
+           missingFieldsName=outTable.Properties.VariableNames(missingFieldsIdx);
+           for f=1:length(missingFieldsName)
+               switch(class(outTable.(missingFieldsName{f})))
+                   case 'double'
+                       outTable.(missingFieldsName{f})(i,:)=nan;
+                   case 'string'
+                       outTable.(missingFieldsName{f})(i,:)="";
+                   case 'char'
+                       outTable.(missingFieldsName{f})(i,:)='';
+                   case 'cell'
+                       outTable.(missingFieldsName{f})(i,:)={};
+                   case 'logical'
+                       outTable.(missingFieldsName{f})(i,:)=nan;
+                   case 'duration'
+                       outTable.(missingFieldsName{f})(i,:)=duration(0,0,nan);
+                   case 'datetime'
+                       outTable.(missingFieldsName{f})(i,:)=NaT;
+                   otherwise
+                        error('Unknown type!');
+               end
+              
+           end
+            
+       end
     end
     %close(hF);
 end
