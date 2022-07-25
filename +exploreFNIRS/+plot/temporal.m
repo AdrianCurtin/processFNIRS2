@@ -28,9 +28,9 @@ numBioM=length(selBioM);
 
 
 
-optStrs=get(handles.listbox_optode,'String');
+optStrs=cellstr(get(handles.listbox_optode,'String'));
 selOpt=get(handles.listbox_optode,'Value');
-selectedOptStr=optStrs(selOpt',:);
+selectedOptStr=optStrs(selOpt);
 %selectedOpt=str2num(selectedOpt);
 
 if(strcmp(exSettings.ChannelMode,'Aux'))
