@@ -610,23 +610,26 @@ for chIdx=1:numOpt
               switch(exSettings.ChannelMode)
                   case 'fNIR'
                       data2plot=curGrand.(bioM);
+                      dataHierarchy=curGrand.info.Hierarchy;
                   case 'ROI'
                       if(~pf2_base.isnestedfield(curGrand,'ROI.HbO.data'))
                           error('ROI data must be calculated using a build ROI step');
                       end
                           
                       data2plot=curGrand.ROI.(bioM);
+                      dataHierarchy=curGrand.info.Hierarchy;
                   case 'Aux'
                       data2plot=curGrand.Aux.(bioM);
+                      dataHierarchy=curGrand.Aux.(bioM).Hierarchy;
               end 
                 curFeatureY=permute(data2plot.data(timeIdx,ch,:),[3,1,2]);
                 
                 if(strcmp(plotFeature,'Count')||strcmp(plotFeature,'N'))
-                    [curFeatureY]=pf2_base.hierarchicalAverage(curFeatureY,curGrand.info.Hierarchy,@nnz);
+                    [curFeatureY]=pf2_base.hierarchicalAverage(curFeatureY,dataHierarchy,@nnz);
                 elseif(strcmp(plotFeature,'Mean'))
-                    [curFeatureY]=pf2_base.hierarchicalAverage(curFeatureY,curGrand.info.Hierarchy,@nanmean);
+                    [curFeatureY]=pf2_base.hierarchicalAverage(curFeatureY,dataHierarchy,@nanmean);
                 elseif(strcmp(plotFeature,'Median'))
-                    [curFeatureY]=pf2_base.hierarchicalAverage(curFeatureY,curGrand.info.Hierarchy,@nanmedian);
+                    [curFeatureY]=pf2_base.hierarchicalAverage(curFeatureY,dataHierarchy,@nanmedian);
                 else
                     error('Unknown parameter');
                     %curHAvg=nanmedian(hierarchicalAverage(curData,curTable(:,dataH),@nanmedian));

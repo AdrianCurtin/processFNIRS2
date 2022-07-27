@@ -47,10 +47,12 @@ segUnits=cell(size(FNIRScellArray));
 segSampleTimes=nan(size(FNIRScellArray));
 segSampleCount=nan(size(FNIRScellArray));
 segROIpresent=false(size(FNIRScellArray));
+hasFNIRS=true(size(FNIRScellArray));
 
 removedIdx=false(size(FNIRScellArray));
 for i=length(FNIRScellArray):-1:1 
-    if(isempty(FNIRScellArray{i})||sum(~isnan(FNIRScellArray{i}.time))==0) % Empty Case
+    if(isempty(FNIRScellArray{i})||(sum(~isnan(FNIRScellArray{i}.time))==0&&...
+            pf2_base.isnestedfield(FNIRScellArray{i},'Aux')&&isempty(FNIRScellArray{i}.Aux))) % Empty Case
         FNIRScellArray(i)=[];
         segSampleTimes(i)=[];
         segSampleCount(i)=[];
@@ -58,6 +60,16 @@ for i=length(FNIRScellArray):-1:1
         segROIpresent(i)=[];
         segUnits(i)=[];
         removedIdx(i)=true;
+        hasFNIRS(i)=[];
+    elseif((sum(~isnan(FNIRScellArray{i}.time))==0&&pf2_base.isnestedfield(FNIRScellArray{i},'Aux'))) % no fnirs but has Aux
+        hasFNIRS(i)=false;
+        
+        segSampleTimes(i)=nan;
+        segSampleCount(i)=0;
+        %segUnits{i}=FNIRScellArray{i}.units;
+        %FNIRScellArray{i}.fs=1/segSampleTimes(i);
+        %FNIRScellArray{i}.fs=round(FNIRScellArray{i}.fs,3);
+        segROIpresent(i)=false;
     elseif(~isfield(FNIRScellArray{i},'fs')&&isfield(FNIRScellArray{i},'time')) % Missing sampling frequency
         FNIRScellArray{i}.time=round(FNIRScellArray{i}.time,5);
         if(timeAlign)
@@ -77,6 +89,8 @@ for i=length(FNIRScellArray):-1:1
         segSampleCount(i)=[];
         segROIpresent(i)=[];
         segUnits(i)=[];
+        hasFNIRS(i)=[];
+
         warning('Cannot use groups which have no time info');
         removedIdx(i)=true;
     elseif(timeAlign)   % Force time alignment
@@ -107,7 +121,7 @@ if(isempty(FNIRScellArray))
 end
 
 
-uUnitsArray=unique(segUnits);
+uUnitsArray=unique(segUnits(hasFNIRS));
 if(~iscell(uUnitsArray))
     uUnitsArray={uUnitsArray};
 end
@@ -167,8 +181,10 @@ for i=1:numfSeg % Resample and find max/min and num channels
             FNIRScellArray{i}=pf2.Data.Resample(FNIRScellArray{i},resampleSize,'centerOnT0',centerOnT0,'averageAux',true,'flattenAux',true,'trimAux',true);
         end
 
-        segmentTimesArr=[segmentTimesArr;FNIRScellArray{i}.segmentTimes];
-    elseif(isfield(FNIRScellArray{i},'segmentTimes'))
+
+    end
+    
+    if(isfield(FNIRScellArray{i},'segmentTimes'))
         segmentTimesArr=[segmentTimesArr;FNIRScellArray{i}.segmentTimes];
     end
     
@@ -199,11 +215,11 @@ for i=1:numfSeg % Resample and find max/min and num channels
         maxTime=maxFtime;
     end
 
-    if(size(FNIRScellArray{i}.HbO,2)>numCh)
+    if(hasFNIRS(i)&&size(FNIRScellArray{i}.HbO,2)>numCh)
        numCh=size(FNIRScellArray{i}.HbO,2);
     end
     
-    if(calcROI&&pf2_base.isnestedfield(FNIRScellArray{i},'ROI.info')&&size(FNIRScellArray{i}.ROI.info,1)>numROI)
+    if(hasFNIRS(i)&&calcROI&&pf2_base.isnestedfield(FNIRScellArray{i},'ROI.info')&&size(FNIRScellArray{i}.ROI.info,1)>numROI)
         numROI=size(FNIRScellArray{i}.ROI.info,1);
     end
     
@@ -296,28 +312,31 @@ initROI=false;
 
 for i=1:numfSeg
     curFNIR=FNIRScellArray{i};
-    numfCh=size(curFNIR.HbO,2);
-    validTidx=FNIRScellArray{i}.timeIdx(:,4)==1;
-    validT=false([numSegs,1]);
-    validT(FNIRScellArray{i}.timeIdx(validTidx,3))=true;
-    
-    for b=1:length(bioMs)
-        curBioM=bioMs{b};
-        outGA.(curBioM).data(validT==1,1:numfCh,i)=curFNIR.(curBioM)(FNIRScellArray{i}.timeIdx(validTidx,2),:,1);
-    end
-    
-    if(calcROI&&pf2_base.isnestedfield(curFNIR,'ROI.HbO'))
-        if(~initROI&&pf2_base.isnestedfield(curFNIR,'ROI.HbO')&&~isempty(curFNIR.ROI.info))
-            outGA.ROI.info=curFNIR.ROI.info;
-            initROI=true;
-        end
-        numfCh_roi=size(curFNIR.ROI.HbO,2);
+
+    if(hasFNIRS)
+        numfCh=size(curFNIR.HbO,2);
+        validTidx=FNIRScellArray{i}.timeIdx(:,4)==1;
+        validT=false([numSegs,1]);
+        validT(FNIRScellArray{i}.timeIdx(validTidx,3))=true;
+        
         for b=1:length(bioMs)
             curBioM=bioMs{b};
-            outGA.ROI.(curBioM).data(validT==1,1:numfCh_roi,i)=curFNIR.ROI.(curBioM)(FNIRScellArray{i}.timeIdx(validTidx,2),:,1);
+            outGA.(curBioM).data(validT==1,1:numfCh,i)=curFNIR.(curBioM)(FNIRScellArray{i}.timeIdx(validTidx,2),:,1);
         end
-    else
-        numfCh_roi=0;
+        
+        if(calcROI&&pf2_base.isnestedfield(curFNIR,'ROI.HbO'))
+            if(~initROI&&pf2_base.isnestedfield(curFNIR,'ROI.HbO')&&~isempty(curFNIR.ROI.info))
+                outGA.ROI.info=curFNIR.ROI.info;
+                initROI=true;
+            end
+            numfCh_roi=size(curFNIR.ROI.HbO,2);
+            for b=1:length(bioMs)
+                curBioM=bioMs{b};
+                outGA.ROI.(curBioM).data(validT==1,1:numfCh_roi,i)=curFNIR.ROI.(curBioM)(FNIRScellArray{i}.timeIdx(validTidx,2),:,1);
+            end
+        else
+            numfCh_roi=0;
+        end
     end
     
     if(isfield(curFNIR,'Aux')&&averageAux&&~isempty(curFNIR.Aux))
@@ -388,7 +407,7 @@ for i=1:numfSeg
                             end
                         catch
                             warning('Mismatch between sampling of aux time and fNIRS time');
-                            outGA.Aux.(curAuxField).data(validT==1,:,i)=nan;
+                            outGA.Aux.(curAuxField).data(:,:,i)=nan;
                         end
                             % this will only work if time indexes match between
                         % auxtime and fnirs time. they either need to be
@@ -400,7 +419,7 @@ for i=1:numfSeg
             for aux=1:numAuxFields
                 curAuxField=char(auxFields(aux));
                 if(ismember(curAuxField,curSegAuxFields))
-                        outGA.Aux.(curAuxField).data(validT==1,:,i)=nan;
+                        outGA.Aux.(curAuxField).data(:,:,i)=nan;
                 end
             end
         end
@@ -480,7 +499,7 @@ if(averageAux)
           
          
             inData= permute(outGA.Aux.(curAuxField).data,[3,1,2]);
-            [hAvg.Aux.(curAuxField).Mean,tierLabel,hierarchy]=pf2_base.hierarchicalAverage(inData,hierarchyVars,@nanmean);
+            [hAvg.Aux.(curAuxField).Mean,hAvg.Aux.(curAuxField).tierLabel,hAvg.Aux.(curAuxField).Hierarchy]=pf2_base.hierarchicalAverage(inData,hierarchyVars,@nanmean);
             hAvg.Aux.(curAuxField).Median=pf2_base.hierarchicalAverage(inData,hierarchyVars,@nanmedian);
             hAvg.Aux.(curAuxField).Max=pf2_base.hierarchicalAverage(inData,hierarchyVars,nanmax3);
             hAvg.Aux.(curAuxField).Min=pf2_base.hierarchicalAverage(inData,hierarchyVars,nanmin3);
@@ -488,6 +507,7 @@ if(averageAux)
     
     for aux=1:numAuxFields
         curAuxField=char(auxFields(aux));
+        outGA.Aux.(curAuxField).Hierarchy=hAvg.Aux.(curAuxField).Hierarchy;
         outGA.Aux.(curAuxField).Mean=permute(mean(hAvg.Aux.(curAuxField).Mean,1,'omitnan'),[2,3,1]);
         outGA.Aux.(curAuxField).Median=permute(nanmedian(hAvg.Aux.(curAuxField).Median,1),[2,3,1]);
         outGA.Aux.(curAuxField).Max=permute(nanmax(hAvg.Aux.(curAuxField).Max,[],1),[2,3,1]);
