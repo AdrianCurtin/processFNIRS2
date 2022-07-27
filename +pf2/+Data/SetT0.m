@@ -8,8 +8,10 @@ outFNIR=fnirStruct;
 if(isdatetime(t0time)&&isfield(outFNIR,'t0'))
     % Ex: orig 15:01:25    new t0 is 15:00
     % t0time = orig + 85s  
-    t0time=seconds(t0time-outFNIR.t0);
+    tDiff=seconds(t0time-outFNIR.t0);
     outFNIR.t0=t0time;
+
+    t0time=tDiff;
 elseif(isdatetime(t0time)&&sfield(outFNIR,'datetime'))
     if(all(size(t0time))==all(size(outFNIR.datetime)))
         outFNIR.t0=t0time;
@@ -23,7 +25,7 @@ if(isfield(outFNIR,'time'))
     outFNIR.time=outFNIR.time-t0time;
 end
 
-if(isfield(outFNIR,'datetime'))
+if(isfield(outFNIR,'t0')&&~isfield(outFNIR,'datetime'))
     outFNIR.datetime=outFNIR.t0+(duration(0,0,outFNIR.time));
 end
 

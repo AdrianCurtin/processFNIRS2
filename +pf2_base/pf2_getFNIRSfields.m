@@ -25,6 +25,6 @@ function [outFields,alternateSpellings]=pf2_getFNIRSfields()
 % segmentTimes: specifies the time periods when resampled 
 %        [start of sample, period, mid, and end]
 
-outFields={'units','channels','info','DPF_factor','markers','fchMask','time','Aux','probeinfo','fs','ftimeChMask','ROI','segmentTimes'};
+outFields={'units','channels','info','DPF_factor','markers','fchMask','time','Aux','probeinfo','fs','ftimeChMask','ROI','segmentTimes','t0','datetime'};
 
 alternateSpellings={};
