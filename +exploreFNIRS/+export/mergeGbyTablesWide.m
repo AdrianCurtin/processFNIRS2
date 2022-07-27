@@ -119,12 +119,21 @@ for g=1:length(gbyTables)
             curBioM=bioMarkers{b};
             for c=1:numROI
                 chNum=ROIs(c);
+                
+               if(pf2_base.isnestedfield(curBarGA,'ROI.info')&&~isempty(curBarGA.ROI.info))
+                    roi_label_part=sprintf('_%s',curBarGA.ROI.info.Properties.RowNames{c});
+               else
+                    roi_label_part=''; 
+               end
                 for t=1:numBarGATimes
                     if(ismember(curBarGA.time(t),times))
+
+                       
+
                        if(numTimes==1)
-                          varName=sprintf('%s_ROI%i',curBioM,chNum); 
+                          varName=sprintf('%s_ROI%i%s',curBioM,chNum,roi_label_part); 
                        else
-                          varName=sprintf('%s_ROI%i_t%.0f',curBioM,chNum,curBarGA.time(t)); 
+                          varName=sprintf('%s_ROI%i%s_t%.0f',curBioM,chNum,roi_label_part,curBarGA.time(t)); 
                        end
                        varName(varName=='-')='_';
                        tempTable.(varName)(tempTable{:,'missingFNIRS'}~=1,1)=permute(curBarGA.ROI.(curBioM).data(t,chNum,:),[3,1,2]);

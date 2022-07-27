@@ -126,8 +126,15 @@ for g=1:length(gbyTables)
                 curBioM=bioMarkers{b};
 
                 for c=1:numROI
+
+                    if(pf2_base.isnestedfield(curBarGA,'ROI.info')&&~isempty(curBarGA.ROI.info))
+                        roi_label_part=sprintf('_%s',curBarGA.ROI.info.Properties.RowNames{c});
+                   else
+                        roi_label_part=''; 
+                    end
+
                     chNum=ROIs(c);
-                    chName=sprintf('ROI%i_%s',chNum,curBioM); 
+                    chName=sprintf('ROI%i%s_%s',chNum,roi_label_part,curBioM); 
 
 
                     tempTable.(chName)(:,1)=nan;

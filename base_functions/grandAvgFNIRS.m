@@ -166,6 +166,7 @@ for i=1:numfSeg % Resample and find max/min and num channels
         else
             FNIRScellArray{i}=pf2.Data.Resample(FNIRScellArray{i},resampleSize,'centerOnT0',centerOnT0,'averageAux',true,'flattenAux',true,'trimAux',true);
         end
+
         segmentTimesArr=[segmentTimesArr;FNIRScellArray{i}.segmentTimes];
     elseif(isfield(FNIRScellArray{i},'segmentTimes'))
         segmentTimesArr=[segmentTimesArr;FNIRScellArray{i}.segmentTimes];
@@ -225,6 +226,7 @@ if(~isempty(segmentTimesArr))
 end
 
 outGA.time=outGA.time(ismember(outGA.time,outGA.segmentTimes(:,1)));
+numSegs=length(outGA.time);
 
 if(showProgress)
     hF=waitbar(0,sprintf('grandAvgFNIRS\nAligning segment %i of %i',1,numfSeg));
@@ -235,8 +237,9 @@ for i=1:numfSeg %find matching times in outGA.time, add to cell time indicies an
         waitbar(i/numfSeg,hF,sprintf('grandAvgFNIRS\nAligning segment %i of %i',i,numfSeg));
     end
 	curT_idx=FNIRScellArray{i}.timeIdx;  % 3xN [Time, TimeIndex,..]
-    [curT_idx(:,3),outIdx]=ismember(curT_idx(:,1),outGA.time);
+    [~,outIdx]=ismember(curT_idx(:,1),outGA.time);
     outTimeIdx=outGA.time(outIdx==0);
+    curT_idx(:,3)=outIdx;
     
     if(~isempty(outTimeIdx))
         outTimeIdx(:,2)=nan;
@@ -266,7 +269,7 @@ for i=1:numfSeg %find matching times in outGA.time, add to cell time indicies an
     
     curT_idx(curT_idx(:,3)==0,:)=[];
     curT_idx(:,4)=~isnan(curT_idx(:,2));
-    FNIRScellArray{i}.timeIdx=curT_idx;
+    FNIRScellArray{i}.timeIdx=curT_idx; % t idx isMemberOfTime isNan
 end
 
 bioMs={'HbO','HbDiff','HbR','HbTotal','CBSI'};
@@ -289,21 +292,29 @@ if(averageAux)
     end
 end
 
+initROI=false;
+
 for i=1:numfSeg
     curFNIR=FNIRScellArray{i};
     numfCh=size(curFNIR.HbO,2);
-    validT=FNIRScellArray{i}.timeIdx(:,4);
+    validTidx=FNIRScellArray{i}.timeIdx(:,4)==1;
+    validT=false([numSegs,1]);
+    validT(FNIRScellArray{i}.timeIdx(validTidx,3))=true;
     
     for b=1:length(bioMs)
         curBioM=bioMs{b};
-        outGA.(curBioM).data(validT==1,1:numfCh,i)=curFNIR.(curBioM)(FNIRScellArray{i}.timeIdx(validT==1,2),:,1);
+        outGA.(curBioM).data(validT==1,1:numfCh,i)=curFNIR.(curBioM)(FNIRScellArray{i}.timeIdx(validTidx,2),:,1);
     end
     
     if(calcROI&&pf2_base.isnestedfield(curFNIR,'ROI.HbO'))
+        if(~initROI&&pf2_base.isnestedfield(curFNIR,'ROI.HbO')&&~isempty(curFNIR.ROI.info))
+            outGA.ROI.info=curFNIR.ROI.info;
+            initROI=true;
+        end
         numfCh_roi=size(curFNIR.ROI.HbO,2);
         for b=1:length(bioMs)
             curBioM=bioMs{b};
-            outGA.ROI.(curBioM).data(validT==1,1:numfCh_roi,i)=curFNIR.ROI.(curBioM)(FNIRScellArray{i}.timeIdx(validT==1,2),:,1);
+            outGA.ROI.(curBioM).data(validT==1,1:numfCh_roi,i)=curFNIR.ROI.(curBioM)(FNIRScellArray{i}.timeIdx(validTidx,2),:,1);
         end
     else
         numfCh_roi=0;
