@@ -303,12 +303,12 @@ else
         outfNIR.time=fNIR.time(indexStart:indexEnd,1);
     end
     
-    if(isfield(fNIR,'datetime'))
-        outfNIR.datetime=fNIR.datetime(indexStart:indexEnd,1);
-    end
+    
 
-    if(isfield(fNIR,'t0'))
+    if(isfield(fNIR,'t0')&&isdatetime(fNIR.t0))
         outfNIR.t0=fNIR.t0;
+
+        outfNIR.datetime=fNIR.t0+duration(0,0,outfNIR.time);
     end
     
     if(hasROIfield)

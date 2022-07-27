@@ -486,10 +486,19 @@ outFNIR.segmentTimes=[times_start,times,times_end];
 if(~isempty(outFNIR.segmentTimes))
     if(strcmp(timeOutMode,'start'))
         outFNIR.time=outFNIR.segmentTimes(:,1); %returns effective "sample point" as startpoint of segmentTimes
+        if(isfield(outFNIR,'t0')&&isdatetime(outFNIR.t0))
+            outFNIR.datetime=outFNIR.t0+(duration(0,0,outFNIR.segmentTimes(:,1)));
+        end
     elseif(strcmp(timeOutMode,'end'))
         outFNIR.time=outFNIR.segmentTimes(:,2); %returns effective "sample point" as endpoint of segmentTimes
+        if(isfield(outFNIR,'t0')&&isdatetime(outFNIR.t0))
+            outFNIR.datetime=outFNIR.t0+(duration(0,0,outFNIR.segmentTimes(:,1)));
+        end
     else %Return midpoint
         outFNIR.time=time; %mean(outFNIR.segmentTimes,2); %returns effective "sample point" as midpoint of segmentTimes
+        if(isfield(outFNIR,'t0')&&isdatetime(outFNIR.t0))
+            outFNIR.datetime=outFNIR.t0+(duration(0,0,outFNIR.time));
+        end
         % should match times variable
     end
 else

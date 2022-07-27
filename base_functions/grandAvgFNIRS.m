@@ -221,7 +221,10 @@ outGA.time=round([minTime:resampleSize:maxTime]',5);
 if(~isempty(segmentTimesArr))
     outGA.segmentTimes=unique(segmentTimesArr,'rows');
     outGA.segmentTimes=sort(outGA.segmentTimes,1);
+     outGA.segmentTimes=round( outGA.segmentTimes,5);
 end
+
+outGA.time=outGA.time(ismember(outGA.time,outGA.segmentTimes(:,1)));
 
 if(showProgress)
     hF=waitbar(0,sprintf('grandAvgFNIRS\nAligning segment %i of %i',1,numfSeg));
