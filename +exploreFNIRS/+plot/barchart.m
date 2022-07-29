@@ -675,12 +675,14 @@ for sH=1:length(subplotHandles)
 
     fprintf('\nInfo Table Values\n');
     curData=subplotGby{sH};
-    for i=1:size(curData.gAStrs,1)
-        for j=1:size(curData.xBarLabels,1)
-            fprintf('%s:%s\tMean %.2f\tError: %.2f\n',curData.gAStrs{i},curData.xBarLabels{j},curData.barChartData(j,i,1),curData.barChartData(j,i,2));
-   
+    if(isfield(curData,'gAStrs'))
+        for i=1:size(curData.gAStrs,1)
+            for j=1:size(curData.xBarLabels,1)
+                fprintf('%s:%s\tMean %.2f\tError: %.2f\n',curData.gAStrs{i},curData.xBarLabels{j},curData.barChartData(j,i,1),curData.barChartData(j,i,2));
+       
+            end
+            
         end
-        
     end
     fprintf('\n');
 
