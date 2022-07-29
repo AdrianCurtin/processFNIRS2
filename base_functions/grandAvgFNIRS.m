@@ -253,13 +253,13 @@ for i=1:numfSeg %find matching times in outGA.time, add to cell time indicies an
         waitbar(i/numfSeg,hF,sprintf('grandAvgFNIRS\nAligning segment %i of %i',i,numfSeg));
     end
 	curT_idx=FNIRScellArray{i}.timeIdx;  % 3xN [Time, TimeIndex,..]
-    [~,outIdx]=ismember(curT_idx(:,1),outGA.time);
+    [validT,outIdx]=ismember(curT_idx(:,1),outGA.time);
     outTimeIdx=outGA.time(outIdx==0);
     curT_idx(:,3)=outIdx;
     
     if(~isempty(outTimeIdx))
         outTimeIdx(:,2)=nan;
-        outTimeIdx(:,3)=1;
+        outTimeIdx(:,3)=0;
         curT_idx=[curT_idx;outTimeIdx];
         [~,idx]=sort(curT_idx(:,1));
         curT_idx=curT_idx(idx,:);
@@ -315,13 +315,18 @@ for i=1:numfSeg
 
     if(hasFNIRS(i))
         numfCh=size(curFNIR.HbO,2);
-        validTidx=FNIRScellArray{i}.timeIdx(:,4)==1;
+        
+        validTidx=FNIRScellArray{i}.timeIdx(:,3)>0.&FNIRScellArray{i}.timeIdx(:,4)==1;
         validT=false([numSegs,1]);
         validT(FNIRScellArray{i}.timeIdx(validTidx,3))=true;
         
         for b=1:length(bioMs)
             curBioM=bioMs{b};
-            outGA.(curBioM).data(validT==1,1:numfCh,i)=curFNIR.(curBioM)(FNIRScellArray{i}.timeIdx(validTidx,2),:,1);
+            try 
+                outGA.(curBioM).data(validT==1,1:numfCh,i)=curFNIR.(curBioM)(FNIRScellArray{i}.timeIdx(validTidx,2),:,1);
+            catch 
+                x=1;
+            end
         end
         
         if(calcROI&&pf2_base.isnestedfield(curFNIR,'ROI.HbO'))
