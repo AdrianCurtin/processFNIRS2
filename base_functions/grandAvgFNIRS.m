@@ -313,7 +313,7 @@ initROI=false;
 for i=1:numfSeg
     curFNIR=FNIRScellArray{i};
 
-    if(hasFNIRS)
+    if(hasFNIRS(i))
         numfCh=size(curFNIR.HbO,2);
         validTidx=FNIRScellArray{i}.timeIdx(:,4)==1;
         validT=false([numSegs,1]);

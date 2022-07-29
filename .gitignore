@@ -4,3 +4,4 @@ sampledata/sampleNIR_CH.mat
 *.DS_Store
 .DS_Store
 
+*.mexmaci64
