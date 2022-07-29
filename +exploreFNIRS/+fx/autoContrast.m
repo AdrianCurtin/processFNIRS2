@@ -13,7 +13,12 @@ if(nargin<2)
     pThreshold=0.1; % Value at which an anova term is considered eligible for post-hoc testing
 end
 
-mdlCoefNames=mdl.CoefficientNames;
+mdlCoefNames=mdl.CoefficientNames';
+mdlCoefNames_with_colon=mdlCoefNames';
+for i=1:length(mdlCoefNames_with_colon)
+    mdlCoefNames_with_colon{i}=sprintf('%s:',mdlCoefNames_with_colon{i});
+end
+
 numMdlCoef=length(mdlCoefNames); 
 
 [uCoefParts,b,uCoefIdx]=unique(strsplit(sprintf('%s:',mdlCoefNames{:}),':'));
@@ -253,6 +258,7 @@ for s=1:length(sigAnvNames)  %Look for contrasts within each term
                   nRows=nRows+1;
                   cRows(nRows,:)=cRow;
                   cName{nRows}=sprintf('%s vs %s',termNameBasic,rootTermName);
+                  
                   isV0(nRows)=false;
                   
                   cAnvGrp(nRows)=c;
@@ -310,10 +316,14 @@ for s=1:length(sigAnvNames)  %Look for contrasts within each term
                                                 % to be made
                     continue;
                   else
-                      nRows=nRows+1;
+                    nRows=nRows+1;
                     cRows(nRows,:)=cRow;
                     uc=uCoefTerms{c2};
-                    cName{nRows}=sprintf('%s vs %s',uc{cIdx(c2)},mdlCoefNames{c});
+                    [cmpNameParts,p_idx]=unique(split(strcat(mdlCoefNames_with_colon{cmp_contrast}),':'));
+                    [a,b_idx]=sort(p_idx);
+                    cmpNameParts=cmpNameParts(b_idx);
+                    cmpName=char(join(cmpNameParts,':'));
+                    cName{nRows}=sprintf('%s vs %s',uc{cIdx(c2)},cmpName(1:end-1));
                     cAnvGrp(nRows)=c;
                     isV0(nRows)=false;
                   end
@@ -329,10 +339,11 @@ for s=1:length(sigAnvNames)  %Look for contrasts within each term
                       cRow(c)=1;
                       cRow(cmp_contrast_vals(cmp))=-1;
 
-                      if(any(ismember(cRows,cRow,'rows'))||any(ismember(cRows,cRow*-1,'rows')))
+                      if(any(ismember(cRows,cRow,'rows'))||any(ismember(cRows,cRow*-1,'rows'))||(cmp_contrast_vals(cmp)>length(numRootAnvTerms)))
                         continue;
                       else
-                          nRows=nRows+1;
+                          
+                        nRows=nRows+1;
                         cRows(nRows,:)=cRow;
                         uc=uCoefTerms{c2};
 
