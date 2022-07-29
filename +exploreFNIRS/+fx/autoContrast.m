@@ -1,5 +1,5 @@
 
-function [contrastTable]=autoContrast(mdl,pThreshold)
+function [contrastTable,contrastCoefTable]=autoContrast(mdl,pThreshold)
 
 %autoContrast provides the post-hoc testing for the provided model with a
 %specified pThreshold used to stop the testing at the anova level
@@ -296,96 +296,96 @@ for s=1:length(sigAnvNames)  %Look for contrasts within each term
        end
        
       if(isInteraction) %check for full model case (and multiple terms) 
-          if(sigCoefIdx(c))
-              
-              cIdx=rootCoefIdx(c,:); % now these are the model terms of all interactions
-              cmp_contrast_idx=rootCoefIdx;
-              cmp_contrast_idx(c,:)=nan;
-              %cIdx=cIdx(~isnan(cIdx));
-              numContrasts=length(cIdx);
-              for c2=1:numContrasts % compare with groups 1 above
-                  cmp_contrast=cmp_contrast_idx(:,c2)==cIdx(c2);
-                  cRow=zeros(1,numMdlCoef);
-                  cRow(c)=1;
-                  cRow(cmp_contrast)=-1;
+%           if(sigCoefIdx(c))
+%               
+%               cIdx=rootCoefIdx(c,:); % now these are the model terms of all interactions
+%               cmp_contrast_idx=rootCoefIdx;
+%               cmp_contrast_idx(c,:)=nan;
+%               %cIdx=cIdx(~isnan(cIdx));
+%               numContrasts=length(cIdx);
+%               for c2=1:numContrasts % compare with groups 1 above
+%                   cmp_contrast=cmp_contrast_idx(:,c2)==cIdx(c2);
+%                   cRow=zeros(1,numMdlCoef);
+%                   cRow(c)=1;
+%                   cRow(cmp_contrast)=-1;
+% 
+%                   if(any(ismember(cRows,cRow,'rows'))||any(ismember(cRows,cRow*-1,'rows'))... %skip if duplicated or
+%                         ||sum(cmp_contrast)==1) % skips when the full interaction term (ex  a:b1 vs a:b2) is a better descripter
+%                                                 % Usually just because
+%                                                 % there is only 1 contrast
+%                                                 % to be made
+%                     continue;
+%                   else
+%                     nRows=nRows+1;
+%                     cRows(nRows,:)=cRow;
+%                     uc=uCoefTerms{c2};
+%                     [cmpNameParts,p_idx]=unique(split(strcat(mdlCoefNames_with_colon{cmp_contrast}),':'));
+%                     [a,b_idx]=sort(p_idx);
+%                     cmpNameParts=cmpNameParts(b_idx);
+%                     cmpName=char(join(cmpNameParts,':'));
+%                     cName{nRows}=sprintf('%s vs %s',uc{cIdx(c2)},cmpName(1:end-1));
+%                     cAnvGrp(nRows)=c;
+%                     isV0(nRows)=false;
+%                   end
+%               end
 
-                  if(any(ismember(cRows,cRow,'rows'))||any(ismember(cRows,cRow*-1,'rows'))... %skip if duplicated or
-                        ||sum(cmp_contrast)==1) % skips when the full interaction term (ex  a:b1 vs a:b2) is a better descripter
-                                                % Usually just because
-                                                % there is only 1 contrast
-                                                % to be made
-                    continue;
-                  else
-                    nRows=nRows+1;
-                    cRows(nRows,:)=cRow;
-                    uc=uCoefTerms{c2};
-                    [cmpNameParts,p_idx]=unique(split(strcat(mdlCoefNames_with_colon{cmp_contrast}),':'));
-                    [a,b_idx]=sort(p_idx);
-                    cmpNameParts=cmpNameParts(b_idx);
-                    cmpName=char(join(cmpNameParts,':'));
-                    cName{nRows}=sprintf('%s vs %s',uc{cIdx(c2)},cmpName(1:end-1));
-                    cAnvGrp(nRows)=c;
-                    isV0(nRows)=false;
-                  end
-              end
-
-              for c2=1:numContrasts % repeat within similar groupss
-                  cmp_contrast=cmp_contrast_idx(:,c2)==cIdx(c2);
-                  
-                  cmp_contrast_vals=find(cmp_contrast==1);
-                  for cmp=1:length(cmp_contrast_vals)
-                       
-                      cRow=zeros(1,numMdlCoef);
-                      cRow(c)=1;
-                      cRow(cmp_contrast_vals(cmp))=-1;
-
-                      if(any(ismember(cRows,cRow,'rows'))||any(ismember(cRows,cRow*-1,'rows'))||(cmp_contrast_vals(cmp)>length(numRootAnvTerms)))
-                        continue;
-                      else
-                          
-                        nRows=nRows+1;
-                        cRows(nRows,:)=cRow;
-                        uc=uCoefTerms{c2};
-
-                        cName{nRows}=sprintf('%s vs %s',mdlCoefNames{c},mdlCoefNames{cmp_contrast_vals(cmp)});
-                        cAnvGrp(nRows)=c;
-                        isV0(nRows)=false;
-                      end
-
-                  end
-              end
-              
-              for c2=1:numContrasts % make more general comparisons if possible
-                  cmp_contrast=rootCoefIdx(:,c2)==cIdx(c2);
-                  
-                  u_contrast_levels=unique(rootCoefIdx(rootCoefIdx(:,c2)~=cIdx(c2),c2));
-                  
-                  for cmp=1:length(u_contrast_levels)
-                      
-                      if(isnan(u_contrast_levels(cmp))||isnan(cIdx(c2)))
-                          continue;
-                      end
-                      
-                      cmp_contrast_val= rootCoefIdx(:,c2)==u_contrast_levels(cmp);
-                      cRow=zeros(1,numMdlCoef);
-                      cRow(cmp_contrast)=1;
-                      cRow(cmp_contrast_val)=-1;
-
-                      if(any(ismember(cRows,cRow,'rows'))||any(ismember(cRows,cRow*-1,'rows')))
-                          %if the contrast is already being compared, skip
-                        continue;
-                      else
-                          nRows=nRows+1;
-                         cRows(nRows,:)=cRow;
-                            uc=uCoefTerms{c2};
-                            cName{nRows}=sprintf('%s vs %s',uc{cIdx(c2)},uc{u_contrast_levels(cmp)});
-                            cAnvGrp(nRows)=c;
-                            isV0(nRows)=false;
-                      end
-
-                  end
-              end
-          end
+%               for c2=1:numContrasts % repeat within similar groupss
+%                   cmp_contrast=cmp_contrast_idx(:,c2)==cIdx(c2);
+%                   
+%                   cmp_contrast_vals=find(cmp_contrast==1);
+%                   for cmp=1:length(cmp_contrast_vals)
+%                        
+%                       cRow=zeros(1,numMdlCoef);
+%                       cRow(c)=1;
+%                       cRow(cmp_contrast_vals(cmp))=-1;
+% 
+%                       if(any(ismember(cRows,cRow,'rows'))||any(ismember(cRows,cRow*-1,'rows'))||(cmp_contrast_vals(cmp)>length(numRootAnvTerms)))
+%                         continue;
+%                       else
+%                           
+%                         nRows=nRows+1;
+%                         cRows(nRows,:)=cRow;
+%                         uc=uCoefTerms{c2};
+% 
+%                         cName{nRows}=sprintf('%s vs %s',mdlCoefNames{c},mdlCoefNames{cmp_contrast_vals(cmp)});
+%                         cAnvGrp(nRows)=c;
+%                         isV0(nRows)=false;
+%                       end
+% 
+%                   end
+%               end
+%               
+%               for c2=1:numContrasts % make more general comparisons if possible
+%                   cmp_contrast=rootCoefIdx(:,c2)==cIdx(c2);
+%                   
+%                   u_contrast_levels=unique(rootCoefIdx(rootCoefIdx(:,c2)~=cIdx(c2),c2));
+%                   
+%                   for cmp=1:length(u_contrast_levels)
+%                       
+%                       if(isnan(u_contrast_levels(cmp))||isnan(cIdx(c2)))
+%                           continue;
+%                       end
+%                       
+%                       cmp_contrast_val= rootCoefIdx(:,c2)==u_contrast_levels(cmp);
+%                       cRow=zeros(1,numMdlCoef);
+%                       cRow(cmp_contrast)=1;
+%                       cRow(cmp_contrast_val)=-1;
+% 
+%                       if(any(ismember(cRows,cRow,'rows'))||any(ismember(cRows,cRow*-1,'rows')))
+%                           %if the contrast is already being compared, skip
+%                         continue;
+%                       else
+%                           nRows=nRows+1;
+%                          cRows(nRows,:)=cRow;
+%                             uc=uCoefTerms{c2};
+%                             cName{nRows}=sprintf('%s vs %s',uc{cIdx(c2)},uc{u_contrast_levels(cmp)});
+%                             cAnvGrp(nRows)=c;
+%                             isV0(nRows)=false;
+%                       end
+% 
+%                   end
+%               end
+          
        else
             for c2=c+1:length(basic_contrast_idx) % compare within similar groups
               nRows=nRows+1;
@@ -463,5 +463,7 @@ contrastTable=table(deltaE',SD_p',F',df',df2',pVal',pVal_corr,sig',cRows(uNameId
 
 %Sorts with vs 0. on top
 contrastTable=[contrastTable(isV0,:);contrastTable(~isV0,:)];
+
+
 
 
