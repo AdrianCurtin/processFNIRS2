@@ -428,12 +428,22 @@ end
 
 
 fprintf('\nInfo Table Values\n');
+global barChartTable;
+barChartTable=table({''},{''},nan,nan,'VariableNames',{'FeatureName','Group',strcat(curInfoStr,'_',plotFeature),strcat(curInfoStr,'_',errorFeature)});
+barChartTable(1,:)=[];
 for i=1:size(gAStrs,1)
+    
     for j=1:length(uCurInfoG)
+        idx=(i-1)*(length(uCurInfoG))+j;
         fprintf('%s:%s\tMean %.2f\tError: %.2f\n',gAStrs{i},uCurInfoG{j},barChartData(j,i,1),barChartData(j,i,2));
+        barChartTable(idx,:)={gAStrs{i},uCurInfoG{j},barChartData(j,i,1),barChartData(j,i,2)};
     end
     
+
 end
+
+
+
 fprintf('\n');
         
 hold off;
