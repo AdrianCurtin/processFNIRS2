@@ -832,7 +832,7 @@ for chIdx=1:numOpt
                                 switch(exSettings.ChannelMode)
                                     case 'fNIR'
                                          axes(curPlotHandle);
-                                         pf2.Data.Plot.InterpolateValues(curR,[minR1,minR2],[],1,titleSTR,clrBtitle);
+                                         pf2.Probe.Plot.InterpolateValues(curR,[],[minR1,minR2],[],1,titleSTR,clrBtitle);
                                         %interpolateNIR(abs(curR),'Mode',topoMode,'fontSize',12,'transparent',true,'lowerThreshold',min([abs(minR2),minR1]),'TitleText',titleSTR,'ChannelLabels',true)%,7,11,2,1,false,'[Hb-Oxy] Natural High Vs. Low',12,'hot',true)
                                     case 'ROI'
                                         roiInfo=ExFNIRS.currentROI;

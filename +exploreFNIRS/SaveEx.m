@@ -22,7 +22,13 @@ if(~isempty(pathname))
     filename=sprintf('%s/%s',pathname,filename);
 end
 
-save(filename,'ExFNIRS');
+fprintf('Saving experiment to %s...\n',filename);
+
+save(filename,'ExFNIRS','-v7.3');
+
+fprintf('Done!\n');
+
+
 
 end
 
