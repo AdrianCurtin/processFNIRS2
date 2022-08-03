@@ -510,8 +510,8 @@ function proj2d=project(XYZ,n,V,p)
     
     B=(A\[XYZ_p';zeros(size(XYZ(:,1)'))])';
     
-    r=vrrotvec([0,0,1],n);
-    RM=vrrotvec2mat(r);
+    r=pf2_base.external.vrrotvec([0,0,1],n);
+    RM=pf2_base.external.vrrotvec2mat(r);
     
     proj2d=B(:,1:3)*RM;
    

@@ -15,7 +15,7 @@ validScalarPosNum = @(x) isnumeric(x) && x>0;
 validScalarPosNumOrNan = @(x) isnumeric(x) && (x>0||isnan(x));
 validI1020Label = @(x) islogical(x) || iscellstr(x);
 validBrodmann = @(x) islogical(x) || isnumeric(x)&&all(x<=55)&&all(x>0);
-validColor = @(x) (ischar(x) && length(x) == 1) || isnumeric(x) && length(x) == 3 || isempty(x);
+validColor = @(x) (ischar(x) && length(x) == 1) || (isnumeric(x) && length(x) == 3) || isempty(x);
 validFnirs = @(x) (iscell(x) || isstruct(x));
 %validColorList = @(x) validColor(x) || all(arrayfun(validColor, x));
 
@@ -25,12 +25,12 @@ validInterpolateType = @(x) any(validatestring(x, validInterpolateTypes));
 
 defaultCamPosition = 'auto';
 validCamPositions = {'auto','front', 'back', 'top' 'left', 'right','face'};
-validCamPosition = @(x) any(validatestring(x, validCamPositions)) || isnumeric(x) && length(x) == 3;
+validCamPosition = @(x) ((isstring(x)||ischar(x))&&any(validatestring(x, validCamPositions))) || (isnumeric(x) && length(x) == 3);
 
 defaultColormap = 'hot';
 defaultColormapLow = 'cool';
 validColormapLabels = {'hot', 'autumn', 'jet', 'gray', 'copper', 'bone', 'cool', 'winter', 'pink'};
-validColormap = @(x) isa(x,'function_handle') || any(ishandle(x)) || any(validatestring(x, validColormapLabels));
+validColormap = @(x) (isnumeric(x)&&(size(x,2)==3))||isa(x,'function_handle') || any(ishandle(x)) || any(validatestring(x, validColormapLabels));
 
 if(numel(varargin) > 0 && isa(varargin{1},'matlab.graphics.axis.Axes')) %If first argument is axes then move to front
    ax=varargin{1};
@@ -89,7 +89,8 @@ addParameter(p, 'BA_cmp', @lines, validColormap); % Colors in Brodmann areas
 addParameter(p, 'useVoxelBrodmannAreas', false, @islogical); % Colors in Brodmann areas
 addParameter(p, 'showVoxelBrain', false, @islogical); % Colors in Brodmann areas
 centerCamPos=[0,-20,0];
-addParameter(p, 'camTarget', centerCamPos, validCamPosition); % Colors in Brodmann areas
+addParameter(p, 'camTarget', centerCamPos, validCamPosition); % Target Camera location
+addParameter(p, 'camUp', [0,0,1] , validCamPosition); % Target Camera location
 addParameter(p, 'animated', false, @islogical); % Optimizes for animation (By not redrawing certain things when possible)
 
 
@@ -118,9 +119,9 @@ if(multiprobe && ~all(dataEmpty))
     for i=1:numel(data2plot)
         concat_data = [concat_data, data2plot{i}];
     end
-    data2plot_concat = concat_data;
+    data2plot_concat = concat_data(:);
 else
-    data2plot_concat=data2plot{1};
+    data2plot_concat=data2plot{1}(:);
 end
 
 if(isempty(p.Results.fNIR) && ~p.Results.useEEG)
@@ -307,7 +308,7 @@ grootHandle.ShowHiddenHandles=true;
 itemsToSkipPlot=cell(0);
 j=1;
 for i=1:length(itemsToDelete)
-    item = findobj(gcf, "Tag", itemsToDelete{i});
+    item = findobj(gca, "Tag", itemsToDelete{i});
     if(~isempty(item)&&~animationOptimized)
         delete(item);
     elseif(~isempty(item)&&animationOptimized)
@@ -575,7 +576,7 @@ end
 
 
 % TAL EEG locations from Automated cortical projection of EEG sensors: Anatomical correlation via the international 10–10 system
-h=gcf;
+h=gca;
 if(useHighRes)
     if(isfield(h,'UserData')&&isfield(h.UserData,'cMdl_high'))
         cerebro_mdl=h.UserData.cMdl_high;
@@ -695,7 +696,7 @@ end
 
 
 if(p.Results.showVoxelBrain&&(isempty(itemsToSkipPlot)||~contains(itemsToSkipPlot,'BrainVoxel')))
-    h=gcf;
+    h=ax;
     if(isfield(h,'UserData')&&isfield(h.UserData,'mni_t1'))
         mni_t1=h.UserData.mni_t1;
     else
@@ -732,7 +733,7 @@ if(p.Results.showVoxelBrain&&(isempty(itemsToSkipPlot)||~contains(itemsToSkipPlo
    lighting('none');
     
     if(p.Results.useVoxelBrodmannAreas)
-        h=gcf;
+        h=ax;
         if(isfield(h,'UserData')&&isfield(h.UserData,'brdm'))
             brdm=h.UserData.brdm;
         else
@@ -879,7 +880,11 @@ if(~all(dataEmpty))
     c_min = nanmin(C, [], 'all');
     c_max = nanmax(C, [], 'all');
     
-    nColorsMaxBar=1024;
+    if(isnumeric(cmap_high))
+        nColorsMaxBar=size(cmap_high,1);
+    else
+        nColorsMaxBar=1024;
+    end
     cbarUpperRange=max(cbarUpper_minmax)-min(cbarUpper_minmax);
     
     if twosided
@@ -919,16 +924,24 @@ if(~all(dataEmpty))
        %end
     else
         if ~negColorbar
-            if(p.Results.logScale)
-                cmap = [cmap_high(nColorsMaxBar)];
+            if(isnumeric(cmap_high))
+                cmap=cmap_high;
             else
-                cmap = [cmap_high(nColorsMaxBar)];
+                %if(p.Results.logScale)
+                %    cmap = [cmap_high(nColorsMaxBar)];
+                %else
+                    cmap = [cmap_high(nColorsMaxBar)];
+                %end
             end
         else 
-            if(p.Results.logScale)
-                cmap = [flip(cmap_low(nColorsMaxBar))];
+            if(isnumeric(cmap_low))
+                cmap=flip(cmap_low);
             else
-                cmap = [flip(cmap_low(nColorsMaxBar))];
+            %if(p.Results.logScale)
+                 %   cmap = [flip(cmap_low(nColorsMaxBar))];
+                %else
+                    cmap = [flip(cmap_low(nColorsMaxBar))];
+                %end
             end
         end
 
@@ -982,7 +995,7 @@ else % No data to plot, everything is brain and anatomy
         
         if(p.Results.useVoxelBrodmannAreas)
 
-                h=gcf;
+                h=ax;
                 if(isfield(h,'UserData')&&isfield(h.UserData,'brdm'))
                     brdm=h.UserData.brdm;
                 else
@@ -1053,10 +1066,10 @@ else % No data to plot, everything is brain and anatomy
 end
 
 if(~p.Results.showVoxelBrain)
-    brainHndl=findobj(gca,'Type','Patch','Tag','Brain');
+    brainHndl=findobj(ax,'Type','Patch','Tag','Brain');
 
     if(isempty(brainHndl))
-       brainHndl=gca; 
+       brainHndl=ax; 
        cameratoolbar
         hold off
         if(~isempty(p.Results.brainLineColor)&&all(~isnan(p.Results.brainLineColor)))
@@ -1203,6 +1216,12 @@ if(isempty(itemsToSkipPlot))
         zlabel('z (U/D)');
 
 
+          camPosUp=p.Results.camUp;
+    camup(camPosUp);
+
+    camPosTarget=p.Results.camTarget;
+    camtarget(camPosTarget);
+
 
     if(isnumeric(p.Results.initCamPosition))
         campos(p.Results.initCamPosition);
@@ -1230,11 +1249,11 @@ if(isempty(itemsToSkipPlot))
 
 
 
+  
 
-    campPosTarget=p.Results.camTarget;
-    camtarget(campPosTarget);
+    
 
-    lht2=findobj(gca,'Type','Light','Tag','Rear');
+    lht2=findobj(ax,'Type','Light','Tag','Rear');
     if(isempty(lht2))
         lht2=camlight('left');
         lht2.Tag='Rear';
@@ -1286,17 +1305,25 @@ end
 
 title(ax, titleString);
 if(p.Results.showColorbar && ~all(dataEmpty)&&isempty(itemsToSkipPlot))
-    cbars = findobj(gcf, "Type", "ColorBar");
+    cbars = findobj(ax, "Type", "ColorBar");
     delete(cbars);
     ax1=ax;
     curAxPosition=ax1.Position;
     
     if(~twosided)
         
-        if(~negColorbar)
-            colormap(ax1,cmap_high(nColorsMaxBar));
+        if(isnumeric(cmap_high))
+             if(~negColorbar)
+                colormap(ax1,cmap_high);
+            else
+                colormap(ax1,cmap_low);
+            end
         else
-            colormap(ax1,cmap_low(nColorsMaxBar));
+            if(~negColorbar)
+                colormap(ax1,cmap_high(nColorsMaxBar));
+            else
+                colormap(ax1,cmap_low(nColorsMaxBar));
+            end
         end
         
         chPos=colorbar(ax1);
@@ -1318,8 +1345,8 @@ if(p.Results.showColorbar && ~all(dataEmpty)&&isempty(itemsToSkipPlot))
         ax2=axes('OuterPosition',curAxPosition);
         ax2.Position=ax1.Position;
 
-        set(gca,'xtick',[]);
-        set(gca,'ytick',[]);
+        set(ax,'xtick',[]);
+        set(ax,'ytick',[]);
 
         %set( chNeg, 'YDir', 'reverse' );
         colormap(ax2,cmap_low(nColorsMaxBar));
@@ -1543,10 +1570,10 @@ if(p.Results.showReference&&(isempty(itemsToSkipPlot)))
     
 end
 
-h=gca;
+h=ax;
 
 if (nargout > 0)
-    h=gca;
+    h=ax;
     
     frame=getframe(ax);
     imgOut = frame.cdata;
