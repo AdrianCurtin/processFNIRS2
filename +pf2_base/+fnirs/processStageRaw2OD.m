@@ -1,5 +1,5 @@
 
-function [outDataOD,outDataRaw]=processStageRaw2OD(method,data,fs,time,rawMask,fMarkers,fAux,channelNumbers,wavelengths,showGUIerrors)
+function [outDataOD,outDataRaw]=processStageRaw2OD(method,data,fs,time,rawMask,fMarkers,fAux,channelNumbers,wavelengths,fSD_dist,fNIR_input,showGUIerrors)
  % Raw data processing
  
  if(nargin<10)
@@ -115,12 +115,15 @@ for i=1:length(method.F)
            elseif strcmp(args{a},'fChannelNumbers')==1
               fchInfo_ind=a;
               passedArgVals{fchInfo_ind}=channelNumbers(validChannels);
-           elseif strcmp(args{a},'fChannelSD')==1
+            elseif strcmp(args{a},'fChannelSD')==1
               fsd_ind=a;
-              passedArgVals{fsd_ind}=PF2.curSDSet(ismember(PF2.curChList,PF2.curChSet(validChannels)));
+              passedArgVals{fsd_ind}=fSD_dist(validChannels);
            elseif strcmp(args{a},'fMarkers')==1
               fmrk_ind=a; 
               passedArgVals{fmrk_ind}=fMarkers;
+           elseif strcmp(args{a},'fNIRstruct')==1
+              fnir_ind=a; 
+              passedArgVals{fnir_ind}=fNIR_input;
            elseif strcmp(args{a},'fAux')==1
               fAux_ind=a;
               passedArgVals{fAux_ind}=fAux;

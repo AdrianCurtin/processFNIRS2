@@ -501,7 +501,7 @@ function [outDataOD,outDataRaw]=processStageRaw2OD(data,time,fMarkers,fAux)
  
 global PF2
  
-[outDataOD,outDataRaw]=pf2_base.fnirs.processStageRaw2OD(PF2.GUIPF2.stageRawMethod,data,PF2.GUIPF2.data.fs,time,PF2.GUIPF2.data.rawMask,fMarkers,fAux,PF2.curCh.OptodeNumber,PF2.curCh.Wavelength); % Raw data processing
+[outDataOD,outDataRaw]=pf2_base.fnirs.processStageRaw2OD(PF2.GUIPF2.stageRawMethod,data,PF2.GUIPF2.data.fs,time,PF2.GUIPF2.data.rawMask,fMarkers,fAux,PF2.curCh.OptodeNumber,PF2.curCh.Wavelength,PF2.curCh.SD,PF2.GUIPF2.data); % Raw data processing
 
 
 function outData=processStageOD2Hb(data,subAge)
@@ -2881,7 +2881,7 @@ if(~isempty(data))
         
         for optIdx=1:numOptodes
             h{optIdx}= axes('Position',[0 0 .001 .001],'Box','on');
-            h{optIdx}.OuterPosition=curTopoInfo.subplot_layout{optIdx};
+            h{optIdx}.OuterPosition=curTopoInfo.subplot_layout_ss{optIdx};
         end
 
         for optIdx=1:numOptodes
@@ -3083,7 +3083,7 @@ if(~isempty(data))
         
         for optIdx=1:numOptodes
             h{optIdx}= axes('Position',[0 0 .001 .001],'Box','on');
-            h{optIdx}.OuterPosition=curTopoInfo.subplot_layout{optIdx};
+            h{optIdx}.OuterPosition=curTopoInfo.subplot_layout_ss{optIdx};
         end
 
         for optIdx=1:numOptodes

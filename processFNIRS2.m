@@ -380,6 +380,7 @@ if(~isempty(data))
     numOptodes=curProbe.NumOptodes;
     channelNumbers=curProbe.TableCh.OptodeNumber;
     wavelengths=curProbe.TableCh.Wavelength;
+    fSD_dist=curProbe.TableOpt.SD;
     
     rawMask=ismember(channelNumbers,curProbe.TableOpt.OptodeNum(reshape(fData.fchMask>PF2.RejectLevel|outputData.ProcessRejected,1,numOptodes)));
 
@@ -392,7 +393,7 @@ if(~isempty(data))
 
    if(outputData.ProcessRaw)
         
-        [fData.stage{3},fData.stage{2}]=pf2_base.fnirs.processStageRaw2OD(PF2.stageRawMethod,fData.stage{1},fData.fs,fData.time,rawMask,fMarkers,fAux,channelNumbers,wavelengths); % Raw data processing
+        [fData.stage{3},fData.stage{2}]=pf2_base.fnirs.processStageRaw2OD(PF2.stageRawMethod,fData.stage{1},fData.fs,fData.time,rawMask,fMarkers,fAux,channelNumbers,wavelengths,fSD_dist,data); % Raw data processing
         if(outputData.ProcessOxy)
             fData.stage{4}=processStageOD2Hb(fData.stage{3},fData.time,fData.info.Age,outputData.DirtyBaseline,curProbe); % Beer-Lambert conversion
         end
