@@ -1,7 +1,7 @@
-function outData=processStageFilterHb(method,data,fs,ProcessRejected,showGUIerrors)
+function outData=processStageFilterHb(method,data,fs,probeInfo,ProcessRejected,showGUIerrors)
 % Oxy data processing
 
-if(nargin<5)
+if(nargin<6)
     showGUIerrors=false;
 end
 
@@ -128,7 +128,10 @@ else
                   passedArgVals{fAux_ind}=data.Aux;
                elseif strcmp(args{a},'fChannelSD')==1
                   fsd_ind=a;
-                  passedArgVals{fsd_ind}=PF2.curSDSet(validChannels);
+                  passedArgVals{fsd_ind}=probeInfo.SD(validChannels);
+               elseif strcmp(args{a},'fProbeInfo')==1
+                  fprobe_ind=a;
+                  passedArgVals{fprobe_ind}=probeInfo;
                elseif strcmp(args{a},'ftimeChMask')==1
                   ftimeMask_ind=a;
                   passedArgVals{ftimeMask_ind}=curftimeMask(:,validChannels); % always needs channel info when used in raw

@@ -501,7 +501,7 @@ function [outDataOD,outDataRaw]=processStageRaw2OD(data,time,fMarkers,fAux)
  
 global PF2
  
-[outDataOD,outDataRaw]=pf2_base.fnirs.processStageRaw2OD(PF2.GUIPF2.stageRawMethod,data,PF2.GUIPF2.data.fs,time,PF2.GUIPF2.data.rawMask,fMarkers,fAux,PF2.curCh.OptodeNumber,PF2.curCh.Wavelength,PF2.curCh.SD,PF2.GUIPF2.data); % Raw data processing
+[outDataOD,outDataRaw]=pf2_base.fnirs.processStageRaw2OD(PF2.GUIPF2.stageRawMethod,data,PF2.GUIPF2.data.fs,time,PF2.GUIPF2.data.rawMask,fMarkers,fAux,PF2.curCh.OptodeNumber,PF2.curCh.Wavelength,PF2.curOpt,PF2.GUIPF2.data); % Raw data processing
 
 
 function outData=processStageOD2Hb(data,subAge)
@@ -570,7 +570,7 @@ global PF2
 
 data.fchMask=PF2.GUIPF2.data.fchMask;
 
-outData=pf2_base.fnirs.processStageFilterHb(PF2.GUIPF2.stageOxyMethod,data,PF2.GUIPF2.data.fs,outputData.ProcessRejected);
+outData=pf2_base.fnirs.processStageFilterHb(PF2.GUIPF2.stageOxyMethod,data,PF2.GUIPF2.data.fs,PF2.curOpt,outputData.ProcessRejected);
 
 if(PF2.GUIPF2.processWindowOnly)
     validChannels=false(size(outData.channels));
