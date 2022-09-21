@@ -24,7 +24,7 @@ else
         
         
 
-        if(isempty(isvalidfield)||~isvalidfield)
+        if(all(isempty(isvalidfield))||all(~isvalidfield))
             isvalidfield=false;
             return;
         end
