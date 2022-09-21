@@ -9,14 +9,22 @@ end
 
 [ filepathdir , filename , ext ] = fileparts( filepath ) ;
 
-mrkFilePath= [filepathdir filename '.mrk'];
-logFilePath= [filepathdir filename '.log'];
-
+mrkFilePath= strjoin([filepathdir '/' filename '.mrk'],'');
+logFilePath= strjoin([filepathdir '/' filename '.log'],'');
 
 
 % Writing .NIR file
 
+if(exist(filepathdir,'dir')~=7)
+    mkdir(filepathdir);
+end
+
  fid=fopen(filepath,'wt');
+
+ if(fid<0)
+    error('Unable to access file for writing!');
+ end
+
  fprintf(fid,'fnirUSB.dll log file\n');
  
  if(isfield(fNIRstruct,'info')&&isfield(fNIRstruct.info,'header')&&...
