@@ -83,7 +83,7 @@ end
        fprintf(fid,'\t%.2f',arr(x,y)); 
     end
      fprintf(fid,'\n');
-     if(x==10)
+     if(x==20)
         fprintf(fid,'-3\tBaseline values\n');
             fprintf(fid,'0'); 
             for y=2:numCol
