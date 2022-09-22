@@ -78,7 +78,7 @@ end
  numLines=size(arr,1);
  numCol=size(arr,2);
  for x=1:numLines
-     fprintf(fid,'%.3f',arr(x,1)); 
+     fprintf(fid,'%.3f',fNIRstruct.time(x,1)); 
     for y=2:numCol
        fprintf(fid,'\t%.2f',arr(x,y)); 
     end
