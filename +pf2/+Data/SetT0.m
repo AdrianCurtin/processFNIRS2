@@ -12,10 +12,14 @@ if(isdatetime(t0time)&&isfield(outFNIR,'t0'))
     outFNIR.t0=t0time;
 
     t0time=tDiff;
-elseif(isdatetime(t0time)&&sfield(outFNIR,'datetime'))
-    if(all(size(t0time))==all(size(outFNIR.datetime)))
+elseif(isdatetime(t0time)&&isfield(outFNIR,'datetime'))
+    % if datetime field is available, use the datetime to subtract
+    if(all(size(outFNIR.time)==size(outFNIR.datetime)))
         outFNIR.t0=t0time;
-        outFNIR.time=seconds(outFNIR.datetime-outFNIR.t0);
+        tdiff=outFNIR.time(1)-seconds(outFNIR.datetime(1)-outFNIR.t0);
+        t0time=tdiff;
+    else
+        error('All datetimes must be the same size as times')
     end
 end
 
@@ -26,6 +30,7 @@ if(isfield(outFNIR,'time'))
 end
 
 if(isfield(outFNIR,'t0')&&~isfield(outFNIR,'datetime'))
+    %datetime shouldn't be changing
     outFNIR.datetime=outFNIR.t0+(duration(0,0,outFNIR.time));
 end
 

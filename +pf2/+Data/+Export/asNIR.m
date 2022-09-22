@@ -27,18 +27,15 @@ end
 
  fprintf(fid,'fnirUSB.dll log file\n');
  
- if(isfield(fNIRstruct,'info')&&isfield(fNIRstruct.info,'header')&&...
-    isfield(fNIRstruct.info.header,'Time'))
-        timestamp=fNIRstruct.info.header.Time;
-    fprintf(fid,'Start Time:\t');
-    for t=1:length(timestamp)
-        fprintf(fid,'%s ',timestamp{t});
-    end
-    fprintf(fid,'\n');   
-else
- fprintf(fid,'Start Time:\tWed Jan 1 1:01:01 2022\n');
-end
- fprintf(fid,'\n');
+ fprintf(fid,'Start Time:\t');
+ if(isfield(fNIRstruct,'t0'))
+    fprintf(fid,'%s\n',datestr(fNIRstruct.t0,'ddd mmm DD hh:MM:ss.FFF yyyy'));
+ else
+    fprintf(fid,'Wed Jan 1 1:01:01 2022\n');
+ end
+
+fprintf(fid,'\n');
+
 
 if(isfield(fNIRstruct,'info')&&isfield(fNIRstruct.info,'header')&&...
     isfield(fNIRstruct.info.header,'startCode'))
@@ -108,17 +105,14 @@ fid=fopen(mrkFilePath,'wt');
  fprintf(fid,'fnirUSB.dll marker file\n');
  fprintf(fid,'Listening from SomePORT port\n');
  
- if(isfield(fNIRstruct,'info')&&isfield(fNIRstruct.info,'header')&&...
-    isfield(fNIRstruct.info.header,'Time'))
-        timestamp=fNIRstruct.info.header.Time;
-    fprintf(fid,'Start Time:\t');
-    for t=1:length(timestamp)
-        fprintf(fid,'%s ',timestamp{t});
-    end
-    fprintf(fid,'\n');   
-else
- fprintf(fid,'Start Time:\tWed Jan 1 1:01:01 2022\n');
-end
+ fprintf(fid,'Start Time:\t');
+ if(isfield(fNIRstruct,'t0'))
+    fprintf(fid,'%s\n',datestr(fNIRstruct.t0,'ddd mmm DD hh:MM:ss.FFF yyyy'));
+ else
+    fprintf(fid,'Wed Jan 1 1:01:01 2022\n');
+ end
+
+
 
 fprintf(fid,'\n');
 
@@ -161,17 +155,14 @@ fid=fopen(logFilePath,'wt');
  fprintf(fid,'Current Device:\tfnirUSB.dll\n');
  fprintf(fid,'Current Filter Module:\tFilters are OFF\n');
  
- if(isfield(fNIRstruct,'info')&&isfield(fNIRstruct.info,'header')&&...
-    isfield(fNIRstruct.info.header,'Time'))
-        timestamp=fNIRstruct.info.header.Time;
-    fprintf(fid,'Start Time:\t');
-    for t=1:length(timestamp)
-        fprintf(fid,'%s ',timestamp{t});
-    end
-    fprintf(fid,'\n');   
-else
- fprintf(fid,'Start Time:\tWed Jan 1 1:01:01 2022\n');
-end
+  fprintf(fid,'Start Time:\t');
+ if(isfield(fNIRstruct,'t0'))
+    fprintf(fid,'%s\n',datestr(fNIRstruct.t0,'ddd mmm DD hh:MM:ss.FFF yyyy'));
+ else
+    fprintf(fid,'Wed Jan 1 1:01:01 2022\n');
+ end
+
+
 
 fprintf(fid,'\n\n\n');
 
@@ -229,6 +220,18 @@ if(isfield(fNIRstruct,'info')&&...
     fprintf(fid,'ProbeName:\n%s\n\n',probename);
 else
  fprintf(fid,'ProbeName:Unknown\n\n\n');
+end
+
+ if(isfield(fNIRstruct,'info')&&isfield(fNIRstruct.info,'header')&&...
+    isfield(fNIRstruct.info.header,'Time'))
+        timestamp=fNIRstruct.info.header.Time;
+    fprintf(fid,'Original Start Time:\t');
+    for t=1:length(timestamp)
+        fprintf(fid,'%s ',timestamp{t});
+    end
+    fprintf(fid,'\n');   
+else
+ fprintf(fid,'Original Start Time:\tUnknown\n');
 end
 
  fprintf(fid,'Finalized Successfully');
