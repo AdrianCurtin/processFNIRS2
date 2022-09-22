@@ -334,6 +334,8 @@ fNIR.fchMask=fchMask;
 
 if(isfield(markers,'data'))
 	fNIR.markers=markers.data;
+else
+    fNIR.markers=[];
 end
 
 fNIR.info=[];
