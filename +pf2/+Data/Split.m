@@ -303,6 +303,13 @@ else
         outfNIR.time=fNIR.time(indexStart:indexEnd,1);
     end
     
+    if(isfield(fNIR,'datetime'))
+        outfNIR.datetime=fNIR.datetime(indexStart:indexEnd,1);
+    end
+    
+    if(isfield(fNIR,'segmentTimes'))
+        outfNIR.segmentTimes=fNIR.datetime(indexStart:indexEnd,:);
+    end
     
 
     if(isfield(fNIR,'t0')&&isdatetime(fNIR.t0))
@@ -355,7 +362,7 @@ validFields=pf2_base.pf2_getFNIRSfields();
 fdataFields=fields(fNIR);  % Copy known fields
 for i=1:length(fdataFields)
    memberIdx=ismember(validFields,fdataFields{i});
-   if(any(memberIdx)&&~strcmp(fdataFields{i},'time')&&~strcmp(fdataFields{i},'ROI'))
+   if(any(memberIdx)&&~strcmp(fdataFields{i},'time')&&~strcmp(fdataFields{i},'ROI')&&~isfield(outfNIR,fdataFields{i}))
         outfNIR.(validFields{memberIdx})=fNIR.(fdataFields{i});
    end
 end
@@ -382,7 +389,7 @@ if(isfield(outfNIR,'Aux')&&splitAux)
                     t2trim=curVar{:,cur_time_ind};
                     minftime=startTime;
                     maxftime=endTime;
-                    t2trim_idx=t2trim>minftime&t2trim<maxftime;
+                    t2trim_idx=t2trim>=minftime&t2trim<=maxftime;
                     outfNIR.Aux.(auxTrimFields{atIdx})=curVar(t2trim_idx,:);
                 end
             end
