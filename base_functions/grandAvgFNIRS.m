@@ -82,7 +82,7 @@ for i=length(FNIRScellArray):-1:1
         FNIRScellArray{i}.fs=round(FNIRScellArray{i}.fs,3);
         segROIpresent(i)=pf2_base.isnestedfield(FNIRScellArray{i},'ROI.HbO');
         
-    elseif(~isfield(FNIRScellArray{i},'time'))  % No Time information
+    elseif(~isfield(FNIRScellArray{i},'time')||all(isnan(FNIRScellArray{i}.time)))  % No Time information
         FNIRScellArray(i)=[];
         hierarchyVars(i,:)=[];
         segSampleTimes(i)=[];
@@ -106,7 +106,11 @@ for i=length(FNIRScellArray):-1:1
         FNIRScellArray{i}.time=round(FNIRScellArray{i}.time,5);
         segSampleTimes(i)=median(diff(FNIRScellArray{i}.time));
         segSampleCount(i)=length(FNIRScellArray{i}.time);
-        segUnits{i}=FNIRScellArray{i}.units;
+        if(isfield(FNIRScellArray{i},'units'))
+            segUnits{i}=FNIRScellArray{i}.units;
+        else
+            segUnits{i}='Unknown';
+        end
         FNIRScellArray{i}.fs=1/segSampleTimes(i);
         FNIRScellArray{i}.fs=round(FNIRScellArray{i}.fs,3);
         segROIpresent(i)=pf2_base.isnestedfield(FNIRScellArray{i},'ROI.HbO');

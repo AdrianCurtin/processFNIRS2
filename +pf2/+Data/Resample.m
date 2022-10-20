@@ -415,7 +415,7 @@ for b = 1:length(bioMlist)
     end
 end
 
-if(~isempty(fNIR.Aux))
+if(~isempty(fNIR.Aux)&&length(fields(fNIR.Aux))>1)
     if(averageAux)
         % Attempts to resample any field (and align with fNIRS)
             % criteria:
@@ -427,6 +427,7 @@ if(~isempty(fNIR.Aux))
             %   4) Aux contains table column t or 'time' which contains time
     
         outFNIR.Aux=recursiveAuxResample(fNIR.Aux,flattenAux,segLength,centerOnTime,fNIR.time,fTimeInd,nanRejectionLevel);
+
         if(isfield(fNIR.Aux,'flattened'))
             outFNIR.Aux.flattened=flattenAux||fNIR.Aux.flattened;
         else
