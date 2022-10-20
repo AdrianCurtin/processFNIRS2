@@ -32,7 +32,12 @@ end
 if(isfield(outFNIR,'t0')&&~isfield(outFNIR,'datetime'))
     %datetime shouldn't be changing
     outFNIR.datetime=outFNIR.t0+(duration(0,0,outFNIR.time));
+elseif(~isfield(outFNIR,'t0')&&isfield(outFNIR,'datetime'))
+    %if we have a datetime, but not t0, make t0
+    outFNIR.t0=outFNIR.datetime(1)-(duration(0,0,outFNIR.time(1)));
 end
+
+
 
 if(isfield(outFNIR,'markers'))
    if(isfield(outFNIR.markers,'data'))
