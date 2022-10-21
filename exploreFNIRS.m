@@ -1449,20 +1449,22 @@ for i=1:max(gbyIdx)
     ExFNIRS.gby(i).gbyFNIRS=ExFNIRS.gbyFlat.gbyFNIRS(gbyIdx==i,:);
     ExFNIRS.gby(i).gbyFNIRS_blk=ExFNIRS.gbyFlat.gbyFNIRS_blk(gbyIdx==i,:);
     
+    missingFNIRSIdx=ExFNIRS.gby(i).gbyTables.missingFNIRS==1;
     
     if(ExFNIRS.settings.within_sub_avg_mode==1)
        hArg=[]; 
        ExFNIRS.settings.within_sub_avg_mode_label='None';
     elseif(ExFNIRS.settings.within_sub_avg_mode==2)
-        hArg=ExFNIRS.gby(i).gbyTables(:,'SubjectID');
+        hArg=ExFNIRS.gby(i).gbyTables(~missingFNIRSIdx,'SubjectID');
         ExFNIRS.settings.within_sub_avg_mode_label='Flat';
     elseif(ExFNIRS.settings.within_sub_avg_mode==3)
-        hArg=ExFNIRS.gby(i).gbyTables(:,ExFNIRS.dataHierarchy);
+        hArg=ExFNIRS.gby(i).gbyTables(~missingFNIRSIdx,ExFNIRS.dataHierarchy);
         ExFNIRS.settings.within_sub_avg_mode_label='Hierarchy';
     end
-    ExFNIRS.gby(i).gbyGrand=grandAvgFNIRS(ExFNIRS.gby(i).gbyFNIRS,false,[],false,hArg,false,true);
-    ExFNIRS.gby(i).gbyGrandBar=grandAvgFNIRS(ExFNIRS.gby(i).gbyFNIRS_blk,false, ExFNIRS.settings.barchart_resample_size,false,hArg,false,true);
-    ExFNIRS.gby(i).gbyGrandBarFlat=grandAvgFNIRS(ExFNIRS.gby(i).gbyFNIRS_blk,false, ExFNIRS.settings.barchart_resample_size,false,ExFNIRS.gby(i).gbyTables(:,'SubjectID'),false,true);
+    
+    ExFNIRS.gby(i).gbyGrand=grandAvgFNIRS(ExFNIRS.gby(i).gbyFNIRS(~missingFNIRSIdx),false,[],false,hArg,false,true);
+    ExFNIRS.gby(i).gbyGrandBar=grandAvgFNIRS(ExFNIRS.gby(i).gbyFNIRS_blk(~missingFNIRSIdx),false, ExFNIRS.settings.barchart_resample_size,false,hArg,false,true);
+    ExFNIRS.gby(i).gbyGrandBarFlat=grandAvgFNIRS(ExFNIRS.gby(i).gbyFNIRS_blk(~missingFNIRSIdx),false, ExFNIRS.settings.barchart_resample_size,false,ExFNIRS.gby(i).gbyTables(~missingFNIRSIdx,'SubjectID'),false,true);
     try
         close(eHf);
     catch
@@ -2167,7 +2169,7 @@ numEx=length(ExFNIRS.data);
 for i=1:length(numEx)
     fprintf('Preprocessing record %i of %i\n',i,numEx);
 
-   if((~isfield(ExFNIRS.data{i},'raw')&&~isfield(ExFNIRS.data{i},'HbO'))||(length(ExFNIRS.data{i}.time)==1&&(isnan(ExFNIRS.data{i}.time)))||sum(sum(~isnan(ExFNIRS.data{i}.raw(:,2:end)),1),2)==0) %info only
+   if((~isfield(ExFNIRS.data{i},'raw')&&~isfield(ExFNIRS.data{i},'HbO'))||all(isnan(ExFNIRS.data{i}.time))||(length(ExFNIRS.data{i}.time)==1&&(isnan(ExFNIRS.data{i}.time)))||sum(sum(~isnan(ExFNIRS.data{i}.raw(:,2:end)),1),2)==0) %info only
        ExFNIRS.data{i}.time=nan;
        ExFNIRS.data{i}.info.missingFNIRS=1;
    else
@@ -2175,7 +2177,7 @@ for i=1:length(numEx)
    end
 
    if(isfield(ExFNIRS.data{i},'Aux'))
-        ExFNIRS.data{i}.info.emptyAux=isempty(ExFNIRS.data{i}.Aux);
+        ExFNIRS.data{i}.info.emptyAux=isempty(ExFNIRS.data{i}.Aux)||isempty(fields(ExFNIRS.data{i}.Aux));
    else
         ExFNIRS.data{i}.info.emptyAux=true;
    end
