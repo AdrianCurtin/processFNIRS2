@@ -37,6 +37,9 @@ elseif(~isfield(outFNIR,'t0')&&isfield(outFNIR,'datetime'))
     outFNIR.t0=outFNIR.datetime(1)-(duration(0,0,outFNIR.time(1)));
 end
 
+if(isfield(outFNIR,'t0'))
+    outFNIR.t0=outFNIR.t0+duration(0,0,t0time);
+end
 
 
 if(isfield(outFNIR,'markers'))
