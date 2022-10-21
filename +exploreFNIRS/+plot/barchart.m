@@ -461,7 +461,7 @@ for chIdx=1:numOpt
         
         subplotHandles{curSubplotIdx}=subplot(numX,numY,curSubplotIdx);
         subplotGby{curSubplotIdx}.barChartData=barChartData{curChart};
-        subplotGby{curSubplotIdx}.gAStrs=gAStrs(:);
+        subplotGby{curSubplotIdx}.gAStrs=gAStrs(:,1);
 
         if(useCurInfoGroup&&numChartTimes>1)
             xBarLabels=cell(numChartTimes*numCurInfoG,1);
@@ -679,7 +679,6 @@ for sH=1:length(subplotHandles)
         for i=1:size(curData.gAStrs,1)
             for j=1:size(curData.xBarLabels,1)
                 fprintf('%s:%s\tMean %.2f\tError: %.2f\n',curData.gAStrs{i},curData.xBarLabels{j},curData.barChartData(j,i,1),curData.barChartData(j,i,2));
-       
             end
             
         end
