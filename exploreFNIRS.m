@@ -2294,7 +2294,7 @@ ExFNIRS.settings.plot_error_feature=strs{idx};
 
 ExFNIRS.settings.plot_legend_mode=2; %1 none %2 last fig %3 all
 
-ExFNIRS.settings.grandavg_resample_size=estimatedFS;
+ExFNIRS.settings.grandavg_resample_size=estimatedFS*2;
 set(handles.edit_grandavg_resample_size,'String',sprintf('%.3f',ExFNIRS.settings.grandavg_resample_size));
 %ExFNIRS.settings.code_missing=get(handles.checkbox_code_nan,'Value');
 
