@@ -99,7 +99,7 @@ for i=1:size(files,1)
         
         device=[];
         if(isfield(probeInfo,'t'))
-            fNIR.time=probeInfo.t';
+            fNIR.time=[probeInfo.t(:)];
             
             fNIR.fs=1/nanmedian(diff(fNIR.time));
             device.Info.TimeIsSampleCount=0;
@@ -153,6 +153,9 @@ for i=1:size(files,1)
             curProbeIdx=probeIdx==p;
         
             device.Probe{p}=[];
+
+            
+            
             
             device.Probe{p}.SrcPosX=probeInfo.SD.SrcPos(:,1);
             device.Probe{p}.SrcPosY=probeInfo.SD.SrcPos(:,2);
@@ -164,6 +167,41 @@ for i=1:size(files,1)
             
             device.Probe{p}.SrcPos3D=probeInfo.SD.SrcPos;
             device.Probe{p}.DetPos3D=probeInfo.SD.DetPos;
+
+            device.Probe{p}.TableSD=table();
+            device.Probe{p}.TableCh=table(); % Map for raw probe data
+            
+            device.Probe{p}.TableCh.ColNumber=[1:length(probeInfo.SD.MeasList(:,1))]';
+
+            [~,~,uOpt]=unique(probeInfo.SD.MeasList(:,[1:2]),'rows');
+            device.Probe{p}.TableCh.OptodeNumber=uOpt;
+            device.Probe{p}.TableCh.isTime=device.Probe{p}.TableCh.OptodeNumber==0;
+            device.Probe{p}.TableCh.isMarker=device.Probe{p}.TableCh.OptodeNumber<0|isnan(device.Probe{p}.TableCh.OptodeNumber);
+            device.Probe{p}.TableCh.OptodeNumber(device.Probe{p}.TableCh.OptodeNumber<1)=nan;
+            
+            
+            device.Probe{p}.TableCh.Wavelength=probeInfo.SD.Lambda(probeInfo.SD.MeasList(:,4))';
+            device.Probe{p}.TableCh.SourceIndex(:)=probeInfo.SD.MeasList(:,1);
+            device.Probe{p}.TableCh.DetectorIndex(:)=probeInfo.SD.MeasList(:,2);
+
+            device.Probe{p}.SrcPos=table();
+            device.Probe{p}.SrcPos.x_2d=device.Probe{p}.SrcPosX(:);
+            device.Probe{p}.SrcPos.y_2d=device.Probe{p}.SrcPosY(:);
+            device.Probe{p}.SrcPos.z_2d=device.Probe{p}.SrcPosZ(:);
+            device.Probe{p}.SrcPos.x=device.Probe{p}.SrcPosX(:);
+            device.Probe{p}.SrcPos.y=device.Probe{p}.SrcPosY(:);
+            device.Probe{p}.SrcPos.z=device.Probe{p}.SrcPosZ(:);
+            
+            
+            device.Probe{p}.DetPos=table();
+            device.Probe{p}.DetPos.x_2d=device.Probe{p}.DetPosX(:);
+            device.Probe{p}.DetPos.y_2d=device.Probe{p}.DetPosY(:);
+            device.Probe{p}.DetPos.z_2d=device.Probe{p}.DetPosZ(:);
+            device.Probe{p}.DetPos.x=device.Probe{p}.DetPosX(:);
+            device.Probe{p}.DetPos.y=device.Probe{p}.DetPosY(:);
+            device.Probe{p}.DetPos.z=device.Probe{p}.DetPosZ(:);
+            
+          
             
 
            
@@ -198,6 +236,14 @@ for i=1:size(files,1)
             device.Probe{p}.OptPosY=mean([device.Probe{p}.SrcPosY(:,1),device.Probe{p}.DetPosY(:,1)],2);
             device.Probe{p}.OptPosZ=mean([device.Probe{p}.SrcPosZ(:,1),device.Probe{p}.DetPosZ(:,1)],2);
             device.Probe{p}.NumOptodes=length(device.Probe{p}.OptPosX);
+
+            device.Probe{p}.OptPos=table();
+            device.Probe{p}.OptPos.x_2d=device.Probe{p}.OptPosX(:);
+            device.Probe{p}.OptPos.y_2d=device.Probe{p}.OptPosY(:);
+            device.Probe{p}.OptPos.z_2d=device.Probe{p}.OptPosZ(:);
+            device.Probe{p}.OptPos.x=device.Probe{p}.OptPosX(:);
+            device.Probe{p}.OptPos.y=device.Probe{p}.OptPosY(:);
+            device.Probe{p}.OptPos.z=device.Probe{p}.OptPosZ(:);
             
             device.Probe{p}.DetPos3D=detPos3D;
             device.Probe{p}.SrcPos3D=srcPos3D;
@@ -216,23 +262,35 @@ for i=1:size(files,1)
             device.Probe{p}.ChannelList= 1:numCh;
             device.Probe{p}.Wavelength=probeInfo.SD.Lambda(device.Probe{p}.wvI);
             device.Info.NumberChannels=device.Info.NumberChannels+numCh;
+
+
+
+
             %numCh=length(unique(device.Probe{p}.ChannelNumbers));
 
             if(buildProbeLayout) % auto generate plot layour
                 if(isfield(device.Probe{p},'OptPosX')&&isfield(device.Probe{p},'OptPosY'))
                     if(includeSSchannels)
-                        device.Probe{p}.OptLayout2D=pf2_base.fitProbe2D(device.Probe{p}.OptPosX,device.Probe{p}.OptPosY,device.Probe{p}.OptPosZ);
-                    else
+                        device.Probe{p}.OptLayout2D_ss=pf2_base.fitProbe2D(device.Probe{p}.OptPosX,device.Probe{p}.OptPosY,device.Probe{p}.OptPosZ);
+                    end
                         device.Probe{p}.OptLayout2D=pf2_base.fitProbe2D(device.Probe{p}.OptPosX(~device.Probe{p}.IsShortSeparation)...
                             ,device.Probe{p}.OptPosY(~device.Probe{p}.IsShortSeparation),...
                             device.Probe{p}.OptPosZ(~device.Probe{p}.IsShortSeparation));
-                    end
+                    
                 else
                     warning('buildProbeLayout option selected, but not enough information to generate Optode locations');
                     device.Probe{p}.OptLayout2D=setUpFalse2D(device.Probe{p}.NumOptodes);  % generate false channels if not requested
                 end
             else
                 device.Probe{p}.OptLayout2D=setUpFalse2D(device.Probe{p}.NumOptodes);  % generate false channels if not requested
+            end
+
+            device.Probe{p}.OptPos.subplot_layout(:)=cell(size(device.Probe{p}.OptPos.z));
+            device.Probe{p}.OptPos.subplot_layout(~device.Probe{p}.IsShortSeparation)=device.Probe{p}.OptLayout2D(:);
+            if(includeSSchannels)
+                device.Probe{p}.OptPos.subplot_layout_ss=device.Probe{p}.OptLayout2D_ss(:);
+            else
+               device.Probe{p}.OptPos.subplot_layout_ss= device.Probe{p}.OptPos.subplot_layout;
             end
         
         end
