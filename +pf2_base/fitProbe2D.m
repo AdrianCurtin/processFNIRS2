@@ -16,9 +16,9 @@ rangeX=max(ChxList)-min(ChxList);
 rangeY=max(ChyList)-min(ChyList);
 rangeZ=max(ChzList)-min(ChzList);
 
-if(rangeZ>rangeY&&rangeY<rangeX)
+if(all(rangeZ>rangeY)&&all(rangeY<rangeX))
     ChyList=ChzList;
-elseif(rangeZ>rangeX&&rangeY>=rangeX)
+elseif(all(rangeZ>rangeX)&&all(rangeY>=rangeX))
     ChxList=ChzList;
 end
 
