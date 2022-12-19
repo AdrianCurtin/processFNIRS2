@@ -29,7 +29,7 @@ validCamPosition = @(x) ((isstring(x)||ischar(x))&&any(validatestring(x, validCa
 
 defaultColormap = 'hot';
 defaultColormapLow = 'cool';
-validColormapLabels = {'hot', 'autumn', 'jet', 'gray', 'copper', 'bone', 'cool', 'winter', 'pink'};
+validColormapLabels = exploreFNIRS.helper.listColormaps('all');
 validColormap = @(x) (isnumeric(x)&&(size(x,2)==3))||isa(x,'function_handle') || any(ishandle(x)) || any(validatestring(x, validColormapLabels));
 
 if(numel(varargin) > 0 && isa(varargin{1},'matlab.graphics.axis.Axes')) %If first argument is axes then move to front
@@ -319,6 +319,7 @@ end
 grootHandle.ShowHiddenHandles=false;
 
 probeInfo=[];
+include_ss=p.Results.includeSS;
 
 if(multiprobe)
     num_devices = length(fNIR);
@@ -353,9 +354,14 @@ if(multiprobe)
             error('Unable to identify probe'); 
         end
         
-        if(~dataEmpty(i) && length(data2plot{i})~=probeInfos{i}.NumOptodes)
+        nData=length(data2plot{i});
+        nOpt=probeInfos{i}.NumOptodes;
+        nSS=probeInfos{i}.NumShortSeparation;
+        if(~dataEmpty(i) && (include_ss&&nData~=nOpt...
+                || (~include_ss&&nData~=(nOpt-nSS))))
             error('Must have a value for all optodes');
         end
+        clear nData nOpt nSS
     end
     probeInfo = {};
     fields = fieldnames(probeInfos{1});
@@ -496,8 +502,9 @@ if(p.Results.useEEG && ~isempty(probeDraw))
     tempProbe = probeInfo;
     probeInfo =  probeDraw;
 end
+
 if(isfield(probeInfo, 'TableOpt'))
-    include_ss=p.Results.includeSS;
+    
     if(include_ss&&probeInfo.NumOptodes>length(data2plot_concat)&&probeInfo.NumOptodes-probeInfo.NumShortSeparation==length(data2plot_concat))
         include_ss=false;
         warning('Not enough data for all channels, ignoring short separation channels');
@@ -548,6 +555,10 @@ if(p.Results.useEEG)
     end
     numOptodes = probeInfo.NumOptodes;
     includeChannels = ~isnan(probeInfo.OptPos3DX);
+end
+
+if(~include_ss)
+    includeChannels=includeChannels&~probeInfo.TableOpt.IsShortSeparation;
 end
 
 if(~all(dataEmpty) && length(data2plot_concat)~=numOptodes)
@@ -959,7 +970,12 @@ if(~all(dataEmpty))
 
             counts = histcounts(ind, 0:num_control+1);
             for i=1:num_control+1
+                try
                 Cs(ind==i-1,:) = repmat(C_temp(i,:), counts(i), 1);
+                catch
+
+                    x=2;
+                end
             end
             n=length(Cs(~any(Cs,2), :));
         case {'linear', 'quadratic', 'cubic'}
@@ -1113,6 +1129,10 @@ mrkScaleFactor=22;
 
 if(showChannels&&isfield(probeInfo, 'TableOpt')&&~contains('ProbeOpt',itemsToSkipPlot))
     optPos = [probeInfo.TableOpt.Pos3D_x probeInfo.TableOpt.Pos3D_y probeInfo.TableOpt.Pos3D_z];
+
+    if(~include_ss)
+        optPos=optPos(~probeInfo.TableOpt.IsShortSeparation,:);
+    end
     
     if(p.Results.useTalairach)
          optPos=pf2_base.external.icbm_fsl2tal(optPos);
@@ -1124,7 +1144,11 @@ if(showChannels&&isfield(probeInfo, 'TableOpt')&&~contains('ProbeOpt',itemsToSki
             
             probe_string=cell(0);
             for i=1:num_devices
+                
                 selOpt=probeInfo.TableOpt.ProbeNum(:,1)==uDevices(i);
+                if(~include_ss)
+                    selOpt(probeInfo.TableOpt.IsShortSeparation)=[];
+                end
                 h(i) = scatter3(optPos(selOpt,1), optPos(selOpt,2), optPos(selOpt,3),20*p.Results.labelfontsize,'filled',optColor,'MarkerEdgeColor' ,probe_colors(i,:),'LineWidth',1.5);
                 
                 probe_string{i}=sprintf('Probe %i',uDevices(i));
@@ -1140,7 +1164,11 @@ if(showChannels&&isfield(probeInfo, 'TableOpt')&&~contains('ProbeOpt',itemsToSki
         end
     end
     
-    h=text(optPos(:,1), optPos(:,2), optPos(:,3), string(probeInfo.TableOpt.OptodeNum), 'HorizontalAlignment', 'center','VerticalAlignment', 'middle', "FontSize", p.Results.labelfontsize, 'color', p.Results.labelfontcolor);
+    if(include_ss)
+        h=text(optPos(:,1), optPos(:,2), optPos(:,3), string(probeInfo.TableOpt.OptodeNum), 'HorizontalAlignment', 'center','VerticalAlignment', 'middle', "FontSize", p.Results.labelfontsize, 'color', p.Results.labelfontcolor);
+    else
+        h=text(optPos(:,1), optPos(:,2), optPos(:,3), string(probeInfo.TableOpt.OptodeNum(~probeInfo.TableOpt.IsShortSeparation)), 'HorizontalAlignment', 'center','VerticalAlignment', 'middle', "FontSize", p.Results.labelfontsize, 'color', p.Results.labelfontcolor);
+    end
     for i=1:length(h)
         h(i).Tag='OptLabel';
     end
