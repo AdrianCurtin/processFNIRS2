@@ -223,8 +223,9 @@ classdef INI < hgsetget & dynamicprops
                                Value = String{2};
                                Struct_section = get(Object,Section);
                                
+                            
                                Value2 = strTrimStrip(Value);
-                               if strcmp(Value2(1),'''')||strcmp(Value2(1),'"')
+                               if ~isempty(Value2)&&(strcmp(Value2(1),'''')||strcmp(Value2(1),'"'))
                                    for s = 3:numel(String)  % looks like its trying to acount for spaces?
                                         Value = [ Value '=' String{s}]; %#ok<AGROW>
                                    end
@@ -233,7 +234,8 @@ classdef INI < hgsetget & dynamicprops
                                else
                                    isString=false; 
                                end
-                               
+
+                  
                                
                                Line = fgetl(ID);
                                
@@ -568,7 +570,10 @@ function str_trimmed=strTrimStrip(str)
     
     str_trimmed=strtrim(str);
     
-    if(str_trimmed(1)==''''&&str_trimmed(end)=='''')||(str_trimmed(end)=='"'&&str_trimmed(1)=='"')
-        str_trimmed=str_trimmed(2:end-1);
+    if(~isempty(str_trimmed)&&length(str_trimmed)>2)
+        if(str_trimmed(1)==''''&&str_trimmed(end)=='''')||(str_trimmed(end)=='"'&&str_trimmed(1)=='"')
+            str_trimmed=str_trimmed(2:end-1);
+        end
     end
+
 end
