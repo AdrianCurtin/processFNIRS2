@@ -413,7 +413,7 @@ for j=1:length(probeInfo.cfg.Sections)
         p.OptPos.z=p.OptPos3DZ(:);
         
         p.OptPos.subplot_layout(:)=cell(size(p.OptPos.z));
-        p.OptPos.subplot_layout(~p.IsShortSeparation)=p.OptLayout2D(~p.IsShortSeparation);
+        p.OptPos.subplot_layout(~p.IsShortSeparation)=p.OptLayout2D(:);
         if(includeSSchannels)
             p.OptPos.subplot_layout_ss=p.OptLayout2D_ss(:);
         else
