@@ -86,7 +86,11 @@ else
     % file already exists
 end
 
-if ~isstr(nir_filename)
+if(isstring(nir_filename))
+   nir_filename=char(nir_filename); 
+end
+
+if ~ischar(nir_filename)
 	error('Input must be a string representing a filename');
 end
 
