@@ -9,21 +9,19 @@ if(isdatetime(t0time)&&isfield(outFNIR,'t0'))
     % Ex: orig 15:01:25    new t0 is 15:00
     % t0time = orig + 85s  
     tDiff=seconds(t0time-outFNIR.t0);
-    outFNIR.t0=t0time;
+    %outFNIR.t0=t0time;
 
     t0time=tDiff;
 elseif(isdatetime(t0time)&&isfield(outFNIR,'datetime'))
     % if datetime field is available, use the datetime to subtract
     if(all(size(outFNIR.time)==size(outFNIR.datetime)))
-        outFNIR.t0=t0time;
+        %outFNIR.t0=outFNIR.datetime(1);
         tdiff=outFNIR.time(1)-seconds(outFNIR.datetime(1)-outFNIR.t0);
         t0time=tdiff;
     else
         error('All datetimes must be the same size as times')
     end
 end
-
-
 
 if(isfield(outFNIR,'time'))
     outFNIR.time=outFNIR.time-t0time;
