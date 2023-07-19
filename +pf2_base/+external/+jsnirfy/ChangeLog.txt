@@ -1,0 +1,12 @@
+= Change Log =
+
+Major updates are marked with a "*"
+
+== JSNIRF Toolbox v0.4 (Amygdala - alpha), FangQ <q.fang (a) neu.edu> ==
+
+ 2019-09-19 [61def95] adding issues link in README
+ 2019-09-19 [b4d357c] polishing snirf toolbox, handling root object names
+ 2019-09-19 [53966d4] pass variable name from savesnirf to saveh5
+ 2019-09-19 [4744840] jsnirf toolbox v0.4
+ 2019-09-19 [a9ffd3b] initial version of jsnirf toolbox
+ 2019-09-17 [3559dcb] a compact SNIRF MATLAB parser and converter to JSNIRF JSON file
