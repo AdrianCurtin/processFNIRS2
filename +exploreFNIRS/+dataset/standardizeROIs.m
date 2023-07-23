@@ -86,7 +86,8 @@ for i=1:length(ExFNIRS_data)
         devROIs= uROI(strcmp(deviceName,uROI.DeviceCfg),:);
         devROIs.Properties.RowNames=devROIs.name;
 
-        ExFNIRS_data{i}.ROI.info=devROIs;
+        [a,s_idx] = sort(devROIs.index);
+        ExFNIRS_data{i}.ROI.info=devROIs(s_idx,:);
     end
 end
 
