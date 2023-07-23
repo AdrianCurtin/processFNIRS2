@@ -532,6 +532,9 @@ for chIdx=1:numOpt
         
         if(exSettings.ylim_fixed)
             %ylim([min(ylimLower-0.05*yrange,0),max(ylimUpper+0.05*yrange,0)]);
+            if(yrange==0)
+                yrange=abs(ylimUpper)*2;
+            end
             ylim([ylimLower-0.1*yrange,ylimUpper+0.1*yrange]);
             cylim=ylim;
             exSettings.ylim_fixed_min=min(cylim(1),exSettings.ylim_fixed_min);
