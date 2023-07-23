@@ -755,6 +755,8 @@ for sH=1:length(subplotHandles)
         
         if(strcmp(exSettings.ChannelMode,'Aux'))
             varName=sprintf('%s_%s_%s',varNameStart,subplotGby{sH}.curBioM{1},selectedOptStr{(selectedOpt==subplotGby{sH}.curCh)});
+        elseif(strcmp(exSettings.ChannelMode,'ROI'))
+            varName=sprintf('%s%i_%s_%s',varNameStart,subplotGby{sH}.curCh,selectedOptStr{(selectedOpt==subplotGby{sH}.curCh)},subplotGby{sH}.curBioM{1});
         else
             varName=sprintf('%s%i_%s',varNameStart,subplotGby{sH}.curCh,subplotGby{sH}.curBioM{1});
         end

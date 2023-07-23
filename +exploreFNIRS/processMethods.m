@@ -40,58 +40,13 @@ if(~any(curRawMatchIdx&curOxyMatchIdx))
     data=ExFNIRS.data;
 
     numData=length(data);
-    if(~isfield(ExFNIRS,'currentROI')) % standaradize all ROIs on first load
+    if(~isfield(ExFNIRS,'currentROI')) % standardize all ROIs on first load
         fprintf('Scanning ROI fields...\n');
     
-        uROI={};
-        roiNames={};
-        for i=1:numData
-            if(pf2_base.isnestedfield(data{i},'ROI.info'))
-                curROInames=data{i}.ROI.info.Properties.RowNames;
-                if(any(~ismember(curROInames,roiNames)))
-                    for roinum=1:size(data{i}.ROI.info,1)
-                        if(~ismember(curROInames{roinum},roiNames))
-                            if(isempty(data{i}.ROI.info.Properties.RowNames{roinum}))
-                                newRoiName=sprintf('ROI%i',roinum+length(rowNames));
-                                roiNames=[roiNames,{newRoiName}];
-                                data{i}.ROI.info.Properties.RowNames{roinum}=newRoiName;
-                            else
-                                roiNames=[roiNames,data{i}.ROI.info.Properties.RowNames(roinum)];
-                            end
-                            data{i}.ROI.info.DeviceCfg(:)={data{i}.info.probename};
-                            uROI=[uROI;data{i}.ROI.info(roinum,:)];
-                        end
-                    end
-                end
-            end
-        end
+        [uROI,uROInames,ExFNIRS.data]=exploreFNIRS.dataset.standardizeROIs(ExFNIRS.data);
 
-        
-
-        % standaradize all ROIs on first load
-        [uROInames,b,c]=unique(roiNames);
-        uROInames=roiNames(b);
-        uROI=uROI(b,:);
-        uROI.Properties.RowName=uROInames;
-
-        fprintf(2,'************\nStandardizing all ROI fields..\n********\n');
-        for i=1:numData
-            if(pf2_base.isnestedfield(data{i},'raw')&&~isempty(data{i}))
-                if(~pf2_base.isnestedfield(data{i},'ROI.info')||isempty(data{i}.ROI)||isempty(data{i}.ROI.info))
-                    data{i}.ROI.info=uROI;
-                else
-                    for roi_idx=1:size(uROI,1)
-                       roi_name=uROI.Row(roi_idx);
-                       if(~contains(data{i}.ROI.info.Row,roi_name))
-                           data{i}.ROI.info=[data{i}.ROI.info;uROI(roi_idx,:)];
-                       end
-                    end
-                    
-                end
-            end
-        end
+        ExFNIRS.currentROInames=uROInames;
         ExFNIRS.currentROI=uROI;
-        ExFNIRS.data=data;   
     end
     
     pf2('blLength',0);
