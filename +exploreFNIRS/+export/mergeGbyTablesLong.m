@@ -22,6 +22,7 @@ if(nargin<3)
 end
 
 if(isempty(channels))
+    % Export All channels , ROIs etc
    emptyChannelFlag=true;
 else
     emptyChannelFlag=false;
@@ -122,23 +123,26 @@ for g=1:length(gbyTables)
         end
         
         if(exportROI&&~isempty(bioMarkers)&&pf2_base.isnestedfield(curBarGA,'ROI.HbO.data'))
+
+            totalROI=size(curBarGA.ROI.HbO.data,2);
             for b=1:length(bioMarkers)
                 curBioM=bioMarkers{b};
 
                 for c=1:numROI
 
+                    curIdx=ROIs(c);
+
                     if(pf2_base.isnestedfield(curBarGA,'ROI.info')&&~isempty(curBarGA.ROI.info))
-                        roi_label_part=sprintf('_%s',curBarGA.ROI.info.Properties.RowNames{c});
+                        roi_label_part=sprintf('_%s',curBarGA.ROI.info.Properties.RowNames{curIdx});
                    else
                         roi_label_part=''; 
                     end
 
-                    chNum=ROIs(c);
-                    chName=sprintf('ROI%i%s_%s',chNum,roi_label_part,curBioM); 
+                    chName=sprintf('ROI%i%s_%s',curIdx,roi_label_part,curBioM); 
 
 
                     tempTable.(chName)(:,1)=nan;
-                    tempTable.(chName)(tempTable{:,'missingFNIRS'}~=1,1)=permute(curBarGA.ROI.(curBioM).data(tDataIdx,chNum,:),[3,1,2]);
+                    tempTable.(chName)(tempTable{:,'missingFNIRS'}~=1,1)=permute(curBarGA.ROI.(curBioM).data(tDataIdx,curIdx,:),[3,1,2]);
                     tempTable.(chName)(tempTable{:,'missingFNIRS'}==1,1)=nan;
 
                 end

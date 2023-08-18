@@ -9,6 +9,14 @@ end
         filenameZip=filename;
         filenameTempDir=strcat('_',filename,'.temp');
         fprintf('Unzipping to %s to %s...\n',filenameZip,filenameTempDir);
+
+
+        if(exist(filenameTempDir))
+             fprintf('Removing existing temp file & directory: %s...\n',filename);
+          
+            rmdir(filenameTempDir);
+         end
+
         out=unzip(filenameZip,filenameTempDir);
         filename=out{1};
         unzipIt=true;

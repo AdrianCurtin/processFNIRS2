@@ -294,115 +294,7 @@ initializeGUIvalues(handles);
 % UIWAIT makes exploreFNIRS wait for user response (see UIRESUME)
 % uiwait(handles.figure1);
 
-function outTable=BuildSegmentInfoTable(FNIRS_array)
-    
-warning off MATLAB:table:RowsAddedExistingVars
 
-global ProgressHandles
-
-if(isempty(FNIRS_array))
-    error('No Data to build exploreFNIRS data table!\n')
-    return;
-else
-    pf2_base.closeProgressHandles();
-    
-    numF=length(FNIRS_array);
-    %hF=waitbar(0,sprintf('ExploreFNIRS\nBuilding Table: Row %i of %i',1,numF));
-    
-    outTable=table();
-    for i=1:numF
-        fprintf('Row %i of %i\n',i,numF);
-%        try
- %           waitbar(i/numF,hF,sprintf('ExploreFNIRS\nBuilding Table: Row %i of %i',i,numF));
-   %     catch
-  %          hF=waitbar(i/numF,0,sprintf('ExploreFNIRS\nBuilding Table: Row %i of %i',i,numF));
-    %    end
-       curFNIRseg=FNIRS_array{i};
-       
-       if(~isfield(curFNIRseg,'info'))
-           warning('All fNIRS segments must have a .info section');
-           continue;
-       end
-       curFields=fields(curFNIRseg.info);
-       for j=1:length(curFields)
-           curFieldName=curFields{j};
-
-           curField=curFNIRseg.info.(curFieldName);
-           
-           
-           
-           if(isempty(curField)|| ...
-                   (isnumeric(curField)&&length(curField)==1)||...  %numeric items of 1
-                   ischar(curField)||isstring(curField)||...        %strings or chars
-                   (islogical(curField)&&length(curField)==1)||...   %logical values
-                   (iscategorical(curField)&&length(curField)==1)||... %categorical values
-                   (istable(curField)&&size(curField,1)==1&&size(curField,2)==1)) %singular tables
-               
-              if(istable(curField)&&size(curField,1)==1&&size(curField,2)==1)
-                  curField=curField{1,1};
-              end
-              
-              
-               
-              if(ismember(curFieldName,outTable.Properties.VariableNames)&&~isempty(curField))
-                  if(strcmpi(curField,'missing')&&isnumeric(outTable.(curFieldName)(1,1)))
-                      outTable.(curFieldName)(i,1)=nan;
-                  else
-                      outTable.(curFieldName)(i,1)=curField;
-                  end
-              elseif(~isempty(curField))
-                  if(ischar(curField)) % adds columns
-                      outTable.(curFieldName)=strings(size(outTable,1),1);
-                      outTable.(curFieldName)(i,1)=nominal(curField);
-                  elseif(isstring(curField))
-                      outTable.(curFieldName)=strings(size(outTable,1),1);
-                      outTable.(curFieldName)(i,1)=nominal(curField);
-                  elseif(isnumeric(curField))
-                      outTable.(curFieldName)=nan(size(outTable,1),1);
-                      outTable.(curFieldName)(i,1)=curField;
-                  elseif(islogical(curField))
-                      outTable.(curFieldName)=strings(size(outTable,1),1);
-                      outTable.(curFieldName)(i,1)=nominal(string(curField));
-                  elseif(iscategorical(curField))
-                      outTable.(curFieldName)=strings(size(outTable,1),1);
-                      outTable.(curFieldName)(i,1)=string(curField);
-                  end
-                  
-              end
-           end
-       end
-
-       missingFieldsIdx=~ismember(outTable.Properties.VariableNames,curFields);
-
-       if(any(missingFieldsIdx))
-           missingFieldsName=outTable.Properties.VariableNames(missingFieldsIdx);
-           for f=1:length(missingFieldsName)
-               switch(class(outTable.(missingFieldsName{f})))
-                   case 'double'
-                       outTable.(missingFieldsName{f})(i,:)=nan;
-                   case 'string'
-                       outTable.(missingFieldsName{f})(i,:)="";
-                   case 'char'
-                       outTable.(missingFieldsName{f})(i,:)='';
-                   case 'cell'
-                       outTable.(missingFieldsName{f})(i,:)={};
-                   case 'logical'
-                       outTable.(missingFieldsName{f})(i,:)=nan;
-                   case 'duration'
-                       outTable.(missingFieldsName{f})(i,:)=duration(0,0,nan);
-                   case 'datetime'
-                       outTable.(missingFieldsName{f})(i,:)=NaT;
-                   otherwise
-                        error('Unknown type!');
-               end
-              
-           end
-            
-       end
-    end
-    %close(hF);
-end
-    
 function PopulateGUIfields(dataTable,handles)
 
 global ExFNIRS
@@ -2224,7 +2116,7 @@ ExFNIRS.settings.plotby.Block=get(handles.checkbox_block_plotby,'Value');
 ExFNIRS.settings.plotby.InfoGroupBy=get(handles.checkbox_block_plotby,'Value');
 
 fprintf('Building Info Table:\n');
-ExFNIRS.dataTable=BuildSegmentInfoTable(ExFNIRS.data);
+ExFNIRS.dataTable=exploreFNIRS.dataset.buildSegmentInfoTable(ExFNIRS.data);
 
 
 ExFNIRS.settings.updateOnChange=get(handles.checkbox_auto_update,'Value');
@@ -4138,63 +4030,19 @@ switch (ExFNIRS.settings.ChannelMode)
     case 'ROI'
 
         if(initROI||~isfield(ExFNIRS,'currentROI')) % standaradize all ROIs on first load
-
             
-            fprintf('Scanning ROI fields...\n');
-    
-            uROI={};
-            roiNames={};
-            for i=1:length(ExFNIRS.data)
-                if(pf2_base.isnestedfield(ExFNIRS.data{i},'ROI.info'))
-                    curROInames=ExFNIRS.data{i}.ROI.info.Properties.RowNames;
-                    if(any(~ismember(curROInames,roiNames)))
-                        for roinum=1:size(ExFNIRS.data{i}.ROI.info,1)
-                            if(~ismember(curROInames{roinum},roiNames))
-                                if(isempty(ExFNIRS.data{i}.ROI.info.Properties.RowNames{roinum}))
-                                    newRoiName=sprintf('ROI%i',roinum+length(rowNames));
-                                    roiNames=[roiNames,{newRoiName}];
-                                    ExFNIRS.data{i}.ROI.info.Properties.RowNames{roinum}=newRoiName;
-                                else
-                                    roiNames=[roiNames,ExFNIRS.data{i}.ROI.info.Properties.RowNames(roinum)];
-                                end
-                                ExFNIRS.data{i}.ROI.info.DeviceCfg(:)={ExFNIRS.data{i}.info.probename};
-                                uROI=[uROI;ExFNIRS.data{i}.ROI.info(roinum,:)];
-                            end
-                        end
-                    end
-                end
-            end
+            [uROI,uROInames,ExFNIRS.data]=exploreFNIRS.dataset.standardizeROIs(ExFNIRS.data);
 
-            %if(initROI) % standaradize all ROIs on first load
-            [~,b,c]=unique(roiNames);
-            uROInames=roiNames(b);
-            uROI=uROI(b,:);
-            uROI.Properties.RowNames=uROInames;
-
-            fprintf(2,'************\nStandardizing all ROI fields..\n********\n');
-            for i=1:length(ExFNIRS.data)
-                if(pf2_base.isnestedfield(ExFNIRS.data{i},'raw')&&~isempty(ExFNIRS.data{i}))
-                    if(~pf2_base.isnestedfield(ExFNIRS.data{i},'ROI.info'))
-                        ExFNIRS.data{i}.ROI.info=uROI;
-                    else
-                        for roi_idx=1:size(uROI,1)
-                           roi_name=uROI.Row(roi_idx);
-                           if(~contains(ExFNIRS.data{i}.ROI.info.Row,roi_name))
-                               ExFNIRS.data{i}.ROI.info=[ExFNIRS.data{i}.ROI.info;uROI(roi_idx,:)];
-                           end
-                        end
-                        
-                    end
-                end
-            end
+            ExFNIRS.currentROInames=uROInames;
             ExFNIRS.currentROI=uROI;
+            
             %end
              fprintf(2,'************\Standardization Complete!\n********\n');
 
             
         else
             uROI=ExFNIRS.currentROI;
-            uROInames=uROI.Properties.RowNames;
+            uROInames=ExFNIRS.currentROInames;
         end
         
         if(isempty(uROI))

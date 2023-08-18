@@ -532,6 +532,9 @@ for chIdx=1:numOpt
         
         if(exSettings.ylim_fixed)
             %ylim([min(ylimLower-0.05*yrange,0),max(ylimUpper+0.05*yrange,0)]);
+            if(yrange==0)
+                yrange=abs(ylimUpper)*2;
+            end
             ylim([ylimLower-0.1*yrange,ylimUpper+0.1*yrange]);
             cylim=ylim;
             exSettings.ylim_fixed_min=min(cylim(1),exSettings.ylim_fixed_min);
@@ -755,6 +758,8 @@ for sH=1:length(subplotHandles)
         
         if(strcmp(exSettings.ChannelMode,'Aux'))
             varName=sprintf('%s_%s_%s',varNameStart,subplotGby{sH}.curBioM{1},selectedOptStr{(selectedOpt==subplotGby{sH}.curCh)});
+        elseif(strcmp(exSettings.ChannelMode,'ROI'))
+            varName=sprintf('%s%i_%s_%s',varNameStart,subplotGby{sH}.curCh,selectedOptStr{(selectedOpt==subplotGby{sH}.curCh)},subplotGby{sH}.curBioM{1});
         else
             varName=sprintf('%s%i_%s',varNameStart,subplotGby{sH}.curCh,subplotGby{sH}.curBioM{1});
         end
