@@ -370,10 +370,12 @@ for i=1:size(files,1)
         
         if(ismember('GeneralInfo',fields(pInfo))&&isfield(pInfo.GeneralInfo,'Date'))
             fNIR.info.Date=pInfo.GeneralInfo.Date;
+            fNIR.info.StartDateTime=datetime(pInfo.GeneralInfo.Date);
         end
         
         if(ismember('GeneralInfo',fields(pInfo))&&isfield(pInfo.GeneralInfo,'Time'))
             fNIR.info.Time=pInfo.GeneralInfo.Time;
+            %fNIR.info.StartDateTime=pInfo.GeneralInfo.Time;
         end
     end
     
