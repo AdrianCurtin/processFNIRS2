@@ -105,7 +105,7 @@ for i=1:size(files,1)
             device.Info.TimeIsSampleCount=0;
         end
         if(isfield(probeInfo,'d'))
-            fNIR.raw=[probeInfo.t,probeInfo.d];
+            fNIR.raw=[probeInfo.d]; % don't load t in data
         end
         if(isfield(probeInfo,'s'))
             mrk=[];
