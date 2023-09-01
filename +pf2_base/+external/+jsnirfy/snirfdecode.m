@@ -30,6 +30,8 @@ function data=snirfdecode(root, varargin)
 %    License: Apache 2.0, see https://github.com/fangq/jsnirf for details
 %
 
+import 'pf2_base.external.easyh5.regrouph5'
+
 if(nargin<1)
     help snirfdecode;
     return;

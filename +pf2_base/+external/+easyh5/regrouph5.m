@@ -42,6 +42,8 @@ function data=regrouph5(root, varargin)
 %    License: GPLv3 or 3-clause BSD license, see https://github.com/fangq/easyh5 for details
 %
 
+import pf2_base.external.easyh5.regrouph5
+
 if(nargin<1)
     help regrouph5;
     return;
