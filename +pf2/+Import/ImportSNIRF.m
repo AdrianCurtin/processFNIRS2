@@ -72,12 +72,12 @@ device.Info.TimeIsSampleCount=0;
 %         end
 %         
 
-if(strcmp(metaDataTags.LengthUnit,'mm'))
+if(strcmp(metaDataTags.LengthUnit,'cm'))
     % convert to cm
 
-    probeInfo.detectorPos3D=probeInfo.detectorPos3D/10;
-    probeInfo.sourcePos3D=probeInfo.sourcePos3D/10;
-    probeInfo.landmarkPos3D=probeInfo.landmarkPos3D/10;
+    probeInfo.detectorPos3D=probeInfo.detectorPos3D*10;
+    probeInfo.sourcePos3D=probeInfo.sourcePos3D*10;
+    probeInfo.landmarkPos3D=probeInfo.landmarkPos3D*10;
 end
         
         %probeNums=unique(probeInfo.SD.MeasList(:,3)); % I THINK
@@ -190,8 +190,8 @@ for p=1:1%length(probeNums)
     device.Probe{p}.dI=measurementList.('detectorIndex');
     device.Probe{p}.sI=measurementList.('sourceIndex');
 
-    device.Probe{p}.TableOpt.SrcIdx=measurementList(firstOpt,'sourceIndex');
-    device.Probe{p}.TableOpt.DetIdx=measurementList(firstOpt,'detectorIndex');
+    device.Probe{p}.TableOpt.SrcIdx=measurementList{firstOpt,'sourceIndex'};
+    device.Probe{p}.TableOpt.DetIdx=measurementList{firstOpt,'detectorIndex'};
     
     SDpairs=[device.Probe{p}.sI,device.Probe{p}.dI];
     [uPairs,uPairUnsorted,uPairIdx]=unique(SDpairs,'rows');
@@ -271,7 +271,7 @@ for p=1:1%length(probeNums)
     
     device.Probe{p}.SD=sqrt((device.Probe{p}.SrcPosX-device.Probe{p}.DetPosX).^2+...
         (device.Probe{p}.SrcPosY-device.Probe{p}.DetPosY).^2+(device.Probe{p}.SrcPosZ-device.Probe{p}.DetPosZ).^2)';
-    device.Probe{p}.IsShortSeparation=device.Probe{p}.SD<2;
+    device.Probe{p}.IsShortSeparation=device.Probe{p}.SD<20;
 
     device.Probe{p}.NumShortSeparation=sum(device.Probe{p}.IsShortSeparation);
 
