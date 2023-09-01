@@ -273,6 +273,8 @@ for p=1:1%length(probeNums)
         (device.Probe{p}.SrcPosY-device.Probe{p}.DetPosY).^2+(device.Probe{p}.SrcPosZ-device.Probe{p}.DetPosZ).^2)';
     device.Probe{p}.IsShortSeparation=device.Probe{p}.SD<2;
 
+    device.Probe{p}.NumShortSeparation=sum(device.Probe{p}.IsShortSeparation);
+
     device.Probe{p}.TableOpt.SD=device.Probe{p}.SD(:);
     device.Probe{p}.TableOpt.IsShortSeparation=device.Probe{p}.IsShortSeparation(:);
     
