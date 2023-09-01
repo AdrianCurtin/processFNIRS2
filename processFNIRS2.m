@@ -563,6 +563,10 @@ else
     warning('Multiple Probes may not be fully supported');
 end
 
+if(isfield(fData,'probeInfo'))
+    setF.device=probeInfo;
+end
+
 if(PF2.mergedProbe) %All channel numbers are unique for merged probes
     for i =1:length(setF.device.Probe)
         curProbe=setF.device.Probe{i};

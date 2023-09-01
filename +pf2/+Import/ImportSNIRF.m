@@ -129,16 +129,35 @@ for p=1:1%length(probeNums)
     
     device.Probe{p}.TableCh.ColNumber=[1:height(measurementList)]';
 
-    [~,~,uOpt]=unique(measurementList(:,{'detectorIndex','sourceIndex'}),'rows');
+    [~,firstOpt,uOpt]=unique(measurementList(:,{'detectorIndex','sourceIndex'}),'rows');
     device.Probe{p}.TableCh.OptodeNumber=uOpt;
     device.Probe{p}.TableCh.isTime=device.Probe{p}.TableCh.OptodeNumber==0;
     device.Probe{p}.TableCh.isMarker=device.Probe{p}.TableCh.OptodeNumber<0|isnan(device.Probe{p}.TableCh.OptodeNumber);
+    
     device.Probe{p}.TableCh.OptodeNumber(device.Probe{p}.TableCh.OptodeNumber<1)=nan;
     
     
     device.Probe{p}.TableCh.Wavelength=probeInfo.wavelengths(measurementList.('wavelengthIndex'))';
+    device.Probe{p}.TableCh.isDark=(isnan(device.Probe{p}.TableCh.Wavelength)|device.Probe{p}.TableCh.Wavelength==0);
     device.Probe{p}.TableCh.SourceIndex(:)=measurementList.('sourceIndex');
     device.Probe{p}.TableCh.DetectorIndex(:)=measurementList.('detectorIndex');
+
+    device.Probe{p}.TableCh.Label(:)="";
+        
+    for ch=1:length(uOpt)
+        if(device.Probe{p}.TableCh.isTime(ch))
+           device.Probe{p}.TableCh.Label(ch)="Time"; 
+        elseif(device.Probe{p}.TableCh.isMarker(ch))
+            device.Probe{p}.TableCh.Label(ch)="Mrk";
+        elseif(device.Probe{p}.TableCh.isDark(ch))
+            opt=device.Probe{p}.TableCh.OptodeNumber(ch);
+            device.Probe{p}.TableCh.Label(ch)=sprintf('Opt%i_dark',opt);
+        else
+            wv=device.Probe{p}.TableCh.Wavelength(ch);
+            opt=device.Probe{p}.TableCh.OptodeNumber(ch);
+            device.Probe{p}.TableCh.Label(ch)=sprintf('Opt%i_wv%.1f',opt,wv);
+        end
+    end
 
     device.Probe{p}.SrcPos=table();
     device.Probe{p}.SrcPos.x_2d=probeInfo.sourcePos2D(:,1);
@@ -158,11 +177,21 @@ for p=1:1%length(probeNums)
     device.Probe{p}.DetPos.z=device.Probe{p}.DetPosZ(:);
     
   
+    device.Probe{p}.TableOpt=table();
+    device.Probe{p}.TableOpt.OptodeNum(:)=[1:length(firstOpt)]';
+
+    % auto generated later, could be pulled from data maybe
+    %device.Probe{p}.TableOpt.Label=p.ChannelLabels(:);
+
     
 
+    
    
     device.Probe{p}.dI=measurementList.('detectorIndex');
     device.Probe{p}.sI=measurementList.('sourceIndex');
+
+    device.Probe{p}.TableOpt.SrcIdx=measurementList(firstOpt,'sourceIndex');
+    device.Probe{p}.TableOpt.DetIdx=measurementList(firstOpt,'detectorIndex');
     
     SDpairs=[device.Probe{p}.sI,device.Probe{p}.dI];
     [uPairs,uPairUnsorted,uPairIdx]=unique(SDpairs,'rows');
@@ -200,24 +229,71 @@ for p=1:1%length(probeNums)
     device.Probe{p}.OptPos.x=device.Probe{p}.OptPosX(:);
     device.Probe{p}.OptPos.y=device.Probe{p}.OptPosY(:);
     device.Probe{p}.OptPos.z=device.Probe{p}.OptPosZ(:);
+
+    device.Probe{p}.TableOpt.Pos2D_x=device.Probe{p}.OptPos.x_2d;
+    device.Probe{p}.TableOpt.Pos2D_y=device.Probe{p}.OptPos.y_2d;
+    device.Probe{p}.TableOpt.Pos2D_z=device.Probe{p}.OptPos.z_2d;
     
+    device.Probe{p}.TableOpt.Pos3D_x=device.Probe{p}.OptPos.x;
+    device.Probe{p}.TableOpt.Pos3D_y=device.Probe{p}.OptPos.y;
+    device.Probe{p}.TableOpt.Pos3D_z=device.Probe{p}.OptPos.z;
+
     device.Probe{p}.DetPos3D=detPos3D;
     device.Probe{p}.SrcPos3D=srcPos3D;
+
+    device.Probe{p}.TableSD=table();
+
+    Type_temp=[ones([height(device.Probe{p}.SrcPos),1]);ones([height(device.Probe{p}.DetPos),1])*2];
+                
+    typeStr_temp={'Src','Det'};
+    
+    catType_temp=categorical(typeStr_temp(Type_temp(:)),typeStr_temp);
+    device.Probe{p}.TableSD.Type=catType_temp(:);
+    
+    device.Probe{p}.TableSD.Index=[(1:height(device.Probe{p}.SrcPos))';(1:height(device.Probe{p}.DetPos))'];
+
+    for sd=1:height(device.Probe{p}.TableSD)
+        typeLabel=sprintf('%s',device.Probe{p}.TableSD.Type(sd));
+        device.Probe{p}.TableSD.Label{sd}=sprintf('%s%i',typeLabel(1),device.Probe{p}.TableSD.Index(sd));
+
+    end
+
+    device.Probe{p}.TableSD.Pos2D_x=[device.Probe{p}.SrcPos.x_2d(:);device.Probe{p}.DetPos.x_2d(:)];
+    device.Probe{p}.TableSD.Pos2D_y=[device.Probe{p}.SrcPos.y_2d(:);device.Probe{p}.DetPos.y_2d(:)];
+    device.Probe{p}.TableSD.Pos2D_z=[device.Probe{p}.SrcPos.z_2d(:);device.Probe{p}.DetPos.z_2d(:)];
+
+
+    device.Probe{p}.TableSD.Pos3D_x=[device.Probe{p}.SrcPos.x(:);device.Probe{p}.DetPos.x(:)];
+    device.Probe{p}.TableSD.Pos3D_y=[device.Probe{p}.SrcPos.y(:);device.Probe{p}.DetPos.y(:)];
+    device.Probe{p}.TableSD.Pos3D_z=[device.Probe{p}.SrcPos.z(:);device.Probe{p}.DetPos.z(:)];
     
     device.Probe{p}.OptPos3D=(srcPos3D+detPos3D)/2;
     
     device.Probe{p}.SD=sqrt((device.Probe{p}.SrcPosX-device.Probe{p}.DetPosX).^2+...
         (device.Probe{p}.SrcPosY-device.Probe{p}.DetPosY).^2+(device.Probe{p}.SrcPosZ-device.Probe{p}.DetPosZ).^2)';
     device.Probe{p}.IsShortSeparation=device.Probe{p}.SD<2;
+
+    device.Probe{p}.TableOpt.SD=device.Probe{p}.SD(:);
+    device.Probe{p}.TableOpt.IsShortSeparation=device.Probe{p}.IsShortSeparation(:);
     
     numCh=size(uPairs,1);
     
     device.Probe{p}.probeNum=1;%probeInfo.SD.MeasList(curProbeIdx,3);
-    device.Probe{p}.wvI=measurementList.('wavelengthIndex');
+    device.Probe{p}.wvI=reshape(measurementList.('wavelengthIndex'),[1,height(measurementList)]);
     device.Probe{p}.ChannelNumbers=uPairIdx';
     device.Probe{p}.ChannelList= 1:numCh;
     device.Probe{p}.Wavelength=probeInfo.wavelengths;
     device.Info.NumberChannels=device.Info.NumberChannels+numCh;
+
+
+    for c=1:length(firstOpt)
+        device.Probe{p}.TableOpt.Ch(c,:)=(find(device.Probe{p}.ChannelNumbers==device.Probe{p}.ChannelList(c)));
+        device.Probe{p}.TableOpt.wv(c,:)=device.Probe{p}.Wavelength(device.Probe{p}.wvI(device.Probe{p}.TableOpt.Ch(c,:)));
+        if(true)%~hasLabel)
+           device.Probe{p}.TableOpt.Label{c}=sprintf('Opt%i', device.Probe{p}.ChannelList(c));
+        end
+    end
+    
 
 
 
