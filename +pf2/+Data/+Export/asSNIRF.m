@@ -37,7 +37,6 @@ end
 curNIR_fieldname='nirs';
 
 numNIRS = length(fNIRcells);
-nirIndex=0;
 
 for n=1:numNIRS
 
@@ -51,10 +50,9 @@ for n=1:numNIRS
 
     metaDataTags=info2meta(curStruct);
 
+
+    probe=buildProbe(curStruct);
     
-
-
-    probe=[];
     
     data=[];
     stim=[];
@@ -305,6 +303,7 @@ function charOut=c2v(str)
 end
 
 function metaData=info2meta(nirStruct)
+
     info=nirStruct.info;
 
     metaData=[];
@@ -318,6 +317,23 @@ function metaData=info2meta(nirStruct)
 
     infoFields=fields(info);
 
+    metaData.TimeUnit=c2v('s');
+    metaData.LengthUnit=c2v('cm');
+    metaData.FrequencyUnit=c2v('hz');
+    
+    if(isfield(nirStruct,'t0')&&~ismember('MeasurementDate',infoFields))
+        metaData.MeasurementDate=c2v(sprintf('%i-%02d-%02d',year(nirStruct.t0),month(nirStruct.t0),day(nirStruct.t0)));
+        ms=floor(rem(second(nirStruct.t0),1)*1000);
+        tzd='z';
+        warning('time zone should still be set properly');
+        metaData.MeasurementTime=c2v(sprintf('%02d:%02d:%02d.%03d%s',hour(nirStruct.t0),minute(nirStruct.t0),floor(second(nirStruct.t0)),ms,tzd)); 
+    end
+
+    if(isfield(info,'SubjectId'))
+        metaData.SubjectID=c2v(into.SubjectId);
+    end
+    
+
     for i = 1:length(infoFields)
         curField=info.(infoFields{i});
 
@@ -326,5 +342,35 @@ function metaData=info2meta(nirStruct)
         end
     end
     
+end
+
+function [probeData,deviceInfoFields]=buildProbe(nirStruct)
+
+    if(isfield(nirStruct,'probe'))
+        probeStruct=nirStruct.probe;
+    else
+        % attempt to load probe from probe name
+
+        if(isfield(nirStruct.info,'probename'))
+              probename = nirStruct.info.probename;
+
+              if(~contains(probename,'cfg'))
+                probename=sprintf('%s.cfg',probename);
+              end
+              device=pf2_base.loadDeviceCfg(probename);
+              deviceInfoFields=device.Info;
+              probeStruct=device.Probe{1};
+        else
+              device = pf2_base.loadDeviceCfg();
+              deviceInfoFields=device.Info;
+              probeStruct=device.Probe{1};
+        end
+
+    end
+
+
+    
+
+    probeData=[];
 end
 
