@@ -1,5 +1,5 @@
 function [fNIR] = ImportSNIRF(filepath,channelCheck,varargin)
-%ImportNIRX imports data from NIRX device recordings
+%ImportSNIRF imports data from SNIRF device recordings
 
 if(nargin<2)
    channelCheck=true; 
