@@ -1,4 +1,4 @@
-function [ ] = asSNIRF( fNIRcells, filepath )
+function [ snirfData] = asSNIRF( fNIRcells, filepath )
 %Takes fNIR struct and packages the .snirf file
 %   Use to construct .snirf files for export and packaging
 
@@ -24,9 +24,9 @@ if(exist(filepathdir,'dir')~=7 && ~isempty(filepathdir))
     mkdir(filepathdir);
 end
 
-data=[];
+snirfData=[];
 
-data.formatVersion=c2v('1.0');
+snirfData.formatVersion=c2v('1.0');
 
 if(~iscell(fNIRcells)&&isstruct(fNIRcells))
     fNIRcells={fNIRcells};
@@ -50,26 +50,65 @@ for n=1:numNIRS
 
     metaDataTags=info2meta(curStruct);
 
+    [probe,measurementList,probeMetaData]=buildProbe(curStruct);
 
-    probe=buildProbe(curStruct);
-    
+    probeFields=fields(probeMetaData);
+    for p=1:length(probeFields)
+        metaDataTags.(probeFields{p})=probeMetaData.(probeFields{p});
+    end
     
     data=[];
-    stim=[];
-    aux=[];
+    data.dataTimeSeries=curStruct.raw;
+    data.time = curStruct.time';
+    data.measurementList=measurementList;
 
+
+    stim=[];
+
+    if(~isempty(curStruct.markers))
+        [uStim,~,stimIndex]=unique(curStruct.markers(:,2));
+        nStim=length(uStim);
+
+        for n=1:nStim
+            %stimFieldName=sprintf('stim%i',n);
+
+            if(istable(curStruct.markers))
+                stimItem=[];
+                stimItem.name=curStruct.markers.name;
+            else
+                stimIdx=curStruct.markers(:,2)==uStim(n);
+                stimItem=[];
+                stimItem.name=sprintf('mrk%i',uStim(n));
+                stimItem.data=curStruct.markers(stimIdx,[1,1,2]);
+                stimItem.data(:,2)=1; % set all stim durations to 1 for now
+            end
+
+            if(n==1)
+                stim=stimItem;
+            else
+                stim=[stim;stimItem];
+            end
+        end
+    end
+    
+
+    aux=[];
+    
 
     curNIRdata.metaDataTags=metaDataTags;
     curNIRdata.probe=probe;
+
     
     curNIRdata.stim=stim;
     curNIRdata.data=data;
     curNIRdata.aux=aux;
     
 
-    data.(curNIR_fieldname)=curNIRdata;
+    snirfData.(curNIR_fieldname)=curNIRdata;
 
 end
+
+pf2_base.external.jsnirfy.savesnirf(snirfData,filepath);
 
 %  fid=fopen(filepath,'wt');
 % 
@@ -327,6 +366,9 @@ function metaData=info2meta(nirStruct)
         tzd='z';
         warning('time zone should still be set properly');
         metaData.MeasurementTime=c2v(sprintf('%02d:%02d:%02d.%03d%s',hour(nirStruct.t0),minute(nirStruct.t0),floor(second(nirStruct.t0)),ms,tzd)); 
+        metaData.AcquisitionStartTime=posix(nirStruct.t0+seconds(min(nirStruct.time)));
+        metaData.UnixTime=posix(nirStruct.t0);
+        
     end
 
     if(isfield(info,'SubjectId'))
@@ -344,10 +386,12 @@ function metaData=info2meta(nirStruct)
     
 end
 
-function [probeData,deviceInfoFields]=buildProbe(nirStruct)
+function [probe,measurementList,deviceMetaDataTags]=buildProbe(nirStruct)
 
-    if(isfield(nirStruct,'probe'))
-        probeStruct=nirStruct.probe;
+    if(isfield(nirStruct,'probeinfo'))
+        probeStruct=nirStruct.probeinfo.Probe{1};
+        deviceInfoFields=nirStruct.probeinfo.Info;
+        
     else
         % attempt to load probe from probe name
 
@@ -369,8 +413,88 @@ function [probeData,deviceInfoFields]=buildProbe(nirStruct)
     end
 
 
+    deviceMetaDataTags=[];
+    if(isfield(deviceInfoFields,'Manufacturer'))
+        deviceMetaDataTags.ManufacturerName=c2v(deviceInfoFields.Manufacturer);
+    end
+    if(isfield(deviceInfoFields,'Name'))
+        deviceMetaDataTags.Model=c2v(deviceInfoFields.Name);
+    end
+
+   
+
+    measurementList=[];
+
+    tableCh=probeStruct.TableCh;
+
+    if(isfield(probeStruct,'Wavelength'))
+        wvList= probeStruct.Wavelength;
+        wvI=probeStruct.wvI;
+    else
+        [wvList,~,wvI]=unique(tableCh.Wavelength);
+    end
+    if(~any(wvList==0))
+        wvList(end+1)=0;
+        darkIdx=length(wvList);
+    else
+        darkIdx=find(wvList==0);
+    end
     
 
-    probeData=[];
+    for i = 1:size(nirStruct.raw,2)
+        measurement=[];
+
+        curCh=tableCh(i,:);
+
+        if(curCh.isTime(1))
+            measurement.dataType=0; 
+            measurement.dataTypeIndex=1;
+            measurement.dataTypeLabel='time-signal';
+            measurement.detectorIndex=nan;
+            measurement.sourceIndex=nan;
+            measurement.wavelengthIndex=nan;
+            measurement.wavelengthActual=nan;
+        elseif(curCh.isMarker(1))
+            measurement.dataType=0; 
+            measurement.dataTypeIndex=1;
+            measurement.dataTypeLabel='marker-signal';
+            measurement.detectorIndex=nan;
+            measurement.sourceIndex=nan;
+            measurement.wavelengthIndex=nan;
+            measurement.wavelengthActual=nan;
+        elseif(curCh.isDark(1))
+            measurement.dataType=1; 
+            measurement.dataTypeIndex=1;
+            measurement.dataTypeLabel='raw-DC-dark';
+            measurement.detectorIndex=tableCh.DetectorIndex(i);
+            measurement.sourceIndex=tableCh.SourceIndex(i);
+            measurement.wavelengthIndex=wvI(i);
+            measurement.wavelengthActual=wvList(darkIdx);
+        else
+            measurement.dataType=1; 
+            measurement.dataTypeIndex=1;
+            measurement.dataTypeLabel='raw-DC';
+            measurement.detectorIndex=tableCh.DetectorIndex(i);
+            measurement.sourceIndex=tableCh.SourceIndex(i);
+            measurement.wavelengthIndex=wvI(i);
+            measurement.wavelengthActual=(wvList(measurement.wavelengthIndex));
+        end
+      
+        if(i==1)
+            measurementList=measurement;
+        else
+            measurementList=[measurementList;measurement];
+        end
+    end
+
+     probe=[];
+
+     probe.detectorPos2D=table2array(probeStruct.DetPos(:,{'x_2d','y_2d'}));
+     probe.detectorPos3D=table2array(probeStruct.DetPos(:,{'x','y','z'}));
+     %probe.landmarkLabels=1;
+     %probe.landmarkPos3D=1;
+     probe.sourcePos2D=table2array(probeStruct.SrcPos(:,{'x_2d','y_2d'}));
+     probe.sourcePos3D=table2array(probeStruct.SrcPos(:,{'x','y','z'}));
+     probe.wvList=wvList;
 end
 
