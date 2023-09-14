@@ -357,7 +357,7 @@ function metaData=info2meta(nirStruct)
     infoFields=fields(info);
 
     metaData.TimeUnit=c2v('s');
-    metaData.LengthUnit=c2v('cm');
+    metaData.LengthUnit=c2v('mm');
     metaData.FrequencyUnit=c2v('hz');
     
     if(isfield(nirStruct,'t0')&&~ismember('MeasurementDate',infoFields))
@@ -491,10 +491,14 @@ function [probe,measurementList,deviceMetaDataTags]=buildProbe(nirStruct)
 
      probe.detectorPos2D=table2array(probeStruct.DetPos(:,{'x_2d','y_2d'}));
      probe.detectorPos3D=table2array(probeStruct.DetPos(:,{'x','y','z'}));
-     %probe.landmarkLabels=1;
-     %probe.landmarkPos3D=1;
+     if(isfield(probeStruct,'landmarkPos3D'))
+        probe.landmarkPos3D=probeStruct.landmarkPos3D;
+     end
+     if(isfield(probeStruct,'landmarkLabels'))
+        probe.landmarkLabels=probeStruct.landmarkLabels;
+     end
      probe.sourcePos2D=table2array(probeStruct.SrcPos(:,{'x_2d','y_2d'}));
      probe.sourcePos3D=table2array(probeStruct.SrcPos(:,{'x','y','z'}));
-     probe.wvList=wvList;
+     probe.wavelengths=wvList';
 end
 

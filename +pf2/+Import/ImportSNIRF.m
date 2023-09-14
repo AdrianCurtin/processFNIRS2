@@ -25,7 +25,6 @@ data=pf2_base.external.jsnirfy.loadsnirf(filepath,varargin);
 
 if(~isfield(data,'nirs'))
     error('No nirs struct contained in file')
-
 end
 
 % probe information
@@ -34,14 +33,29 @@ probeInfo=data.nirs.probe;
 % Data type of 1 is CW amplitude
 % Data type of 99999 is processed
 
+fNIR=[];
+
 metaDataTags=stripStruct(data.nirs.metaDataTags);
+
+if(isfield(data.nirs,'stim'))
+    markerArray=[];
+    stimArray=data.nirs.stim;
+    for m = 1:length(stimArray)
+        curStim=stimArray(m);
+        markerArray=[markerArray;curStim.data(:,[1,3,2])];
+    end
+    fNIR.markers=markerArray;
+else
+    fNIR.markers=[];
+end
+
 data=data.nirs.data;
 
 measurementList=struct2table(data.measurementList);
 
 
 
-fNIR=[];
+
 fNIR.raw=data.dataTimeSeries;
 
 
@@ -51,8 +65,11 @@ fNIR.time=data.time';
             
 fNIR.fs=1/nanmedian(diff(fNIR.time));
 
-fNIR.info=metaDataTags;
 
+
+
+
+fNIR.info=metaDataTags;
 
 device.Info.TimeIsSampleCount=0;
 
@@ -77,7 +94,9 @@ if(strcmp(metaDataTags.LengthUnit,'cm'))
 
     probeInfo.detectorPos3D=probeInfo.detectorPos3D*10;
     probeInfo.sourcePos3D=probeInfo.sourcePos3D*10;
-    probeInfo.landmarkPos3D=probeInfo.landmarkPos3D*10;
+    if(isfield(probeInfo,'landmarkPos3D'))
+        probeInfo.landmarkPos3D=probeInfo.landmarkPos3D*10;
+    end
 end
         
         %probeNums=unique(probeInfo.SD.MeasList(:,3)); % I THINK
@@ -94,7 +113,7 @@ end
 device.cfg=pf2_base.external.INI();
 device.Info.CfgName='generated SNIRF file';
         
-device.Info.Name=metaDataTags.ManufacturerName;
+device.Info.Name=metaDataTags.Model;
 device.Info.Manufacturer=metaDataTags.ManufacturerName;
 device.Info.DefaultSamplingRate=fNIR.fs;
 device.Info.MaxSamplingRate=fNIR.fs;
@@ -136,8 +155,9 @@ for p=1:1%length(probeNums)
     
     device.Probe{p}.TableCh.OptodeNumber(device.Probe{p}.TableCh.OptodeNumber<1)=nan;
     
-    
-    device.Probe{p}.TableCh.Wavelength=probeInfo.wavelengths(measurementList.('wavelengthIndex'))';
+    validWVindex=~isnan(measurementList.('wavelengthIndex'));
+    device.Probe{p}.TableCh.Wavelength(:)=nan;
+    device.Probe{p}.TableCh.Wavelength(validWVindex)=probeInfo.wavelengths(measurementList{validWVindex,'wavelengthIndex'})';
     device.Probe{p}.TableCh.isDark=(isnan(device.Probe{p}.TableCh.Wavelength)|device.Probe{p}.TableCh.Wavelength==0);
     device.Probe{p}.TableCh.SourceIndex(:)=measurementList.('sourceIndex');
     device.Probe{p}.TableCh.DetectorIndex(:)=measurementList.('detectorIndex');
@@ -196,18 +216,31 @@ for p=1:1%length(probeNums)
     SDpairs=[device.Probe{p}.sI,device.Probe{p}.dI];
     [uPairs,uPairUnsorted,uPairIdx]=unique(SDpairs,'rows');
     uPairs=SDpairs(uPairUnsorted,:);
+
+   %uPairs=uPairs(~any(isnan(uPairs),2),:);
     
     for opt=1:size(uPairs,1)
         sIdx=uPairs(opt,1);
         dIdx=uPairs(opt,2);
-        srcPosX(opt)=device.Probe{p}.SrcPosX(sIdx);
-        srcPosY(opt)=device.Probe{p}.SrcPosY(sIdx);
-        srcPosZ(opt)=device.Probe{p}.SrcPosZ(sIdx);
-        detPosX(opt)=device.Probe{p}.DetPosX(dIdx);
-        detPosY(opt)=device.Probe{p}.DetPosY(dIdx);
-        detPosZ(opt)=device.Probe{p}.DetPosZ(dIdx);
-        srcPos3D(opt,:)=device.Probe{p}.SrcPos3D(sIdx,:);
-        detPos3D(opt,:)=device.Probe{p}.DetPos3D(dIdx,:);
+        if(isnan(sIdx)||isnan(dIdx))
+            srcPosX(opt)=nan;
+            srcPosY(opt)=nan;
+            srcPosZ(opt)=nan;
+            detPosX(opt)=nan;
+            detPosY(opt)=nan;
+            detPosZ(opt)=nan;
+            srcPos3D(opt,:)=nan;
+            detPos3D(opt,:)=nan;
+        else
+            srcPosX(opt)=device.Probe{p}.SrcPosX(sIdx);
+            srcPosY(opt)=device.Probe{p}.SrcPosY(sIdx);
+            srcPosZ(opt)=device.Probe{p}.SrcPosZ(sIdx);
+            detPosX(opt)=device.Probe{p}.DetPosX(dIdx);
+            detPosY(opt)=device.Probe{p}.DetPosY(dIdx);
+            detPosZ(opt)=device.Probe{p}.DetPosZ(dIdx);
+            srcPos3D(opt,:)=device.Probe{p}.SrcPos3D(sIdx,:);
+            detPos3D(opt,:)=device.Probe{p}.DetPos3D(dIdx,:);
+        end
     end
     
     device.Probe{p}.SrcPosX=srcPosX';
@@ -229,6 +262,7 @@ for p=1:1%length(probeNums)
     device.Probe{p}.OptPos.x=device.Probe{p}.OptPosX(:);
     device.Probe{p}.OptPos.y=device.Probe{p}.OptPosY(:);
     device.Probe{p}.OptPos.z=device.Probe{p}.OptPosZ(:);
+    
 
     device.Probe{p}.TableOpt.Pos2D_x=device.Probe{p}.OptPos.x_2d;
     device.Probe{p}.TableOpt.Pos2D_y=device.Probe{p}.OptPos.y_2d;
@@ -288,9 +322,12 @@ for p=1:1%length(probeNums)
     device.Info.NumberChannels=device.Info.NumberChannels+numCh;
 
 
-    for c=1:length(firstOpt)
+    for c=50:length(firstOpt)
         device.Probe{p}.TableOpt.Ch(c,:)=(find(device.Probe{p}.ChannelNumbers==device.Probe{p}.ChannelList(c)));
-        device.Probe{p}.TableOpt.wv(c,:)=device.Probe{p}.Wavelength(device.Probe{p}.wvI(device.Probe{p}.TableOpt.Ch(c,:)));
+        wvIdxToMatch=device.Probe{p}.wvI(device.Probe{p}.TableOpt.Ch(c,:));
+        if(~any(isnan(wvIdxToMatch)))
+            device.Probe{p}.TableOpt.wv(c,:)=device.Probe{p}.Wavelength(wvIdxToMatch);
+        end
         if(true)%~hasLabel)
            device.Probe{p}.TableOpt.Label{c}=sprintf('Opt%i', device.Probe{p}.ChannelList(c));
         end
@@ -569,6 +606,9 @@ function outTable=struct2table(structObj)
          newTable=table();
         for f=1:length(fieldsInStruct)
             newTable.(fieldsInStruct{f})=structObj(n).(fieldsInStruct{f});
+            if(ischar(newTable.(fieldsInStruct{f}))||isstring(newTable.(fieldsInStruct{f})))
+                newTable.(fieldsInStruct{f})=cellstr(newTable.(fieldsInStruct{f}));
+            end
         end
         outTable=[outTable;newTable];
     end
