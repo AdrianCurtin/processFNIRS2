@@ -79,8 +79,8 @@ for n=1:numNIRS
                 stimIdx=curStruct.markers(:,2)==uStim(n);
                 stimItem=[];
                 stimItem.name=sprintf('mrk%i',uStim(n));
-                stimItem.data=curStruct.markers(stimIdx,[1,1,2]);
-                stimItem.data(:,2)=1; % set all stim durations to 1 for now
+                stimItem.data=curStruct.markers(stimIdx,[1,3,2]); % use column 3 as time [time, duration, marker value'
+                %stimItem.data(:,2)=1; % set all stim durations to 1 for now
             end
 
             if(n==1)
