@@ -266,7 +266,15 @@ else
 
     xOffsets=nan([1,numbars]);
     for i=1:numbars
+
         xOffsets(i)=handles.bars(i).XOffset;   
+        offsetFx=@(x,n)((x-1)/(n-1))-0.5;
+        if(numbars>1&&(xOffsets(i)==0))
+            waitfor( handles.bars(i),'XOffset');
+            % Fix for stupid mac running too fast
+            %xOffsets(i)=offsetFx(i,numbars)*0.55;
+            xOffsets(i)=handles.bars(i).XOffset;  
+        end
     end
 
     barW=mean(diff(xOffsets));
@@ -278,7 +286,13 @@ else
     
 	% Plot errors + assign colors
 	for i = 1:numbars 
-        x = bsxfun(@plus, handles.bars(i).XData, [handles.bars(i).XOffset]'); 
+        
+
+        xData=handles.bars(i).XData;
+        xOffset=[xOffsets(i)]';
+        
+        x = bsxfun(@plus, xData, xOffset'); 
+
 
         if ~isempty(bw_colormap)
             newI=rem(i,length(bw_colormap(:,1)));
