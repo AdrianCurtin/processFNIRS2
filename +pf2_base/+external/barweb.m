@@ -291,9 +291,9 @@ else
         end
         
         if(hideBar&&~reDrawAsReactangles&&~hideError)
-            handles.errors(i) = errorbar(x, barvalues(:,i), errorsLower(:,i), 'Color',curColor, 'linestyle', 'none', 'linewidth', 3); 
+            handles.errors(i) = errorbar(x', barvalues(:,i), errorsLower(:,i), 'Color',curColor, 'linestyle', 'none', 'linewidth', 3); 
         elseif(~hideError)
-            handles.errors(i) = errorbar(x, barvalues(:,i), errorsLower(:,i),errorsUpper(:,i), 'k', 'linestyle', 'none', 'linewidth', 1); 
+            handles.errors(i) = errorbar(x', barvalues(:,i), errorsLower(:,i),errorsUpper(:,i), 'k', 'linestyle', 'none', 'linewidth', 1); 
        
         end
 
