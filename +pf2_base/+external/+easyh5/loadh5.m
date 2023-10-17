@@ -51,6 +51,9 @@ function varargout=loadh5(filename, varargin)
 %    License: GPLv3 or 3-clause BSD license, see https://github.com/fangq/easyh5 for details
 %
 
+
+
+
 path = '';
 if(bitand(length(varargin),1)==0)
     opt=varargin2struct(varargin{:});
@@ -158,6 +161,8 @@ status=0;
 attr=struct();
 
 encodename=jsonopt('PackHex',1,inputdata.opt);
+
+import 'pf2_base.external.easyh5.encodevarname';
 
 try
   data=inputdata.data;

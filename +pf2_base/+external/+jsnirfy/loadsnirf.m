@@ -36,6 +36,9 @@ if(nargin==0 || ~ischar(fname))
     error('you must provide a file name');
 end
 
+import('pf2_base.external.easyh5.loadh5');
+import('pf2_base.external.jsnirfy.snirfdecode');
+
 data=loadh5(fname);
 
 opt=struct;

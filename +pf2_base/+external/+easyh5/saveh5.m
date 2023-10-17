@@ -158,6 +158,8 @@ end
 %%-------------------------------------------------------------------------
 function oid=struct2h5(name, item,handle,level,varargin)
 
+import 'pf2_base.external.easyh5.decodevarname';
+
 num=numel(item);
 if(num>1)
     oid=obj2h5(name, num2cell(item),handle,level,varargin{:});
@@ -220,6 +222,9 @@ end
 
 %%-------------------------------------------------------------------------
 function oid=mat2h5(name, item,handle,level,varargin)
+
+import 'pf2_base.external.easyh5.decodevarname';
+
 typemap=h5types;
 
 opt=varargin{1};

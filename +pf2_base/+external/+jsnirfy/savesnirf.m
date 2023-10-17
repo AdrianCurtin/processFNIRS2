@@ -31,6 +31,10 @@ if(nargin<2 || ~ischar(outfile))
     error('you must provide data and a file name');
 end
 
+import('pf2_base.external.easyh5.saveh5');
+%import('pf2_base.external.jsnirfy.snirfencode');
+
+
 opt=varargin2struct(varargin{:});
 if(~isfield(opt,'root'))
     opt.rootname='';

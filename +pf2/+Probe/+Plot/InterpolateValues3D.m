@@ -415,6 +415,8 @@ else
         else
            probeInfo=setF.device; 
         end
+    elseif(isfield(fNIR,'probeinfo'))
+        probeInfo=fNIR.probeinfo;
     elseif(pf2_base.isnestedfield(fNIR,'info.probename')&&isfield(fNIR.info,'probename')&&~contains(fNIR.info.probename,'Unknown')) 
         %try to load the probename cfg file
         cfgFilePath=sprintf('%s.cfg',fNIR.info.probename);
@@ -423,6 +425,7 @@ else
     end
 
     if(~isempty(probeInfo) || isempty(cfgFilePath) && p.Results.useEEG)
+        
 
     elseif(isempty(cfgFilePath)||~contains(cfgFilePath,'.cfg'))
 
@@ -433,6 +436,8 @@ else
         if(isempty(probeInfo))
             error('No valid devices selected');
         end
+
+        
 
     elseif(~isempty(cfgFilePath)) % If we're not looking at the GUI, doesn't matter
         probeInfo=pf2_base.loadDeviceCfg(cfgFilePath,false);

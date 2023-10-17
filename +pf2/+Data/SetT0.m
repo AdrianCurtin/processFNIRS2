@@ -20,8 +20,12 @@ elseif(isdatetime(t0time))
     elseif(hasDatetime)
         % if datetime field is available, use the datetime to subtract
         if(all(size(outFNIR.time)==size(outFNIR.datetime)))
-            %outFNIR.t0=outFNIR.datetime(1);
-            tDiff=outFNIR.time(1)-seconds(outFNIR.datetime(1)-outFNIR.t0);
+            
+            fnirStruct.t0 = outFNIR.datetime(1)-duration(0,0,outFNIR.time(1));
+            % if new t0 is before the time of 
+            outFNIR.t0 = t0time;
+            
+            tDiff=seconds(t0time-fnirStruct.t0);
             
         else
             error('All datetimes must be the same size as times');
