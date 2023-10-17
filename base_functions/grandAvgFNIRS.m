@@ -256,37 +256,55 @@ for i=1:numfSeg %find matching times in outGA.time, add to cell time indicies an
     if(showProgress)
         waitbar(i/numfSeg,hF,sprintf('grandAvgFNIRS\nAligning segment %i of %i',i,numfSeg));
     end
-	curT_idx=FNIRScellArray{i}.timeIdx;  % 3xN [Time, TimeIndex,..]
-    [validT,outIdx]=ismember(curT_idx(:,1),outGA.time);
-    outTimeIdx=outGA.time(outIdx==0);
-    curT_idx(:,3)=outIdx;
     
-    if(~isempty(outTimeIdx))
-        outTimeIdx(:,2)=nan;
-        outTimeIdx(:,3)=0;
-        curT_idx=[curT_idx;outTimeIdx];
-        [~,idx]=sort(curT_idx(:,1));
-        curT_idx=curT_idx(idx,:);
-        
-        tDiffMissing=[diff(curT_idx(:,3));0]>0;
-        
-        if(any(tDiffMissing))
-            tTimeDiff=[0;diff(curT_idx(:,1))];
-            tTimeDiffUp=tDiffMissing&tTimeDiff>resampleSize/2;
-            tTimeDiffDown=tDiffMissing&tTimeDiff<=resampleSize/2;
-            upOneArr=[tTimeDiffUp(2:end);false];
-            downOneArr=[false;tTimeDiffDown(1:end-1)];
-            if(any(tTimeDiffUp))
-                curT_idx(tTimeDiffUp,1)=curT_idx(upOneArr,1);
-                curT_idx(upOneArr,2)=curT_idx(tTimeDiffUp,2);
-            end
-            if(any(tTimeDiffDown))
-                curT_idx(tTimeDiffDown,1)=curT_idx(downOneArr,1);
-                curT_idx(downOneArr,2)=curT_idx(tTimeDiffDown,2);
+	curT_idx=FNIRScellArray{i}.timeIdx;  % 3xN [Time, TimeIndex,..]
+
+    [validT,alignedTimeIdx]=ismember(curT_idx(:,1),outGA.time); % check if current indexes are present in outGA.time
+
+    curT_idx(:,3)=alignedTimeIdx; % 3xN [Time, OriginalTimeIndex,AlignedTimeIndex]
+    
+    % Check for GA sections with no data
+    [~,missingTimeIdx]=ismember(outGA.time,curT_idx(:,1));
+
+    if(~isempty(missingTimeIdx)&&any(missingTimeIdx==0))
+        outsideTimeIdx=outGA.time(missingTimeIdx==0);
+
+        if(~isempty(outsideTimeIdx))
+            % if time segement is unmatched, build a nan style matrix for
+            % 3xN [Time, Nan,AlignedTimeIndex]
+            % 
+            outsideTimeIdx(:,2)=nan;
+            outsideTimeIdx(:,3)=0;
+            curT_idx=[curT_idx;outsideTimeIdx];
+
+            % insert missing segments into timeline
+            [~,idx]=sort(curT_idx(:,1));
+            curT_idx=curT_idx(idx,:);
+            
+            % if time is missing  in between two samples
+            tDiffMissing=[diff(curT_idx(:,3));0]>1;
+            
+            if(any(tDiffMissing))
+                % see if it is more appropriate to move samples up by one
+                % or down by one
+                tTimeDiff=[0;diff(curT_idx(:,1))];
+                tTimeDiffUp=tDiffMissing&tTimeDiff>resampleSize/2;
+                tTimeDiffDown=tDiffMissing&tTimeDiff<=resampleSize/2;
+                upOneArr=[tTimeDiffUp(2:end);false];
+                downOneArr=[false;tTimeDiffDown(1:end-1)];
+                if(any(tTimeDiffUp))
+                    curT_idx(tTimeDiffUp,1)=curT_idx(upOneArr,1);
+                    curT_idx(upOneArr,2)=curT_idx(tTimeDiffUp,2);
+                end
+                if(any(tTimeDiffDown))
+                    curT_idx(tTimeDiffDown,1)=curT_idx(downOneArr,1);
+                    curT_idx(downOneArr,2)=curT_idx(tTimeDiffDown,2);
+                end
             end
         end
     end
-    
+                
+    % remove any unmatched rows (alignedtime index is zero)
     curT_idx(curT_idx(:,3)==0,:)=[];
     curT_idx(:,4)=~isnan(curT_idx(:,2));
     FNIRScellArray{i}.timeIdx=curT_idx; % t idx isMemberOfTime isNan
