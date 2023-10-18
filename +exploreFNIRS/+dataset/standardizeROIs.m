@@ -76,8 +76,11 @@ roiIndex = standardROInames;
 
 uROInames=standardDevRoiNames(b);
 uROI=uROI(b,:);
-uROI.Properties.RowNames=uROInames;
+if(~isempty(uROI))
+    uROI.Properties.RowNames=uROInames;
+end
 
+if(~isempty(uROI))
 fprintf(2,'************\nOverwriting all ROI fields with standardized device specific versions..\n********\n');
 for i=1:length(ExFNIRS_data)
     if(pf2_base.isnestedfield(ExFNIRS_data{i},'raw')&&~isempty(ExFNIRS_data{i}))
@@ -91,8 +94,15 @@ for i=1:length(ExFNIRS_data)
     end
 end
 
-uROInames=standardROInames;
-
 %end
- fprintf(2,'************\Standardization Complete!\n********\n');
+ fprintf(2,'************\nStandardization Complete!\n********\n');
+
+ uROInames=standardROInames;
+else
+    uROInames=cell(0,0);
+end
+
+
+
+
 

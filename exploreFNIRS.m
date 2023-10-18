@@ -4037,7 +4037,7 @@ switch (ExFNIRS.settings.ChannelMode)
             ExFNIRS.currentROI=uROI;
             
             %end
-             fprintf(2,'************\Standardization Complete!\n********\n');
+             fprintf(2,'************Standardization Complete!\n********\n');
 
             
         else
