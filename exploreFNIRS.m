@@ -383,7 +383,7 @@ if(~isempty(curOxyMethods))
 end
 
 setExChannelMode('ROI',handles,true)%initialize ROI fields
-setExChannelMode('fNIR',handles);
+setExChannelMode('fNIR',handles,true);
 
 
 
@@ -3996,7 +3996,7 @@ ExFNIRS.settings.ChannelMode=modeStr;
 
 switch (ExFNIRS.settings.ChannelMode)
     case 'fNIR'
-        if(initOPT||~isfield(ExFNIRS,'currentOpt'))
+        if(initOPT||~isfield(ExFNIRS,'currentOpt')||isempty(ExFNIRS.currentOpt))
             uOpt=[];
             for i=1:length(ExFNIRS.data)
                 if(isfield(ExFNIRS.data{i},'channels'))
