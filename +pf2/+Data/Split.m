@@ -375,7 +375,7 @@ if(isfield(outfNIR,'Aux')&&splitAux)
             outfNIR.Aux.flattened=true;
         end
 
-        validTimeFields={'time','t','Time'};
+        validTimeFields={'time','t','Time','elapsedTime'};
     
         if(outfNIR.Aux.flattened)
             auxTrimFields=fields(outfNIR.Aux);
@@ -450,7 +450,7 @@ function [outAuxStruct] = recursiveAuxFlatten(aux_in,nir_time,parent_time_in)
 
 
 
-    validTimeFields={'time','t','Time'};
+    validTimeFields={'time','t','Time', 'elapsedTime'};
 
     cur_time_ind=find(~isempty(intersect(validTimeFields,auxFields)));
 
@@ -575,6 +575,7 @@ function [outAuxStruct] = recursiveAuxFlatten(aux_in,nir_time,parent_time_in)
                 possibleTimeField=isnumeric(curField(:,1))&&all(diff(curField(:,1)>0));
                 if(possibleTimeField&&~alreadyFlattened)
                     t_aux=curField(:,1);
+                    curTimeNames='time';
                     auxFieldHasTime(f)=true;
                     warning('Non-explicit match for Aux time variable alignment, please use Aux.time variable or ''time'' table column ');
                 else
