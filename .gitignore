@@ -5,3 +5,5 @@ sampledata/sampleNIR_CH.mat
 .DS_Store
 
 *.mexmaci64
+.vscode/launch.json
+.vscode/settings.json

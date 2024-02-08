@@ -65,6 +65,8 @@ title('Left');
 pf2_base.loadDeviceCfg('Hitachi_ETG4000_3x5.cfg');
 pf2.Probe.Plot.InterpolateValues3D(1:22, 'interpolateType', 'quadratic', 'colorbarStr', "HbO");
 
+
+
 %% EEG Probe plotting
 %pf2.Probe.Plot.InterpolateValues3D(1:4, 'useEEG', true, 'I1020_labels', {'TP7', 'O1', 'Oz', 'O2'});
 %fnir1200 = pf2.Import.SampleData.fNIR1200();
@@ -88,7 +90,7 @@ pf2.Probe.Plot.InterpolateValues3D(data, 'useEEG', true, 'I1020_labels', labels,
 
 %% Plot FNIRS device over EEG
 fnir1200 = pf2.Import.SampleData.fNIR1200();
-pf2.Probe.Plot.InterpolateValues3D(1:7, fnir1200, 'I1020_labels', {'C5', 'C3', 'C1', 'Cz', 'C2', 'C4', 'C6'}, 'useEEG', true, 'SDLabels', true)
+pf2.Probe.Plot.InterpolateValues3D(1:7, fnir1200,'cmap', 'jet', 'I1020_labels', {'C5', 'C3', 'C1', 'Cz', 'C2', 'C4', 'C6'}, 'useEEG', true, 'SDLabels', true)
 
 %% Plot optical pathways for fNIR
 pf2_base.loadDeviceCfg('fNIR_Devices_fNIR1000.cfg');
