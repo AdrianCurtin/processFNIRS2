@@ -141,9 +141,12 @@ function plotPeriodicSample(startTime,endTime,centerTime,sigHeight,sigAmp,rsLen,
 
     yPoints= sigHeight-sigAmp/2+ones(1,sigLen)*sigAmp.*(rem(idx+offset0,2)==0);
     yPoints=repelem(yPoints,2);
-    yPoints(1)=[];
-    yPoints(end+1)=yPoints(1);
-    
+
+    if(~isempty(yPoints))
+        yPoints(1)=[];
+        yPoints(end+1)=yPoints(1);
+    end
+
     xPoints=repelem(xPoints,2);
 
     plot(xPoints,yPoints,style{:},'lineWidth',weight);
