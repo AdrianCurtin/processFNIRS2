@@ -269,7 +269,7 @@ else
 
         xOffsets(i)=handles.bars(i).XOffset;   
         offsetFx=@(x,n)((x-1)/(n-1))-0.5;
-        if(numbars>1&&(xOffsets(i)==0))
+        if(numbars>1&&(all(xOffsets(1:i)==0)))
             waitfor( handles.bars(i),'XOffset');
             % Fix for stupid mac running too fast
             %xOffsets(i)=offsetFx(i,numbars)*0.55;

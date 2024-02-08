@@ -509,7 +509,9 @@ if(p.Results.useEEG && ~isempty(probeDraw))
 end
 
 if(isfield(probeInfo, 'TableOpt'))
-    
+    if(~isfield(probeInfo,'NumShortSeparation'))
+        probeInfo.NumShortSeparation =0;
+    end
     if(include_ss&&probeInfo.NumOptodes>length(data2plot_concat)&&probeInfo.NumOptodes-probeInfo.NumShortSeparation==length(data2plot_concat))
         include_ss=false;
         warning('Not enough data for all channels, ignoring short separation channels');
