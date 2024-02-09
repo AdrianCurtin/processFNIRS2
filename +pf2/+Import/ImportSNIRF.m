@@ -44,9 +44,14 @@ if(isfield(data.nirs,'stim'))
         curStim=stimArray(m);
         markerArray=[markerArray;curStim.data(:,[1,3,2])];
     end
-    fNIR.markers=markerArray;
+    if(length(stimArray)>1)
+        [~,bi]=sort(markerArray(:,1));
+        fNIR.markers=markerArray(bi,:);
+    else
+        fNIR.markers=[];
+    end
 else
-    fNIR.markers=[];
+    
 end
 
 data=data.nirs.data;
