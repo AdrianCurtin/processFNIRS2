@@ -220,10 +220,10 @@ while(ischar(lineF))
     
     if(countCheckFlag)
        countCheckFlag=false;
-       numVar=sum(lineF(:)=='	');    
+       numVar=length(strsplit(lineF,'\t'));   
        
-       if(numVar==0)
-            numVar=sum(lineF(:)==' ')+1;
+       if(numVar==1)
+             numVar=length(strsplit(lineF,' '));   
             spaceParsingMode=true;
        end
        baseline=nan(1000,numVar);
@@ -325,8 +325,18 @@ justOnes_Baseline=all(baseline==1);
 data=data(:,~justOnes); %Drop all columns that are only 1
 baseline=baseline(:,~justOnes_Baseline); %Drop all columns that are only 1
 
-if(size(data,2)>(size(baseline,2))) % Last column in newer cobi is sample count, but not included in baseline
+% Check for sample count in last column and drop it (newer cobi)
+lastCol=data(:,end);
+lastColIsSampleCount = all(diff(lastCol(1:100))>0)&&max(lastCol)>100000;
+
+if(size(data,2)>(size(baseline,2))||lastColIsSampleCount) % Last column in newer cobi is sample count, but not included in baseline
+     if(size(data,2)==size(baseline,2))
+        baseline=baseline(:,1:end-1);
+    end
+    
     data=data(:,1:end-1);
+
+   
 end
 
 
@@ -388,8 +398,6 @@ numRawChannels=size(data,2)-1;
 switch(numRawChannels)
     case 12
         fNIR.info.probename='fNIR_Devices_fNIR1000_Linear';
-    case 48
-        fNIR.info.probename='fNIR_Devices_fNIR1000';
     case 48
         fNIR.info.probename='fNIR_Devices_fNIR1000';
     case 54
