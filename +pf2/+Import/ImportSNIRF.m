@@ -146,26 +146,17 @@ for p=1:1%length(probeNums)
 
     device.Probe{p}=[];
 
-    
-    
-    
-    device.Probe{p}.SrcPosX=probeInfo.sourcePos3D(:,1);
-    device.Probe{p}.SrcPosY=probeInfo.sourcePos3D(:,2);
-    device.Probe{p}.SrcPosZ=probeInfo.sourcePos3D(:,3);
-    device.Probe{p}.DetPosX=probeInfo.detectorPos3D(:,1);
-    device.Probe{p}.DetPosY=probeInfo.detectorPos3D(:,2);
-    device.Probe{p}.DetPosZ=probeInfo.detectorPos3D(:,3);
-    
-    
-    device.Probe{p}.SrcPos3D=probeInfo.sourcePos3D;
-    device.Probe{p}.DetPos3D=probeInfo.detectorPos3D;
 
     device.Probe{p}.TableSD=table();
-    device.Probe{p}.TableCh=table(); % Map for raw probe data
+    device.Probe{p}.TableCh=table(); % Map for raw probe data, 1 row per measurementList
     
     device.Probe{p}.TableCh.ColNumber=[1:height(measurementList)]';
 
+    numCh = height(measurementList);
+
     [~,firstOpt,uOpt]=unique(measurementList(:,{'detectorIndex','sourceIndex'}),'rows');
+
+    device.Probe{p}.TableCh.OptodeNumber = uOpt;
 
     timeSignalIdx = find(strcmp(measurementList.dataTypeLabel,'time-signal'));
 
@@ -179,6 +170,31 @@ for p=1:1%length(probeNums)
     device.Probe{p}.TableCh.isMarker=device.Probe{p}.TableCh.OptodeNumber<0|isnan(device.Probe{p}.TableCh.OptodeNumber);
     
     device.Probe{p}.TableCh.OptodeNumber(device.Probe{p}.TableCh.OptodeNumber<1)=nan;
+
+    % reorder optodes so they are always increasing by first channel
+    % presentation
+
+    opt_list= device.Probe{p}.TableCh.OptodeNumber;
+    reindexed_list = zeros(size(opt_list));
+    current_value = opt_list(1);
+    next_index = 0;
+
+    % Iterate over the input list
+    for i = 1:length(opt_list)
+        if(isnan(opt_list(i)))
+            reindexed_list(i)=nan;
+            continue;
+        end
+        if opt_list(i) == current_value
+            reindexed_list(i) = next_index;
+        else
+            current_value = opt_list(i);
+            next_index = next_index + 1;
+            reindexed_list(i) = next_index;
+        end
+    end
+
+    device.Probe{p}.TableCh.OptodeNumber=reindexed_list;
     
     validWVindex=~isnan(measurementList.('wavelengthIndex'));
     device.Probe{p}.TableCh.Wavelength(:)=nan;
@@ -186,10 +202,73 @@ for p=1:1%length(probeNums)
     device.Probe{p}.TableCh.isDark=(isnan(device.Probe{p}.TableCh.Wavelength)|device.Probe{p}.TableCh.Wavelength==0);
     device.Probe{p}.TableCh.SourceIndex(:)=measurementList.('sourceIndex');
     device.Probe{p}.TableCh.DetectorIndex(:)=measurementList.('detectorIndex');
+    
+
+    uSrc = unique(device.Probe{p}.TableCh.SourceIndex);  % Get unique sources
+
+    uDet = unique(device.Probe{p}.TableCh.DetectorIndex);  % get unique detectors
+
+    numSrc=length(uSrc);
+    numDet=length(uDet);
+
+    device.Probe{p}.SrcPos=table();
+    device.Probe{p}.DetPos=table();
+
+    srcXYZ=[];
+    srcXYZ_2d=[];
+
+    for(i=1:numSrc)
+        if(isnan(uSrc(i)))
+            continue;
+        end
+       chIdx=find(device.Probe{p}.TableCh.SourceIndex==uSrc(i));
+       curOpt = device.Probe{p}.TableCh.OptodeNumber(chIdx(1));
+       srcXYZ=[srcXYZ;probeInfo.sourcePos3D(curOpt,:)];
+       srcXYZ_2d=[srcXYZ_2d;probeInfo.sourcePos2D(curOpt,:)];
+    end
+
+    detXYZ=[];
+    detXYZ_2d=[];
+    for(i=1:numDet)
+        if(isnan(uDet(i)))
+            continue;
+        end
+       chIdx=find(device.Probe{p}.TableCh.DetectorIndex==uDet(i));
+       curOpt = device.Probe{p}.TableCh.OptodeNumber(chIdx(1));
+       detXYZ=[detXYZ;probeInfo.detectorPos3D(curOpt,:)];
+       detXYZ_2d=[detXYZ_2d;probeInfo.detectorPos2D(curOpt,:)];
+    end
+
+    device.Probe{p}.SrcPosX=srcXYZ(:,1);
+    device.Probe{p}.SrcPosY=srcXYZ(:,2);
+    device.Probe{p}.SrcPosZ=srcXYZ(:,3);
+    device.Probe{p}.DetPosX=detXYZ(:,1);
+    device.Probe{p}.DetPosY=detXYZ(:,2);
+    device.Probe{p}.DetPosZ=detXYZ(:,3);
+
+    device.Probe{p}.SrcPos3D=srcXYZ;
+    device.Probe{p}.DetPos3D=detXYZ;
+
+    
+    device.Probe{p}.SrcPos.x_2d=srcXYZ_2d(:,1);
+    device.Probe{p}.SrcPos.y_2d=srcXYZ_2d(:,2);
+    device.Probe{p}.SrcPos.z_2d=srcXYZ_2d(:,1)*0;
+    device.Probe{p}.SrcPos.x=device.Probe{p}.SrcPosX(:);
+    device.Probe{p}.SrcPos.y=device.Probe{p}.SrcPosY(:);
+    device.Probe{p}.SrcPos.z=device.Probe{p}.SrcPosZ(:);
+    
+    
+    
+    device.Probe{p}.DetPos.x_2d=detXYZ_2d(:,1);
+    device.Probe{p}.DetPos.y_2d=detXYZ_2d(:,2);
+    device.Probe{p}.DetPos.z_2d=detXYZ_2d(:,1)*0;
+    device.Probe{p}.DetPos.x=device.Probe{p}.DetPosX(:);
+    device.Probe{p}.DetPos.y=device.Probe{p}.DetPosY(:);
+    device.Probe{p}.DetPos.z=device.Probe{p}.DetPosZ(:);
 
     device.Probe{p}.TableCh.Label(:)="";
         
-    for ch=1:length(uOpt)
+    for ch=1:numCh
         if(device.Probe{p}.TableCh.isTime(ch))
            device.Probe{p}.TableCh.Label(ch)="Time"; 
         elseif(device.Probe{p}.TableCh.isMarker(ch))
@@ -203,34 +282,15 @@ for p=1:1%length(probeNums)
             device.Probe{p}.TableCh.Label(ch)=sprintf('Opt%i_wv%.1f',opt,wv);
         end
     end
-
-    device.Probe{p}.SrcPos=table();
-    device.Probe{p}.SrcPos.x_2d=probeInfo.sourcePos2D(:,1);
-    device.Probe{p}.SrcPos.y_2d=probeInfo.sourcePos2D(:,2);
-    device.Probe{p}.SrcPos.z_2d=probeInfo.sourcePos2D(:,1)*0;
-    device.Probe{p}.SrcPos.x=device.Probe{p}.SrcPosX(:);
-    device.Probe{p}.SrcPos.y=device.Probe{p}.SrcPosY(:);
-    device.Probe{p}.SrcPos.z=device.Probe{p}.SrcPosZ(:);
     
-    
-    device.Probe{p}.DetPos=table();
-    device.Probe{p}.DetPos.x_2d=probeInfo.detectorPos2D(:,1);
-    device.Probe{p}.DetPos.y_2d=probeInfo.detectorPos2D(:,2);
-    device.Probe{p}.DetPos.z_2d=probeInfo.detectorPos2D(:,1)*0;
-    device.Probe{p}.DetPos.x=device.Probe{p}.DetPosX(:);
-    device.Probe{p}.DetPos.y=device.Probe{p}.DetPosY(:);
-    device.Probe{p}.DetPos.z=device.Probe{p}.DetPosZ(:);
-    
+    numOpt = length(firstOpt);
   
     device.Probe{p}.TableOpt=table();
-    device.Probe{p}.TableOpt.OptodeNum(:)=[1:length(firstOpt)]';
+    device.Probe{p}.TableOpt.OptodeNum(:)=[1:numOpt]';
 
     % auto generated later, could be pulled from data maybe
     %device.Probe{p}.TableOpt.Label=p.ChannelLabels(:);
 
-    
-
-    
    
     device.Probe{p}.dI=measurementList.('detectorIndex');
     device.Probe{p}.sI=measurementList.('sourceIndex');
@@ -248,9 +308,10 @@ for p=1:1%length(probeNums)
 
    %uPairs=uPairs(~any(isnan(uPairs),2),:);
     
-    for opt=1:size(uPairs,1)
-        sIdx=uPairs(opt,1);
-        dIdx=uPairs(opt,2);
+    for opt=1:numOpt
+        
+        sIdx=device.Probe{p}.TableOpt.SrcIdx(opt);
+        dIdx=device.Probe{p}.TableOpt.DetIdx(opt);
         if(isnan(sIdx)||isnan(dIdx))
             srcPosX(opt)=nan;
             srcPosY(opt)=nan;
@@ -282,8 +343,8 @@ for p=1:1%length(probeNums)
     device.Probe{p}.OptPosX=mean([device.Probe{p}.SrcPosX(:,1),device.Probe{p}.DetPosX(:,1)],2);
     device.Probe{p}.OptPosY=mean([device.Probe{p}.SrcPosY(:,1),device.Probe{p}.DetPosY(:,1)],2);
     device.Probe{p}.OptPosZ=mean([device.Probe{p}.SrcPosZ(:,1),device.Probe{p}.DetPosZ(:,1)],2);
-    device.Probe{p}.NumOptodes=length(device.Probe{p}.OptPosX);
-
+    device.Probe{p}.NumOptodes=numOpt;
+    
     device.Probe{p}.OptPos=table();
     device.Probe{p}.OptPos.x_2d=device.Probe{p}.OptPosX(:);
     device.Probe{p}.OptPos.y_2d=device.Probe{p}.OptPosY(:);
