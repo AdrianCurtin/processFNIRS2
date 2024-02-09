@@ -29,53 +29,53 @@ end
     error('Unable to access file for writing!');
  end
 
- fprintf(fid,'fnirUSB.dll log file\r\n');
+ fprintf(fid,'fnirUSB.dll log file\n');
  
  fprintf(fid,'Start Time:\t');
  if(isfield(fNIRstruct,'t0'))
-    fprintf(fid,'%s\r\n',datestr(fNIRstruct.t0,'ddd mmm DD hh:MM:ss.FFF yyyy'));
+    fprintf(fid,'%s\n',datestr(fNIRstruct.t0,'ddd mmm DD hh:MM:ss.FFF yyyy'));
  else
-    fprintf(fid,'Wed Jan 1 1:01:01 2022\r\n');
+    fprintf(fid,'Wed Jan 1 1:01:01 2022\n');
  end
 
-fprintf(fid,'\r\n');
+fprintf(fid,'\n');
 
 
 if(isfield(fNIRstruct,'info')&&isfield(fNIRstruct.info,'header')&&...
     isfield(fNIRstruct.info.header,'startCode'))
         startCode=fNIRstruct.info.header.startCode;
-    fprintf(fid,'Start Code:\t%.6f\t%i\r\n',startCode,startCode*1000);
+    fprintf(fid,'Start Code:\t%.6f\t%i\n',startCode,startCode*1000);
 else
- fprintf(fid,'Start Code:\t	9999.999999	99999999\r\n');
+ fprintf(fid,'Start Code:\t	9999.999999	99999999\n');
 end
 
 if(isfield(fNIRstruct,'info')&&isfield(fNIRstruct.info,'header')&&...
     isfield(fNIRstruct.info.header,'freqCode'))
         freqCode=fNIRstruct.info.header.freqCode;
-    fprintf(fid,'Freq Code:\t%.6f\r\n',freqCode);
+    fprintf(fid,'Freq Code:\t%.6f\n',freqCode);
 else
- fprintf(fid,'Freq Code:\t	99999999.999999\r\n');
+ fprintf(fid,'Freq Code:\t	99999999.999999\n');
 end
 
 if(isfield(fNIRstruct,'info')&&isfield(fNIRstruct.info,'header')&&...
     isfield(fNIRstruct.info.header,'current'))
         current=fNIRstruct.info.header.current;
-    fprintf(fid,'Current:\t%.0f\r\n',current);
+    fprintf(fid,'Current:\t%.0f\n',current);
 else
- fprintf(fid,'Current:\t	99\r\n');
+ fprintf(fid,'Current:\t	99\n');
 end
 
 if(isfield(fNIRstruct,'info')&&isfield(fNIRstruct.info,'header')&&...
     isfield(fNIRstruct.info.header,'gains'))
         gains=fNIRstruct.info.header.gains;
-    fprintf(fid,'Gains:\t%.0f\r\n',gains);
+    fprintf(fid,'Gains:\t%.0f\n',gains);
 else
- fprintf(fid,'Gains:\t99\r\n');
+ fprintf(fid,'Gains:\t99\n');
 end
 
- fprintf(fid,'Other:\tnone\r\n');
+ fprintf(fid,'Other:\tnone\n');
  
- fprintf(fid,'-2\tBaseline Started\r\n');
+ fprintf(fid,'-2\tBaseline Started\n');
 
 
  arr=fNIRstruct.raw;
@@ -86,54 +86,54 @@ end
     for y=2:numCol
        fprintf(fid,'\t%.2f',arr(x,y)); 
     end
-     fprintf(fid,'\r\n');
+     fprintf(fid,'\n');
      if(x==20)
-        fprintf(fid,'-3\tBaseline values\r\n');
+        fprintf(fid,'-3\tBaseline values\n');
             fprintf(fid,'0'); 
             for y=2:numCol
                fprintf(fid,'\t%.2f',nanmean(arr(1:10,y))); 
             end
-             fprintf(fid,'\r\n');
-        fprintf(fid,'-4\tBaseline end\r\n');
+             fprintf(fid,'\n');
+        fprintf(fid,'-4\tBaseline end\n');
      end
  end
  
- fprintf(fid,'-1\tDevice Stopped\r\n');
+ fprintf(fid,'-1\tDevice Stopped\n');
  fclose(fid);
- fprintf('File successfully written to: %s\r\n',filepath);
+ fprintf('File successfully written to: %s\n',filepath);
 
 
 % Writing Marker file
 
 fid=fopen(mrkFilePath,'wt');
- fprintf(fid,'fnirUSB.dll marker file\r\n');
- fprintf(fid,'Listening from SomePORT port\r\n');
+ fprintf(fid,'fnirUSB.dll marker file\n');
+ fprintf(fid,'Listening from SomePORT port\n');
  
  fprintf(fid,'Start Time:\t');
  if(isfield(fNIRstruct,'t0'))
-    fprintf(fid,'%s\r\n',datestr(fNIRstruct.t0,'ddd mmm DD hh:MM:ss.FFF yyyy'));
+    fprintf(fid,'%s\n',datestr(fNIRstruct.t0,'ddd mmm DD hh:MM:ss.FFF yyyy'));
  else
-    fprintf(fid,'Wed Jan 1 1:01:01 2022\r\n');
+    fprintf(fid,'Wed Jan 1 1:01:01 2022\n');
  end
 
 
 
-fprintf(fid,'\r\n');
+fprintf(fid,'\n');
 
 if(isfield(fNIRstruct,'info')&&isfield(fNIRstruct.info,'header')&&...
     isfield(fNIRstruct.info.header,'startCode'))
         startCode=fNIRstruct.info.header.startCode;
-    fprintf(fid,'Start Code:\t%.6f\t%i\r\n',startCode,startCode*1000);
+    fprintf(fid,'Start Code:\t%.6f\t%i\n',startCode,startCode*1000);
 else
- fprintf(fid,'Start Code:\t	9999.999999	99999999\r\n');
+ fprintf(fid,'Start Code:\t	9999.999999	99999999\n');
 end
 
 if(isfield(fNIRstruct,'info')&&isfield(fNIRstruct.info,'header')&&...
     isfield(fNIRstruct.info.header,'freqCode'))
         freqCode=fNIRstruct.info.header.freqCode;
-    fprintf(fid,'Freq Code:\t%.6f\r\n',freqCode);
+    fprintf(fid,'Freq Code:\t%.6f\n',freqCode);
 else
- fprintf(fid,'Freq Code:\t	99999999.999999\r\n');
+    fprintf(fid,'Freq Code:\t	99999999.999999\n');
 end
 
  arr=fNIRstruct.markers;
@@ -144,11 +144,11 @@ end
     for y=2:numCol
        fprintf(fid,'\t%.0f',arr(x,y)); 
     end
-     fprintf(fid,'\r\n');
+     fprintf(fid,'\n');
    
  end
  fclose(fid);
- fprintf('File successfully written to: %s\r\n',mrkFilePath);
+ fprintf('File successfully written to: %s\n',mrkFilePath);
 
 
  if(length(fNIRstruct.info)>1)
@@ -159,75 +159,75 @@ end
 % Writing Log file
 
 fid=fopen(logFilePath,'wt');
- fprintf(fid,'COBI log file 1.1\r\n');
- fprintf(fid,'Current Device:\tfnirUSB.dll\r\n');
- fprintf(fid,'Current Filter Module:\tFilters are OFF\r\n');
+ fprintf(fid,'COBI log file 1.1\n');
+ fprintf(fid,'Current Device:\tfnirUSB.dll\n');
+ fprintf(fid,'Current Filter Module:\tFilters are OFF\n');
  
   fprintf(fid,'Start Time:\t');
  if(isfield(fNIRstruct,'t0'))
-    fprintf(fid,'%s\r\n',datestr(fNIRstruct.t0,'ddd mmm DD hh:MM:ss.FFF yyyy'));
+    fprintf(fid,'%s\n',datestr(fNIRstruct.t0,'ddd mmm DD hh:MM:ss.FFF yyyy'));
  else
-    fprintf(fid,'Wed Jan 1 1:01:01 2022\r\n');
+    fprintf(fid,'Wed Jan 1 1:01:01 2022\n');
  end
 
 
 
-fprintf(fid,'\r\n\r\n\r\n');
+fprintf(fid,'\n\n\n');
 
 if(isfield(fNIRstruct,'info')&&...
     isfield(fNIRstruct.info,'Experimenter'))
         Experimenter=fNIRstruct.info.Experimenter;
-    fprintf(fid,'Experimenter:\r\n%s\r\n\r\n',Experimenter);
+    fprintf(fid,'Experimenter:\n%s\n\n',Experimenter);
 else
- fprintf(fid,'Experimenter:\r\n\r\n\r\n');
+ fprintf(fid,'Experimenter:\n\n\n');
 end
 
 if(isfield(fNIRstruct,'info')&&...
     isfield(fNIRstruct.info,'SubjectID'))
         SubjectID=fNIRstruct.info.SubjectID;
-    fprintf(fid,'SubjectID:\r\n%s\r\n\r\n',SubjectID);
+    fprintf(fid,'SubjectID:\n%s\n\n',SubjectID);
 else
- fprintf(fid,'SubjectID:\r\n\r\n\r\n');
+ fprintf(fid,'SubjectID:\n\n\n');
 end
 
 if(isfield(fNIRstruct,'info')&&...
     isfield(fNIRstruct.info,'log_info')&&isfield(fNIRstruct.info.log_info,'Description'))
         descrip=fNIRstruct.info.log_info.Description;
-    fprintf(fid,'Description:\r\n%s\r\n\r\n',descrip);
+    fprintf(fid,'Description:\n%s\n\n',descrip);
 else
- fprintf(fid,'Description:\r\n\r\n\r\n');
+ fprintf(fid,'Description:\n\n\n');
 end
 
 if(isfield(fNIRstruct,'info')&&...
     isfield(fNIRstruct.info,'log_info')&&isfield(fNIRstruct.info.log_info,'SubjectInfo'))
         subInfo=fNIRstruct.info.log_info.SubjectInfo;
-    fprintf(fid,'Subject Info:\r\n%s\r\n\r\n',subInfo);
+    fprintf(fid,'Subject Info:\n%s\n\n',subInfo);
 else
- fprintf(fid,'Subject Info:\r\n\r\n\r\n');
+ fprintf(fid,'Subject Info:\n\n\n');
 end
 
 if(isfield(fNIRstruct,'info')&&...
     isfield(fNIRstruct.info,'log_info')&&isfield(fNIRstruct.info.log_info,'Comments'))
         comments=fNIRstruct.info.log_info.Comments;
-    fprintf(fid,'Comments:\r\n%s\r\n - Generated by Export from processFNIRS2\r\n\r\n',comments);
+    fprintf(fid,'Comments:\n%s\n - Generated by Export from processFNIRS2\n\n',comments);
 else
- fprintf(fid,'Comments:\r\n - Generated by Export from processFNIRS2\r\n\r\n');
+ fprintf(fid,'Comments:\n - Generated by Export from processFNIRS2\n\n');
 end
 
 if(isfield(fNIRstruct,'info')&&...
     isfield(fNIRstruct.info,'log_info')&&isfield(fNIRstruct.info.log_info,'Flagged'))
         Flagged=fNIRstruct.info.log_info.Flagged;
-    fprintf(fid,'Flagged:\r\n%s\r\n\r\n',Flagged);
+    fprintf(fid,'Flagged:\n%s\n\n',Flagged);
 else
- fprintf(fid,'Flagged:\r\n\r\n\r\n');
+ fprintf(fid,'Flagged:\n\n\n');
 end
 
 if(isfield(fNIRstruct,'info')&&...
     isfield(fNIRstruct.info,'probename'))
         probename=fNIRstruct.info.probename;
-    fprintf(fid,'ProbeName:\r\n%s\r\n\r\n',probename);
+    fprintf(fid,'ProbeName:\n%s\n\n',probename);
 else
- fprintf(fid,'ProbeName:Unknown\r\n\r\n\r\n');
+ fprintf(fid,'ProbeName:Unknown\n\n\n');
 end
 
  if(isfield(fNIRstruct,'info')&&isfield(fNIRstruct.info,'header')&&...
@@ -237,15 +237,15 @@ end
     for t=1:length(timestamp)
         fprintf(fid,'%s ',timestamp{t});
     end
-    fprintf(fid,'\r\n');   
+    fprintf(fid,'\n');   
 else
- fprintf(fid,'Original Start Time:\tUnknown\r\n');
+ fprintf(fid,'Original Start Time:\tUnknown\n');
 end
 
  fprintf(fid,'Finalized Successfully');
 
  fclose(fid);
- fprintf('File successfully written to: %s\r\n',logFilePath);
+ fprintf('File successfully written to: %s\n',logFilePath);
 
 
 end
