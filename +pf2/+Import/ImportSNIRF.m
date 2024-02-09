@@ -103,6 +103,18 @@ if(strcmp(metaDataTags.LengthUnit,'cm'))
         probeInfo.landmarkPos3D=probeInfo.landmarkPos3D*10;
     end
 end
+
+if(isfield(metaDataTags,'MeasurementTime')&&isfield(metaDataTags,'MeasurementDate'))
+    dateTimeStr = [metaDataTags.MeasurementDate 'T' metaDataTags.MeasurementTime];
+    fNIR.t0 = datetime(dateTimeStr, 'InputFormat', 'yyyy-MM-dd''T''HH:mm:ss.SSSz','TimeZone','local');
+
+elseif(isfield(metadataTags,'UnixTime'))
+    unixTime = str2double(metadataTags.UnixTime);
+
+    % Convert Unix time to datetime
+    fNIR.t0 = datetime(unixTime, 'ConvertFrom', 'posixtime');
+
+end
         
         %probeNums=unique(probeInfo.SD.MeasList(:,3)); % I THINK
         
