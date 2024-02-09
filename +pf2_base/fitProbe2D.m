@@ -1,5 +1,25 @@
-function opt_2d_coords=fitProbe2D(ChxList,ChyList,ChzList)
+function opt_2d_coords=fitProbe2D(ChxList,ChyList,ChzList, usePCA)
 % Fits a 2D representation of the plane as best as possible
+
+if(nargin<4)
+    usePCA = true;
+end
+
+if(usePCA)
+    xyzArray= [ChxList,ChyList,ChzList];
+    mean_data = mean(xyzArray);
+    centered_data = xyzArray - mean_data;
+    cov_matrix = cov(centered_data);
+    [eigenvectors, eigenvalues] = eig(cov_matrix);
+    [eigenvalues, idx] = sort(diag(eigenvalues), 'descend');
+    eigenvectors = eigenvectors(:, idx);
+    num_components = 2;
+    principal_components = centered_data * eigenvectors(:, 1:num_components);
+
+    ChxList=principal_components(:,1);
+    ChyList=principal_components(:,2);
+    ChzList(:)=0;
+end
 
 
 plotFigs=false;

@@ -166,8 +166,16 @@ for p=1:1%length(probeNums)
     device.Probe{p}.TableCh.ColNumber=[1:height(measurementList)]';
 
     [~,firstOpt,uOpt]=unique(measurementList(:,{'detectorIndex','sourceIndex'}),'rows');
-    device.Probe{p}.TableCh.OptodeNumber=uOpt;
+
+    timeSignalIdx = find(strcmp(measurementList.dataTypeLabel,'time-signal'));
+
+    if(timeSignalIdx)
+        firstOpt(firstOpt==timeSignalIdx)=[]; % remove time signal from "first opt" argument
+        device.Probe{p}.TableCh.OptodeNumber(timeSignalIdx)=0;
+    end
+
     device.Probe{p}.TableCh.isTime=device.Probe{p}.TableCh.OptodeNumber==0;
+    
     device.Probe{p}.TableCh.isMarker=device.Probe{p}.TableCh.OptodeNumber<0|isnan(device.Probe{p}.TableCh.OptodeNumber);
     
     device.Probe{p}.TableCh.OptodeNumber(device.Probe{p}.TableCh.OptodeNumber<1)=nan;
