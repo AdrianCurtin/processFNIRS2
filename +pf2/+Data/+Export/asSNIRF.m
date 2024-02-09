@@ -366,8 +366,8 @@ function metaData=info2meta(nirStruct)
         tzd='z';
         warning('time zone should still be set properly');
         metaData.MeasurementTime=c2v(sprintf('%02d:%02d:%02d.%03d%s',hour(nirStruct.t0),minute(nirStruct.t0),floor(second(nirStruct.t0)),ms,tzd)); 
-        metaData.AcquisitionStartTime=posix(nirStruct.t0+seconds(min(nirStruct.time)));
-        metaData.UnixTime=posix(nirStruct.t0);
+        metaData.AcquisitionStartTime=num2str(posixtime(nirStruct.t0+seconds(min(nirStruct.time))));
+        metaData.UnixTime=num2str(posixtime(nirStruct.t0));
         
     end
 

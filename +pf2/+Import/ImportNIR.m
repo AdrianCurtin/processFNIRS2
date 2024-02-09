@@ -173,6 +173,7 @@ while(ischar(lineF))
              temp2=lineF(13:end);
              try
                 header.StartDateTime= datetime(temp2,'InputFormat','eee MMM dd HH:mm:ss.SSS yyyy'); % try to get timestamp with milliseconds
+                fNIR.t0=header.StartDateTime;
              catch
                 header.StartDateTime= datetime(temp2,'InputFormat','eee MMM dd HH:mm:ss yyyy'); % else use only regular seconds
              end
@@ -674,6 +675,8 @@ function loginfo=importCOBIlog(log_filename)
            linecount=linecount+1;
            if(lineF~=-1)
                loginfo.SubjectInfo=lineF;
+           else
+                loginfo.SubjectInfo='';
            end
            if(~isempty(loginfo.SubjectInfo))
                subInfoPart=strsplit(loginfo.SubjectInfo,'-');
