@@ -233,6 +233,10 @@ for p=1:1%length(probeNums)
     SDpairs=[device.Probe{p}.sI,device.Probe{p}.dI];
     [uPairs,uPairUnsorted,uPairIdx]=unique(SDpairs,'rows');
     uPairs=SDpairs(uPairUnsorted,:);
+    validRows = ~isnan(sum(uPairs,2));
+
+    uPairs=uPairs(validRows,:);
+    
 
    %uPairs=uPairs(~any(isnan(uPairs),2),:);
     
