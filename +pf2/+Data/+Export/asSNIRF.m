@@ -489,16 +489,19 @@ function [probe,measurementList,deviceMetaDataTags]=buildProbe(nirStruct)
 
      probe=[];
 
-     probe.detectorPos2D=table2array(probeStruct.DetPos(:,{'x_2d','y_2d'}));
-     probe.detectorPos3D=table2array(probeStruct.DetPos(:,{'x','y','z'}));
+     [~,firstDetIdx] = unique(probeStruct.TableOpt.DetIdx);
+     [~,firstSrcIdx] = unique(probeStruct.TableOpt.SrcIdx);
+
+     probe.detectorPos2D=table2array(probeStruct.DetPos(firstDetIdx,{'x_2d','y_2d'}));
+     probe.detectorPos3D=table2array(probeStruct.DetPos(firstDetIdx,{'x','y','z'}));
      if(isfield(probeStruct,'landmarkPos3D'))
         probe.landmarkPos3D=probeStruct.landmarkPos3D;
      end
      if(isfield(probeStruct,'landmarkLabels'))
         probe.landmarkLabels=probeStruct.landmarkLabels;
      end
-     probe.sourcePos2D=table2array(probeStruct.SrcPos(:,{'x_2d','y_2d'}));
-     probe.sourcePos3D=table2array(probeStruct.SrcPos(:,{'x','y','z'}));
+     probe.sourcePos2D=table2array(probeStruct.SrcPos(firstSrcIdx,{'x_2d','y_2d'}));
+     probe.sourcePos3D=table2array(probeStruct.SrcPos(firstSrcIdx,{'x','y','z'}));
      probe.wavelengths=wvList';
 end
 

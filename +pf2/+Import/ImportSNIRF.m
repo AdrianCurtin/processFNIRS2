@@ -105,8 +105,21 @@ if(strcmp(metaDataTags.LengthUnit,'cm'))
 end
 
 if(isfield(metaDataTags,'MeasurementTime')&&isfield(metaDataTags,'MeasurementDate'))
+    hasMilliseconds = contains(metaDataTags.MeasurementTime,'.');
     dateTimeStr = [metaDataTags.MeasurementDate 'T' metaDataTags.MeasurementTime];
-    fNIR.t0 = datetime(dateTimeStr, 'InputFormat', 'yyyy-MM-dd''T''HH:mm:ss.SSSz','TimeZone','local');
+    if(hasMilliseconds)
+        try
+            fNIR.t0 = datetime(dateTimeStr, 'InputFormat', 'yyyy-MM-dd''T''HH:mm:ss.SSSz','TimeZone','local');
+        catch
+            fNIR.t0 = datetime(dateTimeStr, 'InputFormat', 'yyyy-MM-dd''T''HH:mm:ss.SSS','TimeZone','local');
+        end
+    else
+        try
+            fNIR.t0 = datetime(dateTimeStr, 'InputFormat', 'yyyy-MM-dd''T''HH:mm:ssz','TimeZone','local');
+        catch
+            fNIR.t0 = datetime(dateTimeStr, 'InputFormat', 'yyyy-MM-dd''T''HH:mm:ss','TimeZone','local');
+        end
+    end
 
 elseif(isfield(metadataTags,'UnixTime'))
     unixTime = str2double(metadataTags.UnixTime);
@@ -130,8 +143,19 @@ end
 device.cfg=pf2_base.external.INI();
 device.Info.CfgName='generated SNIRF file';
         
-device.Info.Name=metaDataTags.Model;
-device.Info.Manufacturer=metaDataTags.ManufacturerName;
+if(isfield(metaDataTags,'Model'))
+    device.Info.Name=metaDataTags.Model;
+else
+    device.Info.Name='Unknown Model';
+end
+
+if(isfield(metaDataTags,'ManufacturerName'))
+    device.Info.Manufacturer=metaDataTags.ManufacturerName;
+else
+    device.Info.Manufacturer='Unknown Model';
+end
+
+
 device.Info.DefaultSamplingRate=fNIR.fs;
 device.Info.MaxSamplingRate=fNIR.fs;
 device.Info.NumberProbes=1;%length(probeNums);
@@ -171,26 +195,32 @@ for p=1:1%length(probeNums)
     
     device.Probe{p}.TableCh.OptodeNumber(device.Probe{p}.TableCh.OptodeNumber<1)=nan;
 
+
+    numOpt = length(firstOpt);
+  
+
     % reorder optodes so they are always increasing by first channel
     % presentation
 
     opt_list= device.Probe{p}.TableCh.OptodeNumber;
-    reindexed_list = zeros(size(opt_list));
-    current_value = opt_list(1);
-    next_index = 0;
+    reindexed_lookup = nan(numOpt,2);
+    reindexed_list = nan(size(opt_list));
+    next_index = 1;
 
     % Iterate over the input list
     for i = 1:length(opt_list)
         if(isnan(opt_list(i)))
-            reindexed_list(i)=nan;
             continue;
         end
-        if opt_list(i) == current_value
-            reindexed_list(i) = next_index;
+        if ismember(opt_list(i),reindexed_lookup(:,2))
+            reindexed_list(i) = reindexed_lookup(opt_list(i),1);
         else
-            current_value = opt_list(i);
-            next_index = next_index + 1;
+            reindexed_lookup(opt_list(i),1)=next_index;
+            reindexed_lookup(opt_list(i),2)=opt_list(i);
+
+            
             reindexed_list(i) = next_index;
+            next_index = next_index + 1;
         end
     end
 
@@ -214,30 +244,11 @@ for p=1:1%length(probeNums)
     device.Probe{p}.SrcPos=table();
     device.Probe{p}.DetPos=table();
 
-    srcXYZ=[];
-    srcXYZ_2d=[];
+    srcXYZ=probeInfo.sourcePos3D;
+    srcXYZ_2d=probeInfo.sourcePos2D;
 
-    for(i=1:numSrc)
-        if(isnan(uSrc(i)))
-            continue;
-        end
-       chIdx=find(device.Probe{p}.TableCh.SourceIndex==uSrc(i));
-       curOpt = device.Probe{p}.TableCh.OptodeNumber(chIdx(1));
-       srcXYZ=[srcXYZ;probeInfo.sourcePos3D(curOpt,:)];
-       srcXYZ_2d=[srcXYZ_2d;probeInfo.sourcePos2D(curOpt,:)];
-    end
-
-    detXYZ=[];
-    detXYZ_2d=[];
-    for(i=1:numDet)
-        if(isnan(uDet(i)))
-            continue;
-        end
-       chIdx=find(device.Probe{p}.TableCh.DetectorIndex==uDet(i));
-       curOpt = device.Probe{p}.TableCh.OptodeNumber(chIdx(1));
-       detXYZ=[detXYZ;probeInfo.detectorPos3D(curOpt,:)];
-       detXYZ_2d=[detXYZ_2d;probeInfo.detectorPos2D(curOpt,:)];
-    end
+    detXYZ=probeInfo.detectorPos3D;
+    detXYZ_2d=probeInfo.detectorPos2D;
 
     device.Probe{p}.SrcPosX=srcXYZ(:,1);
     device.Probe{p}.SrcPosY=srcXYZ(:,2);
@@ -283,8 +294,6 @@ for p=1:1%length(probeNums)
         end
     end
     
-    numOpt = length(firstOpt);
-  
     device.Probe{p}.TableOpt=table();
     device.Probe{p}.TableOpt.OptodeNum(:)=[1:numOpt]';
 
