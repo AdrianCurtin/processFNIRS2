@@ -591,7 +591,6 @@ if(PF2.mergedProbe) %All channel numbers are unique for merged probes
     end
     PF2.timeIndex=find(PF2.curCh.isTime);
     if(isempty(PF2.timeIndex))
-        warning('Time column could not be found, assuming each row is a sample');
         PF2.timeIndex=0;
     end
 else
@@ -611,6 +610,7 @@ if(PF2.mergedProbe) %All channel numbers are unique for merged probes
             fData.fs=1./median(diff(fData.time));
             fData.sampleTime=1:length(data(:,1));
         elseif(PF2.timeIndex==0)
+            warning('Time column could not be found, assuming each row is a sample');
             fData.sampleTime=1:length(data(:,1));
             fData.time=(fData.sampleTime-1)./setF.device.Info.DefaultSamplingRate;
             fData.fs=setF.device.Info.DefaultSamplingRate;
