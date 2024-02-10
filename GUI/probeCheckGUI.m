@@ -360,6 +360,7 @@ uiwait(handles.figure1);
 function setUpAxes(handles,probInfo)
     
       
+global pf2ChannelCheck
 global pf2ChannelCheckHandles
  
 pf2ChannelCheckHandles.chCurAxesHandle=handles.chAxes;
@@ -373,14 +374,23 @@ if(~isfield(probInfo,'OptLayout2D_ss')&&~isfield(probInfo,'OptPos'))
     warning('Unable to find 2D Optode Layout: Please build layout first');
 end
 
+pf2ChannelCheck.smallMode=false;
 
 if(isfield(probInfo,'OptPos'))
     for c=1:size(probInfo.OptPos,1)
+        curSubplot=probInfo.OptPos.subplot_layout_ss{c};
+        if(c==1 && curSubplot(3)<0.15)
+            pf2ChannelCheck.smallMode=true;
+        end
         if(~isempty(probInfo.OptPos.subplot_layout_ss{c}))
          pf2ChannelCheckHandles.chAxesHandles{c} = axes(uiP);
          plot([1:20],[1:20]);
          pf2ChannelCheckHandles.chAxesHandles{c}.OuterPosition=probInfo.OptPos.subplot_layout_ss{c};
          set(pf2ChannelCheckHandles.chAxesHandles{c},'Tag',sprintf('ChAxes%i',c));
+
+         if(pf2ChannelCheck.smallMode)
+            set(pf2ChannelCheckHandles.chAxesHandles{c},'XTick',[], 'YTick', [],'xticklabels',[],'yticklabels',[]);
+         end
 
          pf2ChannelCheckHandles.chAxesHandles{c}.ButtonDownFcn = @myupdatefcn;
         end
@@ -445,23 +455,39 @@ end
 
     
     hold off;
+    sigLen = length(pf2ChannelCheck.nirsData.time);
+
+    if(~withTitle&&pf2ChannelCheck.smallMode)
+        newIdx = floor(1:sigLen/100:sigLen);
+        timeX = pf2ChannelCheck.nirsData.time(newIdx);
+        dataY = pf2ChannelCheck.nirsData.raw(newIdx,:);
+    else
+        timeX = pf2ChannelCheck.nirsData.time(:);
+        dataY = pf2ChannelCheck.nirsData.raw(:,:);
+    end
+
+   
 
     for i=1:length(curCh)
         x=curCh(i);
-        temp=get(gca);
         
-        handle=plot(pf2ChannelCheck.nirsData.time,pf2ChannelCheck.nirsData.raw(:,x),'linewidth',2);
-        set(gca,'ButtonDownFcn',temp.ButtonDownFcn);
-        set(gca,'Tag',temp.Tag);
+        handle=plot(timeX,dataY(:,x),'linewidth',2);
+        
         hold on;
     end
+
+    temp=get(gca);
+    set(gca,'ButtonDownFcn',temp.ButtonDownFcn);
+    set(gca,'Tag',temp.Tag);
     
    xlim([pf2ChannelCheck.viewTimeStart,pf2ChannelCheck.viewTimeEnd]);
    xl=xlim; 
 
     if(isfield(pf2ChannelCheck.nirsData.probeinfo.Info,'RawMax')&&~pf2ChannelCheck.autoscale)
         
-        plot(xl,ones(size(xl))*pf2ChannelCheck.nirsData.probeinfo.Info.RawMax,'--k');
+        if(~pf2ChannelCheck.smallMode&&~withTitle)
+            plot(xl,ones(size(xl))*pf2ChannelCheck.nirsData.probeinfo.Info.RawMax,'--k');
+        end
         
         yl=ylim();
         ylim([0,pf2ChannelCheck.globalstats.max*1.1]);%pf2ChannelCheck.nirsData.probeinfo.Info.RawMax*1.1]);
@@ -510,7 +536,7 @@ end
     end
     
     
-    if(plotMarkers&&~isempty(pf2ChannelCheck.markers))
+    if(withTitle&&plotMarkers&&~isempty(pf2ChannelCheck.markers))
         reducedMarkers=pf2ChannelCheck.markers(ismember(pf2ChannelCheck.markers(:,2),pf2ChannelCheck.curMarkers),:);
         
         numMarkers=length(reducedMarkers(:,1));
@@ -533,9 +559,10 @@ end
         title(sprintf('Channel %i of %i',ch,pf2ChannelCheck.numChannels));
         set(pf2ChannelCheck.handle.text_curChannel,'String',sprintf('Ch %i of %i',ch,pf2ChannelCheck.numChannels));
         
-        
-        
         set(pf2ChannelCheckHandles.text_channelStats,'String',getChannelStatStr(ch));
+    elseif(pf2ChannelCheck.smallMode)
+        xticklabels([]);
+        yticklabels([]);
     end
     
         xlim([pf2ChannelCheck.viewTimeStart,pf2ChannelCheck.viewTimeEnd]);
