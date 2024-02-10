@@ -51,7 +51,7 @@ if(isfield(data.nirs,'stim'))
         fNIR.markers=[];
     end
 else
-    
+     fNIR.markers=[];
 end
 
 data=data.nirs.data;
@@ -417,11 +417,12 @@ for p=1:1%length(probeNums)
     device.Probe{p}.wvI=reshape(measurementList.('wavelengthIndex'),[1,height(measurementList)]);
     device.Probe{p}.ChannelNumbers=uPairIdx';
     device.Probe{p}.ChannelList= 1:numCh;
-    device.Probe{p}.Wavelength=probeInfo.wavelengths;
+    device.Probe{p}.Wavelength=probeInfo.wavelengths(:)';
     device.Info.NumberChannels=device.Info.NumberChannels+numCh;
 
 
-    for c=50:length(firstOpt)
+    for c=1:numOpt
+        
         device.Probe{p}.TableOpt.Ch(c,:)=(find(device.Probe{p}.ChannelNumbers==device.Probe{p}.ChannelList(c)));
         wvIdxToMatch=device.Probe{p}.wvI(device.Probe{p}.TableOpt.Ch(c,:));
         if(~any(isnan(wvIdxToMatch)))
