@@ -159,7 +159,7 @@ end
 
 if(~isfield(fNIR,'HbR')&&isfield(fNIR,'raw'))
     % out of principle we don't resample the raw data
-    warning('Raw data averaging not supported');
+    error('Raw data averaging not supported');
 elseif(~isfield(fNIR,'HbR')&&~isfield(fNIR,'raw'))
     warning('No fNIRS data');
     outFNIR=fNIR;
