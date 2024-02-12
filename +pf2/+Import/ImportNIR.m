@@ -565,6 +565,8 @@ function markers=importMrkFile(mrkid,mrkSrcID)
 	while(lineF~=-1)
 	   linecount=linecount+1;
 	   
+       markerParts = strsplit(lineF,'\t');
+       
 	   temp=sscanf(lineF,'%f\t%f\t%f')';
 	   if(length(temp)>2)
 			markers.data(linecount,:)=[temp(1:2),mrkSrcID];
