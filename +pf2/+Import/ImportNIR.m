@@ -538,6 +538,14 @@ end
 
 
 function markers=importMrkFile(mrkid,mrkSrcID)
+
+    % Marker format should be
+
+    % t = time from start time/elapsed time
+    % marker value
+    % marker duration
+    % marker source (optional)
+
     if(nargin<2)
         mrkSrcID=0;
     end
@@ -566,20 +574,32 @@ function markers=importMrkFile(mrkid,mrkSrcID)
 	   linecount=linecount+1;
 	   
        markerParts = strsplit(lineF,'\t');
+
+       numTabs = length(markerParts);
+
+       lineF=fgetl(mrkid);
+
+       if(numTabs>0)
+           if(contains(markerParts{1},':'))
+               continue;
+           end
+       else
+             continue;
+       end
+
+       mrkLine=nan([1,3]);
        
-	   temp=sscanf(lineF,'%f\t%f\t%f')';
-	   if(length(temp)>2)
-			markers.data(linecount,:)=[temp(1:2),mrkSrcID];
-	   elseif(length(temp)>1)
-		   markers.data(linecount,:)=[temp(1:2),mrkSrcID];
-	   else
-		   markers.data(linecount,:)=[zeros(1,2),0];
-	   end
-	   lineF=fgetl(mrkid);
-	   
+       for mrkI = 1:numTabs
+            mrkLine(mrkI)=str2double(markerParts{mrkI});
+       end
+
+       markers.data=[markers.data;mrkLine];
+    end
+
+    if(size(markers.data,1)>0)
+        markers.data(:,end+1)=mrkSrcID;
     end
     
-    markers.data(markers.data(:,2)==0&markers.data(:,1)==0,:)=[];
 	fclose(mrkid);
 end
 
