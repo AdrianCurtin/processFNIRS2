@@ -220,7 +220,9 @@ while(ischar(lineF))
     
     if(countCheckFlag)
        countCheckFlag=false;
-       numVar=length(strsplit(lineF,'\t'));   
+       strParts = strsplit(lineF,'\t');
+       strParts = strParts(cellfun(@strlen,strParts)>0);
+       numVar=length(strParts);   
        
        if(numVar==1)
              numVar=length(strsplit(lineF,' '));   
