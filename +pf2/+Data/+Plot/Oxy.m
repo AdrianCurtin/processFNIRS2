@@ -31,13 +31,14 @@ validbioMlist = @(x) (iscell(x) || ischar(x));
 p=inputParser;
 addRequired(p, 'fNIR', validFnirs);
 addOptional(p, 'channels', [], validChannels);
-addOptional(p, 'showMarkers', true, @islogical);
+addOptional(p, 'markers', [], @isnumeric);
 addOptional(p, 'bioMlist', {'HbO', 'HbR'}, validbioMlist);
-addOptional(p, 'baseline', false, @islogical);
+addOptional(p, 'baseline', false, @isnumeric);
 addOptional(p, 'ylimit', [], @isnumeric);
 addOptional(p, 'plotArranged', false, @islogical);
 addOptional(p, 'lineProps', {'LineWidth', 1}, @iscell);
 addOptional(p, 'rejectedLineProps', {'--', 'LineWidth', 1}, @iscell);
+addOptional(p, 'showMarkers', true, @islogical);
 
 parse(p, varargin{:});
 fNIR = p.Results.fNIR;
@@ -127,7 +128,8 @@ end
 
 for i=1:length(bioMlist)
    if(~isfield(fNIR,bioMlist{i}))
-       error(sprintf('Biomarker %s does not exist',bioMlist{i}));
+       warning(sprintf('Biomarker %s does not exist',bioMlist{i}));
+       return;
    end
 end
     
