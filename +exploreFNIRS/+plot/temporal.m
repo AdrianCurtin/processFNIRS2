@@ -682,6 +682,10 @@ if(iscell(possibleStr))
             possibleStr{i}=num2str(possibleStr{i}); 
        end
     end
+
+    if(iscell(possibleStr)&&all(size(possibleStr)==1))
+        possibleStr=possibleStr{1};
+    end
 elseif(~ischar(possibleStr)&&isnumeric(possibleStr))
     possibleStr=num2str(possibleStr);
 end
