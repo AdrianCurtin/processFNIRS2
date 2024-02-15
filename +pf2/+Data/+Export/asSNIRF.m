@@ -108,6 +108,10 @@ for n=1:numNIRS
 
 end
 
+if(isstring(filepath))
+    filepath=char(filepath);
+end
+
 pf2_base.external.jsnirfy.savesnirf(snirfData,filepath);
 
 %  fid=fopen(filepath,'wt');
