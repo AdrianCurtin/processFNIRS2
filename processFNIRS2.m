@@ -152,7 +152,7 @@ else
 
     elseif(~isempty(cfgFilePath)) 
 
-        if(pf2_base.isnestedfield(setF,'device.cfg.Info.CfgName')) % look to see if they match,...
+        if(pf2_base.isnestedfield(setF,'device.cfg.Info.CfgName')&&length(setF)==1) % look to see if they match,...
 
             curProbeName=sprintf('%s.cfg',setF.device.cfg.Info.CfgName);
 

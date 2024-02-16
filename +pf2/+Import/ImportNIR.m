@@ -419,55 +419,31 @@ if(hasDataSource)
 
     numOptodes = sscanf(dataSourceParts{end},'%i optodes'); %ex: 4 18
 
-    switch(imagerModel)
-        case 'Model 1200W Imager'
-            switch(probeStyle)
-                case 'Split'
-                    fNIR.info.probename='fNIR_Devices_fNIR1000_Split_2x2ch';
-                    fNIR.raw=fNIR.raw(:,1:13);
-                case 'Linear'
-                    fNIR.info.probename='fNIR_Devices_fNIR1000_Linear';
-                    fNIR.raw=fNIR.raw(:,1:13);
-                otherwise
-                     warning('Unidentified Probe\n');
-                    fNIR.info.probename='Unknown .nir file';
-            end
-        case 'Model 2000M Imager'
-            switch(probeStyle)
-                case 'HD' % 2x8 +2
-                    fNIR.info.probename='fNIR_Devices_fNIR2000_18ch';
-                    fNIR.raw=fNIR.raw(:,1:55);
-                case 'HDS' % 2x8 +2
-                    fNIR.info.probename='fNIR_Devices_fNIR2000_18ch';
-                    fNIR.raw=fNIR.raw(:,1:55);
-                case 'SD' % 2x2 +1
-                    fNIR.info.probename='fNIR_Devices_fNIR1000';
-                    fNIR.raw=fNIR.raw(:,1:(20*3+1));
-                case 'LD' % 1x4 +2
-                    fNIR.info.probename='fNIR_Devices_fNIR1000';
-                    fNIR.raw=fNIR.raw(:,1:(6*3+1));
-                otherwise
-                     warning('Unidentified Probe\n');
-                    fNIR.info.probename='Unknown .nir file';
-            end
-        case 'Model 2000S Imager'
-              switch(probeStyle)
-                case 'HD' % 2x8 +2
-                    fNIR.info.probename='fNIR_Devices_fNIR2000';
-                    fNIR.raw=fNIR.raw(:,1:55);
-                case 'HDS' % 2x8 +2
-                    fNIR.info.probename='fNIR_Devices_fNIR2000_18ch';
-                    fNIR.raw=fNIR.raw(:,1:55);
-                case 'SD' % 2x2 +1
-                    fNIR.info.probename='fNIR_Devices_fNIR1000';
-                    fNIR.raw=fNIR.raw(:,1:(20*3+1));
-                case 'LD' % 1x4 +2
-                    fNIR.info.probename='fNIR_Devices_fNIR1000';
-                    fNIR.raw=fNIR.raw(:,1:(6*3+1));
-                otherwise
-                     warning('Unidentified Probe\n');
-                    fNIR.info.probename='Unknown .nir file';
-              end
+    switch(probeStyle)
+        case 'Split'
+            fNIR.info.probename='fNIR_Devices_fNIR1000_Split_2x2ch';
+            fNIR.raw=fNIR.raw(:,1:13);
+        case 'Linear'
+            error('update this');
+            fNIR.info.probename='fNIR_Devices_fNIR1000_Linear';
+            fNIR.raw=fNIR.raw(:,1:13);
+        case 'HD' % 2x8 +2
+            fNIR.info.probename='fNIR_Devices_fNIR2000_18ch';
+            fNIR.raw=fNIR.raw(:,1:55);
+        case 'HDS' % 2x8 +2
+            fNIR.info.probename='fNIR_Devices_fNIR2000_18ch';
+            fNIR.raw=fNIR.raw(:,1:55);
+        case 'SD' % 2x2 +1
+            error('update this');
+            fNIR.info.probename='fNIR_Devices_fNIR1000_Split_2x2ch';
+            fNIR.raw=fNIR.raw(:,1:(20*3+1));
+        case 'LD' % 1x4 +2
+            error('update this');
+            fNIR.info.probename='fNIR_Devices_fNIR1000';
+            fNIR.raw=fNIR.raw(:,1:(6*3+1));
+        otherwise
+             warning('Unidentified Probe\n');
+            fNIR.info.probename='Unknown .nir file';
     end
 
 else
