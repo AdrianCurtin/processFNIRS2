@@ -364,7 +364,7 @@ for chIdx=1:numOpt
                           curFigH.legendHandles{curSy,curSx}.h{b}=h;
                       end
                   else
-                      if(~isempty(data2plot.(bioM))&&isfield(data2plot,bioM))
+                      if(isfield(data2plot,bioM)&&~isempty(data2plot.(bioM)))
                           if(~plotAsTable)
                             h=plot(curFigH.subH{curSy,curSx},dataTime,data2plot.(bioM)(:,ch),'color',cIndex(curUgroupIdx,:));
                           else
