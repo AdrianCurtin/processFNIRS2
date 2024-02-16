@@ -131,6 +131,8 @@ log_filename=sprintf('%s.log',fileroot);
 
 log_info=importCOBIlog(log_filename);
 
+hasDataSource=false;
+
 
 lineF=fgetl(fid);
 while(ischar(lineF))
@@ -148,21 +150,15 @@ while(ischar(lineF))
             header.startCode=header.startCodeAlt; %if second code is missing, just use first
         end
         
-    end
-    if(~isempty(strfind(lineF, 'Freq Code:')))
+    elseif(~isempty(strfind(lineF, 'Freq Code:')))
         header.freqCode=sscanf(lineF,'Freq Code:\t%f\n',1);  %record frequency code
-    end
-    if(~isempty(strfind(lineF, 'Current:')))
+    elseif(~isempty(strfind(lineF, 'Current:')))
         header.current=sscanf(lineF,'Current:\t%f\n',1);  %record LED current used
-    end
-    if(~isempty(strfind(lineF, 'Gains:')))
+    elseif(~isempty(strfind(lineF, 'Gains:')))
         header.gains=sscanf(lineF,'Gains:\t%f\n',1);  %record Detector Gain used
-    end
-    if(~isempty(strfind(lineF, 'Other:')))
+    elseif(~isempty(strfind(lineF, 'Other:')))
         header.other=sscanf(lineF,'Other:\t%s\n',1);  %record Detector Gain used
-    end
-    
-    if(~isempty(strfind(lineF,'Start Time:')))
+    elseif(~isempty(strfind(lineF,'Start Time:')))
        temp=strsplit(lineF,'\t');
        temp=temp{2};
        temp=strsplit(temp,' ');
@@ -179,6 +175,21 @@ while(ischar(lineF))
              end
           end
        end
+    end
+
+    if(~isempty(strfind(lineF,'SubjectID:')))
+        lineF_parts=strsplit(lineF,'\t');
+
+        id_idx=find(strcmp(lineF_parts,'SubjectID:'));
+        header.SubjectId=lineF_parts{id_idx+1};
+    end
+
+    if(~isempty(strfind(lineF,'Data Source:')))
+        lineF_parts=strsplit(lineF,'\t');
+
+        id_idx=find(strcmp(lineF_parts,'Data Source:'));
+        header.DataSource=lineF_parts{id_idx+1};
+        hasDataSource=true;
     end
     
     lineF=fgetl(fid); %Get Next Line
@@ -368,6 +379,8 @@ fNIR.info.baseline=baseline;
 
 if(~isempty(log_info)&&isfield(log_info,'SubjectID'))
     fNIR.info.SubjectID=log_info.SubjectID;
+elseif(isfield(fNIR.info.header,'SubjectId'))
+    fNIR.info.SubjectID=fNIR.info.header.SubjectId;
 end
 if(~isempty(log_info)&&isfield(log_info,'Experimenter'))
     fNIR.info.Experimenter=log_info.Experimenter;
@@ -395,18 +408,82 @@ end
 
 numRawChannels=size(data,2)-1;
 
+if(hasDataSource)
+    dataSource = fNIR.info.header.DataSource;
 
+    dataSourceParts = strsplit(dataSource,', ');
 
-switch(numRawChannels)
-    case 12
-        fNIR.info.probename='fNIR_Devices_fNIR1000_Linear';
-    case 48
-        fNIR.info.probename='fNIR_Devices_fNIR1000';
-    case 54
-        fNIR.info.probename='fNIR_Devices_fNIR2000';
-    otherwise
-        warning('Unidentified Probe\n');
-        fNIR.info.probename='Unknown .nir file';
+    imagerModel = dataSourceParts{2}; % ex Model 2000S Imager, Model 1200W Imager
+
+    probeStyle = dataSourceParts{end-1}; % ex HD split
+
+    numOptodes = sscanf(dataSourceParts{end},'%i optodes'); %ex: 4 18
+
+    switch(imagerModel)
+        case 'Model 1200W Imager'
+            switch(probeStyle)
+                case 'Split'
+                    fNIR.info.probename='fNIR_Devices_fNIR1000_Split_2x2ch';
+                    fNIR.raw=fNIR.raw(:,1:13);
+                case 'Linear'
+                    fNIR.info.probename='fNIR_Devices_fNIR1000_Linear';
+                    fNIR.raw=fNIR.raw(:,1:13);
+                otherwise
+                     warning('Unidentified Probe\n');
+                    fNIR.info.probename='Unknown .nir file';
+            end
+        case 'Model 2000M Imager'
+            switch(probeStyle)
+                case 'HD' % 2x8 +2
+                    fNIR.info.probename='fNIR_Devices_fNIR2000_18ch';
+                    fNIR.raw=fNIR.raw(:,1:55);
+                case 'HDS' % 2x8 +2
+                    fNIR.info.probename='fNIR_Devices_fNIR2000_18ch';
+                    fNIR.raw=fNIR.raw(:,1:55);
+                case 'SD' % 2x2 +1
+                    fNIR.info.probename='fNIR_Devices_fNIR1000';
+                    fNIR.raw=fNIR.raw(:,1:(20*3+1));
+                case 'LD' % 1x4 +2
+                    fNIR.info.probename='fNIR_Devices_fNIR1000';
+                    fNIR.raw=fNIR.raw(:,1:(6*3+1));
+                otherwise
+                     warning('Unidentified Probe\n');
+                    fNIR.info.probename='Unknown .nir file';
+            end
+        case 'Model 2000S Imager'
+              switch(probeStyle)
+                case 'HD' % 2x8 +2
+                    fNIR.info.probename='fNIR_Devices_fNIR2000';
+                    fNIR.raw=fNIR.raw(:,1:55);
+                case 'HDS' % 2x8 +2
+                    fNIR.info.probename='fNIR_Devices_fNIR2000_18ch';
+                    fNIR.raw=fNIR.raw(:,1:55);
+                case 'SD' % 2x2 +1
+                    fNIR.info.probename='fNIR_Devices_fNIR1000';
+                    fNIR.raw=fNIR.raw(:,1:(20*3+1));
+                case 'LD' % 1x4 +2
+                    fNIR.info.probename='fNIR_Devices_fNIR1000';
+                    fNIR.raw=fNIR.raw(:,1:(6*3+1));
+                otherwise
+                     warning('Unidentified Probe\n');
+                    fNIR.info.probename='Unknown .nir file';
+              end
+    end
+
+else
+       
+    switch(numRawChannels)
+        case 12
+            fNIR.info.probename='fNIR_Devices_fNIR1000_Linear';
+        case 48
+            fNIR.info.probename='fNIR_Devices_fNIR1200_16ch';
+        case 54
+            fNIR.info.probename='fNIR_Devices_fNIR2000_18ch';
+        otherwise
+            warning('Unidentified Probe\n');
+            fNIR.info.probename='Unknown .nir file';
+    end
+
 end
 
 
