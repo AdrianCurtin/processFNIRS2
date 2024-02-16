@@ -342,7 +342,7 @@ pf2_base.external.jsnirfy.savesnirf(snirfData,filepath);
 end
 
 function charOut=c2v(str)
-    charOut=char(str)';
+    charOut=char(str);
 end
 
 function metaData=info2meta(nirStruct)
