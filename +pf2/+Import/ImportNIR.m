@@ -419,12 +419,14 @@ if(hasDataSource)
 
     numOptodes = sscanf(dataSourceParts{end},'%i optodes'); %ex: 4 18
 
+    fprintf('Loading configuration for: %s %s\n',imagerModel,probeStyle);
+
     switch(probeStyle)
         case 'Split'
             fNIR.info.probename='fNIR_Devices_fNIR1000_Split_2x2ch';
             fNIR.raw=fNIR.raw(:,1:13);
         case 'Linear'
-            error('update this');
+            error('This probe is unsupported');
             fNIR.info.probename='fNIR_Devices_fNIR1000_Linear';
             fNIR.raw=fNIR.raw(:,1:13);
         case 'HD' % 2x8 +2
@@ -434,11 +436,11 @@ if(hasDataSource)
             fNIR.info.probename='fNIR_Devices_fNIR2000_18ch';
             fNIR.raw=fNIR.raw(:,1:55);
         case 'SD' % 2x2 +1
-            error('update this');
+            error('This probe is unsupported');
             fNIR.info.probename='fNIR_Devices_fNIR1000_Split_2x2ch';
             fNIR.raw=fNIR.raw(:,1:(20*3+1));
         case 'LD' % 1x4 +2
-            error('update this');
+            error('This probe is unsupported');
             fNIR.info.probename='fNIR_Devices_fNIR1000';
             fNIR.raw=fNIR.raw(:,1:(6*3+1));
         otherwise
