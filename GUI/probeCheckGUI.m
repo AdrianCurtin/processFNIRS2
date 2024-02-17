@@ -523,13 +523,15 @@ end
         hold on;
     end
     
+   
+
     if(~withTitle&&ch==pf2ChannelCheck.curChannel)
         if(isfield(pf2ChannelCheck,'curChannelMarker'))
             delete(pf2ChannelCheck.curChannelMarker);
         end
         
         
-        pf2ChannelCheck.curChannelMarker=text(mean(xl)/2+15,mean(yl),'O','FontSize',60,'color',[ 0.2,0.2,0.2]);  %Current Channel
+        pf2ChannelCheck.curChannelMarker=text(mean(xl),mean(yl),'O','HorizontalAlignment','center','FontSize',60,'color',[ 0.2,0.2,0.2]);  %Current Channel
         set(pf2ChannelCheck.curChannelMarker,'ButtonDownFcn',temp.ButtonDownFcn);
         set(pf2ChannelCheck.curChannelMarker,'Tag',temp.Tag);
         hold on;
@@ -565,7 +567,12 @@ end
         yticklabels([]);
     end
     
-        xlim([pf2ChannelCheck.viewTimeStart,pf2ChannelCheck.viewTimeEnd]);
+    xlim([pf2ChannelCheck.viewTimeStart,pf2ChannelCheck.viewTimeEnd]);
+
+     if(withTitle&&ch==pf2ChannelCheck.curChannel)
+        axes(pf2ChannelCheckHandles.chAxesHandles{ch});
+        plotChannel(ch,false,false);
+    end
     
 function statStr=getChannelStatStr(ch)
 
