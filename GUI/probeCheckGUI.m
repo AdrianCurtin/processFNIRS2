@@ -466,19 +466,29 @@ end
         dataY = pf2ChannelCheck.nirsData.raw(:,:);
     end
 
-   
+    temp=get(gca);
+
+    channelTag = sprintf('ChAxes%i',ch);
+    
+    set(gca,'Tag',channelTag);
+    set(gca,'ButtonDownFcn',@myupdatefcn);
+
+    temp.ButtonDownFcn = @myupdatefcn;
+    temp.Tag = channelTag;
 
     for i=1:length(curCh)
         x=curCh(i);
         
-        handle=plot(timeX,dataY(:,x),'linewidth',2);
+        lineHandle=plot(timeX,dataY(:,x),'linewidth',2);
+
+
+        set(lineHandle,'Tag',channelTag);
+        set(lineHandle,'ButtonDownFcn',@myupdatefcn);
         
         hold on;
     end
 
-    temp=get(gca);
-    set(gca,'ButtonDownFcn',temp.ButtonDownFcn);
-    set(gca,'Tag',temp.Tag);
+   
     
    xlim([pf2ChannelCheck.viewTimeStart,pf2ChannelCheck.viewTimeEnd]);
    xl=xlim; 
@@ -487,7 +497,9 @@ end
         
         if(~pf2ChannelCheck.smallMode&&~withTitle)
             plot(xl,ones(size(xl))*pf2ChannelCheck.nirsData.probeinfo.Info.RawMax,'--k');
+
         end
+
         
         yl=ylim();
         ylim([0,pf2ChannelCheck.globalstats.max*1.1]);%pf2ChannelCheck.nirsData.probeinfo.Info.RawMax*1.1]);
@@ -505,12 +517,12 @@ end
     yl=ylim();
 
     if(pf2ChannelCheck.fchMask(ch)==0) % big red x to mark rejected
-        th=text(mean(xl)/2+15,mean(yl),'X','FontSize',40,'color',[1,0,0]);
+        th=text(mean(xl),mean(yl),'X','HorizontalAlignment','center','FontSize',40,'color',[1,0,0]);
         set(th,'ButtonDownFcn',temp.ButtonDownFcn);
         set(th,'Tag',temp.Tag);
         hold on;
     elseif(pf2ChannelCheck.fchMask(ch)==0.5)
-        th=text(mean(xl)/2+15,mean(yl),'~','FontSize',50,'color',[ 0.9100,0.4100,0.1700]);
+        th=text(mean(xl),mean(yl),'~','HorizontalAlignment','center','FontSize',50,'color',[ 0.9100,0.4100,0.1700]);
         set(th,'ButtonDownFcn',temp.ButtonDownFcn);
         set(th,'Tag',temp.Tag);
         hold on;
