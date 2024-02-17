@@ -51,6 +51,15 @@ function varargout=loadh5(filename, varargin)
 %    License: GPLv3 or 3-clause BSD license, see https://github.com/fangq/easyh5 for details
 %
 
+if(~exist('varargin2struct'))
+    varargin2struct=@pf2_base.external.easyh5.varargin2struct;
+
+    import('pf2_base.external.easyh5.*'); 
+end
+
+if(~exist('jsonopt'))
+    jsonopt=@pf2_base.external.easyh5.jsonopt;
+end
 
 
 
@@ -159,6 +168,10 @@ meta=inputdata.meta;
 function [status, res]=group_iterate(group_id,objname,inputdata)
 status=0;
 attr=struct();
+
+if(~exist('jsonopt'))
+    jsonopt=@pf2_base.external.easyh5.jsonopt;
+end
 
 encodename=jsonopt('PackHex',1,inputdata.opt);
 

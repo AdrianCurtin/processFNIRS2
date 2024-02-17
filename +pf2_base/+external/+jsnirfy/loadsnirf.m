@@ -36,8 +36,17 @@ if(nargin==0 || ~ischar(fname))
     error('you must provide a file name');
 end
 
-import('pf2_base.external.easyh5.loadh5');
-import('pf2_base.external.jsnirfy.snirfdecode');
+if(~exist('loadh5'))
+    loadh5=@pf2_base.external.easyh5.loadh5;
+end
+
+if(~exist('snirfdecode'))
+    snirfdecode=@pf2_base.external.jsnirfy.snirfdecode;
+end
+
+if(~exist('jsonopt'))
+    jsonopt=@pf2_base.external.easyh5.jsonopt;
+end
 
 data=loadh5(fname);
 
