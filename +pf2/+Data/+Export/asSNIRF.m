@@ -80,6 +80,10 @@ for n=1:numNIRS
     data.time = curStruct.time';
     data.measurementList=measurementList;
 
+    if(stripExtraRawChannels)
+        data.dataTimeSeries=data.dataTimeSeries(:,~extraChannels);
+    end
+
     
 
     if(normalizeRaw)
