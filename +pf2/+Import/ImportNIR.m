@@ -348,9 +348,13 @@ if(size(data,2)>(size(baseline,2))||lastColIsSampleCount) % Last column in newer
     end
     
     data=data(:,1:end-1);
-
-   
 end
+
+if(lastColIsSampleCount)
+    % if we have sample count rewrite time data with that
+    data(:,1)=data(1,1)+lastCol/1000-lastCol(1);
+end
+
 
 
 
