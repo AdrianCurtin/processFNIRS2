@@ -58,10 +58,20 @@ data=data.nirs.data;
 
 measurementList=struct2table(data.measurementList);
 
-
-
+if(isfield(metaDataTags,'Normalized')&&strcmp(metaDataTags.Normalized,'1')||strcmp(metaDataTags.Normalized,'true'))
+    if(isfield(metaDataTags,'RawMax'))
+        rawDC_channels = contains(cat(1,measurementList.dataTypeLabel),'raw-DC');
+        rawMax = str2double(metaDataTags.RawMax);
+        data.dataTimeSeries = data.dataTimeSeries(:,rawDC_channels)*rawMax;
+    else
+        warning('data is normalized but unkown max value, cannot be restored to original state');
+        
+    end
+end
 
 fNIR.raw=data.dataTimeSeries;
+
+
 
 
 device=[];
@@ -104,30 +114,46 @@ if(strcmp(metaDataTags.LengthUnit,'cm'))
     end
 end
 
-if(isfield(metaDataTags,'MeasurementTime')&&isfield(metaDataTags,'MeasurementDate'))
+if(isfield(metaDataTags,'UnixTime'))
+    unixTime = str2double(metaDataTags.UnixTime);
+
+    % Convert Unix time to datetime
+    fNIR.t0 = datetime(unixTime, 'ConvertFrom', 'posixtime');
+
+    if(isfield(metaDataTags,'MeasurementTimeZone'))
+        fNIR.t0.TimeZone =metaDataTags.MeasurementTimeZone;
+    else
+        fNIR.t0.TimeZone ='local';
+    end
+
+elseif(isfield(metaDataTags,'MeasurementTime')&&isfield(metaDataTags,'MeasurementDate'))
     hasMilliseconds = contains(metaDataTags.MeasurementTime,'.');
     dateTimeStr = [metaDataTags.MeasurementDate 'T' metaDataTags.MeasurementTime];
     if(hasMilliseconds)
         try
-            fNIR.t0 = datetime(dateTimeStr, 'InputFormat', 'yyyy-MM-dd''T''HH:mm:ss.SSSz','TimeZone','local');
+            fNIR.t0 = datetime(dateTimeStr, 'InputFormat', 'yyyy-MM-dd''T''HH:mm:ss.SSSz','TimeZone','GMT');
+            if(isfield(metaDataTags,'MeasurementTimeZone'))
+                fNIR.t0.TimeZone =metaDataTags.MeasurementTimeZone;
+            else
+                fNIR.t0.TimeZone ='local';
+            end
         catch
             fNIR.t0 = datetime(dateTimeStr, 'InputFormat', 'yyyy-MM-dd''T''HH:mm:ss.SSS','TimeZone','local');
         end
     else
         try
-            fNIR.t0 = datetime(dateTimeStr, 'InputFormat', 'yyyy-MM-dd''T''HH:mm:ssz','TimeZone','local');
+            fNIR.t0 = datetime(dateTimeStr, 'InputFormat', 'yyyy-MM-dd''T''HH:mm:ssz','TimeZone','GMT');
+            if(isfield(metaDataTags,'MeasurementTimeZone'))
+                fNIR.t0.TimeZone =metaDataTags.MeasurementTimeZone;
+            else
+                fNIR.t0.TimeZone ='local';
+            end
         catch
             fNIR.t0 = datetime(dateTimeStr, 'InputFormat', 'yyyy-MM-dd''T''HH:mm:ss','TimeZone','local');
         end
     end
-
-elseif(isfield(metadataTags,'UnixTime'))
-    unixTime = str2double(metadataTags.UnixTime);
-
-    % Convert Unix time to datetime
-    fNIR.t0 = datetime(unixTime, 'ConvertFrom', 'posixtime');
-
 end
+
         
         %probeNums=unique(probeInfo.SD.MeasList(:,3)); % I THINK
         

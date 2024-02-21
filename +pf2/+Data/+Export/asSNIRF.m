@@ -82,10 +82,10 @@ for n=1:numNIRS
        
             normalizedData = data.dataTimeSeries(:,rawDC_channels)./estimatedRawMax;
             
-            metaDataTags.('RawMax')=num2str(estimatedRawMax);
+            metaDataTags.('RawMax')=c2v(num2str(estimatedRawMax));
         end
 
-        metaDataTags.('Normalized')=true;
+        metaDataTags.('Normalized')='true';
 
         data.dataTimeSeries(:,rawDC_channels)= normalizedData;
     end
