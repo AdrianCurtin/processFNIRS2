@@ -7,6 +7,14 @@ end
 
 structOut=inputStruct1;
 
+if(~isstruct(inputStruct2))
+    return;
+end
+
+if(~isstruct(inputStruct1))
+    structOut=inputStruct2;
+end
+
 structFields2=fields(inputStruct2);
 
 numFields = length(structFields2);
