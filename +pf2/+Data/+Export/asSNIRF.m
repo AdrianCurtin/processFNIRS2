@@ -1,4 +1,4 @@
-function [ snirfData] = asSNIRF( fNIRcells, filepath, normalizeRaw)
+function [ snirfData] = asSNIRF( fNIRcells, filepath, normalizeRaw, stripExtraRawChannels)
 %Takes fNIR struct and packages the .snirf file
 %   Use to construct .snirf files for export and packaging
 
@@ -15,6 +15,10 @@ end
 
 if(nargin<3)
     normalizeRaw=false;
+end
+
+if(nargin<4)
+    stripExtraRawChannels = false;
 end
 
 [ filepathdir , filename , ext ] = fileparts( filepath ) ;
@@ -55,6 +59,12 @@ for n=1:numNIRS
     metaDataTags=info2meta(curStruct);
 
     [probe,measurementList,probeMetaData, rawMax]=buildProbe(curStruct);
+
+    extraChannels = ~strcmp(cat(1,{measurementList.dataTypeLabel}),'raw-DC');
+
+    if(stripExtraRawChannels)
+        measurementList = measurementList(~extraChannels);
+    end
 
     probeFields=fields(probeMetaData);
     for p=1:length(probeFields)
