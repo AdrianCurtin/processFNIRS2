@@ -435,6 +435,8 @@ function metaData=info2meta(nirStruct)
 
         if(isstring(curField)||ischar(curField))
             metaData.(infoFields{i})=c2v(curField);
+        elseif(isnumeric(curField) &&all(size(curField)==1))
+            metaData.(infoFields{i})=c2v(num2str(curField));
         end
     end
     
