@@ -64,6 +64,10 @@ for n=1:numNIRS
 
     if(stripExtraRawChannels)
         measurementList = measurementList(~extraChannels);
+        [a,~,c]=unique(cat(1,measurementList.wavelengthIndex));
+        c=num2cell(c);
+        [measurementList.wavelengthIndex]=c{:};
+        probe.wavelengths=probe.wavelengths(a);
     end
 
     probeFields=fields(probeMetaData);
