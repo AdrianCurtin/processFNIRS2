@@ -1,4 +1,4 @@
-function [ snirfData] = asSNIRF( fNIRcells, filepath )
+function [ snirfData] = asSNIRF( fNIRcells, filepath, normalizeRaw)
 %Takes fNIR struct and packages the .snirf file
 %   Use to construct .snirf files for export and packaging
 
@@ -11,6 +11,10 @@ end
 if nargin<2
    [filename path]=uiputfile(['*.snirf']); 
     filepath=[path filename];
+end
+
+if(nargin<3)
+    normalizeRaw=false;
 end
 
 [ filepathdir , filename , ext ] = fileparts( filepath ) ;
@@ -50,7 +54,7 @@ for n=1:numNIRS
 
     metaDataTags=info2meta(curStruct);
 
-    [probe,measurementList,probeMetaData]=buildProbe(curStruct);
+    [probe,measurementList,probeMetaData, rawMax]=buildProbe(curStruct);
 
     probeFields=fields(probeMetaData);
     for p=1:length(probeFields)
@@ -61,6 +65,30 @@ for n=1:numNIRS
     data.dataTimeSeries=curStruct.raw;
     data.time = curStruct.time';
     data.measurementList=measurementList;
+
+    
+
+    if(normalizeRaw)
+        rawDC_channels = contains(cat(1,{measurementList.dataTypeLabel}),'raw-DC');
+        if(~isnan(rawMax))
+            normalizedData = data.dataTimeSeries(:,rawDC_channels)./rawMax;
+        else
+            if(normalizeRaw>1)
+                estimatedRawMax = normalizeRaw;
+            else
+                estimatedRawMax = nanmax(nanmax(data.dataTimeSeries(:,rawDC_channels)));
+                warning('Normalizing to estimated rawmax %i\nIf this is not your intention, please set the normalizeRaw value to match your intended device normalization',estimatedRawMax);
+            end       
+       
+            normalizedData = data.dataTimeSeries(:,rawDC_channels)./estimatedRawMax;
+            
+            metaDataTags.('RawMax')=num2str(estimatedRawMax);
+        end
+
+        metaDataTags.('Normalized')=true;
+
+        data.dataTimeSeries(:,rawDC_channels)= normalizedData;
+    end
 
 
     stim=[];
@@ -367,8 +395,16 @@ function metaData=info2meta(nirStruct)
     if(isfield(nirStruct,'t0')&&~ismember('MeasurementDate',infoFields))
         metaData.MeasurementDate=c2v(sprintf('%i-%02d-%02d',year(nirStruct.t0),month(nirStruct.t0),day(nirStruct.t0)));
         ms=floor(rem(second(nirStruct.t0),1)*1000);
-        tzd='z';
-        warning('time zone should still be set properly');
+        if(nirStruct.t0.TimeZone) % convert time zone to gmt
+            metaData.MeasurementTimeZone = nirStruct.t0.TimeZone;
+            tzd='';
+            %nirStruct.t0.TimeZone='GMT';
+        else
+            tzd='';
+            warning('time missing should still be set properly');
+        end
+        
+        %
         metaData.MeasurementTime=c2v(sprintf('%02d:%02d:%02d.%03d%s',hour(nirStruct.t0),minute(nirStruct.t0),floor(second(nirStruct.t0)),ms,tzd)); 
         metaData.AcquisitionStartTime=num2str(posixtime(nirStruct.t0+seconds(min(nirStruct.time))));
         metaData.UnixTime=num2str(posixtime(nirStruct.t0));
@@ -390,7 +426,7 @@ function metaData=info2meta(nirStruct)
     
 end
 
-function [probe,measurementList,deviceMetaDataTags]=buildProbe(nirStruct)
+function [probe,measurementList,deviceMetaDataTags, rawMax]=buildProbe(nirStruct)
 
     if(isfield(nirStruct,'probeinfo'))
         probeStruct=nirStruct.probeinfo.Probe{1};
@@ -423,6 +459,13 @@ function [probe,measurementList,deviceMetaDataTags]=buildProbe(nirStruct)
     end
     if(isfield(deviceInfoFields,'Name'))
         deviceMetaDataTags.Model=c2v(deviceInfoFields.Name);
+    end
+
+    if isfield(deviceInfoFields,'RawMax')
+        deviceMetaDataTags.RawMax=c2v(num2str(deviceInfoFields.RawMax));
+        rawMax=deviceInfoFields.RawMax;
+    else
+        rawMax=nan;
     end
 
    
