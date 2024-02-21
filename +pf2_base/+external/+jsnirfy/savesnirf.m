@@ -34,6 +34,10 @@ end
 import('pf2_base.external.easyh5.saveh5');
 %import('pf2_base.external.jsnirfy.snirfencode');
 
+if(~exist('varargin2struct')||~contains('pf2_base',which('varargin2struct','all')))
+    varargin2struct=@pf2_base.external.easyh5.varargin2struct;
+end
+
 
 opt=varargin2struct(varargin{:});
 if(~isfield(opt,'root'))

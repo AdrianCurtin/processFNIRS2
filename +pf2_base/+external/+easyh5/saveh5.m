@@ -63,6 +63,14 @@ if(nargin<2)
     error('you must provide at least two inputs');
 end
 
+if(~exist('varargin2struct')||~contains('pf2_base',which('varargin2struct','all')))
+    varargin2struct=@pf2_base.external.easyh5.varargin2struct;
+end
+
+if(~exist('jsonopt')||~contains('pf2_base',which('jsonopt','all')))
+    jsonopt=@pf2_base.external.easyh5.jsonopt;
+end
+
 rootname=['/' inputname(1)];
 opt=struct;
 
@@ -224,6 +232,10 @@ end
 function oid=mat2h5(name, item,handle,level,varargin)
 
 import 'pf2_base.external.easyh5.decodevarname';
+
+if(~exist('jsonopt')||~contains('pf2_base',which('jsonopt','all')))
+    jsonopt=@pf2_base.external.easyh5.jsonopt;
+end
 
 typemap=h5types;
 
