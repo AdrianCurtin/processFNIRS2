@@ -352,7 +352,7 @@ end
 
 if(lastColIsSampleCount)
     % if we have sample count rewrite time data with that
-    data(:,1)=data(1,1)+lastCol/1000-lastCol(1);
+    data(:,1)=data(1,1)+lastCol/1000-lastCol(1)/1000;
 end
 
 
