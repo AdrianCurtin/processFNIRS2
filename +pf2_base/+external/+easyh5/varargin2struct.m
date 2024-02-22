@@ -22,6 +22,10 @@ function opt=varargin2struct(varargin)
 % -- this function is part of JSONLab toolbox (http://iso2mesh.sf.net/cgi-bin/index.cgi?jsonlab)
 %
 
+if(~exist('mergestruct')||~contains('pf2_base',which('mergestruct','all')))
+    mergestruct=@pf2_base.external.easyh5.mergestruct;
+end
+
 len=length(varargin);
 opt=struct;
 if(len==0) return; end
