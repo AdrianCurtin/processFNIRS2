@@ -227,12 +227,18 @@ end
 
 spaceParsingMode=false;
 
+if(~exist('strlen'))
+    strlen_local=@strlength;
+else
+    strlen_local=@strlen
+end
+
 while(ischar(lineF))
     
     if(countCheckFlag)
        countCheckFlag=false;
        strParts = strsplit(lineF,'\t');
-       strParts = strParts(cellfun(@strlen,strParts)>0);
+       strParts = strParts(cellfun(strlen_local,strParts)>0);
        numVar=length(strParts);   
        
        if(numVar==1)
