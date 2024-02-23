@@ -674,6 +674,10 @@ if(PF2.mergedProbe) %All channel numbers are unique for merged probes
             PF2.GUIPF2.data.sampleTime=data(:,PF2.timeIndex);
             PF2.GUIPF2.data.time=(PF2.GUIPF2.data.sampleTime-1)./setF.device.Info.DefaultSamplingRate;
             PF2.GUIPF2.data.fs=setF.device.Info.DefaultSamplingRate;
+        elseif(isfield(PF2.GUIPF2.data,'time'))
+            PF2.GUIPF2.data.sampleTime=1:length(data(:,1));
+            %PF2.GUIPF2.data.time=data(:,PF2.timeIndex);
+            PF2.GUIPF2.data.fs=1./median(diff(PF2.GUIPF2.data.time));
         else
             PF2.GUIPF2.data.sampleTime=1:length(data(:,1));
             PF2.GUIPF2.data.time=data(:,PF2.timeIndex);
