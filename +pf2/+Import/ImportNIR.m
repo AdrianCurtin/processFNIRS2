@@ -120,6 +120,8 @@ if(autoLoadMrk)
    mrk_filename{2}=sprintf('%s_C.mrk',fileroot);
    mrk_filename{3}=sprintf('%s_Mark1.mrk',fileroot_modern);
    mrk_filename{4}=sprintf('%s_Mark2.mrk',fileroot_modern);
+elseif(ischar(mrk_filename)||isstring(mrk_filename))
+    mrk_filename={sprintf('%s',mrk_filename)};
 end
 
 

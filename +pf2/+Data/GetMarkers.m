@@ -207,8 +207,15 @@ if(isempty(markerPatternIn))
        end
        
        uStartVals=nan(size(startVals));
+       missingMarkers =0;
        for j=1:length(startVals)
-           uStartVals(j)=find(startVals(j)==uMarkers);
+           if(sum(startVals(j)==uMarkers))
+                uStartVals(j)=find(startVals(j)==uMarkers);
+           else
+                % if markers are not in data
+                missingMarkers=missingMarkers+1;
+                uStartVals(j)=length(uMarkers)+missingMarkers;
+           end
        end
        
        markersStartStr{i}=char(uStartVals+47); %convert to ascii
