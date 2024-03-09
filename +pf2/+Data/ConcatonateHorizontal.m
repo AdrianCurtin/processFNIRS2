@@ -26,13 +26,14 @@ for i=1:numObjects %use earliest fNIR file as reference
    
    if(isfield(fNIR_objs{i},'t0'))
         t0times(i)=fNIR_objs{i}.t0;
+        minTimes(i)=fNIR_objs{i}.t0+seconds(minT(i));
    end
 end
 
 
 
-if(length(t0times)>0)
-    [sortedIdx,b]=sort(t0times);
+if(length(minTimes)>0)
+    [sortedIdx,b]=sort(minTimes);
 else
      [sortedIdx,b]=sort(minT);
 end
@@ -50,11 +51,23 @@ for i=1:length(fNIR_objs) %use Slowest fNIR file as reference
     appendFNIR = fNIR_objs{curIndex};
     appendFNIR=pf2.Data.SetT0(appendFNIR,referenceT0);
     outFNIR.time=[outFNIR.time;appendFNIR.time];
+    if(isfield(outFNIR,'datetime'))
+         outFNIR.datetime=[outFNIR.datetime;appendFNIR.datetime];
+    end
     outFNIR.raw=[outFNIR.raw;appendFNIR.raw];
     outFNIR.markers=[outFNIR.markers;appendFNIR.markers];
-
+    
+    
     outFNIR.fchMask=outFNIR.fchMask.*appendFNIR.fchMask;
 end
+
+% order data
+outFNIR.markers = sortrows(outFNIR.markers);
+[outFNIR.time,b] = sort(outFNIR.time);
+if(isfield(outFNIR,'datetime'))
+     outFNIR.datetime=outFNIR.datetime(b,:);
+end
+outFNIR.raw=outFNIR.raw(b,:);
 
 
 
