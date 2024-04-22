@@ -308,7 +308,7 @@ else
     end
     
     if(isfield(fNIR,'segmentTimes'))
-        outfNIR.segmentTimes=fNIR.datetime(indexStart:indexEnd,:);
+        outfNIR.segmentTimes=fNIR.segmentTimes(indexStart:indexEnd,:);
     end
     
 
