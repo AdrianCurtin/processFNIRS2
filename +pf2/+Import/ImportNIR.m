@@ -232,7 +232,7 @@ spaceParsingMode=false;
 if(~exist('strlen'))
     strlen_local=@strlength;
 else
-    strlen_local=@strlen
+    strlen_local=@strlen;
 end
 
 while(ischar(lineF))
