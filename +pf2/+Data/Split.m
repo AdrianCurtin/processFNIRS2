@@ -387,10 +387,26 @@ if(isfield(outfNIR,'Aux')&&splitAux)
                     curTableVarNames=curVar.Properties.VariableNames;
                     cur_time_ind=find(~isempty(intersect(validTimeFields,curTableVarNames)));
                     t2trim=curVar{:,cur_time_ind};
-                    minftime=startTime;
-                    maxftime=endTime;
-                    t2trim_idx=t2trim>=minftime&t2trim<=maxftime;
-                    outfNIR.Aux.(auxTrimFields{atIdx})=curVar(t2trim_idx,:);
+
+                    if(isempty(t2trim)||height(t2trim)==0)
+                        outfNIR.Aux.(auxTrimFields{atIdx})=curVar;
+                    else
+                        if((isnumeric(t2trim)&&isnumeric(startTime))||(isdatetime(t2trim)&&isdatetime(startTime)))
+                            minftime=startTime;
+                            maxftime=endTime;
+                        elseif(isnumeric(t2trim)&&isdatetime(startTime))
+                            minftime=startTime-fNIR.t0;
+                            maxftime=endTime-fNIR.t0;
+                        elseif(isdatetime(t2trim)&&isnumeric(startTime))
+                            minftime=fNIR.t0+duration(0,0,startTime);
+                            maxftime=fNIR.t0+duration(0,0,endTime);
+                        else
+                            error('Mismatched data');
+                        end
+    
+                        t2trim_idx=t2trim>=minftime&t2trim<=maxftime;
+                        outfNIR.Aux.(auxTrimFields{atIdx})=curVar(t2trim_idx,:);
+                    end
                 end
             end
         end
