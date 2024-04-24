@@ -1037,13 +1037,13 @@ ExFNIRS.selectedTable=table();
 ExFNIRS.selectedFNIR=cell(0);
 ExFNIRS.selectedIdx=[];
 
-strs=get(handles.listbox_subjectID,'String');
+strs=string(get(handles.listbox_subjectID,'String'));
 selectedStrs=get(handles.listbox_subjectID,'Value');
 selectedSubs=strs(selectedStrs,:);
 if(isnumeric(ExFNIRS.dataTable.('SubjectID')))
-    selectedSubs=str2num(selectedSubs);
+    selectedSubs=str2num(char(selectedSubs));
 else
-   if(~iscell(selectedSubs))
+   if(~iscell(selectedSubs)&&~isstring(selectedSubs))
        selectedSubs={selectedSubs};
    end
    
@@ -1052,14 +1052,14 @@ else
 end
 selSubIdx=ismember(ExFNIRS.dataTable.('SubjectID'),selectedSubs);
 
-strs=get(handles.listbox_condition,'String');
-selectedStrs=get(handles.listbox_condition,'Value');
+strs=string(get(handles.listbox_condition,'String'));
+selectedStrs=get(handles.listbox_condition,'Value')';
 selectedCondition=strs(selectedStrs,:);
 if(ismember('Condition',ExFNIRS.dataTable.Properties.VariableNames))
     if(isnumeric(ExFNIRS.dataTable.('Condition')))
-        selectedCondition=str2num(selectedCondition);
+        selectedCondition=str2num(char(selectedCondition));
         else
-           if(~iscell(selectedCondition))
+           if(~iscell(selectedCondition)&&~isstring(selectedCondition))
                selectedCondition={selectedCondition};
            end
            
@@ -1071,13 +1071,13 @@ else
     selConditionIdx=true([height(ExFNIRS.dataTable),1]);
 end
 
-strs=get(handles.listbox_session,'String');
-selectedStrs=get(handles.listbox_session,'Value');
+strs=string(get(handles.listbox_session,'String'));
+selectedStrs=get(handles.listbox_session,'Value')';
 selectedSession=strs(selectedStrs,:);
 if(isnumeric(ExFNIRS.dataTable.('Session')))
-    selectedSession=str2num(selectedSession);
+    selectedSession=str2num(char(selectedSession));
 else
-   if(~iscell(selectedSession))
+   if(~iscell(selectedSession)&&~isstring(selectedSession))
        selectedSession={selectedSession};
    end
    
@@ -1086,15 +1086,16 @@ else
 end
 selSessionIdx=ismember(ExFNIRS.dataTable.('Session'),selectedSession);
 
-strs=get(handles.listbox_block,'String');
-selectedStrs=get(handles.listbox_block,'Value');
+strs=string(get(handles.listbox_block,'String'));
+selectedStrs=get(handles.listbox_block,'Value')';
+
 selectedBlock=strs(selectedStrs,:);
 if(ismember('Block',ExFNIRS.dataTable.Properties.VariableNames))
     if(isnumeric(ExFNIRS.dataTable.('Block')))
         
-        selectedBlock=str2double(selectedBlock);
+        selectedBlock=str2num(char(selectedBlock));
     else
-       if(~iscell(selectedBlock))
+       if(~iscell(selectedBlock)&&~isstring(selectedBlock))
            selectedBlock={selectedBlock};
        end
        
@@ -1107,13 +1108,13 @@ else
 end
 
 if(ExFNIRS.settings.use_group)
-    strs=get(handles.listbox_group,'String');
-    selectedStrs=get(handles.listbox_group,'Value');
+    strs=string(get(handles.listbox_group,'String'));
+    selectedStrs=get(handles.listbox_group,'Value')';
     selectedGroup=strs(selectedStrs,:);
     if(isnumeric(ExFNIRS.dataTable.('Group')))
-        selectedGroup=str2num(selectedGroup);
+        selectedGroup=str2num(char(selectedGroup));
     else
-       if(~isempty(selectedGroup)&&~iscell(selectedGroup))
+       if(~isempty(selectedGroup)&&~iscell(selectedGroup)&&~isstring(selectedGroup))
            selectedGroup={selectedGroup};
        end
 
@@ -1123,12 +1124,12 @@ if(ExFNIRS.settings.use_group)
     selGroupIdx=ismember(ExFNIRS.dataTable.('Group'),selectedGroup);
 else
     strs=get(handles.listbox_subgroup,'String');
-    selectedStrs=get(handles.listbox_subgroup,'Value');
+    selectedStrs=get(handles.listbox_subgroup,'Value')';
     selectedGroup=strs(selectedStrs,:);
     if(isnumeric(ExFNIRS.dataTable.('Subgroup')))
-        selectedGroup=str2num(selectedGroup);
+        selectedGroup=str2num(char(selectedGroup));
     else
-       if(~isempty(selectedGroup)&&~iscell(selectedGroup))
+       if(~isempty(selectedGroup)&&~iscell(selectedGroup)&&~isstring(selectedGroup))
            selectedGroup={selectedGroup};
        end
 
@@ -1138,13 +1139,13 @@ else
     selGroupIdx=ismember(ExFNIRS.dataTable.('Subgroup'),selectedGroup);
 end
 
-strs=get(handles.listbox_trial,'String');
-selectedStrs=get(handles.listbox_trial,'Value');
+strs=string(get(handles.listbox_trial,'String'));
+selectedStrs=get(handles.listbox_trial,'Value')';
 selectedTrial=strs(selectedStrs,:);
 if(isnumeric(ExFNIRS.dataTable.('Trial')))
-    selectedTrial=str2num(selectedTrial);
+    selectedTrial=str2num(char(selectedTrial));
 else
-   if(~iscell(selectedTrial))
+   if(~iscell(selectedTrial)&&~isstring(selectedTrial))
        selectedTrial={selectedTrial};
    end
    
@@ -1155,7 +1156,7 @@ selTrialIdx=ismember(ExFNIRS.dataTable.('Trial'),selectedTrial);
 
 if(ExFNIRS.settings.use_info)
     cInfoGBYstring=ExFNIRS.settings.curInfoGroupBy;
-    strs=get(handles.listbox_info_groupby,'String');
+    strs=string(get(handles.listbox_info_groupby,'String'));
     selectedStrs=get(handles.listbox_info_groupby,'Value');
     selectedInfoG=strs(selectedStrs,:);
     if(isnumeric(ExFNIRS.dataTable{1,cInfoGBYstring}))
