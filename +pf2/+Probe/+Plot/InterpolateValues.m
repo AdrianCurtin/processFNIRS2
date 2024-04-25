@@ -76,6 +76,9 @@ end
 probeInfo=[];
 
 if(isempty(fNIR)&&isfield(setF,'device'))
+    if(length(setF)>1)
+        setF=setF(1);
+    end
     
     cfgFilePath=setF.device.cfg.File;
     if(~isfield(setF.device.Probe{1},'OptLayout2D'))
