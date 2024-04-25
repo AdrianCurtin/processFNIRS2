@@ -556,6 +556,10 @@ PF2.curWvSet=[];
 PF2.curSDSet=[];
 PF2.curProbeInd=[];
 
+if(length(setF)>1)
+    setF=setF(1);
+end
+
 if(length(setF.device.Probe)==1)
     PF2.mergedProbe=true;
 else

@@ -395,11 +395,21 @@ if(isfield(outfNIR,'Aux')&&splitAux)
                             minftime=startTime;
                             maxftime=endTime;
                         elseif(isnumeric(t2trim)&&isdatetime(startTime))
-                            minftime=startTime-fNIR.t0;
-                            maxftime=endTime-fNIR.t0;
+                            if(~isfield(fNIR,'t0'))
+                                warning('Missing t0');
+                                continue;
+                            else
+                                minftime=startTime-fNIR.t0;
+                                maxftime=endTime-fNIR.t0;
+                            end
                         elseif(isdatetime(t2trim)&&isnumeric(startTime))
-                            minftime=fNIR.t0+duration(0,0,startTime);
-                            maxftime=fNIR.t0+duration(0,0,endTime);
+                             if(~isfield(fNIR,'t0'))
+                                warning('Missing t0');
+                                continue;
+                            else
+                                minftime=fNIR.t0+duration(0,0,startTime);
+                                maxftime=fNIR.t0+duration(0,0,endTime);
+                             end
                         else
                             error('Mismatched data');
                         end
