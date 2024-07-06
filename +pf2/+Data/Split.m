@@ -574,6 +574,7 @@ function [outAuxStruct] = recursiveAuxFlatten(aux_in,nir_time,parent_time_in)
             
             auxVarNames=curField.Properties.VariableNames;
             timeTableVar=intersect(validTimeFields,curField.Properties.VariableNames);
+            
 
             if(~isempty(timeTableVar))
                 t_aux=curField.(timeTableVar{1});
@@ -582,7 +583,7 @@ function [outAuxStruct] = recursiveAuxFlatten(aux_in,nir_time,parent_time_in)
                 end
                 
                 auxFieldHasTime(f)=true;
-                curTimeNames=auxVarNames(ismember(auxVarNames,validTimeFields));
+                curTimeNames=timeTableVar(1);
                 auxVarNames(ismember(auxVarNames,validTimeFields))=[];
             elseif(~isempty(local_time)&&auxFieldsSize(f,1)==szLocalTime(1)&&~alreadyFlattened)
                  t_aux=local_time;
