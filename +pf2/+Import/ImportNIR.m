@@ -346,6 +346,10 @@ justOnes_Baseline=all(baseline==1);
 data=data(:,~justOnes); %Drop all columns that are only 1
 baseline=baseline(:,~justOnes_Baseline); %Drop all columns that are only 1
 
+%remove nan lines
+allNaN = sum(isnan(data),2);
+data(allNaN>0,:)=[];
+
 % Check for sample count in last column and drop it (newer cobi)
 lastCol=data(:,end);
 lastColIsSampleCount = all(diff(lastCol(1:100))>0)&&max(lastCol)>100000;
