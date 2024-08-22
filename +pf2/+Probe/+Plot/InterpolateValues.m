@@ -125,6 +125,10 @@ if(~include_ss)
     numOptodes=sum(~probeInfo.TableOpt.IsShortSeparation);
     channelList=probeInfo.TableOpt.OptodeNum(~probeInfo.TableOpt.IsShortSeparation);
     optLayout=probeInfo.OptPos.subplot_layout;
+    if(length(data2plot)~=numOptodes&&length(data2plot)==height(probeInfo.TableOpt))
+        
+        data2plot=data2plot(~probeInfo.TableOpt.IsShortSeparation);
+    end
 end
 
 
