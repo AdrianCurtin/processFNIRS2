@@ -360,7 +360,15 @@ end
 
 if(lastColIsSampleCount)
     % if we have sample count rewrite time data with that
-    data(:,1)=data(1,1)+lastCol/1000-lastCol(1)/1000;
+    countResets = find(diff(lastCol)<0);
+    newTime=data(1,1)+lastCol/1000-lastCol(1)/1000;
+    
+    for r=1:length(countResets)
+        timeDiff=data(countResets(r)+1,1)-data(countResets(r),1);
+        newTime(countResets(r)+1:end,1)=-newTime(countResets(r)+1)+newTime(countResets(r,1))+timeDiff+newTime(countResets(r)+1:end,1);
+        warning('Count resets detected\n')
+    end
+    data(:,1)=newTime;
 end
 
 
