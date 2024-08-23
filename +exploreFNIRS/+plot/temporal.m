@@ -839,3 +839,18 @@ th.HorizontalAlignment='left';
 th.VerticalAlignment='bottom';
 curPos=th.Position;
 end
+
+function txt = myDataTipUpdateFcn(pointDataTip, event_obj)
+
+    hAxes=get(pointDataTip,'Parent');
+    pos = event_obj.Position;
+    selectedObjectTag=event_obj.Target.Tag;
+    
+    if(~isempty(selectedObjectTag))
+        txt={sprintf('%s\nt=%.2f, y=%.2f',selectedObjectTag,pos(1),pos(2))};
+    else
+        txt = {sprintf('t=%.2f, y=%.2f',pos(1),pos(2))};
+    end
+   %disp(['You clicked X:',num2str(pos(1)),', Y:',num2str(pos(2))]);
+    
+end
