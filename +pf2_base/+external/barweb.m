@@ -1,10 +1,66 @@
-function handles = barweb(barvalues, errors, width, groupnames, bw_title, bw_xlabel, bw_ylabel, bw_colormap, gridstatus, bw_legend, error_sides, legend_type,data_points,plotViolin,error_is_y,hideBar)
+function handles = barweb(barvalues, errors, varargin)
+% Usage: handles = barweb(barvalues, errors, 'ParameterName', ParameterValue, ...)
+%
+% Required inputs:
+% barvalues - m-by-n-by-o matrix of bar values to be plotted
+% errors - error values (same size as barvalues, or empty)
+%
+% Optional parameters (specified as name-value pairs):
+% 'Width' - Width of bars (default: 1)
+% 'GroupNames' - Cell array of group names (default: {'1', '2', ...})
+% 'Title' - Title of the plot (default: '')
+% 'XLabel' - X-axis label (default: '')
+% 'YLabel' - Y-axis label (default: '')
+% 'ColorMap' - Colormap for bars (default: jet)
+% 'GridStatus' - Grid status ('x', 'y', 'xy', or 'none') (default: 'none')
+% 'Legend' - Cell array of legend entries (default: {})
+% 'ErrorSides' - Number of error bar sides (1 or 2) (default: 2)
+% 'LegendType' - Legend type ('axis' or 'plot') (default: 'plot')
+% 'DataPoints' - Cell array of data points (default: {})
+% 'PlotViolin' - Flag to plot violin (default: false)
+% 'ErrorIsY' - Flag indicating if error is Y value (default: false)
+% 'HideBar' - Flag to hide bars (default: false)
+% 'NegativeToInfinity' - Flag to extend negative bars to bottom (default: false)
 
-%
-% Usage: handles = barweb(barvalues, errors, width, groupnames, bw_title, bw_xlabel, bw_ylabel, bw_colormap, gridstatus, bw_legend, error_sides, legend_type)
-%
-% Ex: handles = barweb(my_barvalues, my_errors, [], [], [], [], [], bone, [], bw_legend, 1, 'axis')
-%
+% Parse input arguments
+p = inputParser;
+addRequired(p, 'barvalues', @isnumeric);
+addRequired(p, 'errors', @(x) isnumeric(x) || isempty(x));
+addParameter(p, 'Width', 1, @isnumeric);
+addParameter(p, 'GroupNames', {}, @(x) iscell(x) || isempty(x));
+addParameter(p, 'Title', '', @ischar);
+addParameter(p, 'XLabel', '', @ischar);
+addParameter(p, 'YLabel', '', @ischar);
+addParameter(p, 'ColorMap', jet, @(x) isnumeric(x) || ischar(x) || isa(x, 'function_handle'));
+addParameter(p, 'GridStatus', 'none', @ischar);
+addParameter(p, 'Legend', {}, @iscell);
+addParameter(p, 'ErrorSides', 2, @(x) x == 1 || x == 2);
+addParameter(p, 'LegendType', 'plot', @ischar);
+addParameter(p, 'DataPoints', {}, @iscell);
+addParameter(p, 'PlotViolin', false, @islogical);
+addParameter(p, 'ErrorIsY', false, @islogical);
+addParameter(p, 'HideBar', false, @islogical);
+addParameter(p, 'NegativeToInfinity', false, @islogical);
+
+parse(p, barvalues, errors, varargin{:});
+
+% Extract parsed values
+width = p.Results.Width;
+groupnames = p.Results.GroupNames;
+bw_title = p.Results.Title;
+bw_xlabel = p.Results.XLabel;
+bw_ylabel = p.Results.YLabel;
+bw_colormap = p.Results.ColorMap;
+gridstatus = p.Results.GridStatus;
+bw_legend = p.Results.Legend;
+error_sides = p.Results.ErrorSides;
+legend_type = p.Results.LegendType;
+data_points = p.Results.DataPoints;
+plotViolin = p.Results.PlotViolin;
+error_is_y = p.Results.ErrorIsY;
+hideBar = p.Results.HideBar;
+negativeToInfinity = p.Results.NegativeToInfinity;
+
 % barweb is the m-by-n-by-o matrix of barvalues to be plotted.
 % m groups, n bars (per group), o can be 3 points(min, mid/summary, max), or 2points (min, max),
 %     or 1 point for just mid/summary
@@ -54,66 +110,14 @@ elseif(nargin<2)
     errors=[];
 end
 
-if (nargin<3)
-    width=1;
-end
-
-if(nargin<4)
+if(isempty(groupnames))
     groupnames=1:size(barvalues,1);
 end
 
-if(nargin<5)
-    bw_title = [];
-end
-
-if(nargin<6)
-    bw_xlabel=[];
-end
-
-if(nargin<7)
-    bw_ylabel = [];
-end
-
-if(nargin<8)
-    bw_colormap=jet;
-end
-
-if(nargin<9)
-    gridstatus='none';
-end
-
-if(nargin<10)
-    bw_legend = [];
-end
-
-if(nargin<11)
-    error_sides = 2;
-end
-
-if(nargin<12)
-    legend_type = 'plot';
-end
-
-if(nargin<13)
-    data_points=[];
+if(isempty(data_points))
     plotData=false;
 else
     plotData=any(any(~cellfun(@isempty,data_points)));
-end
-
-if(nargin<14)
-    plotViolin=false;
-end
-
-if(nargin<15)
-    error_is_y=false;
-end
-
-
-if(nargin<16)
-    hideBar=false;
-    % show point instead of bar (with errorbars)
-    % not implemented yet
 end
 
 plotViolin=plotViolin&&plotData;
@@ -148,7 +152,13 @@ if(plotData||plotViolin)
 end
 
 change_axis = 0;
-ymax = 0;
+
+if(~negativeToInfinity)
+    ymax = 0;
+else
+    ymax = nan;
+end
+ymin =nan;
 
 if(all(isnan(barvalues)))
     %barvalues(:)=0;
@@ -245,8 +255,11 @@ else
 	
 	% Plot bars
     % (even if invisible, we use for the xpoints)
-    handles.bars = bar(barvalues, width,'edgecolor','k', 'linewidth', 2);
-    
+    if(~negativeToInfinity)
+        handles.bars = bar(barvalues, width,'edgecolor','k', 'linewidth', 2);
+    else
+        handles.bars = bar(barvalues, width,'BaseValue', -10,'edgecolor','k', 'linewidth', 2);
+    end
 	hold on
 	if ~isempty(bw_colormap)
 		colormap(bw_colormap);
@@ -292,6 +305,8 @@ else
         xOffset=[xOffsets(i)]';
         
         x = bsxfun(@plus, xData, xOffset'); 
+
+    
 
 
         if ~isempty(bw_colormap)
@@ -436,6 +451,7 @@ else
                 end
             end
         end
+        
 
         if(hideBar)
              if((~hideError&&~reDrawAsReactangles)||plotFeatureAsPoint)
@@ -467,8 +483,8 @@ else
         
         nonNanErrors=errors;
         nonNanErrors(isnan(errors))=0;
-        ymax = nanmax([ymax; barvalues(:,i)+nonNanErrors(:,i)]); 
-        ymin=nanmin(barvalues(:,i)-nonNanErrors(:,i));
+        ymax = nanmax([ymax; barvalues(:,i)+abs(nonNanErrors(:,i))]); 
+        ymin=nanmin([ymin;barvalues(:,i)-abs(nonNanErrors(:,i))]);
 	end
 	
 	if error_sides == 1
@@ -488,7 +504,13 @@ else
            ymin=ymax;
            ymax=temp;
         end
-        ylim([ymin ymax*1.1]);
+
+        if(ymin==0)
+            yminLim = 0;
+        elseif(ymin<0)
+            yminLim = 1.1*ymin;
+        end
+        ylim([yminLim ymax*1.1]);
     end
     
     if(numbars==1&&change_axis)
