@@ -352,7 +352,11 @@ for chIdx=1:numOpt
                   if(plotGroupByBioM)
                       if(~isempty(data2plot)&&isfield(data2plot,bioM))
                           if(~plotAsTable)
+                              try
                             h=plot(curFigH.subH{curSy,curSx},dataTime,data2plot.(bioM)(:,ch),'color',cIndex(b,:));
+                              catch
+                                  x=1;
+                              end
                           else
                             h=plot(curFigH.subH{curSy,curSx},dataTime,data2plot.(bioM){:,ch},'color',cIndex(b,:));
                           end
