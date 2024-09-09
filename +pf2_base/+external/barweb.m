@@ -26,8 +26,8 @@ function handles = barweb(barvalues, errors, varargin)
 p = inputParser;
 addRequired(p, 'barvalues', @isnumeric);
 addRequired(p, 'errors', @(x) isnumeric(x) || isempty(x));
-addParameter(p, 'Width', 1, @isnumeric);
-addParameter(p, 'GroupNames', {}, @(x) iscell(x) || isempty(x));
+addOptional(p, 'Width', 1, @isnumeric);
+addOptional(p, 'GroupNames', {}, @(x) iscell(x) || isempty(x));
 addParameter(p, 'Title', '', @ischar);
 addParameter(p, 'XLabel', '', @ischar);
 addParameter(p, 'YLabel', '', @ischar);

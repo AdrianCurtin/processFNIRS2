@@ -485,7 +485,7 @@ for chIdx=1:numOpt
         
 
         if(exSettings.plot_bar_err&&~plotCount)
-            pf2_base.external.barweb(barChartData{curChart}(:,:,1),barChartData{curChart}(:,:,2:1+numErrFeatures),1,xBarLabels, [], [], [], cIndex,[],gAStrs,[],'hide',barChartDataPoints{curChart},strcmp(errorFeature,'Violin'));
+            pf2_base.external.barweb(barChartData{curChart}(:,:,1),barChartData{curChart}(:,:,2:1+numErrFeatures),1,xBarLabels, 'ColorMap', cIndex,'Legend',gAStrs,'LegendType','hide','DataPoints',barChartDataPoints{curChart},'PlotViolin',strcmp(errorFeature,'Violin'));
             
 
             if(plottingDataPoints||strcmp(errorFeature,'MaxMin')||strcmp(errorFeature,'IQR')||strcmp(errorFeature,'Violin'))
