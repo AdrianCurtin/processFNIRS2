@@ -58,8 +58,9 @@ numOpt=length(uOpt);
 
 numWv=sum(channels==channels(1));
 
-rawArray=zeros(len,numOpt,numWv);
-wvArray=zeros(numOpt,numWv);
+rawArray=nan(len,numOpt,numWv);
+wvArray=nan(numOpt,numWv);
+chArray=nan(numOpt,numWv+1);
 
 if(numWv>2)
     error('MultiWavelengths are not supported yet');
@@ -68,30 +69,18 @@ end
 wv700=wavelengths<805; %Split so wavelength under isobestic point is first column
 
 %Should be fast but only supports two wavelengths
-wvArray(channels(wv700),1)=wavelengths(wv700);
-wvArray(channels(~wv700),2)=wavelengths(~wv700);
 
-chArray(channels(wv700),1)=find(wv700);
-chArray(channels(~wv700),2)=find(~wv700);
+chArray(:,1)=channels(wv700); % channel number
+chArray(:,2)=find(wv700); %raw index of wv700
+chArray(:,3)=find(~wv700); %raw index of wv850
 
+chArray(:,4)=wavelengths(chArray(:,2));
+chArray(:,5)=wavelengths(chArray(:,3));
 
-[wvArray,ind]=sort(wvArray,2); %Sort so left array is lower
-
-indReshape=ind';
-
-
-
-%Use new sort order
-
-chArrIdx=repmat([0:numWv:((numOpt*numWv)-1)]',1,numWv)';
-chArrIdx=chArrIdx(:);
-chOrigInd=repmat(1:numWv,numOpt,1);
-
-chArrIdxSorted=chArrIdx+indReshape(:);
-chArray(:)=chArray(chArrIdxSorted);
+wvArray=chArray(:,[4,5]);
 
 for i=1:numWv
-    rawArray(:,:,i)=rawData(:,chArray(:,i));
+    rawArray(:,:,i)=rawData(:,chArray(:,i+1));
 end
 
 
