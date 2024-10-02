@@ -378,8 +378,9 @@ for j=1:length(probeInfo.cfg.Sections)
          end
          
         for c=1:length(p.ChannelList)
-            p.TableOpt.Ch(c,:)=(find(p.ChannelNumbers==p.ChannelList(c)));
-            p.TableOpt.wv(c,:)=p.Wavelength(p.TableOpt.Ch(c,:));
+            chIdxMatch=(find(p.ChannelNumbers==p.ChannelList(c)));
+            p.TableOpt.Ch(c,1:length(chIdxMatch))=chIdxMatch;
+            p.TableOpt.wv(c,1:length(chIdxMatch))=p.Wavelength(chIdxMatch);
             if(~hasLabel)
                p.TableOpt.Label{c}=sprintf('Opt%i', p.ChannelList(c));
             end
