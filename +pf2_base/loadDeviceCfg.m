@@ -563,6 +563,8 @@ function p = sortOptodes(p)
         uOpt=uOpt(~opt2Drop);
         b=b(~opt2Drop);
 
+        p.TableCh.Dropped = p.TableCh.OptodeNumber>0.&ismember(p.TableCh.OptodeNumber,p.DropOptodes);
+        p.TableCh.isCh = p.TableCh.isCh & ~p.TableCh.Dropped;
     end
 
     if(isequal(uOpt,p.ChannelList))
@@ -593,6 +595,8 @@ function p = sortOptodes(p)
     end
 
     p.TableOpt = sortrows(p.TableOpt,'OptodeNum');
+
+   
 
     p.NumOptodes = height(p.TableOpt);
 

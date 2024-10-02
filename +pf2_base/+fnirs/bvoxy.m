@@ -53,7 +53,7 @@ channels=channels(validChannels);
 
 time=data(:,timeIndex);
 
-[uOpt,b,newOptIdx]=unique(channels);
+[uOpt,~,~]=unique(channels);
 
 numOpt=length(uOpt);
 

@@ -23,9 +23,9 @@ selBioM=get(handles.listbox_biomarker,'Value');
 selectedBioM=biomStrs(selBioM);
 numBioM=length(selBioM);
 
-optStrs=get(handles.listbox_optode,'String');
+optStrs=cellstr(get(handles.listbox_optode,'String'));
 selOpt=get(handles.listbox_optode,'Value');
-selectedOptStr=optStrs(selOpt',:);
+selectedOptStr=cellstr(optStrs(selOpt',:));
 numOpt=length(selOpt);
 
 
@@ -547,8 +547,8 @@ for chIdx=1:numOpt
         
         switch exSettings.ChannelMode
             case 'fNIR'
-                chNamePart=sprintf('Opt. %i',ch);
-                chNamePartLong=sprintf('Optode %i',ch);
+                chNamePart=sprintf('Opt. %s',selectedOptStr{chIdx});
+                chNamePartLong=sprintf('Optode %s',selectedOptStr{chIdx});
             case 'ROI'
                 chNamePart=selectedOptStr{chIdx};
                 chNamePartLong=sprintf('ROI: %s',selectedOptStr{chIdx});
@@ -614,7 +614,7 @@ for chIdx=1:numOpt
         
         switch exSettings.ChannelMode
             case 'fNIR'
-                title_with_space(sprintf('Optode %i',ch));
+                title_with_space(sprintf('Optode %s',optStrs{ch}));
             case 'ROI'
                 title_with_space(sprintf('ROI: %s',optStrs{ch}));
             case 'Aux'
@@ -693,7 +693,7 @@ for sH=1:length(subplotHandles)
     if(exSettings.LME_enable&&isfield(subplotGby{sH},'gby'))
         switch (exSettings.ChannelMode)
             case 'fNIR'
-                mergedTables{sH}=exploreFNIRS.export.mergeGbyTablesLong(subplotGby{sH}.gby,subplotGby{sH}.curBioM,subplotGby{sH}.curCh,barChartTimes,false,false);
+                mergedTables{sH}=exploreFNIRS.export.mergeGbyTablesLong(subplotGby{sH}.gby,subplotGby{sH}.curBioM,subplotGby{sH}.curCh,barChartTimes,false,false,optStrs(subplotGby{sH}.curCh));
                 varNameStart='Opt';
         
             case 'ROI'     
@@ -761,7 +761,7 @@ for sH=1:length(subplotHandles)
         elseif(strcmp(exSettings.ChannelMode,'ROI'))
             varName=sprintf('%s%i_%s_%s',varNameStart,subplotGby{sH}.curCh,selectedOptStr{(selectedOpt==subplotGby{sH}.curCh)},subplotGby{sH}.curBioM{1});
         else
-            varName=sprintf('%s%i_%s',varNameStart,subplotGby{sH}.curCh,subplotGby{sH}.curBioM{1});
+            varName=sprintf('%s%s_%s',varNameStart,selectedOptStr{(selectedOpt==subplotGby{sH}.curCh)},subplotGby{sH}.curBioM{1});
         end
         
         if(exSettings.LME_use_customStr&&~isempty(exSettings.LME_customStr))
@@ -813,7 +813,7 @@ for sH=1:length(subplotHandles)
             
             switch (exSettings.ChannelMode)
                 case 'fNIR'
-                         chName=sprintf('Opt%i',subplotGby{sH}.curCh);
+                         chName=sprintf('Opt%s',optStrs{subplotGby{sH}.curCh});
                          mdlChName=chName;
                 case 'ROI'     
                          chName=sprintf('ROI%i_%s',subplotGby{sH}.curCh,optStrs{subplotGby{sH}.curCh});
@@ -955,14 +955,16 @@ if(showTopo)
         
         numANOVA=size(ExFNIRS.curChartModelsANOVACoefficents_Fstat,2);
         anovaNames=ExFNIRS.curChartModelsANOVACoefficents_Fstat.Properties.VariableNames;
+
+        chArr=1:length(chNames);
         
          for z=1:length(chNames)
             temp=strsplit(chNames{z},'_');
              switch (exSettings.ChannelMode)
                 case 'fNIR'
-                         chArr(z)=sscanf(temp{1},'Opt%i');
+                         %chArr(z)=sscanf(temp{1},'Opt%i');
                 case 'ROI'     
-                         chArr(z)=sscanf(temp{1},'ROI%i');
+                         %chArr(z)=sscanf(temp{1},'ROI%i');
                 case 'Aux'
             end
             
