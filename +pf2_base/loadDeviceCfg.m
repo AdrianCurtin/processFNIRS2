@@ -15,7 +15,7 @@ if nargin < 2
 end
 
 if(nargin<3)
-    loadFromGlobal=false;
+    loadFromGlobal=true;
 end
 
 % Get the default root path
@@ -169,7 +169,7 @@ function probeInfo = processProbeInfo(probeInfo, includeSSchannels)
             p = calculateSourceDetectorSeparation(p);
             p = generateProbeLayout(p, includeSSchannels);
 
-            p = sortOptodes(p);
+            p = sortOptodes(p); % and drop any in DropOptodes
  
             fieldsToRemove={'SrcPosX','SrcPosY','SrcPosZ','SrcPos3DX','SrcPos3DY','SrcPos3DZ' ...
                 'DetPosX','DetPosY','DetPosZ','DetPos3DX','DetPos3DY','DetPos3DZ'...
@@ -554,16 +554,25 @@ function p = sortOptodes(p)
 
     [uOpt,b,c]= unique(p.ChannelList);
 
+    numCh=length(uOpt);
+
+    if(isfield(p,'DropOptodes'))
+        opt2Drop=ismember(uOpt,p.DropOptodes);
+        uOpt=uOpt(~opt2Drop);
+        b=b(~opt2Drop);
+
+    end
+
     if(isequal(uOpt,p.ChannelList))
         return
     end
 
-    numCh=length(uOpt);
+    
 
     fieldsToSort = {'DetPosX','DetPosY','DetPosZ','SrcPosX','SrcPosY','SrcPosZ'...
             'DetPos3DX','DetPos3DY','DetPos3DZ','SrcPos3DX','SrcPos3DY','SrcPos3DZ', 'sI','dI'...
-            'ChannelList','OptPosX','OptPosY','OptPos3DX','OptPos3DY','OptPos3DZ','SD','IsShortSeparation'...
-            'OptLayout2D_ss','OptLayout2D','SrcPos','DetPos','OptPos'};
+            'ChannelList','OptPosX','OptPosY','OptPosZ','OptPos3DX','OptPos3DY','OptPos3DZ','SD','IsShortSeparation'...
+            'OptLayout2D_ss','OptLayout2D','SrcPos','DetPos','OptPos','TableOpt'};
 
     for f=1:length(fieldsToSort)
         if(isfield(p,fieldsToSort{f}))
@@ -582,6 +591,8 @@ function p = sortOptodes(p)
     end
 
     p.TableOpt = sortrows(p.TableOpt,'OptodeNum');
+
+    p.NumOptodes = height(p.TableOpt);
 
 end
 
