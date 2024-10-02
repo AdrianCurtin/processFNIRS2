@@ -1731,7 +1731,7 @@ if(~isempty(data))
     for b=1:numBioM
         if(sum(ismember(PF2.curConc,b))>0)
             for i=1:size(plotSingleTable,1)
-               h=plot(stageAxesHandles{3},PF2.GUIPF2.data.time(timeInd),data.(bioM{b})(timeInd,plotSingleTable.Optode(i)),'color',bioMclr{b}); 
+               h=plot(stageAxesHandles{3},PF2.GUIPF2.data.time(timeInd),data.(bioM{b})(timeInd,plotSingleTable.OptIndex(i)),'color',bioMclr{b}); 
                set(h,'Tag',sprintf('Opt%i_%s',plotSingleTable.Optode(i),bioM{b}));
                hold(stageAxesHandles{3},'on');
             end
@@ -1795,7 +1795,7 @@ if(~isempty(data))
     for b=1:numBioM
         if(sum(ismember(PF2.curConc,b))>0)
             for i=1:size(plotSingleTable,1)
-               h=plot(stageAxesHandles{4},PF2.GUIPF2.data.time(timeInd),data.(bioM{b})(timeInd,plotSingleTable.Optode(i)),'color',bioMclr{b}); 
+               h=plot(stageAxesHandles{4},PF2.GUIPF2.data.time(timeInd),data.(bioM{b})(timeInd,plotSingleTable.OptIndex(i)),'color',bioMclr{b}); 
                set(h,'Tag',sprintf('Opt%i_%s',plotSingleTable.Optode(i),bioM{b}));
                hold(stageAxesHandles{4},'on');
             end
@@ -2158,7 +2158,7 @@ for i=1:length(setF.device.Probe)
     optodeTable.ProbeNum(startIdx_opt:endIdx_opt,1)=probeNum;
     optodeTable.Optode(startIdx_opt:endIdx_opt,1)=probeOptodes;
     optodeTable.IsROI(startIdx_opt:endIdx_opt,1)=false;
-    
+    optodeTable.OptIndex=[1:numOpt]';
 
    
 end
