@@ -53,7 +53,8 @@ channels=channels(validChannels);
 
 time=data(:,timeIndex);
 
-uOpt=sort(unique(channels));
+[uOpt,b,newOptIdx]=unique(channels);
+
 numOpt=length(uOpt);
 
 numWv=sum(channels==channels(1));
@@ -76,6 +77,9 @@ chArray(:,3)=find(~wv700); %raw index of wv850
 
 chArray(:,4)=wavelengths(chArray(:,2));
 chArray(:,5)=wavelengths(chArray(:,3));
+
+[~,b]=sort(chArray(:,1));
+chArray=chArray(b,:);
 
 wvArray=chArray(:,[4,5]);
 
@@ -191,6 +195,7 @@ HbR=(eHBO_700.*(od830./L_830)-eHBO_830.*(od700./L_700))./(eHBO_700.*eHBR_830-eHB
 
 %Oxy(:,ch)=(OD(1,:,ch)*eHBR_830-OD_830(:,ch)*eHBR_700)/(eHBO_700*eHBR_830-eHBO_830*eHBR_700)/DiffPathlengthFactor;
 %Deoxy(:,ch)=(OD_830(:,ch)*eHBO_700-OD_700(:,ch)*eHBO_830)/(eHBO_700*eHBR_830-eHBO_830*eHBR_700)/DiffPathlengthFactor;
+
 
 
 %add index and marker information
@@ -384,6 +389,7 @@ coeffHitachi=[700.8	701.5	702.3	703	703.7   826.4	827.2   827.9	828.7;  %wavelen
 
 %Reverse Engineered values from Hitachi data
 % Need to update for 826.4, 827.2
+
 
    
 eHbO=interp1(coefs(:,1),coefs(:,2),lambda)./1000;  %convert from 1/mM to 1/uM
