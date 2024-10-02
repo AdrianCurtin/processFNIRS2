@@ -57,12 +57,17 @@ function [ outFNIR, pFit] = Resample(varargin)
 %                       No baselining performed, Segments with more than
 %                       50% of the values listed as nan are rejected
 %                       (includes baseline)
+% Data.Resample(fnirData,'specifiedTimepoints', provide data resampled at
+% specific timepoints)
+% 
 
 p=inputParser;
 
 validfNIRInput = @(x) (isnumeric(x)&&length(x)>1) || (isstruct(x) && (isfield(x,'raw')||isfield(x,'time')||isfield(x,'info')));
 validScalarPosNum = @(x) isnumeric(x) && isscalar(x) && (x >= 0);
 validTimeOutMode = @(x) ischar(x)&&(ismember(x,{'mid','start','end'}));
+validTimepoints = @(x) isnumeric(x) && isvector(x) && issorted(x);
+
 
 addRequired(p,'fNIR',validfNIRInput);
 addOptional(p,'segmentLength',1,validScalarPosNum);
@@ -76,6 +81,7 @@ addParameter(p,'flattenAux',false,@islogical);
 addParameter(p,'trimAux',false,@islogical);
 addParameter(p,'polyDegree',1,validScalarPosNum);
 addParameter(p,'centerOnTime',NaN,@isnumeric);
+addParameter(p,'specifiedTimepoints',[],validTimepoints);
 
 parse(p,varargin{:});
 
@@ -86,6 +92,7 @@ blfNIR=p.Results.blfNIR; % a baseline fNIR struct
 %getPolyAvg=p.Results.getPolyAvg;
 centerOnT0=p.Results.centerOnT0; % should the resample include t=0 as the start point
 centerOnTime=p.Results.centerOnTime;
+specifiedTimepoints = p.Results.specifiedTimepoints;
 
 if(centerOnT0)
     centerOnTime=0;
@@ -178,12 +185,18 @@ if(isnan(centerOnTime))  % foces time blocks to start from t=0 or if undefined, 
     centerOnTime=min(fTime);
 end
 
-[fTimeInd,times]=getTimeIdx(fTime,segLength,centerOnTime);
 
-%minSegTime=times(1);
-%maxSegTime=times(end);
+if ~isempty(specifiedTimepoints)
+    [fTimeInd, timeSeries] = getTimeIdxSpecified(fNIR.time, specifiedTimepoints);
+    segLength = mean(diff(specifiedTimepoints)); % Approximate segLength for further calculations
+else
+    [fTimeInd, timeSeries] = getTimeIdx(fNIR.time, segLength, centerOnTime);
+end
 
-numSegs=length(times);
+%minSegTime=timeSeries(1);
+%maxSegTime=timeSeries(end);
+
+numSegs=length(timeSeries);
 
 if(pf2_base.isnestedfield(fNIR,'ROI.HbR')&&~isempty(fNIR.ROI.HbR))
     calcROI=true;
@@ -298,14 +311,14 @@ else %Return midpoint
 end
 
 if(timeOutModeMid)
-    times_start=times-segLength/2;
-    times_end=times+segLength/2-(1e-10);
+    times_start=timeSeries-segLength/2;
+    times_end=timeSeries+segLength/2-(1e-10);
 elseif(timeOutModeEnd)
-    times_start=times-segLength+(1e-10);
-    times_end=times;
+    times_start=timeSeries-segLength+(1e-10);
+    times_end=timeSeries;
 else
-    times_start=times;
-    times_end=times+segLength-1e-10;
+    times_start=timeSeries;
+    times_end=timeSeries+segLength-1e-10;
 end
 
 %minSegTime=times_start(1);
@@ -482,7 +495,7 @@ for fieldIdx=1:length(fdataFields)
    end
 end
 
-outFNIR.segmentTimes=[times_start,times,times_end];
+outFNIR.segmentTimes=[times_start,timeSeries,times_end];
 
 if(~isempty(outFNIR.segmentTimes))
     if(strcmp(timeOutMode,'start'))
@@ -500,7 +513,7 @@ if(~isempty(outFNIR.segmentTimes))
         if(isfield(outFNIR,'t0')&&isdatetime(outFNIR.t0))
             outFNIR.datetime=outFNIR.t0+(duration(0,0,outFNIR.time));
         end
-        % should match times variable
+        % should match timeSeries variable
     end
 else
    outFNIR.time=[]; 
@@ -585,7 +598,7 @@ function [outAuxStruct] = recursiveAuxResample(aux_in,flattenAux,segLength,cente
     szNIRTime(:)=size(nir_time);
 
 
-    % look through each aux field for times
+    % look through each aux field for timeSeries
     for f=1:length(auxFields)
         
         curFieldName=auxFields{f};
@@ -919,7 +932,7 @@ function [outAuxStruct] = recursiveAuxFlatten(aux_in,nir_time,parent_time_in)
     szNIRTime(:)=size(nir_time);
 
 
-    % look through each aux field for times
+    % look through each aux field for timeSeries
     for f=1:length(auxFields)
         
         curFieldName=auxFields{f};
@@ -1209,6 +1222,15 @@ end
     rsData(~fB_nanCheck)=NaN;
 
 end
+
+function [fTimeInd, timeSeries] = getTimeIdxSpecified(times_in, specifiedTimepoints)
+    times_in = times_in(:);
+    specifiedTimepoints = specifiedTimepoints(:);
+    
+    fTimeInd = interp1(specifiedTimepoints, 1:length(specifiedTimepoints), times_in, 'nearest', 'extrap');
+    timeSeries = specifiedTimepoints;
+end
+
 
 function [c,R2] = mpolyfit(x,y,n) 
 % Fits polynomial n to x and y data
