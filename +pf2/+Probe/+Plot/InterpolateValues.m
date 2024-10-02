@@ -180,52 +180,49 @@ buffer=bufferSize*pixelPerCm/2;
 
 if(round(OptDistX,1)==(round(OptDistY,1)))
     [inpX,inpY]=meshgrid(0:OptDistX*pixelPerCm:(maxDimDist+bufferSize*2)*pixelPerCm);
-else
+
+
+    %maxIdxX=round(dimX/OptDistX)+bufferMult+2;
+    %maxIdxY=round(dimY/OptDistY)+bufferMult+2;
+    %inpX=inpX(1:maxIdxX,1:maxIdxY);
+    %inpY=inpY(1:maxIdxX,1:maxIdxY);
     
-    error('Haven''t accounted for this yet');
-end
-
-%maxIdxX=round(dimX/OptDistX)+bufferMult+2;
-%maxIdxY=round(dimY/OptDistY)+bufferMult+2;
-%inpX=inpX(1:maxIdxX,1:maxIdxY);
-%inpY=inpY(1:maxIdxX,1:maxIdxY);
-
-interpBuffer=nan(size(inpX));
-alphaBuffer=zeros(size(inpX));
-
-if(twosided)
-    alphaBufferNeg=alphaBuffer;
-end
-
-numRows=size(inpY,1);
-% NEed to fill in small array middle with interpolated values instead of
-% minimum
-for optIdx=1:length(data2plot)
-    %if optIdx > 16
-    %    continue
-    %end
-    optNum=probeInfo.TableOpt.OptodeNum(optIdx); 
-    optXidx(optIdx)=round(OptPosX(optNum)/OptDistX)+bufferMult+1;
-    optYidx(optIdx)=round(OptPosY(optNum)/OptDistY)+bufferMult+1;
+    interpBuffer=nan(size(inpX));
+    alphaBuffer=zeros(size(inpX));
     
-    if(~twosided&&~isnan(data2plot(optIdx))&&((data2plot(optIdx)>=minVal&&maxVal>minVal)||...
-            (data2plot(optIdx)<=(minVal)&&minVal>maxVal)))
-        interpBuffer(optYidx(optIdx),optXidx(optIdx))=data2plot(optIdx);
-        alphaBuffer(optYidx(optIdx),optXidx(optIdx))=1;
-        alphaBufferNeg(optYidx(optIdx),optXidx(optIdx))=0;
-    elseif(twosided&&~isnan(data2plot(optIdx))&&data2plot(optIdx)<=minVal(1))
-        interpBuffer(optYidx(optIdx),optXidx(optIdx))=data2plot(optIdx);
-        alphaBufferNeg(optYidx(optIdx),optXidx(optIdx))=1;
-        alphaBuffer(optYidx(optIdx),optXidx(optIdx))=0;
-    elseif(twosided&&~isnan(data2plot(optIdx))&&data2plot(optIdx)>=minVal(2))
-        interpBuffer(optYidx(optIdx),optXidx(optIdx))=data2plot(optIdx);
-        alphaBuffer(optYidx(optIdx),optXidx(optIdx))=1;
-        alphaBufferNeg(optYidx(optIdx),optXidx(optIdx))=0;
-    else
-        interpBuffer(optYidx(optIdx),optXidx(optIdx))=data2plot(optIdx);
+    if(twosided)
+        alphaBufferNeg=alphaBuffer;
     end
-    mrkLbl{optIdx}=num2str(optNum);
-end
+    
+    numRows=size(inpY,1);
+    % Need to fill in small array middle with interpolated values instead of
+    % minimum
+    for optIdx=1:length(data2plot)
+        %if optIdx > 16
+        %    continue
+        %end
+        
+        optXidx(optIdx)=round(OptPosX(optIdx)/OptDistX)+bufferMult+1;
+        optYidx(optIdx)=round(OptPosY(optIdx)/OptDistY)+bufferMult+1;
+        
+        if(~twosided&&~isnan(data2plot(optIdx))&&((data2plot(optIdx)>=minVal&&maxVal>minVal)||...
+                (data2plot(optIdx)<=(minVal)&&minVal>maxVal)))
+            interpBuffer(optYidx(optIdx),optXidx(optIdx))=data2plot(optIdx);
+            alphaBuffer(optYidx(optIdx),optXidx(optIdx))=1;
+            alphaBufferNeg(optYidx(optIdx),optXidx(optIdx))=0;
+        elseif(twosided&&~isnan(data2plot(optIdx))&&data2plot(optIdx)<=minVal(1))
+            interpBuffer(optYidx(optIdx),optXidx(optIdx))=data2plot(optIdx);
+            alphaBufferNeg(optYidx(optIdx),optXidx(optIdx))=1;
+            alphaBuffer(optYidx(optIdx),optXidx(optIdx))=0;
+        elseif(twosided&&~isnan(data2plot(optIdx))&&data2plot(optIdx)>=minVal(2))
+            interpBuffer(optYidx(optIdx),optXidx(optIdx))=data2plot(optIdx);
+            alphaBuffer(optYidx(optIdx),optXidx(optIdx))=1;
+            alphaBufferNeg(optYidx(optIdx),optXidx(optIdx))=0;
+        else
+            interpBuffer(optYidx(optIdx),optXidx(optIdx))=data2plot(optIdx);
+        end
+        
+    end
 
 
 numNeighbors=~isnan(interpBuffer)*1;
@@ -307,6 +304,42 @@ x2keep=round([inpX(1,min(optXidx)-bufferMult)+1,inpX(1,max(optXidx)+bufferMult)]
 y2keep=round([inpY(min(optYidx)-bufferMult,1)+1,inpY(max(optYidx)+bufferMult,1)]);
 
 optPos2Plot=round([inpX(1,optXidx);inpX(1,optYidx)]);
+
+else
+    
+        % Calculate the size of the interpolation grid
+    maxX = max(OptPosX);
+    maxY = max(OptPosY);
+    
+    % Create a fine mesh for interpolation
+    [Xq, Yq] = meshgrid(linspace(0, maxX, imgSize), linspace(0, maxY, imgSize));
+
+    % Perform the interpolation
+    if twosided
+        intArr = griddata(OptPosX, OptPosY, data2plot, Xq, Yq, 'cubic');
+    elseif minVal > maxVal
+        intArr = griddata(OptPosX, OptPosY, data2plot, Xq, Yq, 'cubic');
+        intArr(isnan(intArr)) = maxVal;
+    else
+        intArr = griddata(OptPosX, OptPosY, data2plot, Xq, Yq, 'cubic');
+        intArr(isnan(intArr)) = minVal;
+    end
+
+     % Calculate alpha values
+    alphaValues = ~isnan(griddata(OptPosX, OptPosY, data2plot, Xq, Yq, 'nearest'));
+    intArrAlpha = imgaussfilt(double(alphaValues), 2);  % Gaussian filter for smooth edges
+    
+    % Adjust the plotting code
+    x2keep = [1, imgSize];
+    y2keep = [1, imgSize];
+    
+    intArr2plot = intArr;
+
+    optPos2Plot = [interp1(linspace(0, maxX, imgSize), 1:imgSize, OptPosX),...
+                   interp1(linspace(0, maxY, imgSize), 1:imgSize, OptPosY)]';
+
+
+end
 
 
 
@@ -421,6 +454,8 @@ hold on
 %hpt=plot(optPos2Plot(1,:)/1.01+1,optPos2Plot(2,:)/1.01+1,'square','MarkerSize',4,'LineWidth',3,'color','white', 'MarkerFaceColor', 'white');
 
 for optIdx=1:length(data2plot)
+    optNum=probeInfo.TableOpt.OptodeNum(optIdx); 
+    mrkLbl{optIdx}=num2str(optNum);
     %if optIdx > 16
     %    continue 
     %end

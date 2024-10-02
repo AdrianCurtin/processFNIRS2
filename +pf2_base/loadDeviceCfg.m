@@ -51,6 +51,8 @@ if(nargout==0) % assigns the global device
     end
     container = {};
     container.device = probeInfo;
+    existingDevice = strcmp(deviceTable.Probe,name);
+    deviceTable(existingDevice,:)=[];
     deviceTable = [deviceTable; {name, container}];
     setF.device=probeInfo;
 end
