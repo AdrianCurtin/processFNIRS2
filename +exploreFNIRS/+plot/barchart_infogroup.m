@@ -355,7 +355,7 @@ elseif(all(all(isnan(barChartData(:,:,1))))&&~plotPoints)
 end
 
 if(exSettings.plot_bar_err&&~strcmp(plotFeature,'Count'))
-    pf2_base.external.barweb(barChartData(:,:,1),barChartData(:,:,2:1+numErrFeatures),1,uCurInfoG, [], [], [], cIndex,[],gAStrs,[],'hide',barChartDataPoints,strcmp(errorFeature,'Violin'));
+    pf2_base.external.barweb(barChartData(:,:,1),barChartData(:,:,2:1+numErrFeatures),'Width',1,'GroupNames',uCurInfoG, 'ColorMap',cIndex,'Legend',gAStrs,'LegendType','hide','DataPoints',barChartDataPoints,'PlotViolin',strcmp(errorFeature,'Violin'));
     
     if(strcmp(errorFeature,'SEM')||strcmp(errorFeature,'SD'))&&~plotPoints
         ylimLower=min(min(barChartData(:,:,1)))-max(max(barChartData(:,:,2)));
