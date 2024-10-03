@@ -319,8 +319,8 @@ else
 
     % flip X and Y
 
-    OptPosX = maxX-OptPosX;
-    OptPosY = maxY-OptPosY;
+    %OptPosX = maxX-OptPosX;
+    %OptPosY = maxY-OptPosY;
     
     % Create a fine mesh for interpolation
     [Xq, Yq] = meshgrid(linspace(0, maxX, imgSize), linspace(0, maxY, imgSize));
