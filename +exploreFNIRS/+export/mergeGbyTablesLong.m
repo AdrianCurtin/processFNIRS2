@@ -23,7 +23,9 @@ if(nargin<3)
 end
 
 if(nargin<7)
-    channelLabels=double2str(channelIndexes);
+    channelLabels=cellstr(num2str(channelIndexes));
+else
+    channelLabels=cellstr(channelLabels);
 end
 
 if(isempty(channelIndexes))

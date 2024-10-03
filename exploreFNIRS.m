@@ -1977,8 +1977,8 @@ end
 
 logFileName=sprintf('%s_long.log',file(1:end-4));
 
-
-exportTable=exploreFNIRS.export.mergeGbyTablesLong(ExFNIRS.gby,bioMList,[],times,true,true);
+optodeNames=num2str(ExFNIRS.currentOpt);
+exportTable=exploreFNIRS.export.mergeGbyTablesLong(ExFNIRS.gby,bioMList,[],times,true,true,optodeNames);
 
 
 if(ExFNIRS.settings.export_replace_missing_9999)
