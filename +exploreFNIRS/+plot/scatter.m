@@ -45,9 +45,9 @@ selBioM=get(handles.listbox_biomarker,'Value');
 selectedBioM=biomStrs(selBioM);
 numBioM=length(selBioM);
 
-optStrs=get(handles.listbox_optode,'String');
+optStrs=cellstr(get(handles.listbox_optode,'String'));
 selOpt=get(handles.listbox_optode,'Value');
-selectedOptStr=optStrs(selOpt',:);
+selectedOptStr=cellstr(optStrs(selOpt',:));
 numOpt=length(selOpt);
 
 if(strcmp(exSettings.ChannelMode,'Aux'))
@@ -888,8 +888,8 @@ for chIdx=1:numOpt
 
                     switch exSettings.ChannelMode
                         case 'fNIR'
-                            chNamePart=sprintf('Opt. %i',ch);
-                            chNamePartLong=sprintf('Optode %i',ch);
+                            chNamePart=sprintf('Opt. %s',selectedOptStr{chIdx});
+                            chNamePartLong=sprintf('Optode %s',selectedOptStr{chIdx});
                         case 'ROI'
                             chNamePart=selectedOptStr{chIdx};
                             chNamePartLong=sprintf('ROI: %s',selectedOptStr{chIdx});
@@ -933,9 +933,9 @@ for chIdx=1:numOpt
                                 xlabel_with_space(curPlotHandle,{chNamePart;curFeatureString});
                             case 'bioM'
                                 if(numBioM>1)
-                                    xlabel_with_space(curPlotHandle,{bioM,curFeatureString});
+                                    xlabel_with_space(curPlotHandle,{chNamePart;bioM,curFeatureString});
                                 else
-                                    xlabel_with_space(curPlotHandle,curFeatureString);
+                                    xlabel_with_space(curPlotHandle,{chNamePart;curFeatureString});
                                 end
                             otherwise
                                 ylabel_with_space(curPlotHandle,{chNamePart;curFeatureString});
@@ -958,9 +958,9 @@ for chIdx=1:numOpt
                                 ylabel_with_space(curPlotHandle,{chNamePart;curFeatureString});
                             case 'bioM'
                                 if(numBioM>1)
-                                    ylabel_with_space(curPlotHandle,{bioM,curFeatureString});
+                                    ylabel_with_space(curPlotHandle,{chNamePart;bioM,curFeatureString});
                                 else
-                                    ylabel_with_space(curPlotHandle,curFeatureString);
+                                    ylabel_with_space(curPlotHandle,{chNamePart;curFeatureString});
                                 end
                             otherwise
                                 ylabel_with_space(curPlotHandle,{chNamePart;curFeatureString});
@@ -1319,12 +1319,16 @@ if(nargin<2)
     figHandle=gca;
 end
 
-if(iscell(labelstring))
-    labelstring=labelstring{1};
+if(~iscell(labelstring))
+    labelstring=cellstr(labelstring);
 end
 
-if(~isempty(labelstring))
-    labelstring(labelstring=='_')=' ';
+for s=1:length(labelstring)
+    str=labelstring{s};
+    if(~isempty(str))
+        str(str=='_')=' ';
+        labelstring{s}=str;
+    end
 end
 h=xlabel(figHandle,labelstring);
 
@@ -1336,12 +1340,16 @@ if(nargin<2)
     figHandle=gca;
 end
 
-if(iscell(labelstring))
-    labelstring=labelstring{1};
+if(~iscell(labelstring))
+    labelstring=cellstr(labelstring);
 end
 
-if(~isempty(labelstring))
-    labelstring(labelstring=='_')=' ';
+for s=1:length(labelstring)
+    str=labelstring{s};
+    if(~isempty(str))
+        str(str=='_')=' ';
+        labelstring{s}=str;
+    end
 end
 h=ylabel(figHandle,labelstring);
 

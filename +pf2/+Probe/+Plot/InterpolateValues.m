@@ -305,6 +305,11 @@ y2keep=round([inpY(min(optYidx)-bufferMult,1)+1,inpY(max(optYidx)+bufferMult,1)]
 
 optPos2Plot=round([inpX(1,optXidx);inpX(1,optYidx)]);
 
+if(twosided)
+    intArrAlphaNeg=intArrAlpha(y2keep(1):y2keep(2),(x2keep(1)):x2keep(2));
+    %intArrAlphaNeg(intArrAlphaNeg==0)=0; 
+end
+
 else
     
         % Calculate the size of the interpolation grid
@@ -320,14 +325,24 @@ else
     elseif minVal > maxVal
         intArr = griddata(OptPosX, OptPosY, data2plot, Xq, Yq, 'cubic');
         intArr(isnan(intArr)) = maxVal;
+        intArr(intArr<maxVal)=maxVal;
     else
         intArr = griddata(OptPosX, OptPosY, data2plot, Xq, Yq, 'cubic');
         intArr(isnan(intArr)) = minVal;
+        intArr(intArr<minVal)=minVal;
     end
 
      % Calculate alpha values
-    alphaValues = ~isnan(griddata(OptPosX, OptPosY, data2plot, Xq, Yq, 'nearest'));
-    intArrAlpha = imgaussfilt(double(alphaValues), 2);  % Gaussian filter for smooth edges
+    rawGrid = griddata(OptPosX, OptPosY, data2plot, Xq, Yq, 'cubic');
+    alphaValues = ~isnan(rawGrid);
+    if twosided
+        alphaValues = alphaValues.*(rawGrid>minVal(2));
+        alphaValuesNeg = ~isnan(rawGrid).*rawGrid<minVal(1);
+
+        intArrAlphaNeg = imgaussfilt(double(alphaValuesNeg), 10);  % Gaussian filter for smooth edges
+    end
+
+    intArrAlpha = imgaussfilt(double(alphaValues), 10);  % Gaussian filter for smooth edges
     
     % Adjust the plotting code
     x2keep = [1, imgSize];
@@ -349,10 +364,7 @@ intArr2plot=intArr(y2keep(1):y2keep(2),(x2keep(1)):x2keep(2));
 intArrAlpha=intArrAlpha(y2keep(1):y2keep(2),(x2keep(1)):x2keep(2));
 %intArrAlpha(intArrAlpha==0)=0;
 
-if(twosided)
-    intArrAlphaNeg=intArrAlphaNeg(y2keep(1):y2keep(2),(x2keep(1)):x2keep(2));
-    %intArrAlphaNeg(intArrAlphaNeg==0)=0; 
-end
+
 
 %imgFinal=imagesc(intArr,[minVal,maxVal]);
 
