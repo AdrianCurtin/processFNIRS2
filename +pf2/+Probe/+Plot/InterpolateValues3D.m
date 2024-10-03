@@ -9,14 +9,17 @@ function [ h, imgOut ] = InterpolateValues3D(varargin)
 % Short separation channels are not presented here and are skipped
 %
 tic
+isStructOrEmpty=@(x) isstruct(x)||isempty(x);
+isStringOrChar=@(x)isstring(x)||ischar(x);
+
 validAxesHandle= @(x) isa(x,'matlab.graphics.axis.Axes')&&isvalid(x);
 validScalarPosNumOr0 = @(x) isnumeric(x) && x>=0;
 validScalarPosNum = @(x) isnumeric(x) && x>0;
 validScalarPosNumOrNan = @(x) isnumeric(x) && (x>0||isnan(x));
-validI1020Label = @(x) islogical(x) || iscellstr(x);
+validI1020Label = @(x) islogical(x) || isStringOrChar(x);
 validBrodmann = @(x) islogical(x) || isnumeric(x)&&all(x<=55)&&all(x>0);
 validColor = @(x) (ischar(x) && length(x) == 1) || (isnumeric(x) && length(x) == 3) || isempty(x);
-validFnirs = @(x) (iscell(x) || isstruct(x));
+validFnirs = @(x) isStructOrEmpty(x);
 %validColorList = @(x) validColor(x) || all(arrayfun(validColor, x));
 
 defaultInterpolateType = 'nearest';
@@ -46,19 +49,26 @@ end
 
 
 
-
+p_pre=inputParser;
 p=inputParser;
+
+addOptional(p_pre,'data2plot', []);
+
+parse(p_pre,varargin{1});
+data2plot = p_pre.Results.data2plot;
+shouldHideByDefault = isempty(data2plot);
 
 addOptional(p,'data2plot', []);
 addOptional(p,'fNIR', {}, validFnirs);
 addOptional(p,'minval', [], @isnumeric);
 addOptional(p,'maxval', [], @isnumeric);
-addOptional(p,'titleString', '', @isstring);
-addOptional(p,'colorbarStr', '', @isstring);
+addOptional(p,'titleString', '', isStringOrChar);
+addOptional(p,'colorbarStr', '', isStringOrChar);
+
 
 addParameter(p,'ax',ax,validAxesHandle,'PartialMatchPriority',1);
 addParameter(p,'ChannelLabels',true,@islogical);
-addParameter(p,'SDLabels',true,@islogical);
+addParameter(p,'SDLabels',shouldHideByDefault,@islogical);
 addParameter(p,'I1020_labels',false,validI1020Label);
 addParameter(p, 'useHighRes', true, @islogical);
 addParameter(p, 'cmap', defaultColormap, validColormap);
@@ -76,7 +86,7 @@ addParameter(p, 'initCamPosition', defaultCamPosition, validCamPosition);
 addParameter(p, 'logScale', false, @islogical);
 addParameter(p, 'interpolateType', defaultInterpolateType, validInterpolateType);
 addParameter(p, 'bufferDistance', nan, validScalarPosNumOrNan); %In a grid, this may equal to sqrt(sd distance^2/2)
-addParameter(p, 'includeSS', true, @islogical);
+addParameter(p, 'includeSS', shouldHideByDefault, @islogical);
 addParameter(p, 'showReference', false, @islogical);
 addParameter(p, 'showScattering', false, @islogical);
 addParameter(p, 'scatteringFactor', 1, validScalarPosNumOrNan);
@@ -92,7 +102,6 @@ centerCamPos=[0,-20,0];
 addParameter(p, 'camTarget', centerCamPos, validCamPosition); % Target Camera location
 addParameter(p, 'camUp', [0,0,1] , validCamPosition); % Target Camera location
 addParameter(p, 'animated', false, @islogical); % Optimizes for animation (By not redrawing certain things when possible)
-
 
 
 parse(p,varargin{:});

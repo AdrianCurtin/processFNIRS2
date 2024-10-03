@@ -50,15 +50,15 @@ for g=1:numGroups
     curData=curTable(:,curInfoStr);
     
     curData=table2array(curData);
-
+    
     subplotGby.gby(g)=exGby(g);
     
     if(isstring(curData)||iscategorical(curData)||ischar(curData)||islogical(curData))
-       useInfoAsCategoricalGroup=true;
-       if(any(ismissing(curData(:))))
+        useInfoAsCategoricalGroup=true;
+        if(any(ismissing(curData(:))))
             curData(ismissing(curData))="Missing";
-       end
-       uCategoricalVals=unique([uCategoricalVals(:);curData(:)]);
+        end
+        uCategoricalVals=unique([uCategoricalVals(:);curData(:)]);
     end
 end
 
@@ -77,7 +77,7 @@ if(useInfoAsCategoricalGroup&&~isempty(uCategoricalVals))
     numOldGroups=numGroups;
     numNewGroups=numGroups*lenUCatVals;
     newExGby=[];
-
+    
     if(strcmp(curInfoStr,curInfoGroup)&&~strcmp(plotFeature,'Count'))
         newInfoStr=strcat(curInfoStr,'_');
         useNewInfoStr=true;
@@ -107,11 +107,11 @@ if(useInfoAsCategoricalGroup&&~isempty(uCategoricalVals))
             
         end
     end
-
+    
     if(useNewInfoStr)
         curInfoStr=newInfoStr; % has no effect unless both info string and info group are the same
     end
-
+    
     exGby=newExGby;
     numGroups=numNewGroups;
     gbyVars{end+1}=curInfoStr;
@@ -126,27 +126,27 @@ gbyIdx=nan(numGroups,1);
 
 for g=numGroups:-1:1
     gbyStrs{g}='';
-   if(~isempty(exGby(g).gbyTables))
-       for i=1:length(gbyVars)
-           if(i==length(gbyVars)&&useInfoAsCategoricalGroup&&~strcmp(plotFeature,'Count'))
-               gbyStrs{g}=sprintf('%s%s:%s,',gbyStrs{g},gbyVars{i},num2strOrNot(exGby(g).gbyTables.categoricalLabelStr(1)));
-           else
-               gbyStrs{g}=sprintf('%s%s:%s,',gbyStrs{g},gbyVars{i},num2strOrNot(exGby(g).gbyTables.(gbyVars{i})(1)));
-           end
-       end 
-       if(useCurInfoGroup)
-           curInfoGby{g}=num2strOrNot(exGby(g).gbyTables.(curInfoGroup)(1));
-       end
-       if(~isempty(gbyStrs{g}))
-        gbyStrs{g}(end)='';
-       end
-   else
-       gbyStrs(g)=[];
-       exGby(g)=[];
-       curInfoGby(g)=[];
-       numGroups=numGroups-1;
-   end
-   
+    if(~isempty(exGby(g).gbyTables))
+        for i=1:length(gbyVars)
+            if(i==length(gbyVars)&&useInfoAsCategoricalGroup&&~strcmp(plotFeature,'Count'))
+                gbyStrs{g}=sprintf('%s%s:%s,',gbyStrs{g},gbyVars{i},num2strOrNot(exGby(g).gbyTables.categoricalLabelStr(1)));
+            else
+                gbyStrs{g}=sprintf('%s%s:%s,',gbyStrs{g},gbyVars{i},num2strOrNot(exGby(g).gbyTables.(gbyVars{i})(1)));
+            end
+        end
+        if(useCurInfoGroup)
+            curInfoGby{g}=num2strOrNot(exGby(g).gbyTables.(curInfoGroup)(1));
+        end
+        if(~isempty(gbyStrs{g}))
+            gbyStrs{g}(end)='';
+        end
+    else
+        gbyStrs(g)=[];
+        exGby(g)=[];
+        curInfoGby(g)=[];
+        numGroups=numGroups-1;
+    end
+    
 end
 
 
@@ -176,8 +176,8 @@ end
 
 gAStrs=cell(numUgroups,1);
 gAerrStrs=cell(numUgroups,1);
-    
- 
+
+
 
 
 if(exSettings.within_sub_avg_mode==3)
@@ -204,34 +204,34 @@ for g=1:numGroups
     curData=curTable(:,curInfoStr);
     
     if(useCurInfoGroup)
-        cBarSec=uCurIdx(g); % which section to put the bar in 
+        cBarSec=uCurIdx(g); % which section to put the bar in
         curBarGroup=uGroupIdx(g);
     else
-       cBarSec=1;
-       curBarGroup=g;
+        cBarSec=1;
+        curBarGroup=g;
     end
     
     curData=table2array(curData);
-
+    
     if(isempty(curData))
         continue;
     end
     
     if(isstring(curData)||iscategorical(curData)||ischar(curData))
-       %warning('Strings and categories return count');
-       [~,~,curData]=unique(curData);
-       plotFeature='Count';
-       % return;
+        %warning('Strings and categories return count');
+        [~,~,curData]=unique(curData);
+        plotFeature='Count';
+        % return;
     end
-
+    
     if(islogical(curData))
-       %warning('boolean/logical values return count ');
-       curData=double(curData);
+        %warning('boolean/logical values return count ');
+        curData=double(curData);
     end
     curData(curData==-9999)=nan;
     
     %switch modes here
-
+    
     if(strcmp(plotFeature,'Count'))
         curDataH=pf2_base.hierarchicalAverage(curData,curTable(:,dataH),@nanmean);
         plotPoints=false;
@@ -248,103 +248,103 @@ for g=1:numGroups
     end
     
     plottingDataPoints=plotPoints;
-
+    
     if(exSettings.plot_bar_ga)
-          barChartData(cBarSec,curBarGroup,1)=curHAvg;
+        barChartData(cBarSec,curBarGroup,1)=curHAvg;
     else
-            barChartData(cBarSec,curBarGroup,1)=nan;
+        barChartData(cBarSec,curBarGroup,1)=nan;
     end
-
-    gAStrs{curBarGroup}=sprintf('%s',uGbyStrs{curBarGroup}); 
-
+    
+    gAStrs{curBarGroup}=sprintf('%s',uGbyStrs{curBarGroup});
+    
     if(plotPoints||strcmp(errorFeature,'Violin'))
         barChartDataPoints(cBarSec,curBarGroup)={curDataH};
-    end             
-
-
+    end
+    
+    
     if(~strcmp(plotFeature,'Count'))
-
-      errMultiply=exSettings.plot_bar_err_mult;
-     
-      gaFeat=curHAvg;
-
-      numErrFeatures=1;
-
-      if(true)
+        
+        errMultiply=exSettings.plot_bar_err_mult;
+        
+        gaFeat=curHAvg;
+        
+        numErrFeatures=1;
+        
+        if(true)
             minDataPoint=nanmin([minDataPoint,nanmin(pf2_base.hierarchicalAverage(curData,curTable(:,dataH),@nanmin))]);
             maxDataPoint=nanmax([maxDataPoint,nanmax(pf2_base.hierarchicalAverage(curData,curTable(:,dataH),@nanmax))]);
-      end
-      
-      if(strcmp(errorFeature,'MaxMin'))
-          numErrFeatures=2; %min and max)
-          curHerr=nanmin(pf2_base.hierarchicalAverage(curData,curTable(:,dataH),@nanmin));
-            
-          barChartData(cBarSec,curBarGroup,2)=curHerr;
-          curHerr=nanmax(pf2_base.hierarchicalAverage(curData,curTable(:,dataH),@nanmax));
-          barChartData(cBarSec,curBarGroup,3)=curHerr;
-      elseif(strcmp(errorFeature,'SD'))
-          curHerr=nanstd(pf2_base.hierarchicalAverage(curData,curTable(:,dataH),@nanmean));
-          barChartData(cBarSec,curBarGroup,2)=curHerr*errMultiply;
-      elseif(strcmp(errorFeature,'SEM'))
-          curHerr=nanstd(pf2_base.hierarchicalAverage(curData,curTable(:,dataH),@nanmean));
-          curN=length(curDataH);
-          curHerr=curHerr/sqrt(curN);
-          barChartData(cBarSec,curBarGroup,2)=curHerr*errMultiply;
-      elseif(strcmp(errorFeature,'IQR')||strcmp(errorFeature,'IQR-NoOutliers')||strcmp(errorFeature,'Violin'))
-          numErrFeatures=5; %min and max) and median
-          gaQuant=quantile(curDataH,3);
-          iqr=gaQuant(end)-gaQuant(1);
-
-          gaPlotMin=min(curDataH);
-          gaPlotMax=max(curDataH);
-
-          if(contains(errorFeature,'IQR'))
-              outlierMax=gaQuant(end)+errMultiply*iqr;
-              outlierMin=gaQuant(1)-errMultiply*iqr;
-    
-              iqrPlotErrMin=max([gaPlotMin,outlierMin]);
-              iqrPlotErrMax=min([gaPlotMax,outlierMax]);
-
-              barChartData(cBarSec,curBarGroup,2)=iqrPlotErrMin;
-              barChartData(cBarSec,curBarGroup,3)=iqrPlotErrMax;
-
-              barChartData(cBarSec,curBarGroup,6)=gaQuant(2);
-          else
-
-            numErrFeatures=4;
-            barChartData(cBarSec,curBarGroup,2)=gaPlotMin;
-            barChartData(cBarSec,curBarGroup,3)=gaPlotMax;
-         
-          end
-
-          barChartData(cBarSec,curBarGroup,4)=gaQuant(1);
-          barChartData(cBarSec,curBarGroup,5)=gaQuant(end);
-
-          
-
-          if(strcmp(errorFeature,'IQR'))
-              dataPointsIdx=(curDataH>iqrPlotErrMax|curDataH<iqrPlotErrMin);
-              
-              barChartDataPoints(cBarSec,curBarGroup)={curDataH(dataPointsIdx)};
-
-              plottingDataPoints=true;
-          end
-              
-      end
-      
-      gAErrStrs{curBarGroup}=sprintf('%s',gbyStrs{g});
-    end
+        end
         
+        if(strcmp(errorFeature,'MaxMin'))
+            numErrFeatures=2; %min and max)
+            curHerr=nanmin(pf2_base.hierarchicalAverage(curData,curTable(:,dataH),@nanmin));
+            
+            barChartData(cBarSec,curBarGroup,2)=curHerr;
+            curHerr=nanmax(pf2_base.hierarchicalAverage(curData,curTable(:,dataH),@nanmax));
+            barChartData(cBarSec,curBarGroup,3)=curHerr;
+        elseif(strcmp(errorFeature,'SD'))
+            curHerr=nanstd(pf2_base.hierarchicalAverage(curData,curTable(:,dataH),@nanmean));
+            barChartData(cBarSec,curBarGroup,2)=curHerr*errMultiply;
+        elseif(strcmp(errorFeature,'SEM'))
+            curHerr=nanstd(pf2_base.hierarchicalAverage(curData,curTable(:,dataH),@nanmean));
+            curN=length(curDataH);
+            curHerr=curHerr/sqrt(curN);
+            barChartData(cBarSec,curBarGroup,2)=curHerr*errMultiply;
+        elseif(strcmp(errorFeature,'IQR')||strcmp(errorFeature,'IQR-NoOutliers')||strcmp(errorFeature,'Violin'))
+            numErrFeatures=5; %min and max) and median
+            gaQuant=quantile(curDataH,3);
+            iqr=gaQuant(end)-gaQuant(1);
+            
+            gaPlotMin=min(curDataH);
+            gaPlotMax=max(curDataH);
+            
+            if(contains(errorFeature,'IQR'))
+                outlierMax=gaQuant(end)+errMultiply*iqr;
+                outlierMin=gaQuant(1)-errMultiply*iqr;
+                
+                iqrPlotErrMin=max([gaPlotMin,outlierMin]);
+                iqrPlotErrMax=min([gaPlotMax,outlierMax]);
+                
+                barChartData(cBarSec,curBarGroup,2)=iqrPlotErrMin;
+                barChartData(cBarSec,curBarGroup,3)=iqrPlotErrMax;
+                
+                barChartData(cBarSec,curBarGroup,6)=gaQuant(2);
+            else
+                
+                numErrFeatures=4;
+                barChartData(cBarSec,curBarGroup,2)=gaPlotMin;
+                barChartData(cBarSec,curBarGroup,3)=gaPlotMax;
+                
+            end
+            
+            barChartData(cBarSec,curBarGroup,4)=gaQuant(1);
+            barChartData(cBarSec,curBarGroup,5)=gaQuant(end);
+            
+            
+            
+            if(strcmp(errorFeature,'IQR'))
+                dataPointsIdx=(curDataH>iqrPlotErrMax|curDataH<iqrPlotErrMin);
+                
+                barChartDataPoints(cBarSec,curBarGroup)={curDataH(dataPointsIdx)};
+                
+                plottingDataPoints=true;
+            end
+            
+        end
+        
+        gAErrStrs{curBarGroup}=sprintf('%s',gbyStrs{g});
+    end
+    
     if(~exSettings.plot_bar_err)
         curHerr=0;
-  
+        
         gAErrStrs{curBarGroup}='';
     end
-
+    
 end
-    
-    
-    
+
+
+
 
 if(isempty(barChartData))
     warning('All data is missing');
@@ -368,7 +368,7 @@ if(exSettings.plot_bar_err&&~strcmp(plotFeature,'Count'))
             ylabel_with_space(sprintf('%s %s   +/- %dx %s',plotFeature,curInfoStr,errMultiply,errorFeature));
         end
     elseif(plotPoints||strcmp(errorFeature,'MaxMin')||strcmp(errorFeature,'Violin')||strcmp(errorFeature,'IQR'))
-         ylimLower=minDataPoint;
+        ylimLower=minDataPoint;
         ylimUpper=maxDataPoint;
         yrange=ylimUpper-ylimLower;
         ylim([ylimLower-0.1*yrange,ylimUpper+0.1*yrange]);
@@ -390,18 +390,18 @@ if(exSettings.plot_bar_err&&~strcmp(plotFeature,'Count'))
     end
     
     if(useCurInfoGroup)
-       title_with_space(sprintf('%s by %s',curInfoStr,curInfoGroup)); 
-       xlabel_with_space(curInfoGroup);
+        title_with_space(sprintf('%s by %s',curInfoStr,curInfoGroup));
+        xlabel_with_space(curInfoGroup);
     else
-       title_with_space(sprintf('%s',curInfoStr)); 
-
-       xLabGby=strjoin(gbyVars,'x');
-       xlabel_with_space(xLabGby);
+        title_with_space(sprintf('%s',curInfoStr));
+        
+        xLabGby=strjoin(gbyVars,'x');
+        xlabel_with_space(xLabGby);
     end
 else
     pf2_base.external.barweb(barChartData(:,:,1),[],1,uCurInfoG, [], [], [], cIndex,[],gAStrs,[],'hide',barChartDataPoints);
-
-
+    
+    
     if(~plotPoints||strcmp(plotFeature,'Count'))
         ylimLower=min(min(barChartData(:,:,1)));
         ylimUpper=max(max(barChartData(:,:,1)));
@@ -414,8 +414,8 @@ else
     ylabel_with_space(sprintf('%s %s',plotFeature,curInfoStr));
     
     if(useCurInfoGroup)
-       title_with_space(sprintf('%s by %s',curInfoStr,curInfoGroup)); 
-       xlabel_with_space(curInfoGroup);
+        title_with_space(sprintf('%s by %s',curInfoStr,curInfoGroup));
+        xlabel_with_space(curInfoGroup);
     end
 end
 
@@ -439,23 +439,23 @@ for i=1:size(gAStrs,1)
         barChartTable(idx,:)={gAStrs{i},uCurInfoG{j},barChartData(j,i,1),barChartData(j,i,2)};
     end
     
-
+    
 end
 
 
 
 fprintf('\n');
-        
+
 hold off;
-   
+
 if(exSettings.LME_enable)
     x=gbyVars_original;
     curLMEGbyString='';
-
+    
     useAllInteractions=exSettings.LME_all_interactions;
-
+    
     %mdlPrtString='Time';
-
+    
     if(useAllInteractions)
         
         for i=1:length(x)
@@ -463,7 +463,7 @@ if(exSettings.LME_enable)
         end
     else
         for i=1:length(x)
-             curLMEGbyString=sprintf('%s+%s',curLMEGbyString,x{i});
+            curLMEGbyString=sprintf('%s+%s',curLMEGbyString,x{i});
         end
     end
     
@@ -475,17 +475,17 @@ if(exSettings.LME_enable)
     if(exSettings.LME_use_customStr&&~isempty(exSettings.LME_customStr))
         lmeString=sprintf('%s~%s',exSettings.curInfoStr,exSettings.LME_customStr);
         if(contains(lmeString,'-1+')||contains(lmeString,'~-1'))
-           dummyCodeStr='full';
+            dummyCodeStr='full';
         end
     elseif(exSettings.LME_use_intercept)
         lmeString=sprintf('%s~%s+(%s)',exSettings.curInfoStr,curLMEGbyString,exSettings.LME_randomFxStr);
         
     else
-       lmeString=sprintf('%s~-1+%s+(%s)',exSettings.curInfoStr,curLMEGbyString,exSettings.LME_randomFxStr);
-       dummyCodeStr='full';
+        lmeString=sprintf('%s~-1+%s+(%s)',exSettings.curInfoStr,curLMEGbyString,exSettings.LME_randomFxStr);
+        dummyCodeStr='full';
     end
     
-
+    
     try
         rng(2019);
         curInfoChartLME=fitlme(ExFNIRS.selectedTable,lmeString,'FitMethod','REML','CheckHessian',true,'DummyVarCoding',dummyCodeStr);
@@ -494,9 +494,9 @@ if(exSettings.LME_enable)
         curInfoChartLME_ML=fitlme(ExFNIRS.selectedTable,lmeString,'FitMethod','ML','DummyVarCoding',dummyCodeStr);
         nullInfoChartLME=fitlme(ExFNIRS.selectedTable,nullMdlstring,'FitMethod','ML','DummyVarCoding',dummyCodeStr);
         
-%         curInfoChartLME_emm= pf2_base.external.emmeans(curInfoChartLME, {'orig'}, 'effects');
-%         h = emmip(curInfoChartLME_emm,'orig');
-
+        %         curInfoChartLME_emm= pf2_base.external.emmeans(curInfoChartLME, {'orig'}, 'effects');
+        %         h = emmip(curInfoChartLME_emm,'orig');
+        
         fprintf('Info Chart LME model: %s',exSettings.curInfoStr);
         if(useAllInteractions)
             fprintf(' - All Interactions\n');
@@ -516,11 +516,11 @@ if(exSettings.LME_enable)
         end
         
         [curMdlFit{1:4}]=coefTest(curInfoChartLME,mdlTest,zeros(size(mdlTest,1),1),'DFMethod','satterthwaite');
-            fprintf('\nModel Fit (H0: All F=0): p=%.5f\tF=%.2f\tdf1=%i\tdf2=%i\n\n',curMdlFit{1},curMdlFit{2},curMdlFit{3},curMdlFit{4});
-            tic
-            curChartContrast=exploreFNIRS.fx.autoContrast(curInfoChartLME);
-            toc
-            disp(curChartContrast);
+        fprintf('\nModel Fit (H0: All F=0): p=%.5f\tF=%.2f\tdf1=%i\tdf2=%i\n\n',curMdlFit{1},curMdlFit{2},curMdlFit{3},curMdlFit{4});
+        tic
+        curChartContrast=exploreFNIRS.fx.autoContrast(curInfoChartLME);
+        toc
+        disp(curChartContrast);
         ExFNIRS.curInfoChartContrast=curChartContrast;
     catch ME
         warning('Could not generate model for info figure %s',exSettings.curInfoStr);
@@ -544,7 +544,7 @@ if(iscell(possibleStr))
                 possibleStr{i}=sprintf('%s',possibleStr{i})
             end
         elseif(~ischar(possibleStr{i})&&isnumeric(possibleStr{i}))
-            possibleStr{i}=num2str(possibleStr{i}); 
+            possibleStr{i}=num2str(possibleStr{i});
         elseif(islogical(possibleStr{i})&&possibleStr{i})
             possibleStr{i}='true';
         elseif(islogical(possibleStr{i})&&~possibleStr{i})
@@ -565,10 +565,10 @@ elseif(islogical(possibleStr)&&~possibleStr)
     possibleStr='false';
 end
 
-    
-    if(isempty(possibleStr))
-        possibleStr='';
-    end
+
+if(isempty(possibleStr))
+    possibleStr='';
+end
 
 if(isempty(possibleStr))
     possibleStr='';
@@ -630,7 +630,7 @@ function h=suptitle_with_space(axHandle,labelstring)
 
 if(nargin<2)
     labelstring=axHandle;
-
+    
     if(~isempty(labelstring))
         labelstring(labelstring=='_')=' ';
     end
@@ -677,15 +677,15 @@ end
 
 function txt = myDataTipUpdateFcn(pointDataTip, event_obj)
 
-    hAxes=get(pointDataTip,'Parent');
-    pos = event_obj.Position;
-    selectedObjectTag=event_obj.Target.Tag;
-    
-    if(~isempty(selectedObjectTag))
-        txt={sprintf('%s\nt=%.2f, y=%.2f',selectedObjectTag,pos(1),pos(2))};
-    else
-        txt = {sprintf('t=%.2f, y=%.2f',pos(1),pos(2))};
-    end
-   %disp(['You clicked X:',num2str(pos(1)),', Y:',num2str(pos(2))]);
-    
+hAxes=get(pointDataTip,'Parent');
+pos = event_obj.Position;
+selectedObjectTag=event_obj.Target.Tag;
+
+if(~isempty(selectedObjectTag))
+    txt={sprintf('%s\nt=%.2f, y=%.2f',selectedObjectTag,pos(1),pos(2))};
+else
+    txt = {sprintf('t=%.2f, y=%.2f',pos(1),pos(2))};
+end
+%disp(['You clicked X:',num2str(pos(1)),', Y:',num2str(pos(2))]);
+
 end

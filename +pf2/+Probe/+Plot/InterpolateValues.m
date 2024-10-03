@@ -16,15 +16,15 @@ addRequired(p, 'data2plot');
 addOptional(p, 'fNIR', {}, isStructOrEmpty);
 addOptional(p, 'minVal', [], @isnumeric);
 addOptional(p, 'maxVal', [], @isnumeric);
-addOptional(p, 'bufferMult', 1, @isnumeric);
 addOptional(p, 'titleString', '', isStringOrChar);
 addOptional(p, 'clrBarTitle', '', isStringOrChar);
+addParameter(p, 'bufferDistance', 1, @isnumeric);
 
 parse(p, varargin{:});
 
 clrBarTitle = p.Results.clrBarTitle;
 titleString = p.Results.titleString;
-bufferMult = round(p.Results.bufferMult);
+bufferDistance = round(p.Results.bufferDistance);
 minVal = p.Results.minVal;
 maxVal = p.Results.maxVal;
 fNIR = p.Results.fNIR;
@@ -166,7 +166,7 @@ maxDim=max([dimX,dimY]);
 maxDimDist=round(maxDim/OptDistX)*OptDistX;
 
 
-bufferSize=bufferMult*OptDistX;
+bufferSize=bufferDistance*OptDistX;
 pixelPerCm=imgSize/max([dimX+bufferSize*2,dimY+bufferSize*2]);
 
 %optDataSize=10;
@@ -181,8 +181,8 @@ if(round(OptDistX,1)==(round(OptDistY,1)))
     [inpX,inpY]=meshgrid(0:OptDistX*pixelPerCm:(maxDimDist+bufferSize*2)*pixelPerCm);
     
     
-    %maxIdxX=round(dimX/OptDistX)+bufferMult+2;
-    %maxIdxY=round(dimY/OptDistY)+bufferMult+2;
+    %maxIdxX=round(dimX/OptDistX)+bufferDistance+2;
+    %maxIdxY=round(dimY/OptDistY)+bufferDistance+2;
     %inpX=inpX(1:maxIdxX,1:maxIdxY);
     %inpY=inpY(1:maxIdxX,1:maxIdxY);
     
@@ -201,8 +201,8 @@ if(round(OptDistX,1)==(round(OptDistY,1)))
         %    continue
         %end
         
-        optXidx(optIdx)=round(OptPosX(optIdx)/OptDistX)+bufferMult+1;
-        optYidx(optIdx)=round(OptPosY(optIdx)/OptDistY)+bufferMult+1;
+        optXidx(optIdx)=round(OptPosX(optIdx)/OptDistX)+bufferDistance+1;
+        optYidx(optIdx)=round(OptPosY(optIdx)/OptDistY)+bufferDistance+1;
         
         if(~twosided&&~isnan(data2plot(optIdx))&&((data2plot(optIdx)>=minVal&&maxVal>minVal)||...
                 (data2plot(optIdx)<=(minVal)&&minVal>maxVal)))
@@ -299,8 +299,8 @@ if(round(OptDistX,1)==(round(OptDistY,1)))
         intArrAlphaNeg(intArrLinearNeg<0)=0;
     end
     
-    x2keep=round([inpX(1,min(optXidx)-bufferMult)+1,inpX(1,max(optXidx)+bufferMult)]);
-    y2keep=round([inpY(min(optYidx)-bufferMult,1)+1,inpY(max(optYidx)+bufferMult,1)]);
+    x2keep=round([inpX(1,min(optXidx)-bufferDistance)+1,inpX(1,max(optXidx)+bufferDistance)]);
+    y2keep=round([inpY(min(optYidx)-bufferDistance,1)+1,inpY(max(optYidx)+bufferDistance,1)]);
     
     optPos2Plot=round([inpX(1,optXidx);inpX(1,optYidx)]);
     
