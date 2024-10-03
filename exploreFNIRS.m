@@ -3949,6 +3949,12 @@ switch(ExFNIRS.settings.ChannelMode)
         
 end
 
+if(ExFNIRS.UpdateNeeded)
+   updateSelectedTable(handles); 
+
+   %return;
+end
+
 exploreFNIRS.plot.barchart(handles,ExFNIRS.settings,ExFNIRS.gby,ExFNIRS.groupByVars, false,true);
 
 

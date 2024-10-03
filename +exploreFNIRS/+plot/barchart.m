@@ -1008,30 +1008,43 @@ if(showTopo)
               end
               
               fprintf('\n');
+
+           mdlPresent = ones(size(curChartLME));
+           nMdls=length(curChartLME);
+            for sHidx=1:nMdls
+                mdlPresent(sHidx)=~isempty(curChartLME{sHidx});
+            end
+
+            curMdlIdx = 0;
                 
               switch(LME_topo_mode)
-                    case 'coef'
+                case 'coef'
                         for c=1:numCoeff
-                            fNIR_t{b,c}=nan(1,max(chArr));
-                            fNIR_p{b,c}=nan(1,max(chArr));
-                            fNIR_df{b,c}=nan(1,max(chArr));
+                            fNIR_t{b,c}=nan(1,nMdls);
+                            fNIR_p{b,c}=nan(1,nMdls);
+                            fNIR_df{b,c}=nan(1,nMdls);
                         end
                   case 'anova'
                         for a=1:numANOVA
-                            fNIR_f{b,a}=nan(1,max(chArr));
-                            fNIR_p{b,a}=nan(1,max(chArr));
-                            fNIR_df{b,a}=nan(1,max(chArr));
-                            fNIR_df2{b,a}=nan(1,max(chArr));
+                            fNIR_f{b,a}=nan(1,nMdls);
+                            fNIR_p{b,a}=nan(1,nMdls);
+                            fNIR_df{b,a}=nan(1,nMdls);
+                            fNIR_df2{b,a}=nan(1,nMdls);
                         end
 
               end
             end
 
-
+           
             
             for coefIdx=1:size(ExFNIRS.curChartModelsCoefficents_tstat,1)
+
+                curMdlIdx=curMdlIdx+1;
+                while(curMdlIdx<length(curChartLME) && isempty(curChartLME{curMdlIdx}))
+                    curMdlIdx=curMdlIdx+1;
+                end
                     
-               curCh= chArr(coefIdx);
+               %curCh= chArr(coefIdx);
                
                curChName=chNames(coefIdx);
 
@@ -1042,17 +1055,17 @@ if(showTopo)
    
                        for c=1:numCoeff
 
-                           fNIR_t{b_idx,c}(curCh)=ExFNIRS.curChartModelsCoefficents_tstat{curChName,coefNames(c)};
-                           fNIR_p{b_idx,c}(curCh)=ExFNIRS.curChartModelsCoefficents_pval{curChName,coefNames(c)};
-                           fNIR_df{b_idx,c}(curCh)=ExFNIRS.curChartModelsCoefficents_df{curChName,coefNames(c)};
+                           fNIR_t{b_idx,c}(curMdlIdx)=ExFNIRS.curChartModelsCoefficents_tstat{curChName,coefNames(c)};
+                           fNIR_p{b_idx,c}(curMdlIdx)=ExFNIRS.curChartModelsCoefficents_pval{curChName,coefNames(c)};
+                           fNIR_df{b_idx,c}(curMdlIdx)=ExFNIRS.curChartModelsCoefficents_df{curChName,coefNames(c)};
                        end
                    case 'anova'
                        for a=1:numANOVA
 
-                           fNIR_f{b_idx,a}(curCh)=ExFNIRS.curChartModelsANOVACoefficents_Fstat{curChName,anovaNames(a)};
-                           fNIR_p{b_idx,a}(curCh)=ExFNIRS.curChartModelsANOVACoefficents_pval{curChName,anovaNames(a)};
-                           fNIR_df{b_idx,a}(curCh)=ExFNIRS.curChartModelsANOVACoefficents_df1{curChName,anovaNames(a)};
-                           fNIR_df2{b_idx,a}(curCh)=ExFNIRS.curChartModelsANOVACoefficents_df2{curChName,anovaNames(a)};
+                           fNIR_f{b_idx,a}(curMdlIdx)=ExFNIRS.curChartModelsANOVACoefficents_Fstat{curChName,anovaNames(a)};
+                           fNIR_p{b_idx,a}(curMdlIdx)=ExFNIRS.curChartModelsANOVACoefficents_pval{curChName,anovaNames(a)};
+                           fNIR_df{b_idx,a}(curMdlIdx)=ExFNIRS.curChartModelsANOVACoefficents_df1{curChName,anovaNames(a)};
+                           fNIR_df2{b_idx,a}(curMdlIdx)=ExFNIRS.curChartModelsANOVACoefficents_df2{curChName,anovaNames(a)};
                        end
                end
             end
@@ -1191,8 +1204,12 @@ if(showTopo)
                                                                                
                                         switch(exSettings.ChannelMode)
                                             case 'fNIR'
-                                                pf2.Probe.Plot.InterpolateValues(curF,[],estimatedPval_min,[],1,titleSTR,'F-val');%InterpolateValues(fNIR,data2plot,minVal,maxVal,bufferMult,titleString,clrBarTitle)
-                                            case 'ROI'
+                                                try
+                                                    pf2.Probe.Plot.InterpolateValues(curF,[],estimatedPval_min,[],1,titleSTR,'F-val');%InterpolateValues(fNIR,data2plot,minVal,maxVal,bufferMult,titleString,clrBarTitle)
+                                                catch
+                                                              x=1;
+                                                end
+                                                case 'ROI'
                                                 roiInfo=ExFNIRS.currentROI;
                                                 pf2.Probe.Plot.InterpolateROIvalues(mapROIvaluesToCh(roiInfo,curF),[],'ROIinfo',roiInfo,'minVal',estimatedPval_min,'maxVal',[],'bufferMult',1,'titleString',titleSTR,'clrBarTitle','F-val');%,7,11,2,1,false,'[Hb-Oxy] Natural High Vs. Low',12,'hot',true)
                                         end
