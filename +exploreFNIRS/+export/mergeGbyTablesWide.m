@@ -1,5 +1,5 @@
 
-function mergedTables=mergeGbyTablesWide(gbyTables,bioMarkers,channels,times,exportAux,exportROI)
+function mergedTables=mergeGbyTablesWide(gbyTables,bioMarkers,channels,times,exportAux,exportROI,optodeNames)
 % hObject    handle to pushbutton_export_csv (see GCBO)
 % eventdata  reserved - to be defined in a future version of MATLAB
 % handles    structure with handles and user data (see GUIDATA)
@@ -19,6 +19,12 @@ end
 
 if(nargin<3)
     channels=[];
+end
+
+if(nargin<7)
+    optodeNames=num2str(channels);
+else
+    optodeNames=cellstr(optodeNames);
 end
 
 if(isempty(channels))
@@ -99,12 +105,13 @@ for g=1:length(gbyTables)
             curBioM=bioMarkers{b};
             for c=1:numCh
                 chNum=channels(c);
+                chName=optodeNames{c};
                 for t=1:numBarGATimes
                     if(ismember(curBarGA.time(t),times))
                        if(numTimes==1)
-                          varName=sprintf('%s_Opt%i',curBioM,chNum); 
+                          varName=sprintf('%s_Opt%s',curBioM,chName); 
                        else
-                          varName=sprintf('%s_Opt%i_t%.0f',curBioM,chNum,curBarGA.time(t)); 
+                          varName=sprintf('%s_Opt%s_t%.0f',curBioM,chName,curBarGA.time(t)); 
                        end
                        varName(varName=='-')='_';
                        tempTable.(varName)(tempTable{:,'missingFNIRS'}~=1,1)=permute(curBarGA.(curBioM).data(t,chNum,:),[3,1,2]);

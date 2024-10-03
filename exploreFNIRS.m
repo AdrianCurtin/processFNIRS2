@@ -1907,7 +1907,9 @@ end
 
 logFileName=sprintf('%s_wide.log',file(1:end-4));
 
-exportTable=exploreFNIRS.export.mergeGbyTablesWide(ExFNIRS.gby,bioMList,[],times,true,true);
+optodeNames=num2str(ExFNIRS.currentOpt);
+
+exportTable=exploreFNIRS.export.mergeGbyTablesWide(ExFNIRS.gby,bioMList,[],times,true,true,optodeNames);
 
 if(ExFNIRS.settings.export_replace_missing_9999)
     exportTable=nan_to_9999(exportTable);
