@@ -1204,7 +1204,7 @@ if(showTopo)
                                         
                                         switch(exSettings.ChannelMode)
                                             case 'fNIR'
-                                                pf2.Probe.Plot.InterpolateValues(curF,[],estimatedPval_min,[],titleSTR,'F-val','bufferDistance',1);%InterpolateValues(fNIR,data2plot,minVal,maxVal,bufferMult,titleString,clrBarTitle
+                                                pf2.Probe.Plot.InterpolateValues3D(curF,[],estimatedPval_min,[],titleSTR,'F-val','bufferDistance',1);%InterpolateValues(fNIR,data2plot,minVal,maxVal,bufferMult,titleString,clrBarTitle
                                             case 'ROI'
                                                 roiInfo=ExFNIRS.currentROI;
                                                 pf2.Probe.Plot.InterpolateROIvalues(mapROIvaluesToCh(roiInfo,curF),[],'ROIinfo',roiInfo,'minVal',estimatedPval_min,'maxVal',[],'bufferMult',1,'titleString',titleSTR,'clrBarTitle','F-val');%,7,11,2,1,false,'[Hb-Oxy] Natural High Vs. Low',12,'hot',true)

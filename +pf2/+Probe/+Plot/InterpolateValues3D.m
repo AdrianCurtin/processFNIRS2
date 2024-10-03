@@ -30,8 +30,12 @@ defaultCamPosition = 'auto';
 validCamPositions = {'auto','front', 'back', 'top' 'left', 'right','face'};
 validCamPosition = @(x) ((isstring(x)||ischar(x))&&any(validatestring(x, validCamPositions))) || (isnumeric(x) && length(x) == 3);
 
-defaultColormap = 'hot';
-defaultColormapLow = 'cool';
+defaultColormap = 'hotCropped';
+defaultColormapLow = 'winter';
+
+cropFn = @(var,n) var(end-n+1:end,:);
+hotCropped = @(n) cropFn(hot(ceil(n*1.25)),n);
+
 validColormapLabels = exploreFNIRS.helper.listColormaps('all');
 validColormap = @(x) (isnumeric(x)&&(size(x,2)==3))||isa(x,'function_handle') || any(ishandle(x)) || any(validatestring(x, validColormapLabels));
 
@@ -109,6 +113,13 @@ parse(p,varargin{:});
 
 
 data2plot = p.Results.data2plot;
+titleString = p.Results.titleString;
+clrBarTitle = p.Results.colorbarStr;
+projectmode = p.Results.interpolateType;
+bufferDistance=p.Results.bufferDistance;
+
+bufferDistance=nan;
+
 multiprobe = iscell(data2plot);
 
 
@@ -238,14 +249,15 @@ if(p.Results.logScale)
     cbarUpper_minmax=log(cbarUpper_minmax);
 end
 
-titleString = p.Results.titleString;
-clrBarTitle = p.Results.colorbarStr;
-projectmode = p.Results.interpolateType;
-bufferDistance=p.Results.bufferDistance;
+
 
 cmap_high = p.Results.cmap;
 if(~ishandle(cmap_high))
-    cmap_high = str2func(cmap_high);
+    if(strcmp(cmap_high,'hotCropped'))
+        cmap_high=hotCropped;
+    else
+        cmap_high = str2func(cmap_high);
+    end
 end
 
 cmap_low_t = p.Results.cmap_lower;
@@ -923,89 +935,75 @@ if(~all(dataEmpty))
         nColorsMaxBar=1024;
     end
     cbarUpperRange=max(cbarUpper_minmax)-min(cbarUpper_minmax);
+
+    mapWithAlpha = @(cmap, isUpper) [cmap, [linspace( 1* ~isUpper, 1*isUpper, size(cmap(1:floor(end/3),:), 1)).^(0.5)'; ones(size(cmap(floor(end*1/3)+1:end,1)))]];
+   
     
     if twosided
-        cbarLowerRange=max(cbarLower_minmax)-min(cbarLower_minmax);
-        cbarRangeFull=max(cbarUpper_minmax)-min(cbarLower_minmax);
-        cbarOverlappingRange=max(cbarLower_minmax)-min(cbarUpper_minmax);
-        cbarIsOverlapping=cbarOverlappingRange>0;
+        cbarLowerRange = max(cbarLower_minmax) - min(cbarLower_minmax);
+        cbarRangeFull = max(cbarUpper_minmax) - min(cbarLower_minmax);
+        cbarOverlappingRange = max(cbarLower_minmax) - min(cbarUpper_minmax);
+        cbarIsOverlapping = cbarOverlappingRange > 0;
         
+        fracUpper = cbarUpperRange / cbarRangeFull;
+        fracLower = cbarLowerRange / cbarRangeFull;
+        fracOverlap = cbarOverlappingRange / cbarRangeFull;
         
-        
-        fracUpper=cbarUpperRange/cbarRangeFull;
-        fracLower=cbarLowerRange/cbarRangeFull;
-        fracOverlap=cbarOverlappingRange/cbarRangeFull;
-        
-        nColorLower=floor(fracLower*nColorsMaxBar)+1;
-        nColorUpper=floor(fracUpper*nColorsMaxBar)+1;
-        nOverlap=floor(fracOverlap*nColorsMaxBar)+1;
-        
+        nColorLower = floor(fracLower * nColorsMaxBar) + 1;
+        nColorUpper = floor(fracUpper * nColorsMaxBar) + 1;
+        nOverlap = floor(fracOverlap * nColorsMaxBar) + 1;
+   
         if cbarIsOverlapping
-            cmap = colormap(ax,[cmap_low(nColorLower);
-                repmat(brainColor, nOverlap, 1);
-                cmap_high(nColorUpper)]);
-        else %non-overlapping colorbars
-            cmap = colormap(ax,[cmap_low(nColorLower);
-                cmap_high(nColorUpper)]);
+            cmap = [mapWithAlpha(cmap_low(nColorLower),false); repmat([brainColor,1], nOverlap, 1); mapWithAlpha(cmap_high(nColorUpper),true)];
+        else
+            cmap = [mapWithAlpha(cmap_low(nColorLower),false); mapWithAlpha(cmap_high(nColorUpper),true)];
         end
-        c_ind = round(length(cmap)*(C(:) - min(cbarLower_minmax))/(cbarRangeFull)); %Renormalize to min/max of 0 and 1
-        %for i=1:num_control
-        %if C(i) <= minVal(1)
-        %    c_ind(i) = round(length(cmap)*(C(i) - c_min)/range);
-        %    cmap_i(i) = 1;
-        %elseif C(i) < minVal(2)
-        %    c_ind(i) = 0;
-        %    alphas(i) = 1;
-        %else
-        %    c_ind(i) = round(length(cmap)*(C(i) - minVal(2))/range);
-        %end
+        
+        % Normalize C to the range [0, 1] based on the full range
+        c_ind = (C(:) - min(cbarLower_minmax)) / cbarRangeFull;
+        
+        % Create a mask for values that should not be colorized
+        mask = (C(:) > max(cbarLower_minmax)) & (C(:) < min(cbarUpper_minmax));
     else
         if ~negColorbar
             if(isnumeric(cmap_high))
-                cmap=cmap_high;
+                cmap = cmap_high;
             else
-                %if(p.Results.logScale)
-                %    cmap = [cmap_high(nColorsMaxBar)];
-                %else
-                cmap = [cmap_high(nColorsMaxBar)];
-                %end
+                cmap = cmap_high(nColorsMaxBar);
             end
+            
         else
             if(isnumeric(cmap_low))
-                cmap=flip(cmap_low);
+                cmap = flip(cmap_low);
             else
-                %if(p.Results.logScale)
-                %   cmap = [flip(cmap_low(nColorsMaxBar))];
-                %else
-                cmap = [flip(cmap_low(nColorsMaxBar))];
-                %end
+                cmap = flip(cmap_low(nColorsMaxBar));
             end
+           
         end
+
+        cmap = mapWithAlpha(cmap,~negColorbar);
         
-        c_ind = round(length(cmap)*(C(:) - min(cbarUpper_minmax))/cbarUpperRange);
+        c_ind = (C(:) - min(cbarUpper_minmax)) / (max(cbarUpper_minmax) - min(cbarUpper_minmax));
+        mask = false(size(C));
     end
-    
-    switch(projectmode)
+
+    % blend cmap with brainColor according to alpha
+    cmap = cmap .* cmap(:, 4) + repmat([brainColor(1:3),1], size(cmap, 1), 1) .* (1 - cmap(:, 4));
+
+    switch projectmode
         case 'nearest'
-            C_temp = [brainColor;reshape(ind2rgb(c_ind, cmap), [], 3)];
-            C_temp([-1; c_ind] < 0, :) = repmat(brainColor, sum(c_ind < 0)+1, 1);
-            %C_temp = zeros(num_control+1, 3);
-            %C_temp(1,:) = brainColor;
-            %C_temp(logical([0;cmap_i == 1]),:) = reshape(ind2rgb(c_ind(cmap_i == 1), cmap_low), [], 3);
-            %C_temp(logical([0;cmap_i == 0]),:) = reshape(ind2rgb(c_ind(cmap_i == 0), cmap), [], 3);
+            C_temp = [brainColor; reshape(ind2rgb(round(c_ind * (size(cmap, 1) - 1)) + 1, cmap),[],3)];
+            C_temp([-1; c_ind] < 0, :) = repmat(brainColor, sum(c_ind < 0) + 1, 1);
+            C_temp(mask, :) = repmat(brainColor, sum(mask), 1);
             
             counts = histcounts(ind, 0:num_control+1);
-            for i=1:num_control+1
-                try
-                    Cs(ind==i-1,:) = repmat(C_temp(i,:), counts(i), 1);
-                catch
-                    
-                    x=2;
-                end
+            Cs = zeros(num_vertices, 3);
+            for i = 1:num_control+1
+                Cs(ind == i-1, :) = repmat(C_temp(i, :), counts(i), 1);
             end
-            n=length(Cs(~any(Cs,2), :));
+            
         case {'linear', 'quadratic', 'cubic'}
-            switch(projectmode)
+            switch projectmode
                 case 'linear'
                     beta = 0.5;
                 case 'quadratic'
@@ -1013,18 +1011,18 @@ if(~all(dataEmpty))
                 case 'cubic'
                     beta = 1.5;
             end
-            dist_array(dist_array >= max_distance_2) = Inf;
             
-            my_interp_fx = @(dist, val, pow, dim) sum(val.*(1./(dist.^pow + 1e-8))./sum(1./(dist.^pow + 1e-8), dim), dim);
+            dist_array(dist_array >= max_distance_2) = Inf;
+            my_interp_fx = @(dist, val, pow, dim) sum(val .* (1./(dist.^pow + 1e-8)) ./ sum(1./(dist.^pow + 1e-8), dim), dim);
+            
             C_temp = repmat(c_ind', num_vertices, 1);
             v_ind = my_interp_fx(dist_array, C_temp, beta, 2);
-            %v_ind = round(length(cmap)*(v_ind - minVal)/(maxVal - minVal));
             
-            %alpha_interp(cmap_interp > 0.1 & cmap_interp < 0.9) = 1;
-            Cs = reshape(ind2rgb(round(v_ind), cmap), [], 3);
-            Cs(v_ind < 0, :) = repmat(brainColor, sum(v_ind < 0), 1);
-            Cs(ind == 0,:) = repmat(brainColor, sum(ind == 0), 1);
+            Cs = ind2rgb(round(v_ind * (size(cmap, 1) - 1)) + 1, cmap);
+            Cs(v_ind < 0 | mask, :) = repmat(brainColor, sum(v_ind < 0 | mask), 1);
+            Cs(ind == 0, :) = repmat(brainColor, sum(ind == 0), 1);
     end
+
 else % No data to plot, everything is brain and anatomy
     Cs = repmat(brainColor, size(mdl.v, 1), 1);
     
