@@ -532,8 +532,8 @@ for chIdx=1:numOpt
             
             switch exSettings.ChannelMode
                 case 'fNIR'
-                    chNamePart=sprintf('Opt. %i',ch);
-                    chNamePartLong=sprintf('Optode %i',ch);
+                    chNamePart=sprintf('Opt. %s',selectedOptStr{chIdx});
+                    chNamePartLong=sprintf('Optode %s',selectedOptStr{chIdx});
                 case 'ROI'
                     chNamePart=selectedOptStr{chIdx};
                     chNamePartLong=sprintf('ROI: %s',selectedOptStr{chIdx});
