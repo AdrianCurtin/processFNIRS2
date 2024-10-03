@@ -31,7 +31,7 @@ fNIR = p.Results.fNIR;
 data2plot = p.Results.data2plot;
 
 if(isempty(minVal))
-   minVal=nanmin(data2plot); 
+    minVal=nanmin(data2plot);
 end
 
 if(isempty(maxVal))
@@ -46,7 +46,7 @@ cla
 
 
 if(length(minVal)==2&&sum(minVal>0)==1&&isempty(maxVal))  %% expects two minimum values
-    twosided=true; 
+    twosided=true;
     minVal=sort(minVal);
     maxVal(1)=nanmax(data2plot(:));
     maxVal(2)=nanmin(data2plot(:));
@@ -62,11 +62,11 @@ if(length(minVal)==2&&sum(minVal>0)==1&&isempty(maxVal))  %% expects two minimum
     end
     
 elseif(isempty(maxVal))
-     maxVal=nanmax(data2plot(:));
+    maxVal=nanmax(data2plot(:));
     
     twosided=false;
 else
-    twosided=false; 
+    twosided=false;
 end
 
 if(isempty(fNIR))
@@ -85,9 +85,9 @@ if(isempty(fNIR)&&isfield(setF,'device'))
         probeInfo=pf2_base.loadDeviceCfg(cfgFilePath,true);
         setF.device=probeInfo;
     else
-       probeInfo=setF.device; 
+        probeInfo=setF.device;
     end
-elseif(pf2_base.isnestedfield(fNIR,'info.probename')&&isfield(fNIR.info,'probename')&&~contains(fNIR.info.probename,'Unknown')) 
+elseif(pf2_base.isnestedfield(fNIR,'info.probename')&&isfield(fNIR.info,'probename')&&~contains(fNIR.info.probename,'Unknown'))
     %try to load the probename cfg file
     cfgFilePath=sprintf('%s.cfg',fNIR.info.probename);
 else
@@ -95,7 +95,7 @@ else
 end
 
 if(~isempty(probeInfo))
-
+    
 elseif(isempty(cfgFilePath)||~contains(cfgFilePath,'.cfg'))
     
     warning('Missing or invalid configuration file path\n')
@@ -117,7 +117,7 @@ if(pf2_base.isnestedfield(probeInfo,'Probe'))
     end
     probeInfo=probeInfo.Probe{probeNum};
 else
-   error('Unable to identify probe'); 
+    error('Unable to identify probe');
 end
 
 include_ss=false;
@@ -146,7 +146,6 @@ imgSize=1000;
 OptPosX=probeInfo.OptPos.x_2d(~probeInfo.TableOpt.IsShortSeparation);
 OptPosY=probeInfo.OptPos.y_2d(~probeInfo.TableOpt.IsShortSeparation);
 
-OptPosY=-OptPosY;
 
 maxPosX=nanmax(OptPosX);
 maxPosY=nanmax(OptPosY);
@@ -180,8 +179,8 @@ buffer=bufferSize*pixelPerCm/2;
 
 if(round(OptDistX,1)==(round(OptDistY,1)))
     [inpX,inpY]=meshgrid(0:OptDistX*pixelPerCm:(maxDimDist+bufferSize*2)*pixelPerCm);
-
-
+    
+    
     %maxIdxX=round(dimX/OptDistX)+bufferMult+2;
     %maxIdxY=round(dimY/OptDistY)+bufferMult+2;
     %inpX=inpX(1:maxIdxX,1:maxIdxY);
@@ -223,108 +222,108 @@ if(round(OptDistX,1)==(round(OptDistY,1)))
         end
         
     end
-
-
-numNeighbors=~isnan(interpBuffer)*1;
-numNeighbors(numNeighbors==1)=nan; %marks all valid points as nan (so they don't add)
-numNeighbors(2:end,:)=numNeighbors(2:end,:)+~isnan(interpBuffer(1:end-1,:)); %add left shift
-numNeighbors(1:end-1,:)=numNeighbors(1:end-1,:)+~isnan(interpBuffer(2:end,:)); %add right shift
-numNeighbors(:,2:end)=numNeighbors(:,2:end)+~isnan(interpBuffer(:,1:end-1)); %add top shift
-numNeighbors(:,1:end-1)=numNeighbors(:,1:end-1)+~isnan(interpBuffer(:,2:end)); %add bottom shift
-
-neighborIdx=find(numNeighbors>1);
-
-[neighborIdxY,neighborIdxX]=ind2sub(size(numNeighbors),neighborIdx);
-for i=1:length(neighborIdxX)
-   curX=neighborIdxX(i);
-   curY=neighborIdxY(i);
-   
-   up=interpBuffer(curY-1,curX);
-   down=interpBuffer(curY+1,curX);
-   left=interpBuffer(curY,curX-1);
-   right=interpBuffer(curY,curX+1);
-   val=nanmean([up,down,left,right]);
-   
-   if(~twosided&&~isnan(val)&&((val>=minVal&&maxVal>minVal)||...
-            (val<=(minVal)&&minVal>maxVal)))
-        interpBuffer(curY,curX)=val;
-        alphaBuffer(curY,curX)=1;
-        alphaBufferNeg(curY,curX)=0;
-    elseif(twosided&&~isnan(val)&&val<=minVal(1))
-        interpBuffer(curY,curX)=val;
-        alphaBufferNeg(curY,curX)=1;
-        alphaBuffer(curY,curX)=0;
-    elseif(twosided&&~isnan(val)&&val>=minVal(2))
-        interpBuffer(curY,curX)=val;
-        alphaBuffer(curY,curX)=1;
-        alphaBufferNeg(curY,curX)=0;
-    else
-        interpBuffer(curY,curX)=val;
+    
+    
+    numNeighbors=~isnan(interpBuffer)*1;
+    numNeighbors(numNeighbors==1)=nan; %marks all valid points as nan (so they don't add)
+    numNeighbors(2:end,:)=numNeighbors(2:end,:)+~isnan(interpBuffer(1:end-1,:)); %add left shift
+    numNeighbors(1:end-1,:)=numNeighbors(1:end-1,:)+~isnan(interpBuffer(2:end,:)); %add right shift
+    numNeighbors(:,2:end)=numNeighbors(:,2:end)+~isnan(interpBuffer(:,1:end-1)); %add top shift
+    numNeighbors(:,1:end-1)=numNeighbors(:,1:end-1)+~isnan(interpBuffer(:,2:end)); %add bottom shift
+    
+    neighborIdx=find(numNeighbors>1);
+    
+    [neighborIdxY,neighborIdxX]=ind2sub(size(numNeighbors),neighborIdx);
+    for i=1:length(neighborIdxX)
+        curX=neighborIdxX(i);
+        curY=neighborIdxY(i);
+        
+        up=interpBuffer(curY-1,curX);
+        down=interpBuffer(curY+1,curX);
+        left=interpBuffer(curY,curX-1);
+        right=interpBuffer(curY,curX+1);
+        val=nanmean([up,down,left,right]);
+        
+        if(~twosided&&~isnan(val)&&((val>=minVal&&maxVal>minVal)||...
+                (val<=(minVal)&&minVal>maxVal)))
+            interpBuffer(curY,curX)=val;
+            alphaBuffer(curY,curX)=1;
+            alphaBufferNeg(curY,curX)=0;
+        elseif(twosided&&~isnan(val)&&val<=minVal(1))
+            interpBuffer(curY,curX)=val;
+            alphaBufferNeg(curY,curX)=1;
+            alphaBuffer(curY,curX)=0;
+        elseif(twosided&&~isnan(val)&&val>=minVal(2))
+            interpBuffer(curY,curX)=val;
+            alphaBuffer(curY,curX)=1;
+            alphaBufferNeg(curY,curX)=0;
+        else
+            interpBuffer(curY,curX)=val;
+        end
     end
-end
-
-
-if(~twosided)
-    interpBuffer(isnan(interpBuffer))=minVal;
-else
-    interpBuffer(isnan(interpBuffer))=0;
-end
-
-
-%interpBuffer=interpBuffer(end:-1:1,:);
-%alphaBuffer=alphaBuffer(end:-1:1,:);
-
-[Xq,Yq] = meshgrid(1:imgSize);
-
-
-
-
-if(twosided)
-    intArr=interp2(inpX,inpY,interpBuffer,Xq,Yq,'makima',0);%,method,extrapval)
-elseif(minVal>maxVal)
-    intArr=interp2(inpX,inpY,interpBuffer,Xq,Yq,'makima',nanmean(maxVal));%,method,extrapval)
-elseif(maxVal>=minVal)
-    intArr=interp2(inpX,inpY,interpBuffer,Xq,Yq,'makima',nanmean(minVal));%,method,extrapval)
-end
-
-intArrAlpha=interp2(inpX,inpY,alphaBuffer,Xq,Yq,'cubic',0);%,method,extrapval)
-intArrLinear=interp2(inpX,inpY,alphaBuffer,Xq,Yq,'linear',0);%,method,extrapval)
-
-intArrAlpha(intArrAlpha<0)=0;
-intArrAlpha(intArrLinear<0)=0;
-
-if(twosided)
-    intArrAlphaNeg=interp2(inpX,inpY,alphaBufferNeg,Xq,Yq,'cubic',0);%,method,extrapval)
-    intArrLinearNeg=interp2(inpX,inpY,alphaBufferNeg,Xq,Yq,'linear',0);%,method,extrapval)
+    
+    
+    if(~twosided)
+        interpBuffer(isnan(interpBuffer))=minVal;
+    else
+        interpBuffer(isnan(interpBuffer))=0;
+    end
+    
+    
+    %interpBuffer=interpBuffer(end:-1:1,:);
+    %alphaBuffer=alphaBuffer(end:-1:1,:);
+    
+    [Xq,Yq] = meshgrid(1:imgSize);
+    
+    
+    
+    
+    if(twosided)
+        intArr=interp2(inpX,inpY,interpBuffer,Xq,Yq,'makima',0);%,method,extrapval)
+    elseif(minVal>maxVal)
+        intArr=interp2(inpX,inpY,interpBuffer,Xq,Yq,'makima',nanmean(maxVal));%,method,extrapval)
+    elseif(maxVal>=minVal)
+        intArr=interp2(inpX,inpY,interpBuffer,Xq,Yq,'makima',nanmean(minVal));%,method,extrapval)
+    end
+    
+    intArrAlpha=interp2(inpX,inpY,alphaBuffer,Xq,Yq,'cubic',0);%,method,extrapval)
+    intArrLinear=interp2(inpX,inpY,alphaBuffer,Xq,Yq,'linear',0);%,method,extrapval)
+    
     intArrAlpha(intArrAlpha<0)=0;
-    intArrAlphaNeg(intArrLinearNeg<0)=0;
-end
-
-x2keep=round([inpX(1,min(optXidx)-bufferMult)+1,inpX(1,max(optXidx)+bufferMult)]);
-y2keep=round([inpY(min(optYidx)-bufferMult,1)+1,inpY(max(optYidx)+bufferMult,1)]);
-
-optPos2Plot=round([inpX(1,optXidx);inpX(1,optYidx)]);
-
-if(twosided)
-    intArrAlphaNeg=intArrAlpha(y2keep(1):y2keep(2),(x2keep(1)):x2keep(2));
-    %intArrAlphaNeg(intArrAlphaNeg==0)=0; 
-end
-
+    intArrAlpha(intArrLinear<0)=0;
+    
+    if(twosided)
+        intArrAlphaNeg=interp2(inpX,inpY,alphaBufferNeg,Xq,Yq,'cubic',0);%,method,extrapval)
+        intArrLinearNeg=interp2(inpX,inpY,alphaBufferNeg,Xq,Yq,'linear',0);%,method,extrapval)
+        intArrAlpha(intArrAlpha<0)=0;
+        intArrAlphaNeg(intArrLinearNeg<0)=0;
+    end
+    
+    x2keep=round([inpX(1,min(optXidx)-bufferMult)+1,inpX(1,max(optXidx)+bufferMult)]);
+    y2keep=round([inpY(min(optYidx)-bufferMult,1)+1,inpY(max(optYidx)+bufferMult,1)]);
+    
+    optPos2Plot=round([inpX(1,optXidx);inpX(1,optYidx)]);
+    
+    if(twosided)
+        intArrAlphaNeg=intArrAlpha(y2keep(1):y2keep(2),(x2keep(1)):x2keep(2));
+        %intArrAlphaNeg(intArrAlphaNeg==0)=0;
+    end
+    
 else
     
     
-        % Calculate the size of the interpolation grid
+    % Calculate the size of the interpolation grid
     maxX = max(OptPosX);
     maxY = max(OptPosY);
-
+    
     % flip X and Y
-
+    
     %OptPosX = maxX-OptPosX;
     %OptPosY = maxY-OptPosY;
     
     % Create a fine mesh for interpolation
     [Xq, Yq] = meshgrid(linspace(0, maxX, imgSize), linspace(0, maxY, imgSize));
-
+    
     % Perform the interpolation
     if twosided
         intArr = griddata(OptPosX, OptPosY, data2plot, Xq, Yq, 'cubic');
@@ -337,17 +336,17 @@ else
         intArr(isnan(intArr)) = minVal;
         intArr(intArr<minVal)=minVal;
     end
-
-     % Calculate alpha values
+    
+    % Calculate alpha values
     rawGrid = griddata(OptPosX, OptPosY, data2plot, Xq, Yq, 'cubic');
     alphaValues = ~isnan(rawGrid);
     if twosided
         alphaValues = alphaValues.*(rawGrid>minVal(2));
         alphaValuesNeg = ~isnan(rawGrid).*rawGrid<minVal(1);
-
+        
         intArrAlphaNeg = imgaussfilt(double(alphaValuesNeg), 10);  % Gaussian filter for smooth edges
     end
-
+    
     intArrAlpha = imgaussfilt(double(alphaValues), 10);  % Gaussian filter for smooth edges
     
     % Adjust the plotting code
@@ -355,11 +354,11 @@ else
     y2keep = [1, imgSize];
     
     intArr2plot = intArr;
-
+    
     optPos2Plot = [interp1(linspace(0, maxX, imgSize), 1:imgSize, OptPosX),...
-                   interp1(linspace(0, maxY, imgSize), 1:imgSize, OptPosY)]';
-
-
+        interp1(linspace(0, maxY, imgSize), 1:imgSize, OptPosY)]';
+    
+    
 end
 
 
@@ -375,6 +374,7 @@ intArrAlpha=intArrAlpha(y2keep(1):y2keep(2),(x2keep(1)):x2keep(2));
 %imgFinal=imagesc(intArr,[minVal,maxVal]);
 
 ax1=gca;
+set(ax1,'YDir','normal');
 
 curAxPosition=ax1.Position;
 
@@ -397,6 +397,7 @@ if(~twosided)
     imgFinal=imagesc(intArr2plot,[minVal,maxVal]);
     set(gca,'xtick',[]);
     set(gca,'ytick',[]);
+    set(gca,'YDir','normal');
     xlim([1,size(intArrAlpha,2)]);
     ylim([1,size(intArrAlpha,1)]);
     chPos=colorbar();
@@ -405,7 +406,7 @@ if(~twosided)
     imgFinal.AlphaData=intArrAlpha;
     imgFinal.AlphaDataMapping='none';
     axis off
-
+    
     if(negColorbar)
         %set( chPos, 'YDir', 'reverse' );
     end
@@ -425,11 +426,11 @@ else
     axis off
     
     
-
+    
     
     ax2=axes('OuterPosition',curAxPosition);
     ax2.Position=ax1.Position;
-
+    
     %yyaxis left
     imgFinalNeg=imagesc(intArr2plot,[maxVal(2),minVal(1)]);
     set(gca,'YDir','normal');
@@ -445,7 +446,7 @@ else
     cool256=hot(512);
     colormap(ax2,cool256(end-64:-1:92,[3,2,1]));
     %caxis([-1*minVal(1),-1*maxVal(2)])
-  
+    
     axis off
     
     curAxInnerPosition=ax1.Position;
@@ -472,10 +473,10 @@ hold on
 %hpt=plot(optPos2Plot(1,:)/1.01+1,optPos2Plot(2,:)/1.01+1,'square','MarkerSize',4,'LineWidth',3,'color','white', 'MarkerFaceColor', 'white');
 
 for optIdx=1:length(data2plot)
-    optNum=probeInfo.TableOpt.OptodeNum(optIdx); 
+    optNum=probeInfo.TableOpt.OptodeNum(optIdx);
     mrkLbl{optIdx}=num2str(optNum);
     %if optIdx > 16
-    %    continue 
+    %    continue
     %end
     %t=text(optPos2Plot(1,optIdx)/1.01+1,optPos2Plot(2,optIdx)/1.01+1,mrkLbl{optIdx},'FontSize',11,'VerticalAlignment','middle','HorizontalAlignment', 'left','color','white');
     %t2=text(optPos2Plot(1,optIdx)/1.01+1,optPos2Plot(2,optIdx)/1.01+1,mrkLbl{optIdx},'FontSize',8,'VerticalAlignment','middle','HorizontalAlignment', 'right','color','white');
