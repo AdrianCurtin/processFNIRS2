@@ -1,4 +1,4 @@
-function interpolatehitachi(fNIRarr,minVal,maxVal,clrmap)
+function interpolateHitachi(fNIRarr,minVal,maxVal,clrmap)
 if(nargin<4)
     clrmap='hot';
 end

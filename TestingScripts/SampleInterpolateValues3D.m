@@ -2,6 +2,10 @@
 pf2_base.loadDeviceCfg('fNIR_Devices_fNIR1000.cfg');
 pf2.Probe.Plot.InterpolateValues3D([],{'fNIR_Devices_fNIR1000.cfg'});
 
+
+%% Plot with anatomy image
+pf2.Probe.Plot.InterpolateValues3D(fnirData,'brainStyle','Gray_3D_White');
+
 %% Plot just device 3x5 Hitachi
 %% Show 10-20 data
 pf2_base.loadDeviceCfg('Hitachi_ETG4000_3x5.cfg');
