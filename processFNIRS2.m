@@ -374,13 +374,26 @@ end
 varargout={};
 
 if(~isempty(data))
+
+    numOptodes=curProbe.NumOptodes;
     if(~isfield(fData,'fchMask')||(isfield(fData,'fchMask')&&isempty(fData.fchMask)))
         fData.fchMask=true(1,curProbe.NumOptodes);
+    else
+        if(length(fData.fchMask)~=numOptodes)
+            origNumOptodes = unique(curProbe.TableCh.OptodeNumber);
+            origNumOptodes=origNumOptodes(origNumOptodes>0);
+
+            if(length(fData.fchMask)==length(origNumOptodes))
+                fData.fchMask=fData.fchMask(ismember(origNumOptodes,curProbe.TableOpt.OptodeNum));
+            else
+                error('Channel mask does not match number of optodes')
+            end
+        end
     end
-    numOptodes=curProbe.NumOptodes;
     channelNumbers=curProbe.TableCh.OptodeNumber;
     wavelengths=curProbe.TableCh.Wavelength;
     curOptTable=curProbe.TableOpt;
+    
     
     rawMask=ismember(channelNumbers,curProbe.TableOpt.OptodeNum(reshape(fData.fchMask>PF2.RejectLevel|outputData.ProcessRejected,1,numOptodes)));
 
@@ -526,9 +539,12 @@ else
     baselineSamples=startSample:endSample;
 end
 
-curTableCh=curProbe.TableCh;
-curTableOpt=curProbe.TableOpt;
 
+curTableOpt=curProbe.TableOpt;
+curTableCh=curProbe.TableCh;
+
+data=data(:,curTableCh.isCh);
+curTableCh=curTableCh(curTableCh.isCh,:);
 
 [outData.HbO, outData.HbR, outData.HbTotal, outData.HbDiff,outData.CBSI,outData.channels,~,outData.units,outData.DPF_factor]=...
     pf2_base.fnirs.bvoxy(data,curTableCh.OptodeNumber,curTableCh.Wavelength,curTableOpt.SD,baselineSamples,subjectAge,[],true,'NoPathlength',NoPathlength,'DiffPathlengthFactor',fixedDPF);
@@ -537,7 +553,7 @@ outData.time=time;
                                                           %START/END
 %[fNIR.oxy,fNIR.bv_805,fNIR.bv,fNIR.hbo,fNIR.hbr] = bvoxy (1,min(se,60),ss,se,fNIR.fin.raw_730,fNIR.fin.raw_805,fNIR.fin.raw_850);
 
-%outData=data;
+%outData=data;  
 end
 
 

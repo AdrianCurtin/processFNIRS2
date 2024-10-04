@@ -3,7 +3,9 @@ function probeInfo=SelectDevice(device_cfg_path_string)
 
 if(nargin<1)
     probeInfo=pf2_base.loadDeviceCfg();
-else
-
+elseif(nargout>0)
     probeInfo=pf2_base.loadDeviceCfg(device_cfg_path_string);
+else
+    pf2_base.loadDeviceCfg(device_cfg_path_string);
+end
 end

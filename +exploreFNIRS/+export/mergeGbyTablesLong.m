@@ -1,9 +1,10 @@
 
 
-function mergedTables=mergeGbyTablesLong(gbyTables,bioMarkers,channels,times,exportAux,exportROI)
+function mergedTables=mergeGbyTablesLong(gbyTables,bioMarkers,channelIndexes,times,exportAux,exportROI,channelLabels)
 % hObject    handle to pushbutton_export_csv (see GCBO)
 % eventdata  reserved - to be defined in a future version of MATLAB
 % handles    structure with handles and user data (see GUIDATA)
+
 
 if(nargin<6)
     exportROI=false;
@@ -18,19 +19,25 @@ if(nargin<4)
 end
 
 if(nargin<3)
-    channels=[];
+    channelIndexes=[];
 end
 
-if(isempty(channels))
-    % Export All channels , ROIs etc
+if(nargin<7)
+    channelLabels=cellstr(num2str(channelIndexes));
+else
+    channelLabels=cellstr(channelLabels);
+end
+
+if(isempty(channelIndexes))
+    % Export All channelIndexes , ROIs etc
    emptyChannelFlag=true;
 else
     emptyChannelFlag=false;
 end
 
-if((~exportROI&&~exportAux)) % export parameters by themself, or all channels
+if((~exportROI&&~exportAux)) % export parameters by themself, or all channelIndexes
    exportFNIR=true; 
-elseif(isempty(channels)) %used in mass export
+elseif(isempty(channelIndexes)) %used in mass export
    exportFNIR=true; 
 else
     exportFNIR=false;
@@ -70,8 +77,8 @@ for g=1:length(gbyTables)
        numROI=size(curBarGA.ROI.HbO.data,2);
        ROIs=1:numROI;
     elseif(exportROI&&~emptyChannelFlag&&pf2_base.isnestedfield(curBarGA,'ROI.HbO.data'))
-        numROI=length(channels);
-        ROIs=channels;
+        numROI=length(channelIndexes);
+        ROIs=channelIndexes;
     else
        numROI=0; 
     end
@@ -79,9 +86,9 @@ for g=1:length(gbyTables)
     %numRows=size(tempTable,1);
     if(emptyChannelFlag&&exportFNIR)
         numCh=size(curBarGA.HbO.data,2);
-        channels=1:numCh;
+        channelIndexes=1:numCh;
     elseif(exportFNIR)
-       numCh=length(channels); 
+       numCh=length(channelIndexes); 
     else
        numCH=0; 
     end
@@ -110,8 +117,9 @@ for g=1:length(gbyTables)
                 curBioM=bioMarkers{b};
 
                 for c=1:numCh
-                    chNum=channels(c);
-                    chName=sprintf('Opt%i_%s',chNum,curBioM); 
+                    chNum=channelIndexes(c);
+                    chLabel = channelLabels{c};
+                    chName=sprintf('Opt%s_%s',chLabel,curBioM); 
 
 
                     tempTable.(chName)(:,1)=nan;

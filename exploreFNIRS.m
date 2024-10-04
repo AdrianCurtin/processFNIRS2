@@ -1907,7 +1907,9 @@ end
 
 logFileName=sprintf('%s_wide.log',file(1:end-4));
 
-exportTable=exploreFNIRS.export.mergeGbyTablesWide(ExFNIRS.gby,bioMList,[],times,true,true);
+optodeNames=num2str(ExFNIRS.currentOpt);
+
+exportTable=exploreFNIRS.export.mergeGbyTablesWide(ExFNIRS.gby,bioMList,[],times,true,true,optodeNames);
 
 if(ExFNIRS.settings.export_replace_missing_9999)
     exportTable=nan_to_9999(exportTable);
@@ -1975,8 +1977,8 @@ end
 
 logFileName=sprintf('%s_long.log',file(1:end-4));
 
-
-exportTable=exploreFNIRS.export.mergeGbyTablesLong(ExFNIRS.gby,bioMList,[],times,true,true);
+optodeNames=num2str(ExFNIRS.currentOpt);
+exportTable=exploreFNIRS.export.mergeGbyTablesLong(ExFNIRS.gby,bioMList,[],times,true,true,optodeNames);
 
 
 if(ExFNIRS.settings.export_replace_missing_9999)
@@ -3945,6 +3947,12 @@ switch(ExFNIRS.settings.ChannelMode)
         
     case 'Aux'
         
+end
+
+if(ExFNIRS.UpdateNeeded)
+   updateSelectedTable(handles); 
+
+   %return;
 end
 
 exploreFNIRS.plot.barchart(handles,ExFNIRS.settings,ExFNIRS.gby,ExFNIRS.groupByVars, false,true);

@@ -174,6 +174,7 @@ while(ischar(lineF))
                 fNIR.t0=header.StartDateTime;
              catch
                 header.StartDateTime= datetime(temp2,'InputFormat','eee MMM dd HH:mm:ss yyyy'); % else use only regular seconds
+                fNIR.t0=header.StartDateTime;
              end
           end
        end

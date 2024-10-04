@@ -34,6 +34,8 @@ end
  fprintf(fid,'Start Time:\t');
  if(isfield(fNIRstruct,'t0'))
     fprintf(fid,'%s\n',datestr(fNIRstruct.t0,'ddd mmm DD hh:MM:ss.FFF yyyy'));
+ elseif(isfield(fNIRstruct,'info')&&isfield(fNIRstruct.info,'header')&&isfield(fNIRstruct.info.header,'StartDateTime'))
+    fprintf(fid,'%s\n',datestr(fNIRstruct.info.header.StartDateTime,'ddd mmm DD hh:MM:ss.FFF yyyy'));
  else
     fprintf(fid,'Wed Jan 1 1:01:01 2022\n');
  end
@@ -112,6 +114,8 @@ fid=fopen(mrkFilePath,'wt');
  fprintf(fid,'Start Time:\t');
  if(isfield(fNIRstruct,'t0'))
     fprintf(fid,'%s\n',datestr(fNIRstruct.t0,'ddd mmm DD hh:MM:ss.FFF yyyy'));
+ elseif(isfield(fNIRstruct,'info')&&isfield(fNIRstruct.info,'header')&&isfield(fNIRstruct.info.header,'StartDateTime'))
+    fprintf(fid,'%s\n',datestr(fNIRstruct.info.header.StartDateTime,'ddd mmm DD hh:MM:ss.FFF yyyy'));
  else
     fprintf(fid,'Wed Jan 1 1:01:01 2022\n');
  end
@@ -142,7 +146,11 @@ end
  for x=1:numLines
      fprintf(fid,'%.3f',arr(x,1)); 
     for y=2:numCol
-       fprintf(fid,'\t%.0f',arr(x,y)); 
+        if(rem(arr(x,y),1)==0)
+            fprintf(fid,'\t%.0f',arr(x,y));
+        else
+            fprintf(fid,'\t%.3f',arr(x,y));
+        end
     end
      fprintf(fid,'\n');
    
@@ -166,6 +174,8 @@ fid=fopen(logFilePath,'wt');
   fprintf(fid,'Start Time:\t');
  if(isfield(fNIRstruct,'t0'))
     fprintf(fid,'%s\n',datestr(fNIRstruct.t0,'ddd mmm DD hh:MM:ss.FFF yyyy'));
+ elseif(isfield(fNIRstruct,'info')&&isfield(fNIRstruct.info,'header')&&isfield(fNIRstruct.info.header,'StartDateTime'))
+    fprintf(fid,'%s\n',datestr(fNIRstruct.info.header.StartDateTime,'ddd mmm DD hh:MM:ss.FFF yyyy'));
  else
     fprintf(fid,'Wed Jan 1 1:01:01 2022\n');
  end
