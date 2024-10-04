@@ -346,6 +346,10 @@ justOnes_Baseline=all(baseline==1);
 data=data(:,~justOnes); %Drop all columns that are only 1
 baseline=baseline(:,~justOnes_Baseline); %Drop all columns that are only 1
 
+%remove nan lines
+allNaN = sum(isnan(data),2);
+data(allNaN>0,:)=[];
+
 % Check for sample count in last column and drop it (newer cobi)
 lastCol=data(:,end);
 lastColIsSampleCount = all(diff(lastCol(1:100))>0)&&max(lastCol)>100000;
@@ -360,7 +364,15 @@ end
 
 if(lastColIsSampleCount)
     % if we have sample count rewrite time data with that
-    data(:,1)=data(1,1)+lastCol/1000-lastCol(1)/1000;
+    countResets = find(diff(lastCol)<0);
+    newTime=data(1,1)+lastCol/1000-lastCol(1)/1000;
+    
+    for r=1:length(countResets)
+        timeDiff=data(countResets(r)+1,1)-data(countResets(r),1);
+        newTime(countResets(r)+1:end,1)=-newTime(countResets(r)+1)+newTime(countResets(r,1))+timeDiff+newTime(countResets(r)+1:end,1);
+        warning('Count resets detected\n')
+    end
+    data(:,1)=newTime;
 end
 
 

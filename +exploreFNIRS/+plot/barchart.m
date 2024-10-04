@@ -485,7 +485,7 @@ for chIdx=1:numOpt
         
 
         if(exSettings.plot_bar_err&&~plotCount)
-            pf2_base.external.barweb(barChartData{curChart}(:,:,1),barChartData{curChart}(:,:,2:1+numErrFeatures),1,xBarLabels, [], [], [], cIndex,[],gAStrs,[],'hide',barChartDataPoints{curChart},strcmp(errorFeature,'Violin'));
+            pf2_base.external.barweb(barChartData{curChart}(:,:,1),barChartData{curChart}(:,:,2:1+numErrFeatures),1,xBarLabels, 'ColorMap', cIndex,'Legend',gAStrs,'LegendType','hide','DataPoints',barChartDataPoints{curChart},'PlotViolin',strcmp(errorFeature,'Violin'));
             
 
             if(plottingDataPoints||strcmp(errorFeature,'MaxMin')||strcmp(errorFeature,'IQR')||strcmp(errorFeature,'Violin'))
@@ -1189,10 +1189,10 @@ if(showTopo)
                                                                                
                                         switch(exSettings.ChannelMode)
                                             case 'fNIR'
-                                                pf2.Data.Plot.InterpolateValues(curF,[],estimatedPval_min,[],1,titleSTR,'F-val');%InterpolateValues(fNIR,data2plot,minVal,maxVal,bufferMult,titleString,clrBarTitle)
+                                                pf2.Probe.Plot.InterpolateValues(curF,[],estimatedPval_min,[],1,titleSTR,'F-val');%InterpolateValues(fNIR,data2plot,minVal,maxVal,bufferMult,titleString,clrBarTitle)
                                             case 'ROI'
                                                 roiInfo=ExFNIRS.currentROI;
-                                                pf2.Data.Plot.InterpolateValues(mapROIvaluesToCh(roiInfo,curF),[],'minVal',estimatedPval_min,'maxVal',[],'bufferMult',1,'titleString',titleSTR,'clrBarTitle','F-val');%,7,11,2,1,false,'[Hb-Oxy] Natural High Vs. Low',12,'hot',true)
+                                                pf2.Probe.Plot.InterpolateROIvalues(mapROIvaluesToCh(roiInfo,curF),[],'ROIinfo',roiInfo,'minVal',estimatedPval_min,'maxVal',[],'bufferMult',1,'titleString',titleSTR,'clrBarTitle','F-val');%,7,11,2,1,false,'[Hb-Oxy] Natural High Vs. Low',12,'hot',true)
                                         end
                                 end
 
@@ -1449,4 +1449,20 @@ disp(stats);
 % [~,~,stats]=randomEffects(lme_mdl,'DFMethod','satterthwaite');
 % disp(stats);
 disp(anova(lme_mdl,'DFMethod','satterthwaite'));
+end
+
+
+function txt = myDataTipUpdateFcn(pointDataTip, event_obj)
+
+    hAxes=get(pointDataTip,'Parent');
+    pos = event_obj.Position;
+    selectedObjectTag=event_obj.Target.Tag;
+    
+    if(~isempty(selectedObjectTag))
+        txt={sprintf('%s\nt=%.2f, y=%.2f',selectedObjectTag,pos(1),pos(2))};
+    else
+        txt = {sprintf('t=%.2f, y=%.2f',pos(1),pos(2))};
+    end
+   %disp(['You clicked X:',num2str(pos(1)),', Y:',num2str(pos(2))]);
+    
 end

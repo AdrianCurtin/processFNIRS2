@@ -352,7 +352,11 @@ for chIdx=1:numOpt
                   if(plotGroupByBioM)
                       if(~isempty(data2plot)&&isfield(data2plot,bioM))
                           if(~plotAsTable)
+                              try
                             h=plot(curFigH.subH{curSy,curSx},dataTime,data2plot.(bioM)(:,ch),'color',cIndex(b,:));
+                              catch
+                                  x=1;
+                              end
                           else
                             h=plot(curFigH.subH{curSy,curSx},dataTime,data2plot.(bioM){:,ch},'color',cIndex(b,:));
                           end
@@ -834,4 +838,19 @@ th.LineStyle='none';
 th.HorizontalAlignment='left';
 th.VerticalAlignment='bottom';
 curPos=th.Position;
+end
+
+function txt = myDataTipUpdateFcn(pointDataTip, event_obj)
+
+    hAxes=get(pointDataTip,'Parent');
+    pos = event_obj.Position;
+    selectedObjectTag=event_obj.Target.Tag;
+    
+    if(~isempty(selectedObjectTag))
+        txt={sprintf('%s\nt=%.2f, y=%.2f',selectedObjectTag,pos(1),pos(2))};
+    else
+        txt = {sprintf('t=%.2f, y=%.2f',pos(1),pos(2))};
+    end
+   %disp(['You clicked X:',num2str(pos(1)),', Y:',num2str(pos(2))]);
+    
 end

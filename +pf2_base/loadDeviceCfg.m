@@ -1,109 +1,42 @@
-function probeInfo=loadDeviceCfg(deviceCfgFilename,includeSSchannels)
-% Builds a probeInfo struct from the device.cfg file
+function probeInfo=loadDeviceCfg(deviceCfgFilename,includeSSchannels,loadFromGlobal)
+% Builds a probeInfo struct from the device.cfg file 
+%   (located in process fnirs 2 / devices folder)
+% 
 % use BuildProbeLayout to build a 2D representation for plotting
-%   use includeSSchannels disable remove short separation channels from 2D
+%   use includeSSchannels to disable removal of short separation channels from 2D
 %   plot layouts and figures
 
-%If no input argument, open a device configuration file
-if(nargin<1)
-    deviceCfgFilename='';
+% Set default values for input arguments
+if nargin < 1
+    deviceCfgFilename = '';
+end
+if nargin < 2
+    includeSSchannels = true;
 end
 
-% Option to hide SS channels
-if(nargin<2)
-    includeSSchannels=true;
+if(nargin<3)
+    loadFromGlobal=true;
 end
 
-pF2_folder=pf2_base.pf2_defaultRootPath();
+% Get the default root path
+pF2_folder = pf2_base.pf2_defaultRootPath();
 
+% Try to load the device configuration file
+[probeInfo, name] = loadDeviceConfig(deviceCfgFilename, pF2_folder);
 
+% Check if the probe is already in the global deviceTable
+global deviceTable
+global setF
 
-
-if(nargin>0&&~isempty(deviceCfgFilename)) % If file name is specified, try to load it
-    global deviceTable
-    global setF
-    
-    
-   [devCfg_folder,name,ext] = fileparts(deviceCfgFilename); 
-
-
-    % Find matching probe name in global deviceTable
-    saveOptLayout2=false;
-    if(~isempty(deviceTable) && any(strcmp(name, deviceTable.Probe)))
-       setF = deviceTable.ProbeInfo(strcmp(name, deviceTable.Probe));
-       %if(~isfield(setF.device.Probe{1},'OptLayout2D')&&buildProbeLayout)
-       %     saveOptLayout2=true;
-       % else
-            probeInfo=setF.device;
-            return;
-       % end
-    end
-
-    % Otherwise, open device cfg file
-    fid = fopen(deviceCfgFilename);   
-    
-    if fid==-1 && isempty(devCfg_folder) % if the file wasn't immediately accessible...
-                        %try loading from root/devices
-        fid = fopen(sprintf('%s/devices/%s',pF2_folder,deviceCfgFilename));
-        if(fid~=-1)
-            deviceCfgFilename=sprintf('%s/devices/%s',pF2_folder,deviceCfgFilename);
-        end
-    end
-
-    if fid==-1
-        warning('Local Config File not found');
-        
-        if(isempty(devCfg_folder))
-        
-            [file, pathname] = uigetfile({'*.cfg';'*.*'},'Please Select Device Configuration file',sprintf('%s/devices/',pF2_folder));
-        
-        else
-            [file, pathname] = uigetfile({'*.cfg';'*.*'},'Please Select Device Configuration file',devCfg_folder);
-        end
-        
-        if(isempty(file)||(isnumeric(file)&&file==0))
-            return;
-        end
-        
-        fid = fopen([pathname file]);
-
-        if fid==-1
-            error('Data file not found or permission denied');
-        end
-    
-        fclose(fid);
-
-        probeInfo.cfg = pf2_base.external.INI('File',[pathname file]);
-    else
-        fclose(fid);
-        probeInfo.cfg = pf2_base.external.INI('File',deviceCfgFilename);
-    end
-else %otherwise prompt user to open a file
-    saveOptLayout2=false;
-    
-    [file, pathname] = uigetfile({'*.cfg';'*.*'},'Please Select Device Configuration file',sprintf('%s/devices',sprintf('%s/devices/',pF2_folder)));
-    
-    if(isempty(file)||(isnumeric(file)&&file==0))
-        return;
-    end
-    fid = fopen([pathname file]);
-    
-    
-
-    if fid==-1
-      error('Data file not found or permission denied');
-    end
-
-    [~,name,~] = fileparts(file); 
-    
-    fclose(fid);
-
-    probeInfo.cfg = pf2_base.external.INI('File',[pathname file]);
+if ~isempty(deviceTable) && any(strcmp(name, deviceTable.Probe)) && loadFromGlobal
+    setF = deviceTable.ProbeInfo(strcmp(name, deviceTable.Probe));
+    probeInfo = setF.device;
+    return;
 end
 
+% Read the configuration file
 probeInfo.cfg.read();
-
-probeInfo.Info=probeInfo.cfg.Info;
+probeInfo.Info = probeInfo.cfg.Info;
 
 probeCount=0;
 for j=1:length(probeInfo.cfg.Sections)
@@ -378,8 +311,9 @@ for j=1:length(probeInfo.cfg.Sections)
          end
          
         for c=1:length(p.ChannelList)
-            p.TableOpt.Ch(c,:)=(find(p.ChannelNumbers==p.ChannelList(c)));
-            p.TableOpt.wv(c,:)=p.Wavelength(p.TableOpt.Ch(c,:));
+            chIdxMatch=(find(p.ChannelNumbers==p.ChannelList(c)));
+            p.TableOpt.Ch(c,1:length(chIdxMatch))=chIdxMatch;
+            p.TableOpt.wv(c,1:length(chIdxMatch))=p.Wavelength(chIdxMatch);
             if(~hasLabel)
                p.TableOpt.Label{c}=sprintf('Opt%i', p.ChannelList(c));
             end
@@ -516,5 +450,40 @@ function proj2d=project(XYZ,n,V,p)
     proj2d=B(:,1:3)*RM;
    
 
+end
+
+
+
+function [probeInfo, name] = loadDeviceConfig(deviceCfgFilename, pF2_folder)
+    if isempty(deviceCfgFilename)
+        [file, pathname] = uigetfile({'*.cfg;*.ini', 'Configuration Files (*.cfg, *.ini)'; ...
+                                      '*.*', 'All Files (*.*)'}, ...
+                                     'Select Device Configuration File', ...
+                                     fullfile(pF2_folder, 'devices'));
+        if isequal(file, 0)
+            error('User cancelled file selection');
+        end
+        deviceCfgFilename = fullfile(pathname, file);
+    end
+
+    [~, name, ~] = fileparts(deviceCfgFilename);
+
+    % Try to open the file
+    if ~exist(deviceCfgFilename, 'file')
+        % If not found, try in the devices folder
+        altPath = fullfile(pF2_folder, 'devices', deviceCfgFilename);
+        if exist(altPath, 'file')
+            deviceCfgFilename = altPath;
+        else
+            error('Configuration file not found: %s', deviceCfgFilename);
+        end
+    end
+
+    % Load the configuration file
+    try
+        probeInfo.cfg = pf2_base.external.INI('File', deviceCfgFilename);
+    catch ME
+        error('Error loading configuration file: %s', ME.message);
+    end
 end
 

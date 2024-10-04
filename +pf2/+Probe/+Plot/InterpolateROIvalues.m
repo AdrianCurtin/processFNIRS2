@@ -6,12 +6,13 @@ function [ imgOut ] = InterpolateROIvalues(varargin)
 
 p = inputParser;
 
-isStructOrEmpty=@(x) isstruct(x)||isempty(x);
+isStructOrEmpty=@(x) isstruct(x)||isempty(x) ||istable(x);
 isStringOrChar=@(x)isstring(x)||ischar(x);
 
 
 addRequired(p, 'data2plot');
 addOptional(p, 'fNIR', {}, isStructOrEmpty);
+addOptional(p, 'ROIinfo',{}, isStructOrEmpty);
 addOptional(p, 'minVal', [], @isnumeric);
 addOptional(p, 'maxVal', [], @isnumeric);
 addOptional(p, 'bufferMult', 1, @isnumeric);
@@ -27,12 +28,17 @@ minVal = p.Results.minVal;
 maxVal = p.Results.maxVal;
 fNIR = p.Results.fNIR;
 data2plot = p.Results.data2plot;
+ROIinfo = p.Results.ROIinfo;
 
-if(~isempty(fNIR)&&istable(fNIR)&&any(ismember(fNIR.Properties.VariableNames,'DeviceCfg')))%%is struct for ROI info?
-    ROIinfo=fNIR;
-    deviceCfg=ROIinfo.DeviceCfg{1};
+if(isempty(ROIinfo))
+    if(~isempty(fNIR)&&istable(fNIR)&&any(ismember(fNIR.Properties.VariableNames,'DeviceCfg')))%%is struct for ROI info?
+        ROIinfo=fNIR;
+        deviceCfg=ROIinfo.DeviceCfg{1};
+    else
+        ROIinfo=[];
+    end
 else
-    ROIinfo=[];
+    deviceCfg = ROIinfo.DeviceCfg{1};
 end
 
 if(isempty(ROIinfo)&&~isempty(fNIR)&&~pf2_base.isnestedfield(fNIR,'ROI.info')&&~isempty(fNIR.info))
@@ -95,7 +101,7 @@ end
 
 
 allCh=[];
-chData2plot=nan(size(probeInfo.ChannelList));
+chData2plot=nan(height(probeInfo.TableOpt));
 
 mrkLbl=cell(size(chData2plot));
 mrkLbl(:)={''};
@@ -103,13 +109,18 @@ mrkLbl(:)={''};
 ROInames=ROIinfo.Properties.RowNames;
 
 for roiIdx=1:numROI
+
+    if(~strcmp(deviceCfg,ROIinfo.DeviceCfg(roiIdx)))
+        continue;
+    end
+
     curCh=ROIinfo.Optodes{roiIdx};
     
     for(optIdx=1:length(curCh))
-        optNum=probeInfo.ChannelList(curCh(optIdx));
+        optNum=probeInfo.TableOpt.OptodeNum(curCh(optIdx));
 
-        chData2plot(optNum)=data2plot(roiIdx);
-        mrkLbl{optNum}=ROInames{roiIdx};
+        chData2plot(optNum)=data2plot(ROIinfo.index(roiIdx));
+        mrkLbl{optNum}=ROInames{ROIinfo.index(roiIdx)};
     end
     
     allCh=[allCh,curCh];
@@ -120,8 +131,8 @@ end
 
 imgSize=1000;
 
-OptPosX=probeInfo.OptPosX(~probeInfo.IsShortSeparation);
-OptPosY=probeInfo.OptPosY(~probeInfo.IsShortSeparation);
+OptPosX=probeInfo.TableOpt.Pos2D_x(~probeInfo.TableOpt.IsShortSeparation);
+OptPosY=probeInfo.TableOpt.Pos2D_y(~probeInfo.TableOpt.IsShortSeparation);
 
 maxPosX=nanmax(OptPosX);
 maxPosY=nanmax(OptPosY);
@@ -147,17 +158,14 @@ pixelPerCm=imgSize/max([dimX+bufferSize*2,dimY+bufferSize*2]);
 
 optDataSize=10;
 
-optPosX=probeInfo.OptPosX-minPosX;
-optPosY=probeInfo.OptPosY-minPosY;
-
 
 buffer=bufferSize*pixelPerCm/2;
 
 if(OptDistX==OptDistY)
-    [inpX,inpY]=meshgrid(0:OptDistX*pixelPerCm:(maxDimDist+bufferSize*2)*pixelPerCm);
+    [inpX,inpY]=meshgrid(0:OptDistX*pixelPerCm:(maxDimDist+bufferSize*3)*pixelPerCm);
 else
-    
-    error('Haven''t accoutned for this yet');
+    [inpX,inpY]=meshgrid(0:OptDistX*pixelPerCm:(maxDimDist+bufferSize*3)*pixelPerCm);
+    %error('Haven''t accoutned for this yet');
 end
 
 interpBuffer=ones(size(inpX))*minVal;
@@ -166,9 +174,13 @@ alphaBuffer=ones(size(inpX))*-1;
 numRows=size(inpY,1);
 
 for optIdx=1:length(chData2plot)
-    optNum=probeInfo.ChannelList(optIdx);
+    optNum=probeInfo.TableOpt.OptodeNum(optIdx);
     optXidx(optIdx)=round(OptPosX(optNum)/OptDistX+bufferMult+1);
-    optYidx(optIdx)=round(OptPosY(optNum)/OptDistY+bufferMult+1);
+    if(isempty(OptDistY))
+        optYidx(optIdx)=bufferMult+1;
+    else
+        optYidx(optIdx)=round(OptPosY(optNum)/OptDistY+bufferMult+1);
+    end
     if(~isnan(chData2plot(optIdx))&&chData2plot(optIdx)>minVal)
         interpBuffer(optYidx(optIdx),optXidx(optIdx))=chData2plot(optIdx);
         alphaBuffer(optYidx(optIdx),optXidx(optIdx))=1;
@@ -194,7 +206,7 @@ intArrLinear=interp2(inpX,inpY,alphaBuffer,Xq,Yq,'linear',-1);%,method,extrapval
 intArrAlpha(intArrAlpha<0)=0;
 intArrAlpha(intArrLinear<0)=0;
 
-x2keep=round([inpX(1,min(optXidx)-bufferMult)+1,inpX(1,max(optXidx)+bufferMult)]);
+x2keep=round([inpX(1,min(optXidx)-bufferMult)+1,inpX(1,min(max(optXidx)+bufferMult,length(optXidx)))]);
 y2keep=round([inpY(min(optYidx)-bufferMult,1)+1,inpY(max(optYidx)+bufferMult,1)]);
 
 optPos2Plot=round([inpX(1,optXidx);inpX(1,optYidx)]);
