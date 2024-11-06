@@ -54,6 +54,8 @@ if(exSettings.ylim_fixed)
     exSettings.ylim_fixed_max=-inf;
 end
 
+multiPlot=true;
+
 if(showBarChart)
     multiPlot=false;
     global ExFNIRS
