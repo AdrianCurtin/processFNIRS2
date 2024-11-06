@@ -117,6 +117,8 @@ titleString = p.Results.titleString;
 clrBarTitle = p.Results.colorbarStr;
 projectmode = p.Results.interpolateType;
 bufferDistance=p.Results.bufferDistance;
+include_ss=p.Results.includeSS;
+
 
 bufferDistance=nan;
 
@@ -350,7 +352,6 @@ end
 grootHandle.ShowHiddenHandles=false;
 
 probeInfo=[];
-include_ss=p.Results.includeSS;
 
 if(multiprobe)
     num_devices = length(fNIR);
@@ -597,6 +598,10 @@ end
 
 if(~include_ss)
     includeChannels=includeChannels&~probeInfo.TableOpt.IsShortSeparation;
+
+    if(length(data2plot_concat)>sum(includeChannels))
+        data2plot_concat=data2plot_concat(includeChannels);
+    end
 end
 
 if(~all(dataEmpty) && length(data2plot_concat)~=numOptodes)
