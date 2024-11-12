@@ -315,12 +315,18 @@ if(length(uSub)==1)
     set(handles.checkbox_subjectID_plotby,'Enable','off');
     set(handles.checkbox_subjectID_plotby,'Value',0);
     ExFNIRS.settings.plotby.SubjectID=0;
+else
+    set(handles.listbox_subjectID,'Enable','on');
+    set(handles.checkbox_subjectID_plotby,'Enable','on');
 end
 set(handles.listbox_group,'String',uGroup);
 set(handles.listbox_group,'Value',1:length(uGroup));
 if(length(uGroup)==1)
     set(handles.listbox_group,'Enable','off');
     set(handles.checkbox_use_group,'Enable','off');
+else
+    set(handles.listbox_group,'Enable','on');
+    set(handles.checkbox_use_group,'Enable','on');
 end
 set(handles.listbox_subgroup,'String',uSubgroup);
 set(handles.listbox_subgroup,'Value',1:length(uSubgroup));
@@ -346,6 +352,9 @@ if(length(uSession)==1)
     set(handles.checkbox_session_plotby,'Enable','off');
     set(handles.checkbox_session_plotby,'Value',0);
     ExFNIRS.settings.plotby.Session=0;
+else
+    set(handles.listbox_session,'Enable','on');
+    set(handles.checkbox_session_plotby,'Enable','on');
 end
 set(handles.listbox_trial,'String',uTrial);
 set(handles.listbox_trial,'Value',1:length(uTrial));
@@ -354,6 +363,9 @@ if(length(uTrial)==1)
     set(handles.checkbox_trial_plotby,'Enable','off');
     set(handles.checkbox_trial_plotby,'Value',0);
     ExFNIRS.settings.plotby.Trial=0;
+else
+    set(handles.listbox_trial,'Enable','on');
+    set(handles.checkbox_trial_plotby,'Enable','on');
 end
 set(handles.listbox_condition,'String',uCondition);
 set(handles.listbox_condition,'Value',1:length(uCondition));
@@ -362,6 +374,9 @@ if(length(uCondition)==1)
     set(handles.checkbox_condition_plotby,'Enable','off');
     set(handles.checkbox_condition_plotby,'Value',0);
     ExFNIRS.settings.plotby.Condition=0;
+else
+    set(handles.listbox_condition,'Enable','on');
+    set(handles.checkbox_condition_plotby,'Enable','on');
 end
 set(handles.listbox_block,'String',uBlock);
 set(handles.listbox_block,'Value',1:length(uBlock));
@@ -370,6 +385,9 @@ if(length(uBlock)==1)
     set(handles.checkbox_block_plotby,'Enable','off');
     set(handles.checkbox_block_plotby,'Value',0);
     ExFNIRS.settings.plotby.Block=0;
+else
+    set(handles.listbox_block,'Enable','on');
+    set(handles.checkbox_block_plotby,'Enable','on');
 end
 
 

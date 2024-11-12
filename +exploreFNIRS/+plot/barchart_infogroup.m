@@ -399,7 +399,7 @@ if(exSettings.plot_bar_err&&~strcmp(plotFeature,'Count'))
         xlabel_with_space(xLabGby);
     end
 else
-    pf2_base.external.barweb(barChartData(:,:,1),[],1,uCurInfoG, [], [], [], cIndex,[],gAStrs,[],'hide',barChartDataPoints);
+    pf2_base.external.barweb(barChartData(:,:,1),[],'Width',1,'GroupNames',uCurInfoG, 'ColorMap',cIndex,'Legend',gAStrs,'LegendType','hide','DataPoints',barChartDataPoints);
     
     
     if(~plotPoints||strcmp(plotFeature,'Count'))
