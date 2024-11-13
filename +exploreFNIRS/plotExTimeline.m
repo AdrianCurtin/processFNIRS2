@@ -139,6 +139,10 @@ function plotPeriodicSample(startTime,endTime,centerTime,sigHeight,sigAmp,rsLen,
 
     offset0=rem(find(xPoints==centerTime)+1,2);
 
+    if(isnan(sigLen))
+        return;
+    end
+
     yPoints= sigHeight-sigAmp/2+ones(1,sigLen)*sigAmp.*(rem(idx+offset0,2)==0);
     yPoints=repelem(yPoints,2);
 

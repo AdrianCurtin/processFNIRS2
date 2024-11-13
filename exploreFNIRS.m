@@ -299,95 +299,38 @@ function PopulateGUIfields(dataTable,handles)
 
 global ExFNIRS
 
-uSub=unique(dataTable.('SubjectID'));
-uGroup=unique(dataTable.('Group'));
-uSubgroup=unique(dataTable.('Subgroup'));
-uSession=unique(dataTable.('Session'));
-uTrial=unique(dataTable.('Trial'));
-uCondition=unique(dataTable.('Condition'));
-uBlock=unique(dataTable.('Block'));
+fieldNames={'SubjectID','Group','Subgroup','Session','Trial','Condition','Block'};
+defaultFields={'Group','Condition'};
 
+for f = 1:length(fieldNames)
 
-set(handles.listbox_subjectID,'String',uSub);
-set(handles.listbox_subjectID,'Value',1:length(uSub));
-if(length(uSub)==1)
-    set(handles.listbox_subjectID,'Enable','off');
-    set(handles.checkbox_subjectID_plotby,'Enable','off');
-    set(handles.checkbox_subjectID_plotby,'Value',0);
-    ExFNIRS.settings.plotby.SubjectID=0;
-else
-    set(handles.listbox_subjectID,'Enable','on');
-    set(handles.checkbox_subjectID_plotby,'Enable','on');
-end
-set(handles.listbox_group,'String',uGroup);
-set(handles.listbox_group,'Value',1:length(uGroup));
-if(length(uGroup)==1)
-    set(handles.listbox_group,'Enable','off');
-    set(handles.checkbox_use_group,'Enable','off');
-else
-    set(handles.listbox_group,'Enable','on');
-    set(handles.checkbox_use_group,'Enable','on');
-end
-set(handles.listbox_subgroup,'String',uSubgroup);
-set(handles.listbox_subgroup,'Value',1:length(uSubgroup));
-if(length(uSubgroup)==1)
-    set(handles.listbox_subgroup,'Enable','off');
-    set(handles.checkbox_use_subgroup,'Enable','off');
-    set(handles.checkbox_use_subgroup,'Value',0);
-end
+    uItems=unique(dataTable.(fieldNames{f}));
+    lowerNamePart=fieldNames{f};
+    lowerNamePart(1)=lower(lowerNamePart(1));
 
-if(length(uGroup)==1&&length(uSubgroup)==1)
-    set(handles.checkbox_group_plotby,'Enable','off');
-    set(handles.checkbox_group_plotby,'Value',0);
-    ExFNIRS.settings.plotby.Group=0;
-elseif(length(uGroup)==1&&length(uSubgroup)>1)
-    set(handles.checkbox_use_group,'Value',0);
-    set(handles.checkbox_use_subgroup,'Value',1);
-end
+    listboxName=sprintf('listbox_%s',lowerNamePart);
+    checkboxName=sprintf('checkbox_%s_plotby',lowerNamePart);
 
-set(handles.listbox_session,'String',uSession);
-set(handles.listbox_session,'Value',1:length(uSession));
-if(length(uSession)==1)
-    set(handles.listbox_session,'Enable','off');
-    set(handles.checkbox_session_plotby,'Enable','off');
-    set(handles.checkbox_session_plotby,'Value',0);
-    ExFNIRS.settings.plotby.Session=0;
-else
-    set(handles.listbox_session,'Enable','on');
-    set(handles.checkbox_session_plotby,'Enable','on');
-end
-set(handles.listbox_trial,'String',uTrial);
-set(handles.listbox_trial,'Value',1:length(uTrial));
-if(length(uTrial)==1)
-    set(handles.listbox_trial,'Enable','off');
-    set(handles.checkbox_trial_plotby,'Enable','off');
-    set(handles.checkbox_trial_plotby,'Value',0);
-    ExFNIRS.settings.plotby.Trial=0;
-else
-    set(handles.listbox_trial,'Enable','on');
-    set(handles.checkbox_trial_plotby,'Enable','on');
-end
-set(handles.listbox_condition,'String',uCondition);
-set(handles.listbox_condition,'Value',1:length(uCondition));
-if(length(uCondition)==1)
-    set(handles.listbox_condition,'Enable','off');
-    set(handles.checkbox_condition_plotby,'Enable','off');
-    set(handles.checkbox_condition_plotby,'Value',0);
-    ExFNIRS.settings.plotby.Condition=0;
-else
-    set(handles.listbox_condition,'Enable','on');
-    set(handles.checkbox_condition_plotby,'Enable','on');
-end
-set(handles.listbox_block,'String',uBlock);
-set(handles.listbox_block,'Value',1:length(uBlock));
-if(length(uBlock)==1)
-    set(handles.listbox_block,'Enable','off');
-    set(handles.checkbox_block_plotby,'Enable','off');
-    set(handles.checkbox_block_plotby,'Value',0);
-    ExFNIRS.settings.plotby.Block=0;
-else
-    set(handles.listbox_block,'Enable','on');
-    set(handles.checkbox_block_plotby,'Enable','on');
+    set(handles.(listboxName),'String',uItems);
+    set(handles.(listboxName),'Value',1:length(uItems));
+
+    if(length(uItems)<=1)
+        set(handles.(listboxName),'Enable','off');
+
+        if(~strcmp(checkboxName,'checkbox_subgroup_plotby'))
+            set(handles.(checkboxName),'Enable','off');
+            set(handles.(checkboxName),'Value',0);
+        end
+        ExFNIRS.settings.plotby.(fieldNames{f})=0;
+    else
+        set(handles.(listboxName),'Enable','on');
+        if(~strcmp(checkboxName,'checkbox_subgroup_plotby'))
+            set(handles.(checkboxName),'Enable','on');
+            set(handles.(checkboxName),'Value',ismember(fieldNames{f},defaultFields));
+        end
+        ExFNIRS.settings.plotby.(fieldNames{f})=ismember(fieldNames{f},defaultFields);
+    end
+
 end
 
 
@@ -1795,7 +1738,9 @@ end
 
 curTimes=[];
 for i=1:length(ExFNIRS.gby)
-    curTimes=[curTimes;ExFNIRS.gby(i).gbyGrandBar.segmentTimes];
+    if(~isempty(ExFNIRS.gby(i).gbyGrandBar))
+        curTimes=[curTimes;ExFNIRS.gby(i).gbyGrandBar.segmentTimes];
+    end
 end
 curTimes=unique(curTimes,'row');
 

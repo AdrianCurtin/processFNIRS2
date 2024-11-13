@@ -27,8 +27,6 @@ else
 
            curField=curFNIRseg.info.(curFieldName);
            
-           
-           
            if(isempty(curField)|| ...
                    (isnumeric(curField)&&length(curField)==1)||...  %numeric items of 1
                    ischar(curField)||isstring(curField)||...        %strings or chars
@@ -40,6 +38,9 @@ else
                   curField=curField{1,1};
               end
               
+              if(isstring(curField)||ischar(curField))
+                    curField=string(strtrim(curField));
+              end
               
                
               if(ismember(curFieldName,outTable.Properties.VariableNames)&&~isempty(curField))
