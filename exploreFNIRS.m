@@ -5,7 +5,7 @@ function varargout = exploreFNIRS(varargin) % exploreFNIRS(data,timeShiftTo0,blS
 %		Behavioral and FNIRS data is averaged by default according to the within subject heirarchy options
 %			ie: a subjects average score is the average of their sessions each of which is the average of all trials (this hierarchy can be changed in the GUI)
 %			Alternatively averaging can be set to Flat to change it so that subject data is averaged without respect to experimental hierarchy (necessary for LME models)
-%			ie: a subjects average score is the average of all their scores regardless of how many trials are in each session
+% %			ie: a subjects average score is the average of all their scores regardless of how many trials are in each session
 %		Plots are generated based on your groupby selection and the number of optodes/biomarkers you have selected to plot simultaneously
 %			There is an additional plotby button which allows one of the groupby factors to be used to split plots based on that factor
 %			(Otherwise all groups show up as different colors on the same plot)
@@ -185,6 +185,7 @@ addOptional(p,'blockEnd',ExFNIRS.settings.block_end,validScalarNum); %Time at wh
 addOptional(p,'plotStart',ExFNIRS.settings.plot_start,validScalarNum); %Default parameter for lower xlimit on plots (affects which models are displayed in barcharts and which timepoints are included)
 addOptional(p,'plotEnd',ExFNIRS.settings.plot_end,validScalarNum); %Default parameter for upper xlimit on plots (see above note)
 addOptional(p,'barSegmentLength', ExFNIRS.settings.barchart_resample_size,validScalarPosNum); %Default averaging/binning period for barcharts AND relevant export information  
+addOptional(p,'resampleSize',nan,validScalarPosNum); % ExFNIRS.settings.grandavg_resample_size, used for resampling
 
 parse(p,varargin{:});
 
@@ -210,6 +211,7 @@ ExFNIRS.settings.block_end=p.Results.blockEnd;
 ExFNIRS.settings.plot_start=p.Results.plotStart;
 ExFNIRS.settings.plot_end=p.Results.plotEnd;
 ExFNIRS.settings.barchart_resample_size=p.Results.barSegmentLength;
+ExFNIRS.settings.grandavg_resample_size=p.Results.resampleSize;
 
 
 
@@ -327,6 +329,8 @@ for f = 1:length(fieldNames)
         if(~strcmp(checkboxName,'checkbox_subgroup_plotby'))
             set(handles.(checkboxName),'Enable','on');
             set(handles.(checkboxName),'Value',ismember(fieldNames{f},defaultFields));
+        else
+            set(handles.checkbox_group_plotby,'Enable','on');
         end
         ExFNIRS.settings.plotby.(fieldNames{f})=ismember(fieldNames{f},defaultFields);
     end
@@ -2152,7 +2156,9 @@ ExFNIRS.settings.plot_error_feature=strs{idx};
 
 ExFNIRS.settings.plot_legend_mode=2; %1 none %2 last fig %3 all
 
-ExFNIRS.settings.grandavg_resample_size=estimatedFS*2;
+if(isnan(ExFNIRS.settings.grandavg_resample_size))
+   ExFNIRS.settings.grandavg_resample_size=estimatedFS*2;
+end
 set(handles.edit_grandavg_resample_size,'String',sprintf('%.3f',ExFNIRS.settings.grandavg_resample_size));
 %ExFNIRS.settings.code_missing=get(handles.checkbox_code_nan,'Value');
 

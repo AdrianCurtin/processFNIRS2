@@ -14,6 +14,9 @@ if(isnumeric(raw_method)) % Lookup method based on index
 	global PF2
 	if(pf2_base.isnestedfield(PF2,'myRawMethods.cfg.Sections'))
         if(raw_method<=length(PF2.myRawMethods.cfg.Sections))
+            if(raw_method==0)
+                raw_method=1;
+            end
             raw_method=PF2.myRawMethods.cfg.Sections{raw_method};
         end
 	end

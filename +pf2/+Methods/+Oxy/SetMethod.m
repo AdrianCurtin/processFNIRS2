@@ -12,6 +12,9 @@ if(isnumeric(oxy_method)) % Lookup method based on index
 	global PF2
 	if(pf2_base.isnestedfield(PF2,'myOxyMethods.cfg.Sections'))
         if(oxy_method<=length(PF2.myOxyMethods.cfg.Sections))
+            if(oxy_method==0)
+                oxy_method=1;
+            end
             oxy_method=PF2.myOxyMethods.cfg.Sections{oxy_method};
         end
 	end

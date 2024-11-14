@@ -525,7 +525,8 @@ for chIdx=1:numOpt
             maxValFromBarChart=max(max(barChartData{curChart}(:,:,1)));
             minValFromBarChart=min(min(barChartData{curChart}(:,:,1)));
             
-            pf2_base.external.barweb(barChartData{curChart}(:,:,1),[],1,xBarLabels, [], [], [], cIndex,[],gAStrs,[],'hide',barChartDataPoints{curChart});
+            pf2_base.external.barweb(barChartData{curChart}(:,:,1),[],1,xBarLabels, 'ColorMap', cIndex,'Legend',gAStrs,'LegendType','hide', 'DataPoints',barChartDataPoints{curChart});
+            
             ylimLower=minValFromBarChart;
             ylimUpper=maxValFromBarChart;
             yrange=ylimUpper-ylimLower;
