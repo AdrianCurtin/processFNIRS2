@@ -1,4 +1,4 @@
-# processFNIRS v0.7
+# processFNIRS v0.8
 
 ## Overview
 processFNIRS is a modular MATLAB toolbox designed for processing functional Near-Infrared Spectroscopy (fNIRS) data. The toolbox provides a flexible framework for importing, processing, analyzing, and visualizing fNIRS data from multiple device manufacturers.
@@ -9,7 +9,6 @@ processFNIRS is a modular MATLAB toolbox designed for processing functional Near
   - fNIR Devices/Biopac
   - Hitachi ETG-4000
   - NIRx systems
-  - Custom devices
 - **Customizable processing methods** that can be configured and saved
 - **Robust visualization tools** including:
   - Time series plots
@@ -18,7 +17,7 @@ processFNIRS is a modular MATLAB toolbox designed for processing functional Near
 - **Channel quality assessment** and artifact rejection capabilities
 - **Region-of-Interest (ROI) analysis** support
 - **Statistical analysis** with LME models integrated in exploreFNIRS
-- **Data export** in various formats including CSV, nir, snirf and MATLAB formats
+- **Data export** in various formats including NIR, SNIRF, CSV and MATLAB formats
 
 ## Getting Started
 
@@ -45,7 +44,12 @@ processFNIRS2.Methods.Oxy.SetMethod('MyOxyMethod');
 myprocesseddata = processFNIRS2(mydata);
 
 % Visualize data
-processFNIRS2(myprocesseddata);
+processFNIRS2.Data.Plot.Oxy(myprocesseddata);
+processFNIRS2.Data.Plot.ROI(myprocesseddata);
+
+% Export data
+processFNIRS2.Data.Export.asNIR(myprocesseddata, 'myexport.nir');
+processFNIRS2.Data.Export.asSNIRF(myprocesseddata, 'myexport.snirf');
 
 % Explore and analyze data
 exploreFNIRS(myprocesseddata);
@@ -59,6 +63,16 @@ Use functions in the `processFNIRS2.Import` module to load data from various fNI
 - `ImportHitachiMES`: Import Hitachi ETG-4000 files
 - `ImportNIRx`: Import NIRx system files
 - `ImportSampleData`: Load example datasets included with the toolbox
+
+### Data Manipulation
+The toolbox provides various functions for manipulating fNIRS data:
+- `processFNIRS2.Data.ApplyChannelMask`: Set bad channels to NaN
+- `processFNIRS2.Data.GetMarkers`: Find specific markers in the data
+- `processFNIRS2.Data.Resample`: Resample or average fNIRS data
+- `processFNIRS2.Data.SetT0`: Shift time to align with experiment start
+- `processFNIRS2.Data.Split`: Split fNIRS segments based on time points
+- `processFNIRS2.Data.Plot`: Visualize fNIRS data (Oxy, Raw, ROI, AuxData)
+- `processFNIRS2.Data.Export`: Export data to NIR or SNIRF formats
 
 ### Method Configuration
 processFNIRS2 uses a two-stage processing pipeline:
@@ -96,13 +110,19 @@ myrawprocessed = processFNIRS2.Process.ProcessRaw(mydata);
 myoxyprocessed = processFNIRS2.Process.ProcessOxy(myrawprocessed);
 ```
 
-### Data Manipulation
-The toolbox provides various functions for manipulating fNIRS data:
-- `processFNIRS2.Data.ApplyChannelMask`: Set bad channels to NaN
-- `processFNIRS2.Data.GetMarkers`: Find specific markers in the data
-- `processFNIRS2.Data.Resample`: Resample or average fNIRS data
-- `processFNIRS2.Data.SetT0`: Shift time to align with experiment start
-- `processFNIRS2.Data.Split`: Split fNIRS segments based on time points
+### Visualization and Export
+Visualize and export your processed data:
+```matlab
+% Visualize different aspects of the data
+processFNIRS2.Data.Plot.Oxy(myprocesseddata);      % Plot oxygenation data
+processFNIRS2.Data.Plot.Raw(myprocesseddata);      % Plot raw intensity data
+processFNIRS2.Data.Plot.ROI(myprocesseddata);      % Plot region of interest data
+processFNIRS2.Data.Plot.AuxData(myprocesseddata);  % Plot auxiliary data
+
+% Export data to different formats
+processFNIRS2.Data.Export.asNIR(myprocesseddata, 'myexport.nir');
+processFNIRS2.Data.Export.asSNIRF(myprocesseddata, 'myexport.snirf');
+```
 
 ### Advanced Analysis with exploreFNIRS
 For more advanced data exploration and analysis, use the exploreFNIRS module:
@@ -118,8 +138,12 @@ exploreFNIRS(myprocesseddata, 'timeShiftTo0', true, 'blStart', 0, 'blEnd', 5, ..
 exploreFNIRS features:
 - Group-level analysis
 - Statistical modeling with LME
-- Various visualization options (temporal plots, scatter plots, bar charts)
-- Exportable statistics and figures
+- Various visualization options:
+  - Temporal plots: `exploreFNIRS.plot.temporal()`
+  - Bar charts: `exploreFNIRS.plot.barchart()`
+  - Scatter plots: `exploreFNIRS.plot.scatter()`
+  - ROI analysis: `exploreFNIRS.plot.ROI()`
+- Data export: `exploreFNIRS.export.mergeGbyTablesWide()` / `mergeGbyTablesLong()`
 
 ## Settings Configuration
 Adjust common settings using the Settings module:
@@ -146,6 +170,47 @@ processFNIRS2.Settings.SelectDevice('fNIR_Devices_fNIR1200_16ch.cfg');
 - `devices/`: Device configuration files
 - `sampledata/`: Example datasets
 
+## Overall Structure
+processFNIRS2 is laid out in the following manner:
+- **Data**: Functions to manipulate individual fNIRS segments
+  - ApplyChannelMask: Set bad channels to nan
+  - GetMarkers: Find timepoints of markers in a regex style
+  - Resample: Resample or average fNIRS data
+  - SetT0: Shift fNIRS time to match start of experiment
+  - Split: Split fNIRS segment based on different input times
+  - **Plot**: Functions to visualize fNIRS data
+    - AuxData: Plot auxiliary data channels
+    - Oxy: Plot oxygenation data
+    - ROI: Plot Region of Interest data
+    - Raw: Plot raw intensity data
+  - **Export**: Functions to export fNIRS data
+    - asNIR: Export to NIR file format
+    - asSNIRF: Export to SNIRF file format
+- **GUI**: Shortcut for accessing the GUI
+- **Help**: Access to help documentation
+- **Import**: Functions to import fNIRS files
+  - ImportHitachiMES: Import Hitachi Probes
+  - ImportNIRx: Import NIRx files
+  - ImportNIR: Import fNIR Devices/Biopac files
+  - ImportSampleData: Import sample data included with the toolbox
+- **Methods**: Functions to change and modify processing methods
+  - Oxy: Oxy conversion pipeline methods
+  - Raw: Raw domain pipeline methods
+- **Process**: Process fNIR segment data
+  - ProcessOxy: Run the Oxy Pipeline only
+  - ProcessRaw: Run the Raw Pipeline only
+- **Settings**: Change settings related to processing
+  - Baseline: Change baseline time settings
+  - DPF: Change mode of Differential Path Length
+  - SelectDevice: Reload device settings for FNIRS probe
+
+## Troubleshooting Tips
+- When importing data for the first time, verify that the probe configuration is correct
+- If you get errors about DPF factors, check the settings using processFNIRS2.Settings.DPF
+- For visualization issues, try running with default methods first
+- If having trouble loading the software, check the MATLAB preference directory (`prefdir`) and delete any related settings files
+- Remember that GUI settings are for visualization only and don't affect your data
+
 ## Preferences and Configuration
 Settings, loaded functions, and methods are stored in the MATLAB preference directory.
 Access this location using the MATLAB command: `prefdir`
@@ -166,4 +231,4 @@ If you use processFNIRS2 in your research, please cite:
 [Citation information to be added]
 
 ## Contact
-For questions or support, contact Adrian Curtin at abc48@drexel.edu
+For questions or support, contact Dr. Adrian Curtin at adrian.b.curtin@drexel.edu
