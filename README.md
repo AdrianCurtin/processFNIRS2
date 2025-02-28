@@ -1,92 +1,169 @@
-# Welcome to processFNIRS v0.4
+# processFNIRS v0.7
 
- This tool is designed to allow modular processing of fNIRS data. If this is your first time using this software, try running processFNIRS2() and click configure methods to build your first methods file. You will need to load the default functions first, but then you may add functions to your library and build your first processing methods. Test out a few methods using the visualization tool to see how they work!
+## Overview
+processFNIRS is a modular MATLAB toolbox designed for processing functional Near-Infrared Spectroscopy (fNIRS) data. The toolbox provides a flexible framework for importing, processing, analyzing, and visualizing fNIRS data from multiple device manufacturers.
 
-Note: settings changed in the GUI do not affect your data and are for visualization only.
+## Key Features
+- **Modular processing pipeline** for both raw intensity data and hemoglobin concentration data
+- **Device-agnostic design** with support for multiple fNIRS systems:
+  - fNIR Devices/Biopac
+  - Hitachi ETG-4000
+  - NIRx systems
+  - Custom devices
+- **Customizable processing methods** that can be configured and saved
+- **Robust visualization tools** including:
+  - Time series plots
+  - Topographic mapping
+  - Interactive data exploration via exploreFNIRS
+- **Channel quality assessment** and artifact rejection capabilities
+- **Region-of-Interest (ROI) analysis** support
+- **Statistical analysis** with LME models integrated in exploreFNIRS
+- **Data export** in various formats including CSV, nir, snirf and MATLAB formats
 
-Once you have defined a few functions you can use the normal processFNIRS2 pipeline.
+## Getting Started
 
-This is generally done in three stages:
+### Installation
+1. Clone or download this repository
+2. Add the main processFNIRS2 folder and the following subdirectories to your MATLAB path:
+   ```matlab
+   addpath('base_functions', 'GUI', 'functions');
+   ```
+   Note: Folders with + signs in front of the name will be automatically included
 
-	1) Import Data
-		Import your data using processFNIRS.Import.ImportNIR (or other function)
-		Load your data using the function as a string or select the file yourself
-		ex: mydata = processFNIRS.Import.ImportNIR('myNIRSfile.nir')
+### Quick Start Guide
+```matlab
+% Import data
+mydata = processFNIRS2.Import.ImportNIR('myNIRSfile.nir');
 
-	2) Set Methods
-		Select a method for both Raw and Oxy domain processing
-		You can visualize the effects of your methods by using processFNIRS(mydata)
-		and configure your methods by using processFNIRS.Methods.Oxy/Raw.ConfigureMethods
-		Selecting methods is easy, you can select a method using either the method name,
-		Or selecting the method interactively
-		Please note that both the Raw method is applied first and then the Oxy method
-		ex: processFNIRS2.Methods.Raw.SetMethod('MyMethodName')
-		ex: processFNIRS2.Methods.Oxy.SetMethod('MyMethodName')
+% Configure processing methods
+processFNIRS2(); % Opens GUI for method configuration
+% Or select methods programmatically:
+processFNIRS2.Methods.Raw.SetMethod('MyRawMethod');
+processFNIRS2.Methods.Oxy.SetMethod('MyOxyMethod');
 
-	3) Process Data
-		Run your processing method on your data using processFNIRS2(mydata)
-		You can optionally process only the oxy or raw domain signals using processFNIRS2.Process.ProcessRaw/ProcessOxy
-		However the default function will run both Raw and Oxy pipelines
-		exL myprocesseddata=processFNIRS2(mydata))
+% Process data
+myprocesseddata = processFNIRS2(mydata);
 
-processfNIRS2 is laid out in the following manner&nbsp;&nbsp;&nbsp;&nbsp;
+% Visualize data
+processFNIRS2(myprocesseddata);
 
-|Function|Description|
-| ------------- | ------------- |
-|processFNIRS2|Main function (runs GUI if no assignment)|
-|*Data|functions to manipulate individual fNIRS segments<br>|
-|&nbsp;&nbsp;&nbsp;&nbsp;-ApplyChannelMask|Set bad channels to nan|
-|&nbsp;&nbsp;&nbsp;&nbsp;-GetMarkers|Function to find the timepoints of markers in a regex style|
-|&nbsp;&nbsp;&nbsp;&nbsp;-Resample|Function to resample or average fNIRS data (ex&nbsp;&nbsp;&nbsp;&nbsp; 30s block average or convert to 1hz)|
-|&nbsp;&nbsp;&nbsp;&nbsp;-SetT0|Function to shift the fNIRS time to match start of experiment t=0|
-|&nbsp;&nbsp;&nbsp;&nbsp;-Split|Function to split fNIRS segment based on different input times|
-|*GUI|Shortcut for accessing the GUI|
-|*Help|This!|
-|*Import|Functions to import fNIRS files|
-|&nbsp;&nbsp;&nbsp;&nbsp;-ImportHitachiMES|Import Hitachi Probes|
-|&nbsp;&nbsp;&nbsp;&nbsp;-ImportNIRx|Import NIRx files|
-|&nbsp;&nbsp;&nbsp;&nbsp;-ImportNIR|Import fNIR Devices/Biopac files|
-|&nbsp;&nbsp;&nbsp;&nbsp;-ImportSampleData|Import some sample data included here|
-|*Methods|Functions to change and modify processing methods|
-|&nbsp;&nbsp;&nbsp;&nbsp;-Oxy|Oxy conversion pipeline methods|
-|&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;-ConfigureMethods|GUI to edit functions in Oxy pipeline|
-|&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;-ImportMethods|Import pre-existing methods from a file|
-|&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;-List|List currently loaded methods|
-|&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;-SetMethod|Select a method based on name or method number|
-|&nbsp;&nbsp;&nbsp;&nbsp;-Raw|Raw conversion pipeline methods|
-|&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;ConfigureMethods|GUI to edit functions in Oxy pipeline|
-|&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;ImportMethods|Import pre-existing methods from a file|
-|&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;List|List currently loaded methods|
-|&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;SetMethod|Select a method based on name or method number|
-|&nbsp;&nbsp;&nbsp;&nbsp;-Process|Process fNIR segment data|
-|&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;-ProcessOxy|Run the Oxy Pipeline only (raw must be run first)|
-|&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;-ProcessRaw|Run the Raw Pipeline only|
-|&nbsp;&nbsp;&nbsp;&nbsp;-Settings|Change settings related to processing|
-|&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;Baseline|Change baseline time settings|
-|&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;DPF|Change mode of Differential Path Length (DPF)|
-|&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;SetFixedDFP|Change to fixed distance factor|
-|&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;SetDPFmode| Set to 'none','fixed', or 'calc'|
-|&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;SelectDevice|Forcibly reload device settings for FNIRS probe|
+% Explore and analyze data
+exploreFNIRS(myprocesseddata);
+```
 
-Please be sure to add the matlab path the main folder (processFNIRS2) and the folders named&nbsp;&nbsp;&nbsp;&nbsp;
+## Processing Pipeline
 
-      base_functions, GUI, and functions
+### Data Import
+Use functions in the `processFNIRS2.Import` module to load data from various fNIRS devices:
+- `ImportNIR`: Import fNIR Devices/Biopac files
+- `ImportHitachiMES`: Import Hitachi ETG-4000 files
+- `ImportNIRx`: Import NIRx system files
+- `ImportSampleData`: Load example datasets included with the toolbox
 
-Folders with + signs in front of the name do not need to be included
+### Method Configuration
+processFNIRS2 uses a two-stage processing pipeline:
+1. **Raw processing** (Raw → Optical Density)
+   - Configure and select methods using `processFNIRS2.Methods.Raw`
+   - Common preprocessing includes: motion artifact correction, filtering, CAR, etc.
 
-base_functions and GUI contain functions related to the operation of processFNIRS2
+2. **Oxy processing** (Optical Density → Hemoglobin)
+   - Configure and select methods using `processFNIRS2.Methods.Oxy`
+   - Processing includes: Beer-Lambert conversion, filtering, ROI analysis, etc.
 
-functions contains the functions used in the processFNIRS2 method pipelines, but you may use any matlab functions in a pipeline if you add the function to your method
+Methods can be configured through the GUI or programmatically:
+```matlab
+% Open method configuration GUI
+processFNIRS2.Methods.Raw.ConfigureMethods();
+processFNIRS2.Methods.Oxy.ConfigureMethods();
 
-Loaded functions and methods are stored in the matlab preference directory
+% List available methods
+processFNIRS2.Methods.Raw.List();
+processFNIRS2.Methods.Oxy.List();
 
-You may find these settings using the matlab command&nbsp;&nbsp;&nbsp;&nbsp; prefdir
+% Set methods programmatically
+processFNIRS2.Methods.Raw.SetMethod('MyRawMethod');
+processFNIRS2.Methods.Oxy.SetMethod('MyOxyMethod');
+```
 
-If you are having trouble loading processFNIRS2, delete these files and try again
+### Data Processing
+Process data using the selected methods:
+```matlab
+% Process both raw and oxy stages
+myprocesseddata = processFNIRS2(mydata);
 
+% Process specific stages only
+myrawprocessed = processFNIRS2.Process.ProcessRaw(mydata);
+myoxyprocessed = processFNIRS2.Process.ProcessOxy(myrawprocessed);
+```
 
-processFNIRS2 is free for academic and non-commercial use, but some included code may have other licenses
+### Data Manipulation
+The toolbox provides various functions for manipulating fNIRS data:
+- `processFNIRS2.Data.ApplyChannelMask`: Set bad channels to NaN
+- `processFNIRS2.Data.GetMarkers`: Find specific markers in the data
+- `processFNIRS2.Data.Resample`: Resample or average fNIRS data
+- `processFNIRS2.Data.SetT0`: Shift time to align with experiment start
+- `processFNIRS2.Data.Split`: Split fNIRS segments based on time points
 
-(c)2019
+### Advanced Analysis with exploreFNIRS
+For more advanced data exploration and analysis, use the exploreFNIRS module:
+```matlab
+% Basic usage
+exploreFNIRS(myprocesseddata);
 
-Contact Adrian Curtin for more information at abc48@drexel.edu
+% With additional options
+exploreFNIRS(myprocesseddata, 'timeShiftTo0', true, 'blStart', 0, 'blEnd', 5, ...
+             'blockStart', 5, 'blockEnd', 65, 'barSegmentLength', 60);
+```
+
+exploreFNIRS features:
+- Group-level analysis
+- Statistical modeling with LME
+- Various visualization options (temporal plots, scatter plots, bar charts)
+- Exportable statistics and figures
+
+## Settings Configuration
+Adjust common settings using the Settings module:
+```matlab
+% Baseline settings
+processFNIRS2.Settings.Baseline.SetBaselineStartTime(0);
+processFNIRS2.Settings.Baseline.SetBaselineLength(5);
+
+% DPF (Differential Path Length) settings
+processFNIRS2.Settings.DPF.SetDPFmode('Calc'); % 'None', 'Fixed', or 'Calc'
+processFNIRS2.Settings.DPF.SetFixedDPF(5.93);
+
+% Device selection
+processFNIRS2.Settings.SelectDevice('fNIR_Devices_fNIR1200_16ch.cfg');
+```
+
+## File Structure
+- `processFNIRS2.m`: Main function for processing fNIRS data
+- `+pf2/`: Main module containing user-facing functions
+- `+pf2_base/`: Internal base functions
+- `base_functions/`: Core processing functions
+- `GUI/`: User interface components
+- `functions/`: Processing algorithms
+- `devices/`: Device configuration files
+- `sampledata/`: Example datasets
+
+## Preferences and Configuration
+Settings, loaded functions, and methods are stored in the MATLAB preference directory.
+Access this location using the MATLAB command: `prefdir`
+
+## Documentation
+For detailed function documentation, use MATLAB's `help` command:
+```matlab
+help processFNIRS2
+help processFNIRS2.Methods.Raw
+help processFNIRS2.Import.ImportNIR
+```
+
+## License
+processFNIRS2 is free for academic and non-commercial use, but some included code may have other licenses.
+
+## Citation
+If you use processFNIRS2 in your research, please cite:
+[Citation information to be added]
+
+## Contact
+For questions or support, contact Adrian Curtin at abc48@drexel.edu
