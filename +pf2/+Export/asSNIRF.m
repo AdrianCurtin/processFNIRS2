@@ -597,6 +597,8 @@ function [probe, measurementList, deviceMetaDataTags, rawMax, strippedChannelsMa
         darkIdx = find(wvList == 0);
     end
 
+    invalidWv = isnan(wvI);
+
     measurementList=[];
     
     % Build measurement list with enhanced info for each channel
@@ -616,7 +618,12 @@ function [probe, measurementList, deviceMetaDataTags, rawMax, strippedChannelsMa
             measurement.dataTypeLabel = c2v('raw-DC-dark');
             measurement.detectorIndex = tableCh.DetectorIndex(i);
             measurement.sourceIndex = tableCh.SourceIndex(i);
-            measurement.wavelengthIndex = wvI(i);
+            if(invalidWv(i))
+                warning('This channel has an invalid wavelength')
+                measurement.wavelengthIndex = nan;
+            else
+                measurement.wavelengthIndex = wvI(i);
+            end
             measurement.wavelengthActual = wvList(darkIdx);
             measurement.dataUnit = c2v('au');
         else
@@ -625,7 +632,12 @@ function [probe, measurementList, deviceMetaDataTags, rawMax, strippedChannelsMa
             measurement.dataTypeLabel = c2v('raw-DC');
             measurement.detectorIndex = tableCh.DetectorIndex(i);
             measurement.sourceIndex = tableCh.SourceIndex(i);
-            measurement.wavelengthIndex = wvI(i);
+            if(invalidWv(i))
+                warning('This channel has an invalid wavelength')
+                measurement.wavelengthIndex = nan;
+            else
+                measurement.wavelengthIndex = wvI(i);
+            end
             measurement.wavelengthActual = wvList(measurement.wavelengthIndex);
             measurement.dataUnit = c2v('au');
         end
@@ -678,5 +690,5 @@ function [probe, measurementList, deviceMetaDataTags, rawMax, strippedChannelsMa
     probe.coordinateSystemDescription = c2v('Probe-specific coordinate system');
      
     % Add wavelengths
-    probe.wavelengths = wvList;
+    probe.wavelengths = wvList(~isnan(wvList));
 end
