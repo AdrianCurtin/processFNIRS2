@@ -1,4 +1,4 @@
-function opt=varargin2struct(varargin)
+function opt = varargin2struct(varargin)
 %
 % opt=varargin2struct('param1',value1,'param2',value2,...)
 %   or
@@ -17,28 +17,30 @@ function opt=varargin2struct(varargin)
 %      opt: a struct where opt.param1=value1, opt.param2=value2 ...
 %
 % license:
-%     BSD or GPL version 3, see LICENSE_{BSD,GPLv3}.txt files for details 
+%     BSD or GPL version 3, see LICENSE_{BSD,GPLv3}.txt files for details
 %
 % -- this function is part of JSONLab toolbox (http://iso2mesh.sf.net/cgi-bin/index.cgi?jsonlab)
 %
+
+len = length(varargin);
+opt = struct;
+if (len == 0)
+    return
+end
 
 if(~exist('mergestruct')||~contains('pf2_base',which('mergestruct','all')))
     mergestruct=@pf2_base.external.easyh5.mergestruct;
 end
 
-len=length(varargin);
-opt=struct;
-if(len==0) return; end
-i=1;
-while(i<=len)
-    if(isstruct(varargin{i}))
-        opt=mergestruct(opt,varargin{i});
-    elseif(ischar(varargin{i}) && i<len)
-        opt.(lower(varargin{i}))=varargin{i+1};
-        i=i+1;
+i = 1;
+while (i <= len)
+    if (isstruct(varargin{i}))
+        opt = mergestruct(opt, varargin{i});
+    elseif (ischar(varargin{i}) && i < len)
+        opt.(lower(varargin{i})) = varargin{i + 1};
+        i = i + 1;
     else
         error('input must be in the form of ...,''name'',value,... pairs or structs');
     end
-    i=i+1;
+    i = i + 1;
 end
-

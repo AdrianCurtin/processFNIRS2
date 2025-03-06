@@ -326,8 +326,10 @@ else
     cfgFilePath='';
 end
 
+if(isfield(data,'probeinfo'))
+    setF.device=data.probeinfo;
 
-if(isempty(cfgFilePath)||~contains(cfgFilePath,'.cfg'))
+elseif(isempty(cfgFilePath)||~contains(cfgFilePath,'.cfg'))
     
     warning('Missing or invalid configuration file path\n')
     
@@ -339,7 +341,7 @@ if(isempty(cfgFilePath)||~contains(cfgFilePath,'.cfg'))
     
 elseif(~isempty(cfgFilePath)) % If we're not looking at the GUI, doesn't matter
     
-    if(pf2_base.isnestedfield(setF,'device.cfg')&&isfield(setF.device.cfg.Info,'CfgName')) % look to see if they match,...
+    if(pf2_base.isnestedfield(setF,'device.cfg.Info')&&isfield(setF.device.cfg.Info,'CfgName')) % look to see if they match,...
             
         curProbeName=sprintf('%s.cfg',setF.device.cfg.Info.CfgName);
         
