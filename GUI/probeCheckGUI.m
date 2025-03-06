@@ -81,6 +81,15 @@ else
     pf2ChannelCheck.multiFigure=get(handles.checkbox_multiFigureMode,'Value');
 end
 
+delete pf2ChannelCheck.maskIndicators;
+pf2ChannelCheck.maskIndicators = [];
+pf2ChannelCheck.plotHandles =[];
+pf2ChannelCheck.mainPlotHandle =[];
+
+set(handles.figure1, 'DoubleBuffer', 'on');
+set(0, 'DefaultFigureRenderer', 'opengl'); % Use hardware acceleration if available
+   
+
 
 pf2ChannelCheck.autoscale=get(handles.checkbox_autoscale,'Value');
 pf2ChannelCheck.mark_noisy=get(handles.checkbox_automark_noisy,'Value');
@@ -344,7 +353,7 @@ pf2ChannelCheck.orig_fmask=pf2ChannelCheck.fchMask;
 % so window can get raised using probeCheckGUI.
 if strcmp(get(hObject,'Visible'),'off')
     
-   updateChannels(handles);
+   updateChannels(handles, true);
     
     
     %yaxis([0,4500]);
@@ -363,7 +372,7 @@ function setUpAxes(handles,probInfo)
 global pf2ChannelCheck
 global pf2ChannelCheckHandles
  
-pf2ChannelCheckHandles.chCurAxesHandle=handles.chAxes;
+pf2ChannelCheckHandles.mainCurAxesHandle=handles.chAxes;
 
 uiP=handles.uipanel_arranged;
   
@@ -384,7 +393,9 @@ if(isfield(probInfo,'OptPos'))
         end
         if(~isempty(probInfo.OptPos.subplot_layout_ss{c}))
          pf2ChannelCheckHandles.chAxesHandles{c} = axes(uiP);
-         plot([1:20],[1:20]);
+         h=plot([1:20],[1:20],'HitTest','on');
+         h.ButtonDownFcn = @markUnmarkChannelFcn;
+
          pf2ChannelCheckHandles.chAxesHandles{c}.OuterPosition=probInfo.OptPos.subplot_layout_ss{c};
          set(pf2ChannelCheckHandles.chAxesHandles{c},'Tag',sprintf('ChAxes%i',c));
 
@@ -392,18 +403,20 @@ if(isfield(probInfo,'OptPos'))
             set(pf2ChannelCheckHandles.chAxesHandles{c},'XTick',[], 'YTick', [],'xticklabels',[],'yticklabels',[]);
          end
 
-         pf2ChannelCheckHandles.chAxesHandles{c}.ButtonDownFcn = @myupdatefcn;
+         pf2ChannelCheckHandles.chAxesHandles{c}.ButtonDownFcn = @markUnmarkChannelFcn;
         end
     end
 else
     for c=1:size(probInfo.OptPos,1)
         if(~isempty(probInfo.OptPos.subplot_layout_ss{c}))
              pf2ChannelCheckHandles.chAxesHandles{c} = axes(uiP);
-             plot([1:20],[1:20]);
+             h=plot([1:20],[1:20],'HitTest','on');
+             h.ButtonDownFcn = @markUnmarkChannelFcn;
+         
              pf2ChannelCheckHandles.chAxesHandles{c}.OuterPosition=probInfo.OptPos.subplot_layout{c};
              set(pf2ChannelCheckHandles.chAxesHandles{c},'Tag',sprintf('ChAxes%i',c));
 
-             pf2ChannelCheckHandles.chAxesHandles{c}.ButtonDownFcn = @myupdatefcn;
+             pf2ChannelCheckHandles.chAxesHandles{c}.ButtonDownFcn = @markUnmarkChannelFcn;
         end
     end
 end
@@ -412,7 +425,7 @@ end
 
 pf2ChannelCheckHandles.text_channelStats=handles.text_channelStats;
 
-function myupdatefcn(hObject, eventdata, handles)
+function markUnmarkChannelFcn(hObject, eventdata, handles)
     
 curChTag=get(hObject,'Tag');
 
@@ -421,78 +434,160 @@ curChNum=str2double(curChTag(7:end));
 
 markUnmarkChannel(curChNum,eventdata);
     
-    
 
         
+function [handle]= plotChannel(ch, plotMarkers, withTitle, mainPlot)
+    global pf2ChannelCheck
+    global pf2ChannelCheckHandles
 
-function [handle]= plotChannel(ch,plotMarkers,withTitle)
+    autoscale=pf2ChannelCheck.autoscale;
+    mark_noisy=pf2ChannelCheck.mark_noisy;
 
-      
-global pf2ChannelCheck
-global pf2ChannelCheckHandles
-if(nargin<3)
-    withTitle=false;
-end
+    if(nargin<4)
+        mainPlot = false;
+    end
 
-if(nargin<2)
-    plotMarkers=false;
-end
-
-if(nargin<1)
-    ch=pf2ChannelCheck.curChannel;
-end
-
-curCh=find(pf2ChannelCheck.nirsData.probeinfo.Probe{pf2ChannelCheck.probeNum}.TableCh.OptodeNumber==ch);
-curWv=pf2ChannelCheck.nirsData.probeinfo.Probe{pf2ChannelCheck.probeNum}.TableCh.Wavelength(curCh);
-
-if(~isfield(pf2ChannelCheck,'viewTimeStart'))
-   pf2ChannelCheck.viewTimeStart=min(pf2ChannelCheck.nirsData.time);
-end
-
-if(~isfield(pf2ChannelCheck,'viewTimeEnd'))
-   pf2ChannelCheck.viewTimeEnd=max(pf2ChannelCheck.nirsData.time);
-end
-
+    if(nargin<3)
+        withTitle=false;
+    end
+    
+    if(nargin<2)
+        plotMarkers=false;
+    end
+    
+    if(nargin<1)
+        ch=pf2ChannelCheck.curChannel;
+    end
+    
+    curCh=find(pf2ChannelCheck.nirsData.probeinfo.Probe{pf2ChannelCheck.probeNum}.TableCh.OptodeNumber==ch);
+    curWv=pf2ChannelCheck.nirsData.probeinfo.Probe{pf2ChannelCheck.probeNum}.TableCh.Wavelength(curCh);
+    
+    if(~isfield(pf2ChannelCheck,'viewTimeStart'))
+       pf2ChannelCheck.viewTimeStart=min(pf2ChannelCheck.nirsData.time);
+    end
+    
+    if(~isfield(pf2ChannelCheck,'viewTimeEnd'))
+       pf2ChannelCheck.viewTimeEnd=max(pf2ChannelCheck.nirsData.time);
+    end
     
     hold off;
+    
+    % OPTIMIZATION 1: Smart downsampling based on display needs
     sigLen = length(pf2ChannelCheck.nirsData.time);
+    visibleTimeWindow = pf2ChannelCheck.viewTimeEnd - pf2ChannelCheck.viewTimeStart;
+    
+    % Determine reasonable number of points to display
+    maxVisiblePoints = 1000; % This can be adjusted based on performance needs
+    
+    % Apply time range filter first to reduce data
+    timeFilter = (pf2ChannelCheck.nirsData.time >= pf2ChannelCheck.viewTimeStart) & ...
+                 (pf2ChannelCheck.nirsData.time <= pf2ChannelCheck.viewTimeEnd);
 
-    if(~withTitle&&pf2ChannelCheck.smallMode)
-        newIdx = floor(1:sigLen/100:sigLen);
-        timeX = pf2ChannelCheck.nirsData.time(newIdx);
-        dataY = pf2ChannelCheck.nirsData.raw(newIdx,:);
+    channelsFilter = pf2ChannelCheck.ChannelNumbers > 0;
+    
+    if sum(timeFilter) > 0
+        visibleTimeX = pf2ChannelCheck.nirsData.time(timeFilter);
+        visibleDataY = pf2ChannelCheck.nirsData.raw(timeFilter,channelsFilter);
+        
+        % Apply downsampling
+        [visibleTimeX, visibleDataY] = smartDownsample(visibleTimeX, visibleDataY, maxVisiblePoints);
+        timeX = visibleTimeX;
+        dataY = visibleDataY;
     else
-        timeX = pf2ChannelCheck.nirsData.time(:);
-        dataY = pf2ChannelCheck.nirsData.raw(:,:);
+        % Fallback if no data in range
+        timeX = pf2ChannelCheck.nirsData.time;
+        dataY = pf2ChannelCheck.nirsData.raw;
+        [timeX, dataY] = smartDownsample(timeX, dataY, maxVisiblePoints);
     end
-
-    temp=get(gca);
-
+    
+    % Get axes handle
+    temp = get(gca);
     channelTag = sprintf('ChAxes%i',ch);
+    set(gca, 'Tag', channelTag);
+    set(gca, 'ButtonDownFcn', @markUnmarkChannelFcn);
     
-    set(gca,'Tag',channelTag);
-    set(gca,'ButtonDownFcn',@myupdatefcn);
+    % OPTIMIZATION 2: Use object handles for persistent plotting
+    % Check if we already have plot handles for this channel
+    if ~isfield(pf2ChannelCheck, 'plotHandles') || length(pf2ChannelCheck.plotHandles) < ch || isempty(pf2ChannelCheck.plotHandles{ch})
+        % First time setup
+        if ~isfield(pf2ChannelCheck, 'plotHandles')
+            pf2ChannelCheck.plotHandles = cell(1, pf2ChannelCheck.numChannels);
+        end
 
-    temp.ButtonDownFcn = @myupdatefcn;
-    temp.Tag = channelTag;
+        if ~isfield(pf2ChannelCheck, 'mainPlotHandle');
+            pf2ChannelCheck.mainPlotHandle = [];
+        end
 
-    for i=1:length(curCh)
-        x=curCh(i);
         
-        lineHandle=plot(timeX,dataY(:,x),'linewidth',2);
-
-
-        set(lineHandle,'Tag',channelTag);
-        set(lineHandle,'ButtonDownFcn',@myupdatefcn);
         
-        hold on;
+        % Create new plot
+        pf2ChannelCheck.plotHandles{ch} = gobjects(length(curCh), 1);
+        for i=1:length(curCh)
+            x = curCh(i);
+            pf2ChannelCheck.plotHandles{ch}(i) = plot(timeX, dataY(:,x), 'linewidth', 2,'HitTest','on');
+            set(pf2ChannelCheck.plotHandles{ch}(i), 'Tag', channelTag);
+            set(pf2ChannelCheck.plotHandles{ch}(i), 'ButtonDownFcn', @markUnmarkChannelFcn);
+            hold on;
+        end
+
+
+        
+    else
+
+        if ~isfield(pf2ChannelCheck,'mainPlotHandle') && mainPlot
+            pf2ChannelCheck.mainPlotHandle = [];
+
+            pf2ChannelCheck.mainPlotHandle = gobjects(length(curCh), 1);
+            for i=1:length(curCh)
+                x = curCh(i);
+                pf2ChannelCheck.mainPlotHandle(i) = plot(timeX, dataY(:,x), 'linewidth', 2, 'HitTest','on');
+                set(pf2ChannelCheck.mainPlotHandle(i), 'Tag', channelTag);
+                set(pf2ChannelCheck.mainPlotHandle(i), 'ButtonDownFcn', @markUnmarkChannelFcn);
+                hold on;
+            end
+        end
+
+        maxVal = max(max(dataY(:,curCh)));
+        maxVal = max(0.01,maxVal);
+        
+        % Update existing plot
+        for i=1:length(curCh)
+            x = curCh(i);
+
+            if(~mainPlot)
+                if ishandle(pf2ChannelCheck.plotHandles{ch}(i))
+                    set(pf2ChannelCheck.plotHandles{ch}(i), 'XData', timeX);
+                    set(pf2ChannelCheck.plotHandles{ch}(i), 'YData', dataY(:,x));
+                    hold on;
+                else
+                    % Handle was deleted, recreate it
+                    pf2ChannelCheck.plotHandles{ch}(i) = plot(timeX, dataY(:,x), 'linewidth', 2, 'HitTest','on');
+                    set(pf2ChannelCheck.plotHandles{ch}(i), 'Tag', channelTag);
+                    set(pf2ChannelCheck.plotHandles{ch}(i), 'ButtonDownFcn', @markUnmarkChannelFcn);
+                    hold on;
+                end
+            else
+                if ~isempty(pf2ChannelCheck.mainPlotHandle)&& i <= length(pf2ChannelCheck.mainPlotHandle)&&ishandle(pf2ChannelCheck.mainPlotHandle(i))
+                    set(pf2ChannelCheck.mainPlotHandle(i), 'XData', timeX);
+                    set(pf2ChannelCheck.mainPlotHandle(i), 'YData', dataY(:,x));
+                    hold on;
+                else
+                    % Handle was deleted, recreate it
+                    pf2ChannelCheck.mainPlotHandle(i) = plot(timeX, dataY(:,x), 'linewidth', 2, 'HitTest','on');
+                    set(pf2ChannelCheck.mainPlotHandle(i), 'Tag', channelTag);
+                    set(pf2ChannelCheck.mainPlotHandle(i), 'ButtonDownFcn', @markUnmarkChannelFcn);
+                    hold on;
+                end
+            end
+        end
     end
 
-   
     
-   xlim([pf2ChannelCheck.viewTimeStart,pf2ChannelCheck.viewTimeEnd]);
-   xl=xlim; 
-
+    
+    % Set axis limits
+    xlim([pf2ChannelCheck.viewTimeStart, pf2ChannelCheck.viewTimeEnd]);
+    xl = xlim;
+    
     if(isfield(pf2ChannelCheck.nirsData.probeinfo.Info,'RawMax')&&~pf2ChannelCheck.autoscale)
         
         if(~pf2ChannelCheck.smallMode&&~withTitle)
@@ -501,78 +596,105 @@ end
         end
 
         
-        yl=ylim();
         ylim([0,pf2ChannelCheck.globalstats.max*1.1]);%pf2ChannelCheck.nirsData.probeinfo.Info.RawMax*1.1]);
     elseif(~pf2ChannelCheck.autoscale)
-        yl=ylim();
         ylim([0,pf2ChannelCheck.globalstats.max*1.1]);
         
+    else
+        ylim([0, maxVal*1.2]);
     end
     
     if(isfield(pf2ChannelCheck.nirsData.probeinfo.Info,'RawMin'))
         
         plot(xl,ones(size(xl))*pf2ChannelCheck.nirsData.probeinfo.Info.RawMin,'--k');
     end
-    
-    yl=ylim();
-
-    if(pf2ChannelCheck.fchMask(ch)==0) % big red x to mark rejected
-        th=text(mean(xl),mean(yl),'X','HorizontalAlignment','center','FontSize',40,'color',[1,0,0]);
-        set(th,'ButtonDownFcn',temp.ButtonDownFcn);
-        set(th,'Tag',temp.Tag);
-        hold on;
-    elseif(pf2ChannelCheck.fchMask(ch)==0.5)
-        th=text(mean(xl),mean(yl),'~','HorizontalAlignment','center','FontSize',50,'color',[ 0.9100,0.4100,0.1700]);
-        set(th,'ButtonDownFcn',temp.ButtonDownFcn);
-        set(th,'Tag',temp.Tag);
-        hold on;
-    end
-    
-    if(pf2ChannelCheck.mark_noisy&&(pf2ChannelCheck.statsWV1.cov(ch)>pf2ChannelCheck.noisyThreshold||pf2ChannelCheck.statsWV2.cov(ch)>pf2ChannelCheck.noisyThreshold))
-        th=text(min(xl)+mean(xl)/4,max(yl)-mean(yl)/4,'*','FontSize',20,'color',[ 0.2100,0.4100,0.2700]);
-        set(th,'ButtonDownFcn',temp.ButtonDownFcn);
-        set(th,'Tag',temp.Tag);
-        hold on;
-    end
-    
    
-
-    if(~withTitle&&ch==pf2ChannelCheck.curChannel)
-        if(isfield(pf2ChannelCheck,'curChannelMarker'))
-            delete(pf2ChannelCheck.curChannelMarker);
-        end
-        
-        
-        pf2ChannelCheck.curChannelMarker=text(mean(xl),mean(yl),'O','HorizontalAlignment','center','FontSize',60,'color',[ 0.2,0.2,0.2]);  %Current Channel
-        set(pf2ChannelCheck.curChannelMarker,'ButtonDownFcn',temp.ButtonDownFcn);
-        set(pf2ChannelCheck.curChannelMarker,'Tag',temp.Tag);
-        hold on;
-    end
     
-    
-    if(withTitle&&plotMarkers&&~isempty(pf2ChannelCheck.markers))
-        reducedMarkers=pf2ChannelCheck.markers(ismember(pf2ChannelCheck.markers(:,2),pf2ChannelCheck.curMarkers),:);
-        
-        numMarkers=length(reducedMarkers(:,1));
-        
-        maxMarkers=200;
-        if(numMarkers>maxMarkers)
-               fprintf(2,'Num Markers exceeds 200, only plotting first 200. Please select fewer pf2ChannelCheck.markers\n');
+    yl = ylim();
+   
+    % OPTIMIZATION 3: Optimize channel mask visualization
+    % Initialize or update mask indicators
+    if ~isfield(pf2ChannelCheck, 'maskIndicators') || length(pf2ChannelCheck.maskIndicators) < ch || isempty(pf2ChannelCheck.maskIndicators{ch})
+        if ~isfield(pf2ChannelCheck, 'maskIndicators')
+            pf2ChannelCheck.maskIndicators = cell(1, pf2ChannelCheck.numChannels);
         end
         
-        for i=1:min(length(reducedMarkers(:,1)),maxMarkers)
-            pf2_base.external.vline(reducedMarkers(i,1),'-k');
-        end
-       
+        
+        
+        pf2ChannelCheck.maskIndicators{ch} = text(mean(xl), mean(yl), 'X', 'HorizontalAlignment', 'center', 'FontSize', 40, 'Color', [1,0,0], 'Visible', 'off');
+        set(pf2ChannelCheck.maskIndicators{ch}, 'ButtonDownFcn', @markUnmarkChannelFcn);
+        set(pf2ChannelCheck.maskIndicators{ch}, 'Tag', channelTag);
     end
 
+    % Update mask indicator visibility
+    if pf2ChannelCheck.fchMask(ch) == 0
+        set(pf2ChannelCheck.maskIndicators{ch}, 'Visible', 'on', 'String', 'X', 'Color', [1,0,0]);
+    elseif pf2ChannelCheck.fchMask(ch) == 0.5
+        set(pf2ChannelCheck.maskIndicators{ch}, 'Visible', 'on', 'String', '~', 'Color', [0.91,0.41,0.17]);
+    else
+        if(ishandle(pf2ChannelCheck.maskIndicators{ch}))
+            set(pf2ChannelCheck.maskIndicators{ch}, 'Visible', 'off');
+        end
+    end
+
+    if ~isfield(pf2ChannelCheck, 'noiseIndicators') || length(pf2ChannelCheck.noiseIndicators) < ch || isempty(pf2ChannelCheck.noiseIndicators{ch})
+        if ~isfield(pf2ChannelCheck, 'noiseIndicators')
+            pf2ChannelCheck.noiseIndicators = cell(1, pf2ChannelCheck.numChannels);
+        end
+        
+        
+        
+        pf2ChannelCheck.noiseIndicators{ch} = text(max(xl)-min(xl)/4,max(yl)-mean(yl)/4,'*','FontSize',20,'color',[ 0.2100,0.4100,0.2700],'HitTest','off','Visible','off');
+    end
+
+    if(pf2ChannelCheck.mark_noisy&&(pf2ChannelCheck.statsWV1.cov(ch)>pf2ChannelCheck.noisyThreshold||pf2ChannelCheck.statsWV2.cov(ch)>pf2ChannelCheck.noisyThreshold))
+        pf2ChannelCheck.noiseIndicators{ch}.Visible= "on";
+    end
+
+    if (~mainPlot)
+        if pf2ChannelCheck.curChannel == ch
+            if(isfield(pf2ChannelCheck,'selectionIndicator') && ishandle(pf2ChannelCheck.selectionIndicator))
+                pf2ChannelCheck.selectionIndicator.Visible = "off";
+            end
+            if exist('pf2ChannelCheck.selectionIndicator')
+                delete pf2ChannelCheck.selectionIndicator
+            end
+            pf2ChannelCheck.selectionIndicator = text(mean(xl), mean(yl), 'O', 'HorizontalAlignment', 'center', 'FontSize', 60, 'Color', [0.2,0.2,0.2],'HitTest','off');
+        end
+    end
+    % OPTIMIZATION 4: Optimize marker plotting
+    if(withTitle && plotMarkers && ~isempty(pf2ChannelCheck.markers))
+        % Filter markers to only those in the visible time range
+        reducedMarkers = pf2ChannelCheck.markers(ismember(pf2ChannelCheck.markers(:,2), pf2ChannelCheck.curMarkers) & ...
+                                                pf2ChannelCheck.markers(:,1) >= pf2ChannelCheck.viewTimeStart & ...
+                                                pf2ChannelCheck.markers(:,1) <= pf2ChannelCheck.viewTimeEnd, :);
+        
+        maxMarkers = 200;
+        yl = ylim();
+        
+        if ~isempty(reducedMarkers)
+            numMarkers = min(size(reducedMarkers,1), maxMarkers);
+            % Batch process markers for efficiency
+            markerTimes = reducedMarkers(1:numMarkers,1);
+            
+            % Plot markers using a more efficient approach
+            for i = 1:length(markerTimes)
+                line([markerTimes(i) markerTimes(i)], yl, 'Color', 'k', 'LineStyle', '-');
+            end
+            
+            if size(reducedMarkers,1) > maxMarkers
+                fprintf(2,'Num Markers exceeds 200, only plotting first 200. Please select fewer markers\n');
+            end
+        end
+    end
+    
+    % Rest of function remains unchanged
     hold off;
     if(withTitle)
         xlabel('Time (s)');
         ylabel('Light Intensity');
         title(sprintf('Channel %i of %i',ch,pf2ChannelCheck.numChannels));
         set(pf2ChannelCheck.handle.text_curChannel,'String',sprintf('Ch %i of %i',ch,pf2ChannelCheck.numChannels));
-        
         set(pf2ChannelCheckHandles.text_channelStats,'String',getChannelStatStr(ch));
     elseif(pf2ChannelCheck.smallMode)
         xticklabels([]);
@@ -580,11 +702,9 @@ end
     end
     
     xlim([pf2ChannelCheck.viewTimeStart,pf2ChannelCheck.viewTimeEnd]);
-
-     if(withTitle&&ch==pf2ChannelCheck.curChannel)
-        axes(pf2ChannelCheckHandles.chAxesHandles{ch});
-        plotChannel(ch,false,false);
-    end
+    
+    % Force redraw only when strictly necessary
+    drawnow limitrate;
     
 function statStr=getChannelStatStr(ch)
 
@@ -713,20 +833,38 @@ function figure1_CreateFcn(hObject, eventdata, handles)
 % eventdata  reserved - to be defined in a future version of MATLAB
 % handles    empty - handles not created until after all CreateFcns called
 
+function updateChannels(handles, forceUpdate)
+    global pf2ChannelCheck
+    global pf2ChannelCheckHandles
 
+    if(nargin<2)
+        forceUpdate = false;
+    end
+    
+    % OPTIMIZATION: Only update current channel in full detail
+    axes(pf2ChannelCheckHandles.mainCurAxesHandle);
+    plotChannel(pf2ChannelCheck.curChannel, pf2ChannelCheck.showMarkers, true, true);
+    
+    % For other channels, only update if necessary
+    for i=1:pf2ChannelCheck.numChannels
+        if i ~= pf2ChannelCheck.curChannel
+            % Check if axis needs update (e.g., channel status changed)
+            needsUpdate = forceUpdate; % Set criteria for when update is needed
+            
+            if needsUpdate
+                axes(pf2ChannelCheckHandles.chAxesHandles{i});
+                plotChannel(i, false);
+            end
+        else
+            axes(pf2ChannelCheckHandles.chAxesHandles{i});
+            plotChannel(i, false);
+        end
+    end
+    
+    % Reduce redraw frequency
+    drawnow limitrate;
+    
 
-
-function updateChannels(handles)
-  
-global pf2ChannelCheck
-global pf2ChannelCheckHandles
-axes(pf2ChannelCheckHandles.chCurAxesHandle);
-plotChannel(pf2ChannelCheck.curChannel,pf2ChannelCheck.showMarkers,true);
-
-for i=1:pf2ChannelCheck.numChannels
-    axes(pf2ChannelCheckHandles.chAxesHandles{i});
-    plotChannel(i,false);
-end
 % --- Executes on button press in rejectButton.
 function rejectButton_Callback(hObject, eventdata, handles)
 % hObject    handle to rejectButton (see GCBO)
@@ -739,8 +877,8 @@ global pf2ChannelCheckHandles
 pf2ChannelCheck.fchMask(pf2ChannelCheck.curChannel)=0;
 axes(pf2ChannelCheckHandles.chAxesHandles{pf2ChannelCheck.curChannel});
 plotChannel(pf2ChannelCheck.curChannel,false);
-axes(pf2ChannelCheckHandles.chCurAxesHandle);
-plotChannel(pf2ChannelCheck.curChannel,pf2ChannelCheck.showMarkers,true);
+axes(pf2ChannelCheckHandles.mainCurAxesHandle);
+plotChannel(pf2ChannelCheck.curChannel,pf2ChannelCheck.showMarkers,true, true);
 
 
 % --- Executes on button press in noisyButton.
@@ -754,8 +892,8 @@ global pf2ChannelCheckHandles
 pf2ChannelCheck.fchMask(pf2ChannelCheck.curChannel)=0.5;
 axes(pf2ChannelCheckHandles.chAxesHandles{pf2ChannelCheck.curChannel});
 plotChannel(pf2ChannelCheck.curChannel,false);
-axes(pf2ChannelCheckHandles.chCurAxesHandle);
-plotChannel(pf2ChannelCheck.curChannel,pf2ChannelCheck.showMarkers,true);
+axes(pf2ChannelCheckHandles.mainCurAxesHandle);
+plotChannel(pf2ChannelCheck.curChannel,pf2ChannelCheck.showMarkers,true, true);
 
 
 %nextButton_Callback(hObject, eventdata, handles);
@@ -772,7 +910,7 @@ global pf2ChannelCheckHandles
 pf2ChannelCheck.fchMask(pf2ChannelCheck.curChannel)=1;
 axes(pf2ChannelCheckHandles.chAxesHandles{pf2ChannelCheck.curChannel});
 plotChannel(pf2ChannelCheck.curChannel,false);
-axes(pf2ChannelCheckHandles.chCurAxesHandle);
+axes(pf2ChannelCheckHandles.mainCurAxesHandle);
 plotChannel(pf2ChannelCheck.curChannel,pf2ChannelCheck.showMarkers,true);
 
 
@@ -860,8 +998,8 @@ if(pf2ChannelCheck.showMarkers)
 
     pf2ChannelCheck.curMarkers=pf2ChannelCheck.curMarkerset(pf2ChannelCheck.curMarkersInd);
 
-    axes(pf2ChannelCheckHandles.chCurAxesHandle);
-    plotChannel(pf2ChannelCheck.curChannel,pf2ChannelCheck.showMarkers,true);
+    axes(pf2ChannelCheckHandles.mainCurAxesHandle);
+    plotChannel(pf2ChannelCheck.curChannel,pf2ChannelCheck.showMarkers,true,true);
 else
     pf2ChannelCheck.curMarkers=[];
     set(handles.marker_listbox,'Enable','off');
@@ -870,39 +1008,58 @@ end
 
 
 
-
-function markUnmarkChannel(ch,eventdata)
-  
-global pf2ChannelCheck
-global pf2ChannelCheckHandles
-pf2ChannelCheck.curChannel=ch;
-
-b = eventdata.Button;
-if b==1
+function markUnmarkChannel(ch, eventdata)
+    global pf2ChannelCheck
+    global pf2ChannelCheckHandles
     
-else
-    switch pf2ChannelCheck.fchMask(ch)
-        case 0
-            pf2ChannelCheck.fchMask(ch)=0.5;
-        case 0.5
-            pf2ChannelCheck.fchMask(ch)=1;
-        case 1
-            pf2ChannelCheck.fchMask(ch)=0;
+    % Save previous channel to update it
+    oldChannel = pf2ChannelCheck.curChannel;
+    pf2ChannelCheck.curChannel = ch;
+    
+    b = eventdata.Button;
+    if b==1
+        % Left click - just select
+    else
+        % Right click - cycle status
+        switch pf2ChannelCheck.fchMask(ch)
+            case 0
+                pf2ChannelCheck.fchMask(ch) = 0.5;
+            case 0.5
+                pf2ChannelCheck.fchMask(ch) = 1;
+            case 1
+                pf2ChannelCheck.fchMask(ch) = 0;
+        end
     end
-end
+    
+    % Update only the channels that changed
+    axes(pf2ChannelCheckHandles.chAxesHandles{ch});
+    plotChannel(ch, false);
+    
+    % Only update the main display if the current channel changed
+    if oldChannel ~= ch
+        axes(pf2ChannelCheckHandles.mainCurAxesHandle);
+        plotChannel(ch, pf2ChannelCheck.showMarkers, true, true);
+    end
+    
+    % Instead of full redraw, just update indicators
+    updateMaskIndicator(ch);
+    
+    % Force limited redraw
+    drawnow limitrate;
+    
+function updateMaskIndicator(ch)
+    global pf2ChannelCheck
+    
+    if isfield(pf2ChannelCheck, 'maskIndicators') && length(pf2ChannelCheck.maskIndicators) >= ch && ~isempty(pf2ChannelCheck.maskIndicators{ch})
+        if pf2ChannelCheck.fchMask(ch) == 0
+            set(pf2ChannelCheck.maskIndicators{ch}, 'Visible', 'on', 'String', 'X', 'Color', [1,0,0]);
+        elseif pf2ChannelCheck.fchMask(ch) == 0.5
+            set(pf2ChannelCheck.maskIndicators{ch}, 'Visible', 'on', 'String', '~', 'Color', [0.91,0.41,0.17]);
+        else
+            set(pf2ChannelCheck.maskIndicators{ch}, 'Visible', 'off');
+        end
+    end
 
-axes(pf2ChannelCheckHandles.chAxesHandles{ch});
-plotChannel(ch,false);
-
-axes(pf2ChannelCheckHandles.chCurAxesHandle);
-plotChannel(ch,pf2ChannelCheck.showMarkers,true);
-
-
- function figure1_WindowKeyPressFcn(hObject, eventdata, handles)
- switch eventdata.Key
-    case 'return'
-        pushbutton15_Callback(handles.movefront, [], handles); 
- end
 
 % --- Executes on button press in savebutton.
 function savebutton_Callback(hObject, eventdata, handles)
@@ -1050,8 +1207,8 @@ global pf2ChannelCheckHandles
 pf2ChannelCheck.curMarkersInd=get(handles.marker_listbox,'Value');
 pf2ChannelCheck.curMarkers=pf2ChannelCheck.curMarkerset(pf2ChannelCheck.curMarkersInd);
 
-axes(pf2ChannelCheckHandles.chCurAxesHandle);
-plotChannel(pf2ChannelCheck.curChannel,pf2ChannelCheck.showMarkers,true);
+axes(pf2ChannelCheckHandles.mainCurAxesHandle);
+plotChannel(pf2ChannelCheck.curChannel,pf2ChannelCheck.showMarkers,true, true);
 
 axes(pf2ChannelCheckHandles.chAxesHandles{pf2ChannelCheck.curChannel});
 plotChannel(pf2ChannelCheck.curChannel,false,false);
@@ -1086,27 +1243,28 @@ if(pf2ChannelCheck.multiFigure)
     set(handles.uipanel_arranged,'OuterPosition',[-0.001,0.001,0.918,0.913]);
     newFig=figure(2020);
     
-    pf2ChannelCheckHandles.chCurAxesHandle=axes(newFig);
-    set(pf2ChannelCheckHandles.chCurAxesHandle,'Tag',sprintf('ChAxes%i',pf2ChannelCheck.curChannel));
-    plotChannel(pf2ChannelCheck.curChannel,pf2ChannelCheck.showMarkers,true);
-    set(newFig,'ButtonDownFcn',@myupdatefcn);
-    set(pf2ChannelCheckHandles.chCurAxesHandle,'ButtonDownFcn',@myupdatefcn);
+    pf2ChannelCheckHandles.mainCurAxesHandle=axes(newFig);
+    pf2ChannelCheck.mainPlotHandle = [];
+    set(pf2ChannelCheckHandles.mainCurAxesHandle,'Tag',sprintf('ChAxes%i',pf2ChannelCheck.curChannel));
+    plotChannel(pf2ChannelCheck.curChannel,pf2ChannelCheck.showMarkers,true,true);
+    set(newFig,'ButtonDownFcn',@markUnmarkChannelFcn);
+    set(pf2ChannelCheckHandles.mainCurAxesHandle,'ButtonDownFcn',@markUnmarkChannelFcn);
 else
     
     try
-        axes(pf2ChannelCheckHandles.chCurAxesHandle)
+        axes(pf2ChannelCheckHandles.mainCurAxesHandle)
         close(gcf());
     catch
         
     end
     
     
-    pf2ChannelCheckHandles.chCurAxesHandle=handles.chAxes;
+    pf2ChannelCheckHandles.mainCurAxesHandle=handles.chAxes;
     
     set(handles.uipanel_curCh,'OuterPosition',[-0.001,0.471,0.918,0.447]);
     set(handles.uipanel_arranged,'OuterPosition',[-0.001,0.001,0.918,0.466]);
-    axes(pf2ChannelCheckHandles.chCurAxesHandle);
-    plotChannel(pf2ChannelCheck.curChannel,pf2ChannelCheck.showMarkers,true);
+    axes(pf2ChannelCheckHandles.mainCurAxesHandle);
+    plotChannel(pf2ChannelCheck.curChannel,pf2ChannelCheck.showMarkers,true, true);
 end
 
 
@@ -1142,17 +1300,24 @@ function pushbutton_prev_Callback(hObject, eventdata, handles)
   
 global pf2ChannelCheck
 global pf2ChannelCheckHandles
+
+prevChannel = pf2ChannelCheck.curChannel;
 if(pf2ChannelCheck.curChannel>1)
     pf2ChannelCheck.curChannel=pf2ChannelCheck.curChannel-1;
 
 else
-    pf2ChannelCheck.curChannel=1;
+    pf2ChannelCheck.curChannel=pf2ChannelCheck.numChannels;
     
 end
 
-axes(pf2ChannelCheckHandles.chCurAxesHandle);
-plotChannel(pf2ChannelCheck.curChannel,pf2ChannelCheck.showMarkers,true);
+axes(pf2ChannelCheckHandles.mainCurAxesHandle);
+plotChannel(pf2ChannelCheck.curChannel,pf2ChannelCheck.showMarkers,true, true);
 
+axes(pf2ChannelCheckHandles.chAxesHandles{prevChannel});
+plotChannel(prevChannel,pf2ChannelCheck.showMarkers,false, false);
+
+axes(pf2ChannelCheckHandles.chAxesHandles{pf2ChannelCheck.curChannel});
+plotChannel(pf2ChannelCheck.curChannel,pf2ChannelCheck.showMarkers,false, false);
 
 % --- Executes on button press in pushbutton_next.
 function pushbutton_next_Callback(hObject, eventdata, handles)
@@ -1163,16 +1328,28 @@ function pushbutton_next_Callback(hObject, eventdata, handles)
   
 global pf2ChannelCheck
 global pf2ChannelCheckHandles
+
+prevChannel = pf2ChannelCheck.curChannel;
 if(pf2ChannelCheck.curChannel<pf2ChannelCheck.numChannels)
     pf2ChannelCheck.curChannel=pf2ChannelCheck.curChannel+1;
 
 else
-    pf2ChannelCheck.curChannel=pf2ChannelCheck.numChannels;
+    pf2ChannelCheck.curChannel=1;
     
 end
 
-axes(pf2ChannelCheckHandles.chCurAxesHandle);
-plotChannel(pf2ChannelCheck.curChannel,pf2ChannelCheck.showMarkers,true);
+axes(pf2ChannelCheckHandles.mainCurAxesHandle);
+plotChannel(pf2ChannelCheck.curChannel,pf2ChannelCheck.showMarkers,true, true);
+
+axes(pf2ChannelCheckHandles.mainCurAxesHandle);
+plotChannel(pf2ChannelCheck.curChannel,pf2ChannelCheck.showMarkers,true, true);
+
+axes(pf2ChannelCheckHandles.chAxesHandles{prevChannel});
+plotChannel(prevChannel,pf2ChannelCheck.showMarkers,false, false);
+
+axes(pf2ChannelCheckHandles.chAxesHandles{pf2ChannelCheck.curChannel});
+plotChannel(pf2ChannelCheck.curChannel,pf2ChannelCheck.showMarkers,false, false);
+
 
 
 % --- Executes on button press in checkbox_autoscale.
@@ -1185,7 +1362,9 @@ function checkbox_autoscale_Callback(hObject, eventdata, handles)
 global pf2ChannelCheck
 pf2ChannelCheck.autoscale=get(handles.checkbox_autoscale,'Value');
 
-updateChannels(handles);
+updateChannels(handles, true);
+
+
 
 % --- Executes on button press in checkbox_automark_noisy.
 function checkbox_automark_noisy_Callback(hObject, eventdata, handles)
@@ -1198,4 +1377,19 @@ function checkbox_automark_noisy_Callback(hObject, eventdata, handles)
 global pf2ChannelCheck
 pf2ChannelCheck.mark_noisy=get(handles.checkbox_automark_noisy,'Value');
 
-updateChannels(handles);
+updateChannels(handles, true);
+
+
+function [downsampledTime, downsampledData] = smartDownsample(time, data, maxPoints)
+    len = size(data, 1);
+    if len > maxPoints
+        % Calculate step size based on visible points
+        step = max(1, floor(len/maxPoints));
+        
+        % Basic downsampling for large datasets
+        downsampledData = data(1:step:end, :);
+        downsampledTime = time(1:step:end);
+    else
+        downsampledData = data;
+        downsampledTime = time;
+    end
