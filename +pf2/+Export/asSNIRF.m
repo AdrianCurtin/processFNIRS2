@@ -66,7 +66,7 @@ for n = 1:numNIRS
     % Handle extra channels if needed
     rawDCchannels = strcmp(cellfun(@(x) x, {measurementList.dataTypeLabel}, 'UniformOutput', false), 'raw-DC');
     rawDCdarkChannels = strcmp(cellfun(@(x) x, {measurementList.dataTypeLabel}, 'UniformOutput', false), 'raw-DC-dark');
-    extraChannels = ~(rawDCchannels | rawDCdarkChannels);
+    extraChannels = ~(rawDCchannels);
 
     if(stripExtraRawChannels && ~isempty(extraChannels))
         measurementList = measurementList(~extraChannels);

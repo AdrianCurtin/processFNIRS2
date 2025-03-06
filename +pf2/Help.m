@@ -55,8 +55,8 @@ fprintf('\t\tVisualize your data using the Plot functions\n');
 fprintf(2,'\t\tex: processFNIRS2.Data.Plot.Oxy(myprocesseddata)\n');
 fprintf(2,'\t\tex: processFNIRS2.Data.Plot.ROI(myprocesseddata)\n');
 fprintf('\t\tExport your data to different file formats\n');
-fprintf(2,'\t\tex: processFNIRS2.Data.Export.asNIR(myprocesseddata, ''myexport.nir'')\n');
-fprintf(2,'\t\tex: processFNIRS2.Data.Export.asSNIRF(myprocesseddata, ''myexport.snirf'')\n');
+fprintf(2,'\t\tex: processFNIRS2.Export.asNIR(myprocesseddata, ''myexport.nir'')\n');
+fprintf(2,'\t\tex: processFNIRS2.Export.asSNIRF(myprocesseddata, ''myexport.snirf'')\n');
 
 fprintf('\n\nPress Any Key to continue...\n\n\n')
 pause;

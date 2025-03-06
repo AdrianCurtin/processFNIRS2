@@ -48,8 +48,8 @@ processFNIRS2.Data.Plot.Oxy(myprocesseddata);
 processFNIRS2.Data.Plot.ROI(myprocesseddata);
 
 % Export data
-processFNIRS2.Data.Export.asNIR(myprocesseddata, 'myexport.nir');
-processFNIRS2.Data.Export.asSNIRF(myprocesseddata, 'myexport.snirf');
+processFNIRS2.Export.asNIR(myprocesseddata, 'myexport.nir');
+processFNIRS2.Export.asSNIRF(myprocesseddata, 'myexport.snirf');
 
 % Explore and analyze data
 exploreFNIRS(myprocesseddata);
