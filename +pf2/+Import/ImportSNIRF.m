@@ -247,7 +247,7 @@ for p = 1:1 % Just one probe for now
     numCh = height(measurementList);
     
     % Get unique optode pairs
-    [~, firstOpt, uOpt] = unique(measurementList(:, {'detectorIndex', 'sourceIndex'}), 'rows');
+    [~, firstOpt, uOpt] = unique(measurementList(:, {'sourceIndex','detectorIndex' }), 'rows');
     device.Probe{p}.TableCh.OptodeNumber = uOpt;
     
     % Handle time signals

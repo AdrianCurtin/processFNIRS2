@@ -499,6 +499,10 @@ function [handle]= plotChannel(ch, plotMarkers, withTitle, mainPlot)
         dataY = pf2ChannelCheck.nirsData.raw;
         [timeX, dataY] = smartDownsample(timeX, dataY, maxVisiblePoints);
     end
+
+     maxVal = nanmax(nanmax(dataY(:,curCh)));
+     maxVal = max(0.01,maxVal);
+        
     
     % Get axes handle
     temp = get(gca);
@@ -531,6 +535,7 @@ function [handle]= plotChannel(ch, plotMarkers, withTitle, mainPlot)
         end
 
 
+        
         
     else
 
@@ -601,6 +606,9 @@ function [handle]= plotChannel(ch, plotMarkers, withTitle, mainPlot)
         ylim([0,pf2ChannelCheck.globalstats.max*1.1]);
         
     else
+        if(~exist("maxVal"))
+            maxVal=0.01;
+        end
         ylim([0, maxVal*1.2]);
     end
     
@@ -642,13 +650,19 @@ function [handle]= plotChannel(ch, plotMarkers, withTitle, mainPlot)
             pf2ChannelCheck.noiseIndicators = cell(1, pf2ChannelCheck.numChannels);
         end
         
+        noiseOffset = (max(xl)-min(xl) *0.4) + min(xl);
         
-        
-        pf2ChannelCheck.noiseIndicators{ch} = text(max(xl)-min(xl)/4,max(yl)-mean(yl)/4,'*','FontSize',20,'color',[ 0.2100,0.4100,0.2700],'HitTest','off','Visible','off');
+        pf2ChannelCheck.noiseIndicators{ch} = text(noiseOffset,max(yl)-mean(yl)/4,'*','FontSize',20,'color',[ 0.2100,0.4100,0.2700],'HitTest','off','Visible','off');
     end
 
     if(pf2ChannelCheck.mark_noisy&&(pf2ChannelCheck.statsWV1.cov(ch)>pf2ChannelCheck.noisyThreshold||pf2ChannelCheck.statsWV2.cov(ch)>pf2ChannelCheck.noisyThreshold))
-        pf2ChannelCheck.noiseIndicators{ch}.Visible= "on";
+        if(isfield(pf2ChannelCheck, 'noiseIndicators')&&~isempty(pf2ChannelCheck.noiseIndicators{ch})&&ishandle(pf2ChannelCheck.noiseIndicators{ch}))
+            pf2ChannelCheck.noiseIndicators{ch}.Visible= "on";
+        else
+            hold on
+            pf2ChannelCheck.noiseIndicators{ch} = text(max(xl)-min(xl)/4,max(yl)-mean(yl)/4,'*','FontSize',20,'color',[ 0.2100,0.4100,0.2700],'HitTest','off','Visible','on');
+            hold on
+        end
     end
 
     if (~mainPlot)
