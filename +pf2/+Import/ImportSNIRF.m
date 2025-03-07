@@ -247,7 +247,7 @@ for p = 1:1 % Just one probe for now
     numCh = height(measurementList);
     
     % Get unique optode pairs
-    [~, firstOpt, uOpt] = unique(measurementList(:, {'sourceIndex','detectorIndex' }), 'rows');
+    [~, firstOpt, uOpt] = unique(measurementList(:, {'sourceIndex','detectorIndex' }), 'rows',  'stable');
     device.Probe{p}.TableCh.OptodeNumber = uOpt;
     
     % Handle time signals
@@ -387,8 +387,7 @@ for p = 1:1 % Just one probe for now
     % Get unique source-detector pairs
     SDpairs = [device.Probe{p}.sI, device.Probe{p}.dI];
     SDpairs = SDpairs(sum(SDpairs,2)>0,:);
-    [uPairs, uPairUnsorted, uPairIdx] = unique(SDpairs, 'rows');
-    uPairs = SDpairs(uPairUnsorted, :);
+    [uPairs, ~, uPairIdx] = unique(SDpairs, 'rows', 'stable');
     validRows = ~isnan(sum(uPairs, 2));
     
     uPairs = uPairs(validRows, :);

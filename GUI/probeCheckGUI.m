@@ -645,12 +645,14 @@ function [handle]= plotChannel(ch, plotMarkers, withTitle, mainPlot)
         end
     end
 
+    noiseOffset = (max(xl)-min(xl) *0.4) + min(xl);
+
     if ~isfield(pf2ChannelCheck, 'noiseIndicators') || length(pf2ChannelCheck.noiseIndicators) < ch || isempty(pf2ChannelCheck.noiseIndicators{ch})
         if ~isfield(pf2ChannelCheck, 'noiseIndicators')
             pf2ChannelCheck.noiseIndicators = cell(1, pf2ChannelCheck.numChannels);
         end
         
-        noiseOffset = (max(xl)-min(xl) *0.4) + min(xl);
+        
         
         pf2ChannelCheck.noiseIndicators{ch} = text(noiseOffset,max(yl)-mean(yl)/4,'*','FontSize',20,'color',[ 0.2100,0.4100,0.2700],'HitTest','off','Visible','off');
     end
@@ -660,7 +662,7 @@ function [handle]= plotChannel(ch, plotMarkers, withTitle, mainPlot)
             pf2ChannelCheck.noiseIndicators{ch}.Visible= "on";
         else
             hold on
-            pf2ChannelCheck.noiseIndicators{ch} = text(max(xl)-min(xl)/4,max(yl)-mean(yl)/4,'*','FontSize',20,'color',[ 0.2100,0.4100,0.2700],'HitTest','off','Visible','on');
+            pf2ChannelCheck.noiseIndicators{ch} = text(noiseOffset,max(yl)-mean(yl)/4,'*','FontSize',20,'color',[ 0.2100,0.4100,0.2700],'HitTest','off','Visible','on');
             hold on
         end
     end
