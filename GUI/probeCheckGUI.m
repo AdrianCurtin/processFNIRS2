@@ -458,9 +458,12 @@ function [handle]= plotChannel(ch, plotMarkers, withTitle, mainPlot)
     if(nargin<1)
         ch=pf2ChannelCheck.curChannel;
     end
+
+    channelsFilter = pf2ChannelCheck.ChannelNumbers > 0;
     
-    curCh=find(pf2ChannelCheck.nirsData.probeinfo.Probe{pf2ChannelCheck.probeNum}.TableCh.OptodeNumber==ch);
-    curWv=pf2ChannelCheck.nirsData.probeinfo.Probe{pf2ChannelCheck.probeNum}.TableCh.Wavelength(curCh);
+    
+    curCh=find(pf2ChannelCheck.nirsData.probeinfo.Probe{pf2ChannelCheck.probeNum}.TableCh(channelsFilter,:).OptodeNumber==ch);
+    curWv=pf2ChannelCheck.nirsData.probeinfo.Probe{pf2ChannelCheck.probeNum}.TableCh(channelsFilter,:).Wavelength(curCh);
     
     if(~isfield(pf2ChannelCheck,'viewTimeStart'))
        pf2ChannelCheck.viewTimeStart=min(pf2ChannelCheck.nirsData.time);
@@ -483,7 +486,7 @@ function [handle]= plotChannel(ch, plotMarkers, withTitle, mainPlot)
     timeFilter = (pf2ChannelCheck.nirsData.time >= pf2ChannelCheck.viewTimeStart) & ...
                  (pf2ChannelCheck.nirsData.time <= pf2ChannelCheck.viewTimeEnd);
 
-    channelsFilter = pf2ChannelCheck.ChannelNumbers > 0;
+    
     
     if sum(timeFilter) > 0
         visibleTimeX = pf2ChannelCheck.nirsData.time(timeFilter);
