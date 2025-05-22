@@ -238,6 +238,11 @@ if(blLength>0) % if baseline is present
 
     for b = 1:length(bioMlist)
         curB=bioMlist{b};
+
+        if(~isfield(blfNIR,curB))
+            continue;
+        end
+
         fB=blfNIR.(curB);
    
         blNanCheck=sum(isnan(fB),1)/length(fB)<nanRejectionLevel; %calculate percentage of invalid values in baseline
@@ -343,8 +348,14 @@ bioMlist={'raw','HbO','HbR','HbDiff','HbTotal','CBSI'};
 for b = 1:length(bioMlist)
     curB=bioMlist{b};
 
+    if(~isfield(fNIR,curB))
+        continue;
+    end
+
     isRaw=strcmpi(curB,'raw');
     fB=fNIR.(curB);
+
+    
 
     numCh=size(fB,2);
 
@@ -428,7 +439,7 @@ for b = 1:length(bioMlist)
     end
 end
 
-if(~isempty(fNIR.Aux)&&length(fields(fNIR.Aux))>1)
+if(isfield(fNIR,'Aux')&&~isempty(fNIR.Aux)&&length(fields(fNIR.Aux))>1)
     if(averageAux)
         % Attempts to resample any field (and align with fNIRS)
             % criteria:
