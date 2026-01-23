@@ -1,4 +1,4 @@
-# processFNIRS2 v8.1
+# processFNIRS2 v0.8.1
 
 ## Overview
 processFNIRS2 is a modular MATLAB toolbox designed for processing functional Near-Infrared Spectroscopy (fNIRS) data. The toolbox provides a flexible framework for importing, processing, analyzing, and visualizing fNIRS data from multiple device manufacturers.

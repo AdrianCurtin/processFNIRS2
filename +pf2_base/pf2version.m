@@ -15,8 +15,8 @@ function [outStr,pf2ver,dateStr]=pf2version()
 %
 % Outputs:
 %   outStr  - Formatted version string containing release and date info
-%             Example: 'processFNIRS2 Release v8.1\nBuild Date: January 23 2026'
-%   pf2ver  - Version number string (e.g., 'v8.1')
+%             Example: 'processFNIRS2 Release v0.8.1\nBuild Date: January 23 2026'
+%   pf2ver  - Version number string (e.g., 'v0.8.1')
 %   dateStr - Build date string (e.g., 'January 23 2026')
 %
 % Example:
@@ -29,7 +29,7 @@ function [outStr,pf2ver,dateStr]=pf2version()
 %
 % See also: pf2_initialize, processFNIRS2
 
-pf2ver='v8.1';
+pf2ver='v0.8.1';
 dateStr='January 23 2026';
 
 
