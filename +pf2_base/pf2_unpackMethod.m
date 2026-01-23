@@ -1,8 +1,47 @@
 function x=pf2_unpackMethod(method)
-	% pf2_unpackMethod
-	%	Unpacks methods stored in configuration files into argument values, outputs and other functions
-	
-	%Converts mymethods function from .S to fields in F
+% PF2_UNPACKMETHOD Parse method configuration into executable function chain
+%
+% Unpacks processing method definitions stored in configuration files into
+% a structured format with function handles, arguments, and output mappings.
+% Converts legacy .S field notation to the .F cell array format used by the
+% processing pipeline.
+%
+% Reference:
+%   Internal pf2 implementation for method configuration parsing.
+%
+% Syntax:
+%   x = pf2_unpackMethod(method)
+%
+% Inputs:
+%   method - Method configuration in one of several formats:
+%            - Empty [] returns struct with empty F cell
+%            - Cell array with .F field already defined
+%            - Cell array of function structs
+%            - Struct with .S1, .S2, etc. legacy fields
+%
+% Outputs:
+%   x - Unpacked method structure containing:
+%       .F    - Cell array of function definitions, each with:
+%               .f       - Function name or handle
+%               .args    - Cell array of argument names
+%               .argvals - Cell array of argument values
+%               .default_argvals - Cell array of default values
+%               .output  - Cell array of output variable names
+%       .name - Method display name (default: 'Unknown Method')
+%
+% Algorithm:
+%   1. Handle empty input or already-unpacked methods
+%   2. Convert legacy .S# notation to .F cell array
+%   3. Flatten any struct arrays within function definitions
+%   4. Ensure consistent field structure across all functions
+%
+% Example:
+%   % Unpack a method loaded from configuration
+%   method = PF2.rawMethods{1};
+%   unpacked = pf2_base.pf2_unpackMethod(method);
+%   fprintf('Method has %d processing steps\n', length(unpacked.F));
+%
+% See also: pf2_describeMethod, processStageRaw2OD, processStageFilterHb
     x=method;
     
     if(isempty(method))

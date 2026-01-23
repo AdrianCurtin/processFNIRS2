@@ -1,4 +1,48 @@
 function [descrip,functions]=DescribeMethod(oxyMethod)
+% DESCRIBEMETHOD Display detailed information about an oxy processing method
+%
+% Shows the complete configuration of an oxy (hemoglobin) processing method,
+% including all processing functions in the pipeline, their arguments, and
+% output assignments. Useful for understanding what a method does before
+% applying it to data, or for debugging processing issues.
+%
+% Syntax:
+%   pf2.Methods.Oxy.DescribeMethod()
+%   pf2.Methods.Oxy.DescribeMethod(oxyMethod)
+%   pf2.Methods.Oxy.DescribeMethod(methodIndex)
+%   [descrip, functions] = pf2.Methods.Oxy.DescribeMethod(...)
+%
+% Inputs:
+%   oxyMethod - Method identifier (optional), one of:
+%               - String/char: Method name (e.g., 'takizawa_easy_lpf')
+%               - Numeric: Method index from the available methods list
+%               If omitted, prompts for interactive selection.
+%
+% Outputs:
+%   descrip   - String containing the formatted method description
+%               If not requested, description prints to console.
+%   functions - Cell array of function configuration structs containing:
+%               .f       - Function name
+%               .args    - Argument names
+%               .argvals - Argument values
+%               .output  - Output variable assignment
+%
+% Example:
+%   % Display current method details to console
+%   pf2.Methods.Oxy.DescribeMethod();
+%
+%   % Describe a specific method by name
+%   pf2.Methods.Oxy.DescribeMethod('takizawa_easy_lpf');
+%
+%   % Get method details as variables for programmatic use
+%   [desc, funcs] = pf2.Methods.Oxy.DescribeMethod('medfilt_car');
+%   fprintf('Method has %d processing functions\n', length(funcs));
+%
+%   % Describe method by index
+%   pf2.Methods.Oxy.DescribeMethod(3);
+%
+% See also: pf2.Methods.Oxy.List, pf2.Methods.Oxy.SetMethod,
+%           pf2.Methods.Raw.DescribeMethod, pf2.Methods.DescribeCurrentMethods
 
 global PF2
 
@@ -20,7 +64,7 @@ if(pf2_base.isnestedfield(PF2,'myOxyMethods.cfg.Sections')&&~isempty(PF2.myOxyMe
     oxyMethods=PF2.myOxyMethods.cfg.Sections;
     
     if(getByIndex)
-        if(oxyMethodIndex>0&&oxyMethodIndex<=length(oxyMethods))
+        if(oxyMethod>0&&oxyMethod<=length(oxyMethods))
             oxyMethod=oxyMethods{oxyMethod};
         else
             error('Unable to find Oxy Method at Index %i',oxyMethod);

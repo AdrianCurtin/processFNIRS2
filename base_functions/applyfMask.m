@@ -3,7 +3,7 @@ function fnir=applyfMask(fnir)
 
 global PF2
 
-warning('Please replace with processFNIRS.Data.ApplyChannelMask');
+warning('Please replace with pf2.Data.ApplyChannelMask');
 
 fnir=pf2.Data.ApplyChannelMask(fnir);
 

@@ -1,6 +1,54 @@
 function [fData] = pf2_updateCurrentDevice(fData,cfgFilePath)
-%PF2_UPDATECURRENTDEVICE Summary of this function goes here
-%   Detailed explanation goes here
+% PF2_UPDATECURRENTDEVICE Synchronize device configuration with fNIRS data
+%
+% Updates the global PF2 and setF structures to reflect the current device
+% configuration. Loads device configuration files as needed, extracts channel
+% and wavelength information, and computes timing data from the raw signal.
+% This function ensures consistency between the loaded fNIRS data and the
+% device settings used for processing.
+%
+% Reference:
+%   Internal pf2 implementation for device configuration management.
+%
+% Syntax:
+%   fData = pf2_updateCurrentDevice(fData)
+%   fData = pf2_updateCurrentDevice(fData, cfgFilePath)
+%
+% Inputs:
+%   fData       - fNIRS data structure containing raw data and metadata
+%                 Must include .raw field [T x C double] and optionally
+%                 .info.probename for automatic device detection.
+%   cfgFilePath - Path to device configuration file (default: auto-detect)
+%                 Must be a .cfg file from the devices/ directory.
+%                 If empty or invalid, prompts user via GUI selection.
+%
+% Outputs:
+%   fData - Updated fNIRS structure with additional fields:
+%           .probeInfo - Probe geometry information
+%           .fs        - Sampling frequency in Hz
+%           .time      - Time vector [T x 1]
+%           .sampleTime - Sample indices [1 x T]
+%
+% Algorithm:
+%   1. Clear existing channel/wavelength sets in PF2 global
+%   2. Load or validate device configuration file
+%   3. Extract channel numbers, wavelengths, and source-detector info
+%   4. Compute timing information from raw data or config defaults
+%
+% Example:
+%   % Update device settings from data's embedded probe name
+%   data = pf2.Import.ImportNIR('myfile.nir');
+%   data = pf2_base.pf2_updateCurrentDevice(data);
+%
+%   % Explicitly specify device configuration
+%   data = pf2_base.pf2_updateCurrentDevice(data, 'fNIR_Devices_fNIR2000.cfg');
+%
+% Notes:
+%   - Uses global variables PF2 and setF for state management
+%   - Multiple probes may not be fully supported (warning issued)
+%   - Assumes merged probe layout with unique channel numbers
+%
+% See also: loadDeviceCfg, loadProbeInfo, pf2_initialize
 
 global setF
 global PF2

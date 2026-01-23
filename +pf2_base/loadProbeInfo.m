@@ -1,4 +1,59 @@
 function probeInfo = loadProbeInfo(fNIR, buildProbeLayout, includeSS)
+% LOADPROBEINFO Extract probe geometry from fNIRS data or device config
+%
+% Retrieves probe layout information including optode positions, channel
+% mappings, and source-detector geometry. Uses embedded probe info if
+% available in the fNIRS structure, otherwise loads from device configuration
+% file based on the probe name in the data metadata.
+%
+% Reference:
+%   Internal pf2 implementation for probe geometry management.
+%
+% Syntax:
+%   probeInfo = loadProbeInfo(fNIR)
+%   probeInfo = loadProbeInfo(fNIR, buildProbeLayout)
+%   probeInfo = loadProbeInfo(fNIR, buildProbeLayout, includeSS)
+%
+% Inputs:
+%   fNIR             - fNIRS data structure with one of:
+%                      .probeinfo - Direct probe geometry (returned as-is)
+%                      .info.probename - Device name for config file lookup
+%   buildProbeLayout - Construct 2D/3D layouts from config (default: true)
+%                      Set to false for faster loading when layout not needed.
+%   includeSS        - Include short-separation channels (default: true)
+%                      Set to false to exclude SS channels from probe info.
+%
+% Outputs:
+%   probeInfo - Probe geometry structure containing:
+%               .ChannelNumbers - Channel indices [1 x C]
+%               .Wavelength     - Wavelengths per channel [1 x C*W]
+%               .SD             - Source-detector distances [1 x C]
+%               .sI, .dI        - Source/detector indices per channel
+%               .DetPosX, .DetPosY, .DetPosZ - 2D detector positions
+%               .SrcPosX, .SrcPosY, .SrcPosZ - 2D source positions
+%               .DetPos3DX, etc. - 3D positions (MNI/Talairach)
+%               Additional fields vary by device configuration.
+%
+% Algorithm:
+%   1. Check for existing .probeinfo field (return directly if present)
+%   2. Extract probe name from fNIR.info.probename
+%   3. Load corresponding .cfg file via loadDeviceCfg
+%   4. Extract first probe from multi-probe configurations
+%
+% Example:
+%   % Get probe info from loaded data
+%   data = pf2.Import.ImportNIR('myfile.nir');
+%   probeInfo = pf2_base.loadProbeInfo(data);
+%   fprintf('Probe has %d channels\n', length(probeInfo.ChannelNumbers));
+%
+%   % Load without building layout (faster)
+%   probeInfo = pf2_base.loadProbeInfo(data, false);
+%
+% Notes:
+%   - Prompts for GUI device selection if probe name is missing/invalid
+%   - Currently assumes single probe; multi-probe support is limited
+%
+% See also: loadDeviceCfg, buildProbeLayout, pf2_updateCurrentDevice
 if(nargin < 2)
     buildProbeLayout=true;
 end

@@ -1,4 +1,73 @@
 function [fNIR] = ImportHitachiMES(file,pathname,channelCheck)
+% IMPORTHITACHIMES Import fNIRS data from Hitachi ETG-4000 MES files
+%
+% Reads fNIRS data from Hitachi ETG-4000 optical topography systems, which
+% export data in a proprietary CSV-based MES format. The MES file contains
+% header metadata, wavelength information, marker events, and raw intensity
+% data for all channels. Automatically detects probe configuration based on
+% channel count (3x5 or 3x11 probe arrays).
+%
+% Reference:
+%   Internal pf2 implementation for Hitachi ETG-4000 format.
+%   Hitachi Medical Corporation. ETG-4000 Optical Topography System.
+%
+% Syntax:
+%   fNIR = pf2.Import.ImportHitachiMES()
+%   fNIR = pf2.Import.ImportHitachiMES(file)
+%   fNIR = pf2.Import.ImportHitachiMES(file, pathname)
+%   fNIR = pf2.Import.ImportHitachiMES(file, pathname, channelCheck)
+%
+% Inputs:
+%   file         - Filename or full path to MES file [char | string]
+%                  If omitted, a file selection dialog opens.
+%                  Files typically contain 'MES' in the filename.
+%   pathname     - Directory path if file is just a filename (default: pwd)
+%                  Ignored if file contains full path.
+%   channelCheck - Run channel quality check GUI after import (default: true)
+%                  Set to false to skip interactive quality assessment.
+%
+% Outputs:
+%   fNIR - Standard pf2 fNIRS data structure containing:
+%          .raw       - Raw intensity data [T x C double]
+%          .time      - Time vector in seconds [T x 1 double]
+%          .fs        - Sampling frequency in Hz [double]
+%          .markers   - Event markers [M x 3: time, value, index]
+%          .fchMask   - Channel quality mask [1 x C: 1=good, 0=bad]
+%          .info      - Metadata structure containing:
+%                       .MESheader      - Raw header fields
+%                       .chWavelengths  - Wavelength per channel [2 x C]
+%                       .SubjectID      - Subject name from header
+%                       .Age            - Subject age (if available)
+%                       .Sex            - Subject sex (if available)
+%                       .startTime      - Recording start time string
+%                       .probename      - Auto-detected probe config
+%
+% Algorithm:
+%   1. Parse header section (tab or comma delimited)
+%   2. Extract wavelength info from column headers CH#(wavelength)
+%   3. Read data matrix using textscan
+%   4. Convert sample indices to time using sampling period
+%   5. Extract markers from Mark column
+%   6. Auto-detect probe type from channel count
+%
+% Example:
+%   % Import with file dialog
+%   data = pf2.Import.ImportHitachiMES();
+%
+%   % Import specific file
+%   data = pf2.Import.ImportHitachiMES('Subject01_MES.csv');
+%
+%   % Import with explicit path, skip channel check
+%   data = pf2.Import.ImportHitachiMES('data.csv', '/path/to/data/', false);
+%
+% Notes:
+%   - Supports both tab-delimited and comma-delimited MES formats
+%   - Time offset assumes 10-second baseline period (adjustable via SetT0)
+%   - Channel count determines probe config: 44=3x5, 104=3x11
+%   - Date/time parsed from header for .t0 if available
+%   - Special characters in header fields are sanitized to valid MATLAB names
+%
+% See also: pf2.Import.ImportSNIRF, pf2.Import.ImportNIRX, pf2.Import.ImportNIR
 
 forceChannelCheck=false;
 
@@ -291,32 +360,32 @@ for n = 1:length(Name)
         case Numbers
         case LowerCases
         case UpperCases
-        case {'À','Á','Â','Ã','Ä','Å'},     Character = 'A';
-        case 'Æ',                           Character = 'AE';
-        case 'Ç',                           Character = 'C';
-        case {'È','É','Ê','Ë'},             Character = 'E';
-        case {'Ì','Í','Î','Ï'},             Character = 'I';
-        case 'Ñ',                           Character = 'N';
-        case {'Ò','Ó','Ô','Õ','Ö'},         Character = 'O';
-        case {'Ù','Ú','Û','Ü'},             Character = 'U';
-        case 'Ý',                           Character = 'Y';
-        case '²',                           Character = '2';
-        case '³',                           Character = '3';
-        case '¼',                           Character = '1_4';
-        case '½',                           Character = '1_2';
-        case '¾',                           Character = '3_4';
-        case {'à','á','â','ã','ä','å'},     Character = 'a';
-        case 'æ',                           Character = 'ae';
-        case 'ç',                           Character = 'c';
-        case {'è','é','ê','ë'},             Character = 'e';
-        case {'ì','í','î','ï'},             Character = 'i';
-        case 'ñ',                           Character = 'n';
-        case {'ò','ó','ô','õ','ö'},         Character = 'o';
-        case {'ù','ú','û','ü','µ'},         Character = 'u';
-        case {'ý','ÿ'},                     Character = 'y';
+        case {'ï¿½','ï¿½','ï¿½','ï¿½','ï¿½','ï¿½'},     Character = 'A';
+        case 'ï¿½',                           Character = 'AE';
+        case 'ï¿½',                           Character = 'C';
+        case {'ï¿½','ï¿½','ï¿½','ï¿½'},             Character = 'E';
+        case {'ï¿½','ï¿½','ï¿½','ï¿½'},             Character = 'I';
+        case 'ï¿½',                           Character = 'N';
+        case {'ï¿½','ï¿½','ï¿½','ï¿½','ï¿½'},         Character = 'O';
+        case {'ï¿½','ï¿½','ï¿½','ï¿½'},             Character = 'U';
+        case 'ï¿½',                           Character = 'Y';
+        case 'ï¿½',                           Character = '2';
+        case 'ï¿½',                           Character = '3';
+        case 'ï¿½',                           Character = '1_4';
+        case 'ï¿½',                           Character = '1_2';
+        case 'ï¿½',                           Character = '3_4';
+        case {'ï¿½','ï¿½','ï¿½','ï¿½','ï¿½','ï¿½'},     Character = 'a';
+        case 'ï¿½',                           Character = 'ae';
+        case 'ï¿½',                           Character = 'c';
+        case {'ï¿½','ï¿½','ï¿½','ï¿½'},             Character = 'e';
+        case {'ï¿½','ï¿½','ï¿½','ï¿½'},             Character = 'i';
+        case 'ï¿½',                           Character = 'n';
+        case {'ï¿½','ï¿½','ï¿½','ï¿½','ï¿½'},         Character = 'o';
+        case {'ï¿½','ï¿½','ï¿½','ï¿½','ï¿½'},         Character = 'u';
+        case {'ï¿½','ï¿½'},                     Character = 'y';
         case {' ','''', '-', '_',...
                 '(','[','/','\'},         	Character = '_';
-        case {'°'},                         Character = 'deg';
+        case {'ï¿½'},                         Character = 'deg';
         otherwise,                          Character = '' ;
     end
     Name2 = [Name2, Character]; %#ok<AGROW>

@@ -1,4 +1,56 @@
 function quicksave(var, filename,zipIt)
+% QUICKSAVE Save MATLAB data to binary file using fast serialization
+%
+% Serializes any MATLAB data structure to a compact binary format and writes
+% it to disk. Supports optional ZIP compression. Significantly faster than
+% standard MAT file save for large structures with many fields. Data can be
+% recovered using quickopen.
+%
+% Reference:
+%   Based on hlp_serialize/hlp_deserialize by Christian Kothe, SCCN/UCSD.
+%   Original serialize.m (C) 2010 Tim Hutt.
+%
+% Syntax:
+%   quicksave(var, filename)
+%   quicksave(var, filename, zipIt)
+%
+% Inputs:
+%   var      - MATLAB variable to serialize (any supported type)
+%              Supports: numeric, char, cell, struct, logical, function
+%              handles, objects, sparse, complex, datetime, duration, table.
+%   filename - Output file path [char]
+%              Extension is arbitrary; .bin is conventional.
+%   zipIt    - Compress output to ZIP archive (default: false)
+%              If true, creates filename.zip and deletes uncompressed file.
+%
+% Outputs:
+%   None (writes to disk)
+%
+% Algorithm:
+%   1. Serialize MATLAB variable to byte vector via hlp_serialize
+%   2. Write byte vector to binary file
+%   3. Optionally compress to ZIP and remove original
+%
+% Example:
+%   % Save processed fNIRS data
+%   processed = processFNIRS2(data);
+%   pf2_base.quicksave(processed, 'processed_data.bin');
+%
+%   % Save with compression for archival
+%   pf2_base.quicksave(processed, 'archive.bin', true);
+%   % Creates archive.bin.zip
+%
+% Notes:
+%   - Performance is ~10x faster than standard MAT files for large structs
+%   - Java objects cannot be properly serialized (placeholder used)
+%   - Anonymous functions with large workspaces may be slow
+%   - Displays file size and timing information during save
+%
+% Limitations:
+%   - Arrays with >255 dimensions have last dimensions clamped
+%   - Nested/scoped function handles require special parent function support
+%
+% See also: quickopen, hlp_serialize, hlp_deserialize
 
 if(nargin<3)
     zipIt=false;

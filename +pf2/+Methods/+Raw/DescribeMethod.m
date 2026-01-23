@@ -1,4 +1,48 @@
 function [descrip,functions]=DescribeMethod(rawMethod)
+% DESCRIBEMETHOD Display detailed information about a raw processing method
+%
+% Shows the complete configuration of a raw processing method, including
+% all processing functions in the pipeline, their arguments, and output
+% assignments. Useful for understanding what a method does before applying
+% it to data, or for debugging processing issues.
+%
+% Syntax:
+%   pf2.Methods.Raw.DescribeMethod()
+%   pf2.Methods.Raw.DescribeMethod(rawMethod)
+%   pf2.Methods.Raw.DescribeMethod(methodIndex)
+%   [descrip, functions] = pf2.Methods.Raw.DescribeMethod(...)
+%
+% Inputs:
+%   rawMethod - Method identifier (optional), one of:
+%               - String/char: Method name (e.g., 'x2_lpf_smar')
+%               - Numeric: Method index from the available methods list
+%               If omitted, prompts for interactive selection.
+%
+% Outputs:
+%   descrip   - String containing the formatted method description
+%               If not requested, description prints to console.
+%   functions - Cell array of function configuration structs containing:
+%               .f       - Function name
+%               .args    - Argument names
+%               .argvals - Argument values
+%               .output  - Output variable assignment
+%
+% Example:
+%   % Display current method details to console
+%   pf2.Methods.Raw.DescribeMethod();
+%
+%   % Describe a specific method by name
+%   pf2.Methods.Raw.DescribeMethod('x2_lpf_smar');
+%
+%   % Get method details as variables for programmatic use
+%   [desc, funcs] = pf2.Methods.Raw.DescribeMethod('x5_TDDR');
+%   fprintf('Method has %d processing functions\n', length(funcs));
+%
+%   % Describe method by index
+%   pf2.Methods.Raw.DescribeMethod(3);
+%
+% See also: pf2.Methods.Raw.List, pf2.Methods.Raw.SetMethod,
+%           pf2.Methods.Oxy.DescribeMethod, pf2.Methods.DescribeCurrentMethods
 
 global PF2
 
@@ -20,7 +64,7 @@ if(pf2_base.isnestedfield(PF2,'myRawMethods.cfg.Sections')&&~isempty(PF2.myRawMe
     rawMethods=PF2.myRawMethods.cfg.Sections;
     
     if(getByIndex)
-        if(rawMethodIndex>0&&rawMethodIndex<=length(rawMethods))
+        if(rawMethod>0&&rawMethod<=length(rawMethods))
             rawMethod=rawMethods{rawMethod};
         else
             error('Unable to find Raw Method at Index %i',rawMethod);

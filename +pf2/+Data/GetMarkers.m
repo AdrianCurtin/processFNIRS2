@@ -1,44 +1,61 @@
-function [markerTimes,tableMrkTimes, matchedPatterns] = GetMarkers(varargin) %(fNIR, markersStart,markersEnd)   or (fNIR, markerPattern)
-%GetMarkers Function which matches markers and marker patterns to
-%return start and end times
-% markersStart, markersEnd, and markerPattern  may be  N x mrk  arrays or
-%                                                   cell arrays of 1 x mrk 
-   %                        wher N is the number of patterns and mrk is the
-   %                        number of markers in the pattern
-   %                ex: markersStart [50,51] will look for the marker
-   %                            pattern 50 followed by 51
-   %                ex: markersStart [50;51] will look for the markers
-   %                            50 and markers valued at 51
-      %                ex: markerPattern {25,[50,51]} will look for markers
-      %                            25 and the pattern 50-51
-%   Note: in patterns, all extra markers are removed, ie: the pattern [1,4]
-%                   will return the markers 1 and 4 in the set [1,2,3,4]
-   
-
-%   GetMarkers(fNIR, markersStart)
-%       returns all markers at specified time
+function [markerTimes, tableMrkTimes, matchedPatterns] = GetMarkers(varargin)
+% GETMARKERS Extract event marker times matching specified codes or patterns
 %
+% Searches fNIRS marker data to find events matching specified marker codes
+% or sequential patterns. Returns marker times for use in epoching, event
+% alignment, or stimulus analysis.
 %
-%   GetMarkers(fNIR, markersStart,markersEnd)
-%       returns all markers between start and end marker pairs 
-%               if only one start marker is given, all start-end pairs are
-%               matched
-%               if only one end marker is given, all start- end pairs are
-%               matched
-%                   otherwise each start and end marker must be paired
+% Syntax:
+%   markerTimes = pf2.Data.GetMarkers(fNIR, markerCode)
+%   markerTimes = pf2.Data.GetMarkers(fNIR, startMarker, endMarker)
+%   markerTimes = pf2.Data.GetMarkers(fNIR, markerPattern)
+%   [markerTimes, tableMrkTimes, matchedPatterns] = pf2.Data.GetMarkers(...)
 %
-%   GetMarkers(fNIR,markerPattern)
-%       returns all start and end times for markers matching specific
-%       pattern (with any interleaving markers allowed)
-
-% Additional parameters
-%       %markerColumn: the column number containing the respective markers
-%       %markerVariableName: the variable name containing respective marker
-%                         values (in a table), will overwrite markerColumn
-%       %timeColumn: the column number containing the marker timing
-%       %returnIndicies:  will return marker indicies instead of times as
-%               the default time output
-%       %exactMatch: requires that all makers are explicitly found in order
+% Inputs:
+%   fNIR           - fNIRS data structure with .markers field [M x 3]
+%                    Or marker table/matrix directly
+%   markerCode     - Single marker code(s) to find:
+%                    - Scalar: Find all markers with this code
+%                    - [50,51] row vector: Find sequence 50 followed by 51
+%                    - [50;51] column vector: Find markers 50 OR 51
+%   startMarker    - Start marker code(s) for paired extraction
+%   endMarker      - End marker code(s) for paired extraction
+%   markerPattern  - Cell array of codes/patterns: {25, [50,51]}
+%                    Finds marker 25 AND pattern 50-51
+%
+% Name-Value Parameters:
+%   'markerColumn'       - Column index for marker values (default: 2)
+%   'markerVariableName' - Variable name in table (overrides markerColumn)
+%   'timeColumn'         - Column index for marker times (default: 1)
+%   'returnIndices'      - Return indices instead of times (default: false)
+%   'exactMatch'         - Require exact sequence without interleaving (default: false)
+%
+% Outputs:
+%   markerTimes      - Matrix of marker times [N x 2] (start, end)
+%                      Or [N x 1] for single marker queries
+%   tableMrkTimes    - Table with marker details and matched times
+%   matchedPatterns  - Cell array of matched pattern information
+%
+% Pattern Matching:
+%   - Row vectors [50,51]: Sequential pattern (50 THEN 51)
+%   - Column vectors [50;51]: Either marker (50 OR 51)
+%   - Cell arrays {25,[50,51]}: Multiple patterns (25 AND sequence 50-51)
+%   - Interleaving markers allowed unless exactMatch=true
+%
+% Example:
+%   % Find all instances of marker 49
+%   times = pf2.Data.GetMarkers(data, 49);
+%
+%   % Find start/end pairs for markers 50 and 51
+%   times = pf2.Data.GetMarkers(data, 50, 51);
+%
+%   % Find pattern: marker 25 followed by sequence 50-51
+%   times = pf2.Data.GetMarkers(data, {25, [50,51]});
+%
+%   % Get indices instead of times
+%   idx = pf2.Data.GetMarkers(data, 49, 'returnIndices', true);
+%
+% See also: pf2.Data.Split, pf2.Data.SetT0, pf2.Data.Resample
 
 
 
@@ -251,7 +268,7 @@ if(isempty(markerPatternIn))
        elseif(size(markersEnd,1)==1)
            markerPatternChar{i}=sprintf('%s\\w*?%s',markersStartStr{i},markersEndStr{1});
            matchedPatterns{i,1}=markersStart(i,:);
-           matchedPatterns{i,2}=markersEndStr(1,:);
+           matchedPatterns{i,2}=markersEnd(1,:);
        elseif(size(markersEnd,1)==size(markersStart,1))
            markerPatternChar{i}=sprintf('%s?%s',markersStartStr{i},markersEndStr{i});
            matchedPatterns{i,1}=markersStart(i,:);

@@ -1,9 +1,51 @@
 function [ imgOut ] = ImageValues(varargin)
-%pf2.Data.Plot.ImageValues
+% IMAGEVALUES Display per-channel values as a 2D image heatmap
 %
-% Uses an imagemap to change the color of each cell based on data2plot
+% Creates a 2D image visualization where each fNIRS channel position is filled
+% with a color corresponding to its data value. Channel positions are mapped
+% to a grid image based on probe layout, creating a rectangular heatmap
+% representation of the channel data. This is useful for creating publication-
+% ready topographic plots of channel-level metrics.
 %
-% ImageValues(fNIR,data2plot,minVal,maxVal,titleString,clrBarTitle)
+% Reference:
+%   Internal pf2 implementation for probe-based visualization.
+%
+% Syntax:
+%   ImageValues(data2plot)
+%   ImageValues(data2plot, fNIR)
+%   ImageValues(data2plot, fNIR, minVal, maxVal)
+%   ImageValues(data2plot, fNIR, minVal, maxVal, titleString, clrBarTitle)
+%   imgOut = ImageValues(...)
+%   ImageValues(..., 'includeSS', false)
+%
+% Inputs:
+%   data2plot   - Values to display for each channel [1 x C double]
+%                 Must have one value per optode/channel in the probe.
+%   fNIR        - fNIRS data structure containing probe info (default: {})
+%                 If empty, attempts to load from global setF or prompts user.
+%   minVal      - Minimum value for color scale (default: min(data2plot))
+%   maxVal      - Maximum value for color scale (default: max(data2plot))
+%   titleString - Title displayed above the plot (default: '')
+%   clrBarTitle - Title for the colorbar (default: '')
+%   'includeSS' - Include short separation channels (default: true)
+%                 Set to false to exclude short separation channels.
+%
+% Outputs:
+%   imgOut - Handle to the image object (optional)
+%
+% Example:
+%   % Display mean HbO values as heatmap
+%   data = pf2.Import.SampleData.fNIR2000();
+%   processed = processFNIRS2(data);
+%   meanHbO = mean(processed.HbO, 1);
+%   pf2.Probe.Plot.ImageValues(meanHbO, processed, [], [], 'Mean HbO', 'uM');
+%
+%   % Display p-values with custom range
+%   pvals = rand(1, 18) * 0.1;
+%   pf2.Probe.Plot.ImageValues(pvals, processed, 0, 0.05, 'P-values');
+%
+% See also: pf2.Probe.Plot.ArrangedValues, pf2.Probe.Plot.InterpolateValues,
+%           pf2.Probe.Plot.ImageROIvalues, pf2.Data.Plot.Oxy
 
 p = inputParser;
 

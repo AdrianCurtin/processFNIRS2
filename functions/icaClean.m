@@ -1,9 +1,58 @@
 function [data1f,data2f,valica]=icaClean(data1,data2,use_fast_ica)
-% data1: either raw730 or raw850 (regular wavelength light intensities)
-% data2: raw805 (ambient channel)
-% data1f: raw805 effect eliminated data1
-
-%use_fast_ica selects fastica otherwise uses runica
+% ICACLEAN Remove ambient/systemic noise from fNIRS using ICA
+%
+% Uses Independent Component Analysis (ICA) to separate and remove ambient
+% light or systemic physiological interference from fNIRS signals. Identifies
+% the independent component most correlated with the ambient channel and
+% removes its contribution from the measurement channels.
+%
+% Syntax:
+%   [data1f, data2f, valica] = icaClean(data1, data2)
+%   [data1f, data2f, valica] = icaClean(data1, data2, use_fast_ica)
+%
+% Inputs:
+%   data1        - Primary fNIRS signal [T x 1] or [1 x T]
+%                  Typically raw730 or raw850 (single wavelength intensity)
+%                  Will be transposed to row vector if necessary
+%   data2        - Reference/ambient signal [T x 1] or [1 x T]
+%                  Typically raw805 (dark/ambient channel) or short-separation
+%   use_fast_ica - ICA algorithm selection (default: true)
+%                  true  = Use FastICA (faster, recommended)
+%                  false = Use EEGLAB's runica (slower, more robust)
+%
+% Outputs:
+%   data1f       - Cleaned primary signal [T x 1]
+%                  Ambient-correlated component removed
+%   data2f       - Cleaned reference signal [T x 1]
+%                  Signal-correlated component removed
+%   valica       - Quality metric (0-1)
+%                  Correlation between ambient and signal component
+%                  Higher values indicate better separation
+%
+% Algorithm:
+%   1. Stack data1 and data2 into mixed signal matrix
+%   2. Center signals by removing mean
+%   3. Apply ICA to extract 2 independent components
+%   4. Identify components by correlation:
+%      - Component correlated with data2 is "ambient/noise"
+%      - Component correlated with data1 is "signal"
+%   5. Reconstruct cleaned signals by removing cross-contributions
+%
+% Notes:
+%   - Requires FastICA toolbox or EEGLAB's runica on MATLAB path
+%   - FastICA is automatically loaded if not present
+%   - Returns original data if ICA fails to converge
+%   - Best for removing ambient light contamination
+%   - Consider using with pf2_ambient_ICA_clean for multi-channel data
+%
+% Example:
+%   % Clean raw 730nm data using 805nm ambient as reference
+%   [clean730, cleanAmb, quality] = icaClean(raw730, raw805);
+%
+%   % Use runica instead of FastICA
+%   [clean730, cleanAmb, quality] = icaClean(raw730, raw805, false);
+%
+% See also: pf2_ambient_ICA_clean, fastica, runica, pf2_subtractAmbient
 
 %addpath('C:\Meltem\MeltemPC\fNIR\K9\RunICA')
 %addpath('C:\Kurtulus PC\DOCUMENTS\Anesth\RunICA');

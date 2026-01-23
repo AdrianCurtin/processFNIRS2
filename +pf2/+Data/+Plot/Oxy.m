@@ -1,28 +1,61 @@
-function [ figHandle ] = Oxy(varargin)
-%pf2.Data.Plot.Oxy
-%   plots an individual channels or autoarranged plot of the channelss based on the device
-% specify an individual optode to plot that or leave blank or 'all' to plot
-% all channels arranged
+function [figHandle] = Oxy(varargin)
+% OXY Plot hemoglobin concentration time series
 %
-% showMarkers argument can be an array of markers, strings of marker
-% labels, or just true/false to plot all
+% Creates time series plots of processed fNIRS hemoglobin data (HbO, HbR,
+% etc.). Can display individual channels or all channels arranged according
+% to probe geometry. Supports marker overlay, baseline subtraction, and
+% visual distinction of rejected channels.
 %
-% bioMlist is the list of biomarkers that Plot.Oxy will use, defaults to
-% just HbO/HbR
+% Syntax:
+%   pf2.Data.Plot.Oxy(fNIR)                          % Plot all channels
+%   pf2.Data.Plot.Oxy(fNIR, channel)                 % Plot specific channel
+%   pf2.Data.Plot.Oxy(fNIR, 'all')                   % Explicit all channels
+%   pf2.Data.Plot.Oxy(..., 'Name', Value)            % With options
+%   figHandle = pf2.Data.Plot.Oxy(...)               % Return figure handle
 %
-% baseline will accept a time (ex 10s) for a baseline at the beginning of the plot
-%   can be negative indexed from the end or accepts an FNIRS struct to
-%   baseline from
-% 
-% ylimit will force the ylimit of each plot to a specific value
+% Inputs:
+%   fNIR          - Processed fNIRS structure with HbO, HbR fields
+%   channels      - Channel(s) to plot (optional):
+%                   - Numeric: Specific channel number(s)
+%                   - 'all' or []: All channels in probe arrangement
+%   'markers'     - Marker display options:
+%                   - true: Show all markers (default)
+%                   - false: Hide markers
+%                   - Numeric array: Show only specified marker codes
+%   'bioMlist'    - Biomarkers to plot (default: {'HbO', 'HbR'})
+%                   Options: 'HbO', 'HbR', 'HbTotal', 'HbDiff', 'CBSI'
+%   'baseline'    - Baseline subtraction:
+%                   - Numeric: Seconds from start for baseline period
+%                   - Negative: Index from end of recording
+%                   - fNIR struct: Use separate data as baseline
+%   'ylimit'      - Y-axis limits [min max] for all subplots
+%   'plotArranged' - Force probe arrangement layout (default: false)
+%   'lineProps'   - Line properties for all plots (cell array)
+%                   Default: {'LineWidth', 1}
+%   'rejectedLineProps' - Line properties for rejected channels
+%                   Default: {'--', 'LineWidth', 1}
+%   'showMarkers' - Display event markers (default: true)
 %
-% plotArranged will force the plot to be arranged in probe format even if
-%   optodes are not present
+% Outputs:
+%   figHandle     - Handle to the created figure
 %
-% lineprops will be passed along to all polots
+% Notes:
+%   - Requires processed data (must contain HbO field)
+%   - Probe arrangement uses device configuration subplot layout
+%   - Rejected channels (fchMask < RejectLevel) shown with dashed lines
+%   - Standard biomarker colors: HbO=red, HbR=blue, HbTotal=green
 %
-% rejectedLineProps will just be passed on to rejected Optodes
-%   (fchMask<rejectLevel)
+% Example:
+%   % Basic plot of all channels
+%   pf2.Data.Plot.Oxy(processedData);
+%
+%   % Plot specific channel with custom biomarkers
+%   pf2.Data.Plot.Oxy(data, 5, 'bioMlist', {'HbO', 'HbR', 'HbTotal'});
+%
+%   % Plot with baseline subtraction
+%   pf2.Data.Plot.Oxy(data, 'baseline', 10);  % 10s baseline
+%
+% See also: pf2.Data.Plot.Raw, pf2.Data.Plot.ROI, pf2.Probe.Plot.ImageValues
 
 validFnirs = @(x) (iscell(x) || isstruct(x));
 validChannels = @(x) (isnumeric(x) || ischar(x));

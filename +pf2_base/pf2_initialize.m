@@ -1,6 +1,71 @@
 function pf2_initialize()
-% this will initalize pf2
-
+% PF2_INITIALIZE Initialize processFNIRS2 global state and defaults
+%
+% Sets up the global PF2 structure with default processing parameters,
+% loads saved method configurations from disk, and initializes the toolbox
+% for use. This function is called automatically by processFNIRS2() on
+% first use, but can be called explicitly to reset or reinitialize.
+%
+% Syntax:
+%   pf2_initialize()
+%
+% Inputs:
+%   None
+%
+% Outputs:
+%   None (modifies global PF2 structure)
+%
+% Global Variables Modified:
+%   PF2 - Main processing configuration structure with fields:
+%
+%   Path Configuration:
+%     .defaultRootPath     - processFNIRS2 installation directory
+%     .defaultOxyMethodsPath - Path to saved Oxy method configs
+%     .defaultRawMethodsPath - Path to saved Raw method configs
+%
+%   Method Configuration:
+%     .myRawMethods        - Loaded raw processing method definitions
+%     .myOxyMethods        - Loaded oxy processing method definitions
+%     .stageRawMethod      - Currently selected raw method (set later)
+%     .stageOxyMethod      - Currently selected oxy method (set later)
+%
+%   DPF (Differential Pathlength Factor) Settings:
+%     .curDPF_fixed        - Fixed DPF value (default: 5.93, van der Zee 1992)
+%     .dpf_mode            - DPF calculation mode: 'None', 'Fixed', or 'Calc'
+%                            Default: 'Calc' (age-dependent)
+%     .curDPF_age          - Subject age for DPF calculation (default: 25)
+%
+%   Baseline Settings:
+%     .baseline.startTime       - Baseline start time in seconds (default: 0)
+%     .baseline.blLength        - Baseline duration in seconds (default: 10)
+%     .baseline.useAbsoluteTime - Use absolute vs relative time (default: false)
+%     .baseline.windowStartTime - GUI window start time (default: 0)
+%
+%   Quality Control:
+%     .RejectLevel         - Channel rejection threshold (default: 0)
+%
+% Method Configuration Files:
+%   Raw methods: <prefdir>/pf2_raw_methods_stored_processFNIRS2.cfg
+%   Oxy methods: <prefdir>/pf2_oxy_methods_stored_processFNIRS2.cfg
+%
+% Notes:
+%   - Only initializes if PF2.myRawMethods or PF2.baseline is missing
+%   - Adds 'base_functions', 'functions', and 'GUI' to MATLAB path
+%   - Prints loaded method names to console during initialization
+%   - Uses MATLAB prefdir() for user-specific method storage
+%
+% Example:
+%   % Force reinitialization
+%   clear global PF2
+%   pf2_initialize();
+%
+%   % Check initialization state
+%   global PF2
+%   if isfield(PF2, 'myRawMethods')
+%       disp('Already initialized');
+%   end
+%
+% See also: processFNIRS2, pf2.Methods.Raw.SetMethod, pf2.Settings.SetDPFmode
 
 global PF2
 

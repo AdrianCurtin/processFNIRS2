@@ -1,9 +1,39 @@
-
-
 function mergedTables=mergeGbyTablesLong(gbyTables,bioMarkers,channelIndexes,times,exportAux,exportROI,channelLabels)
-% hObject    handle to pushbutton_export_csv (see GCBO)
-% eventdata  reserved - to be defined in a future version of MATLAB
-% handles    structure with handles and user data (see GUIDATA)
+% MERGEGBYTABLESLONG Merge grouped fNIRS tables into long format for export
+%
+% Combines multiple grouped-by tables from exploreFNIRS analysis into a
+% single long-format table suitable for statistical software (R, SPSS, etc.).
+% Long format has one row per observation with columns for grouping variables.
+%
+% Syntax:
+%   mergedTables = mergeGbyTablesLong(gbyTables, bioMarkers, channelIndexes, ...
+%       times, exportAux, exportROI, channelLabels)
+%
+% Inputs:
+%   gbyTables      - Cell array of grouped data tables from exploreFNIRS
+%   bioMarkers     - Cell array of biomarker names to include
+%                    Default: {'HbO','HbR','HbDiff','HbTotal','CBSI'}
+%   channelIndexes - Vector of channel indices to export (default: [] = all)
+%   times          - Time points to include (default: [] = all)
+%   exportAux      - Include auxiliary data (default: false)
+%   exportROI      - Include ROI-averaged data (default: false)
+%   channelLabels  - Cell array of channel name strings (default: numbers)
+%
+% Outputs:
+%   mergedTables   - Combined table in long format with columns:
+%                    Subject, Group, Condition, Channel, Time, Value, etc.
+%
+% Notes:
+%   - Long format is preferred for mixed-effects models in R (lme4)
+%   - Each channel/time/biomarker combination becomes a separate row
+%   - Compatible with tidyverse and ggplot2 for visualization
+%
+% Example:
+%   % Export HbO and HbR for channels 1-10
+%   longTable = mergeGbyTablesLong(gbyData, {'HbO','HbR'}, 1:10);
+%   writetable(longTable, 'export_long.csv');
+%
+% See also: mergeGbyTablesWide, exploreFNIRS
 
 
 if(nargin<6)

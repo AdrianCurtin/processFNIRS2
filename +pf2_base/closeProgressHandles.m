@@ -1,6 +1,25 @@
 function closeProgressHandles()
-% This function closes any progress status figures currently open that have
-% handles stored in global variable ProgressHandles.h
+% CLOSEPROGRESSHANDLES Close all open progress bar figures
+%
+% Closes any progress status figures that have handles stored in the global
+% variable ProgressHandles.h. Validates each handle before closing and
+% removes invalid or closed handles from the structure. Initializes the
+% ProgressHandles structure if it doesn't exist.
+%
+% Syntax:
+%   closeProgressHandles()
+%
+% Inputs:
+%   None - Reads from global variable ProgressHandles
+%
+% Outputs:
+%   None - Closes figures and updates global ProgressHandles.h structure
+%
+% Example:
+%   % After creating progress bars with stored handles
+%   closeProgressHandles();  % Close all tracked progress figures
+%
+% See also: waitbar, close
 
 global ProgressHandles
 

@@ -1,12 +1,71 @@
 function [ imgOut,optPos2Plot ] = InterpolateValues(varargin)
-%pf2.Data.Plot.InterpolateValues
+% INTERPOLATEVALUES Create interpolated 2D topographic map of channel values
 %
-% Uses an imagemap to change the color of each cell based on data2plot
-% fNIR is a data structure that contains the fNIRS structure info, data2
-% plot houses the numbers themselves
+% Generates a smooth, interpolated 2D topographic visualization of fNIRS
+% channel data. Values are interpolated between channel positions using
+% makima interpolation to create a continuous surface representation.
+% Supports both single-sided and two-sided colormaps for displaying
+% activation/deactivation patterns. Short separation channels are excluded
+% from visualization.
 %
-% Short separation channels are not presented here and are skipped
+% Reference:
+%   Internal pf2 implementation for topographic visualization.
+%   Uses MATLAB makima interpolation for smooth surface generation.
 %
+% Syntax:
+%   InterpolateValues(data2plot)
+%   InterpolateValues(data2plot, fNIR)
+%   InterpolateValues(data2plot, fNIR, minVal, maxVal)
+%   InterpolateValues(data2plot, fNIR, minVal, maxVal, titleString, clrBarTitle)
+%   [imgOut, optPos2Plot] = InterpolateValues(...)
+%   InterpolateValues(..., 'bufferDistance', 1)
+%
+% Inputs:
+%   data2plot      - Values to display for each channel [1 x C double]
+%                    Must have one value per optode/channel in the probe.
+%   fNIR           - fNIRS data structure containing probe info (default: {})
+%                    If empty, attempts to load from global setF or prompts user.
+%   minVal         - Minimum value(s) for color scale (default: min(data2plot))
+%                    For two-sided colormap, pass [negMin, posMin] to create
+%                    separate hot/cold colormaps with a gap in between.
+%   maxVal         - Maximum value for color scale (default: max(data2plot))
+%   titleString    - Title displayed above the plot (default: '')
+%   clrBarTitle    - Title for the colorbar (default: '')
+%   'bufferDistance' - Buffer distance around probe in optode spacing units
+%                      (default: 1). Controls how much padding around edges.
+%
+% Outputs:
+%   imgOut      - Handle to the image object (optional)
+%   optPos2Plot - Pixel positions of optodes in the plot [2 x C]
+%                 Row 1: X positions, Row 2: Y positions
+%
+% Algorithm:
+%   1. Extract 2D optode positions from probe configuration
+%   2. Create sparse grid at optode locations with data values
+%   3. Fill interior grid points with neighbor-averaged values
+%   4. Interpolate to high-resolution image using makima method
+%   5. Apply alpha masking to limit visualization to probe coverage area
+%
+% Example:
+%   % Create interpolated HbO topography
+%   data = pf2.Import.SampleData.fNIR2000();
+%   processed = processFNIRS2(data);
+%   timepoint = 100;  % Sample index
+%   hboVals = processed.HbO(timepoint, :);
+%   pf2.Probe.Plot.InterpolateValues(hboVals, processed, -1, 1, ...
+%                                    'HbO at t=10s', 'uM');
+%
+%   % Two-sided colormap for activation/deactivation
+%   pf2.Probe.Plot.InterpolateValues(hboVals, processed, [-0.5, 0.5], [], ...
+%                                    'HbO Changes');
+%
+% Notes:
+%   - Short separation channels are automatically excluded
+%   - Two-sided colormap uses hot colors for positive, cool for negative
+%   - NaN values in data are handled gracefully
+%
+% See also: pf2.Probe.Plot.InterpolateValues3D, pf2.Probe.Plot.ImageValues,
+%           pf2.Probe.Plot.InterpolateROIvalues, pf2.Data.Plot.Oxy
 p = inputParser;
 
 isStructOrEmpty=@(x) isstruct(x)||isempty(x);

@@ -1,7 +1,48 @@
 function [] = temporal(gbyData,gbyVars,exSettings, handles)
-%TEMPORAL exploreFNIRS.plot.temporal
-        % plots temporal plots for a given group of biomarkers/aux signals
-%   Detailed explanation goes here
+% TEMPORAL Plot time-series data from exploreFNIRS grouped analysis
+%
+% Creates temporal (time-course) plots for fNIRS biomarker data, showing
+% the hemodynamic response over time for selected channels and conditions.
+% Supports multiple grouping variables, error shading, and marker overlays.
+%
+% Reference:
+%   Internal exploreFNIRS visualization. Uses shadedErrorBar for error
+%   visualization (Rob Campbell, 2009, MATLAB File Exchange).
+%
+% Syntax:
+%   temporal(gbyData, gbyVars, exSettings, handles)
+%
+% Inputs:
+%   gbyData    - Cell array of grouped data from exploreFNIRS analysis
+%                Each cell contains data for one group/condition
+%   gbyVars    - Cell array of grouping variable names used in analysis
+%                e.g., {'Subject', 'Condition', 'Block'}
+%   exSettings - Structure of exploreFNIRS settings including:
+%                .curInfoGroup  - Current info grouping variable
+%                .ChannelMode   - 'Channel', 'ROI', or 'Aux'
+%                .showMarkers   - Display event markers
+%                .errorType     - 'SEM', 'STD', or 'CI'
+%   handles    - GUI handles structure from exploreFNIRS containing:
+%                .listbox_biomarker - Selected biomarkers
+%                .listbox_optode    - Selected channels/optodes
+%                .axes_temporal     - Target axes for plotting
+%
+% Outputs:
+%   None (creates figure/updates axes)
+%
+% Plot Features:
+%   - Mean time-course with shaded error regions
+%   - Multiple biomarkers (HbO, HbR, etc.) on same axes
+%   - Condition comparison with different colors
+%   - Event marker overlay from experimental design
+%   - Automatic legend generation
+%
+% Notes:
+%   - Typically called from exploreFNIRS GUI, not directly
+%   - Uses shadedErrorBar for visualization
+%   - Supports hierarchical averaging within subjects
+%
+% See also: exploreFNIRS.plot.barchart, exploreFNIRS.plot.scatter
 
 curInfoGroup=exSettings.curInfoGroup;
 

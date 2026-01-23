@@ -1,26 +1,70 @@
 function [] = scatter(handles,exSettings,exGby,gbyVars,plotTopo)
-% if one timepoint
-% 	if multi biomarker + multichannels
-% 	groupby x channels (fig biomarker)
-% 	if 1 biomarker + mult channels
-% 	groupby x channels
-% 	if 1 channel + mult biomarker
-% 	groupby x biomarkers
-% 	if 1 channel + 1 biomarker
-% 	groupby
-% if 1 groups
-% 	biomarker mode
-% 	if 1 timepoint
-% 	groupby x channels
-% 	if multi timepoints
-% 	groupby x time   (fig channels)
-% if no groupby
-% 	if one timepoint
-% 		biomarker x channels
-% 	if multitimepoints & multi channel
-% 		time x channels (fig biomarker)
-% 	if multitimepoints & 1 channel
-% 		time x biomarker
+% SCATTER Create scatter plots for fNIRS correlation analysis in exploreFNIRS
+%
+% Generates scatter plots showing relationships between fNIRS biomarker
+% data and external variables (behavioral, physiological, etc.) from the
+% exploreFNIRS GUI. Supports correlation analysis with optional regression
+% lines, confidence intervals, and topographic correlation maps.
+%
+% Reference:
+%   Internal exploreFNIRS visualization. Correlation analysis uses MATLAB's
+%   corr function (Pearson/Spearman). Confidence intervals computed via
+%   polyparci for regression line visualization.
+%
+% Syntax:
+%   scatter(handles, exSettings, exGby, gbyVars, plotTopo)
+%
+% Inputs:
+%   handles    - GUI handles structure from exploreFNIRS
+%   exSettings - Settings structure containing:
+%                .curInfoGroup   - Variable for grouping (e.g., 'Condition')
+%                .curInfoStr     - Variable to correlate against (X-axis)
+%                .ChannelMode    - 'fNIR', 'ROI', or 'Aux'
+%                .ylim_fixed     - Use fixed Y-axis limits across subplots
+%                .ylim_manual    - Use manually specified Y-axis limits
+%                .plot_scatter_nonparametric - Use Spearman instead of Pearson
+%                .plot_scatter_line - Show regression line
+%                .plot_scatter_err  - Show confidence/prediction intervals
+%                .plot_scatter_err_feature - 'SEM','SD','95%CI','95%PI', etc.
+%                .plot_scatter_flipxy - Swap X and Y axes
+%                .plot_bar_feature  - Summary statistic ('Mean','Median')
+%                .topoSigThrehold   - {type, value} for significance
+%   exGby      - Array of grouped-by data structures containing:
+%                .gbyTables     - Table with subject-level data
+%                .gbyGrandBar   - Grand average structure with biomarker data
+%   gbyVars    - Cell array of grouping variable names
+%   plotTopo   - Logical flag to generate topographic correlation maps
+%
+% Outputs:
+%   (No direct outputs - creates figure windows)
+%
+% Plot Layout Logic:
+%   The subplot arrangement adapts to the data dimensionality:
+%   - 1 timepoint: group-by x channels (separate figures per biomarker)
+%   - 1 group: biomarker mode with channels as subplots
+%   - Multiple groups: separate subplots per group
+%   - Topographic mode: creates spatial maps of correlation coefficients
+%
+% Correlation Statistics:
+%   - Pearson r and p-value (parametric)
+%   - Spearman rho and p-value (non-parametric option)
+%   - FDR correction for topographic maps
+%
+% Global Variables:
+%   ExFNIRS - Main exploreFNIRS state structure
+%
+% Notes:
+%   - Called internally by exploreFNIRS GUI
+%   - Supports hierarchical averaging for within-subject designs
+%   - Topographic mode generates probe-space correlation maps
+%   - Data cursor shows correlation statistics on click
+%
+% Example:
+%   % Called internally from exploreFNIRS GUI when scatter plot selected
+%   exploreFNIRS.plot.scatter(handles, exSettings, exGby, gbyVars, false);
+%
+% See also: exploreFNIRS.plot.barchart, exploreFNIRS.plot.temporal,
+%           exploreFNIRS.fx.performFDR
 
 global ExFNIRS
 

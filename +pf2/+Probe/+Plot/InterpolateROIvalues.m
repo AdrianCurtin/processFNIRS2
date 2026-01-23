@@ -1,8 +1,65 @@
 function [ imgOut ] = InterpolateROIvalues(varargin)
-%pf2.Data.Plot.InterpolateROIvalues
+% INTERPOLATEROIVALUES Create interpolated 2D topographic map of ROI values
 %
-% Uses an imagemap to change the color of each cell based on data2plot
-% InterpolateROIvalues(fNIR,data2plot,minVal,maxVal,bufferMult,titleString,clrBarTitle)
+% Generates a smooth, interpolated 2D topographic visualization of fNIRS
+% ROI data. Each ROI's value is assigned to all channels within that ROI,
+% then the values are interpolated between channel positions to create a
+% continuous surface. This is useful for displaying region-level statistics
+% while maintaining smooth spatial transitions between regions.
+%
+% Reference:
+%   Internal pf2 implementation for ROI-based topographic visualization.
+%   Uses MATLAB makima interpolation for smooth surface generation.
+%
+% Syntax:
+%   InterpolateROIvalues(data2plot)
+%   InterpolateROIvalues(data2plot, fNIR)
+%   InterpolateROIvalues(data2plot, fNIR, ROIinfo)
+%   InterpolateROIvalues(data2plot, fNIR, ROIinfo, minVal, maxVal)
+%   InterpolateROIvalues(..., bufferMult, titleString, clrBarTitle)
+%   imgOut = InterpolateROIvalues(...)
+%
+% Inputs:
+%   data2plot   - Values to display for each ROI [1 x R double]
+%                 Must have one value per ROI defined in ROIinfo or fNIR.ROI.info.
+%   fNIR        - fNIRS data structure containing probe info (default: {})
+%                 Can also be ROI info table if ROIinfo not provided separately.
+%   ROIinfo     - ROI definition table (default: {} uses fNIR.ROI.info)
+%                 Table with 'Optodes' and 'DeviceCfg' columns.
+%   minVal      - Minimum value for color scale (default: min(data2plot))
+%   maxVal      - Maximum value for color scale (default: max(data2plot))
+%   bufferMult  - Buffer multiplier for padding around probe (default: 1)
+%                 Controls how much padding in units of optode spacing.
+%   titleString - Title displayed above the plot (default: '')
+%   clrBarTitle - Title for the colorbar (default: '')
+%
+% Outputs:
+%   imgOut - Handle to the image object (optional)
+%
+% Algorithm:
+%   1. Map ROI values to individual channels based on ROI definitions
+%   2. Extract 2D optode positions from probe configuration
+%   3. Interpolate channel values to high-resolution image grid
+%   4. Apply alpha masking to limit visualization to probe coverage area
+%   5. Overlay ROI labels at channel positions
+%
+% Notes:
+%   - Requires ROI definitions (either in fNIR.ROI.info or ROIinfo parameter)
+%   - ROIs must not contain duplicate channels (overlapping ROIs not supported)
+%   - ROI names are displayed as text labels on the plot
+%
+% Example:
+%   % Define ROIs and create interpolated visualization
+%   data = pf2.Import.SampleData.fNIR2000();
+%   processed = processFNIRS2(data);
+%   processed = pf2.Probe.ROI.defineROI(processed, {1:6, 7:12, 13:18}, ...
+%                                       {'Left', 'Center', 'Right'});
+%   roiStats = [0.8, 1.2, 0.5];  % Example statistics per ROI
+%   pf2.Probe.Plot.InterpolateROIvalues(roiStats, processed, [], [], [], ...
+%                                       1, 'ROI Statistics', 'Value');
+%
+% See also: pf2.Probe.Plot.ImageROIvalues, pf2.Probe.Plot.InterpolateValues,
+%           pf2.Probe.ROI.defineROI, pf2_base.fnirs.buildROI
 
 p = inputParser;
 

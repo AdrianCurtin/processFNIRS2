@@ -1,17 +1,53 @@
 function [ dataf ] = pf2_bandstop( data,filtOrder,fs,lowF,highF)
-
-% inputs ------------------------
-% data: data to be filtered
-% filtOrder: filter order
-% fs: sampling freq.
-% lowF: highpass cut-off frequency
-% highF: lowpass cutoff frequency
-% outputs -----------------------
-% dataf: filtered data
-%--------------------------------
-% pf2_bandstop function designs bandstop butterworth filter with the specified cut-off frequencies and order.
-% It filters the data columnwise as its output
-%--------------------------------
+% PF2_BANDSTOP Band-stop (notch) Butterworth filter for fNIRS signals
+%
+% Designs and applies a band-stop (notch) filter to attenuate frequencies
+% within a specified band while passing frequencies outside that band. Useful
+% for removing specific noise sources such as mains interference (50/60 Hz)
+% or other known periodic artifacts from fNIRS data.
+%
+% Reference:
+%   Standard signal processing; see MATLAB designfilt, filtfilt documentation.
+%
+% Syntax:
+%   dataf = pf2_bandstop(data, filtOrder, fs, lowF, highF)
+%
+% Inputs:
+%   data      - Input signal matrix [T x C] where T=samples, C=channels
+%               Each column is filtered independently.
+%               Row vectors are automatically transposed for filtering.
+%   filtOrder - Filter order for the Butterworth design (scalar)
+%               Higher order = sharper cutoff but more ringing.
+%               Typical range: 2-6 for fNIRS applications.
+%   fs        - Sampling frequency in Hz
+%   lowF      - Lower edge of the stop band in Hz
+%               Frequencies below this pass through unattenuated.
+%   highF     - Upper edge of the stop band in Hz
+%               Frequencies above this pass through unattenuated.
+%
+% Outputs:
+%   dataf - Filtered signal matrix [T x C], same size as input
+%           Frequencies between lowF and highF are attenuated.
+%
+% Algorithm:
+%   1. Design IIR band-stop Butterworth filter using designfilt
+%   2. Apply zero-phase filtering using filtfilt (forward-backward)
+%   3. Preserve input orientation (row vs column vector)
+%
+% Example:
+%   % Remove 60 Hz mains interference (58-62 Hz band)
+%   cleanData = pf2_bandstop(rawData, 4, 10, 58, 62);
+%
+%   % Remove 50 Hz European mains interference
+%   cleanData = pf2_bandstop(rawData, 4, fs, 48, 52);
+%
+% Notes:
+%   - Uses zero-phase filtering (filtfilt) to avoid phase distortion
+%   - Row vectors are automatically handled but returned in original shape
+%   - For notch filters targeting a specific frequency, set lowF and highF
+%     to bracket the target frequency (e.g., 59-61 Hz for 60 Hz notch)
+%
+% See also: pf2_bpf_butter, pf2_lpf, pf2_hpf, designfilt, filtfilt
 
 [Mini,Nini]=size(data);
 if Mini==1 %if the data is a row vector converts it to column vector

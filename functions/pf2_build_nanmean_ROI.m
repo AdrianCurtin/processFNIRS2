@@ -1,27 +1,60 @@
-function roi_out=pf2_build_pca_ROI(fNIR,component_number)
-% pf2_build_nanmean_ROI uses the buildROI_pf2 wrapper
-%   this function takes an fNIR struct and extracts already assigned values from 
-%	the .ROI field
-
-%	A welldefined ROI field will have a table with the names of each ROI in the rownames
-% 	and a single column with the Optodes for each ROI
-
-%	ex:	
-%	fNIR.ROI.info=table([[1,2,3,4];[2,3,4]},'VariableNames',{'Optodes'},'RowNames',{'MyROI1','MyROI2'});
-
-%	ex2:
-%	myOptodes={[1,2,3,4];[10,11,12]};
-%	myROInames={'thisROI','thatROI'};
-%	fNIR.ROI.info=table(myOptodex,'VariableNames',{'Optode'},'RowNames',myROInames);
-
-%	Weaklydefined ROIs can also be used
-%		a cell array of optode numbers will be interpreted as each optode
-%		and automatically converted to a table format with names ROI1,ROI2,...ROIn
-%	ex: fNIR.ROI.info=cell({1,2,3,4};[7,8,9,10]};
-
-%   myfuncString can either be a handle to a function or string for a function itself
-%		if used as varargin, the inputs can be modified according to the functions needs
-
+function roi_out=pf2_build_nanmean_ROI(fNIR)
+% PF2_BUILD_NANMEAN_ROI Build ROI signals using nanmean averaging
+%
+% Constructs Region of Interest (ROI) time series by averaging the specified
+% channels using nanmean. This is the standard approach for creating ROI
+% signals when channels may contain NaN values (e.g., from artifact rejection).
+%
+% The function reads ROI definitions from the fNIR.ROI.info field and applies
+% nanmean across the channels belonging to each ROI, ignoring NaN values.
+%
+% Reference:
+%   Internal pf2 implementation. Standard ROI averaging approach.
+%
+% Syntax:
+%   roi_out = pf2_build_nanmean_ROI(fNIR)
+%
+% Inputs:
+%   fNIR - fNIRS data structure containing:
+%          .HbO, .HbR, .HbTotal, .HbDiff - Hemoglobin time series [T x C]
+%          .ROI.info - Table defining ROI channel assignments
+%                      RowNames: ROI names (e.g., 'LeftPFC', 'RightPFC')
+%                      Column 'Optodes' or 'Channels': cell array of channel
+%                      numbers belonging to each ROI
+%
+% Outputs:
+%   roi_out - fNIRS structure with ROI fields populated:
+%             .ROI.HbO, .ROI.HbR, etc. - [T x R] where R = number of ROIs
+%             Each column is the nanmean of the channels in that ROI
+%
+% ROI Definition Formats:
+%   Well-defined ROI (table format):
+%     fNIR.ROI.info = table({[1,2,3,4]; [5,6,7,8]}, ...
+%                          'VariableNames', {'Optodes'}, ...
+%                          'RowNames', {'LeftPFC', 'RightPFC'});
+%
+%   Weakly-defined ROI (cell array - auto-named as ROI1, ROI2, ...):
+%     fNIR.ROI.info = {[1,2,3,4]; [5,6,7,8]};
+%
+% Example:
+%   % Define ROIs for a frontal probe
+%   fNIR.ROI.info = table({[1,2,3]; [7,8,9]}, ...
+%                        'VariableNames', {'Optodes'}, ...
+%                        'RowNames', {'LeftDLPFC', 'RightDLPFC'});
+%
+%   % Build ROI averages
+%   fNIR = pf2_build_nanmean_ROI(fNIR);
+%
+%   % Plot ROI time series
+%   plot(fNIR.time, fNIR.ROI.HbO);
+%   legend(fNIR.ROI.info.Properties.RowNames);
+%
+% Notes:
+%   - Uses nanmean to handle NaN values from artifact rejection
+%   - If all channels in an ROI are NaN at a time point, ROI value is NaN
+%   - For PCA-based ROI construction, use pf2_build_pca_ROI instead
+%
+% See also: pf2_build_pca_ROI, pf2_base.fnirs.ezBuildROI, pf2_base.fnirs.buildROI
 
 roi_out=pf2_base.fnirs.ezBuildROI(fNIR,@nanmean);
 

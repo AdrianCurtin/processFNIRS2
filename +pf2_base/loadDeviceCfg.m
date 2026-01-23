@@ -1,10 +1,68 @@
 function probeInfo=loadDeviceCfg(deviceCfgFilename,includeSSchannels,loadFromGlobal)
-% Builds a probeInfo struct from the device.cfg file 
-%   (located in process fnirs 2 / devices folder)
-% 
-% use BuildProbeLayout to build a 2D representation for plotting
-%   use includeSSchannels to disable removal of short separation channels from 2D
-%   plot layouts and figures
+% LOADDEVICECFG Load and parse fNIRS device configuration file
+%
+% Reads a device configuration file (.cfg) and constructs a comprehensive
+% probeInfo structure containing channel mappings, optode positions (2D and
+% 3D), source-detector separation distances, wavelength information, and
+% probe layout data for visualization.
+%
+% The function supports caching via a global deviceTable to avoid reloading
+% previously parsed configurations.
+%
+% Syntax:
+%   probeInfo = loadDeviceCfg()
+%   probeInfo = loadDeviceCfg(deviceCfgFilename)
+%   probeInfo = loadDeviceCfg(deviceCfgFilename, includeSSchannels)
+%   probeInfo = loadDeviceCfg(deviceCfgFilename, includeSSchannels, loadFromGlobal)
+%   loadDeviceCfg(deviceCfgFilename)  % Assigns to global setF
+%
+% Inputs:
+%   deviceCfgFilename - Path to device configuration file (string)
+%                       If empty, opens file selection dialog.
+%                       Can be filename only (searches /devices folder) or
+%                       full path. Extension .cfg is added if missing.
+%   includeSSchannels - Include short separation channels in 2D layouts
+%                       (default: true). Set false to exclude SS channels
+%                       from visualization layouts.
+%   loadFromGlobal    - Load from cached deviceTable if available
+%                       (default: true). Set false to force reload.
+%
+% Outputs:
+%   probeInfo - Device configuration structure with fields:
+%               .cfg      - Raw INI configuration object
+%               .Info     - Device metadata (name, manufacturer, etc.)
+%               .Probe{i} - Cell array of probe structures, each containing:
+%                   .NumOptodes        - Number of measurement channels
+%                   .NumShortSeparation - Number of short separation channels
+%                   .TableOpt          - Table of optode properties
+%                   .TableSD           - Table of source/detector properties
+%                   .TableCh           - Table of raw channel mappings
+%                   .SrcPos, .DetPos, .OptPos - Position tables (2D and 3D)
+%
+%   When called with no output arguments, assigns probeInfo to global setF
+%   and updates the global deviceTable cache.
+%
+% Supported Device Configurations:
+%   - fNIR Devices (fNIR1000, fNIR2000, etc.)
+%   - Hitachi ETG-4000 (3x5, 3x11 configurations)
+%   - NIRx Sport systems
+%   - Custom probe configurations
+%
+% Example:
+%   % Load fNIR 2000 configuration
+%   probe = loadDeviceCfg('fNIR_Devices_fNIR2000');
+%   disp(probe.Probe{1}.NumOptodes);
+%
+%   % Load with file dialog
+%   probe = loadDeviceCfg();
+%
+%   % Assign to global and cache
+%   loadDeviceCfg('fNIR_Devices_fNIR2000');
+%   global setF
+%   disp(setF.device.Info.Name);
+%
+% See also: buildProbeLayout, loadProbeInfo, pf2.Settings.SelectDevice,
+%           fitProbe2D, pf2_initialize
 
 % Set default values for input arguments
 if nargin < 1

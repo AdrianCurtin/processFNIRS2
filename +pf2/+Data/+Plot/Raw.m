@@ -1,13 +1,61 @@
 function [ figHandle ] = Raw(varargin)
-% Raw(fNIR,channels,showMarkers,wavelengths,ylimit,plotArranged,lineProps,rejectedLineProps)
-% This function plots and automatically arranges raw fNIRS data based on
-% the input values.
-%   It expects fNIR (the data struct), the channels to plot:
-%       (can be a number or a logical index)
-%      a set of wavelengths (ie: 730 or logical index)
-%   A specific ylimit ( to force all to use the same axes
-%   a boolean to plot the arranged channels
-%  Accepted line properties and for normal and rejected channels
+% RAW Plot raw light intensity data from fNIRS acquisition
+%
+% Creates time series plots of raw fNIRS intensity data, optionally
+% arranged according to probe geometry. Supports wavelength selection,
+% marker overlay, and visual indication of rejected channels. Useful for
+% quality assessment of raw data before processing.
+%
+% Syntax:
+%   pf2.Data.Plot.Raw(fNIR)
+%   pf2.Data.Plot.Raw(fNIR, channels)
+%   pf2.Data.Plot.Raw(fNIR, channels, showMarkers, wavelengths)
+%   pf2.Data.Plot.Raw(fNIR, channels, showMarkers, wavelengths, ylimit, plotArranged)
+%   figHandle = pf2.Data.Plot.Raw(..., lineProps, rejectedLineProps)
+%
+% Inputs:
+%   fNIR              - fNIRS data structure [struct]
+%                       Must contain 'raw' [T x C] and 'time' [T x 1] fields.
+%   channels          - Channels to plot [numeric array | logical | 'all']
+%                       (default: all channels, enables arranged plot)
+%                       Can be channel numbers or logical index.
+%   showMarkers       - Display event markers on plots [logical | numeric | 'all']
+%                       (default: true) If numeric, specifies marker codes to show.
+%   wavelengths       - Wavelengths to include [numeric array | 'all']
+%                       (default: all available wavelengths from probe config)
+%                       Common values: 730, 850 nm.
+%   ylimit            - Y-axis limits for all subplots [1x2 numeric]
+%                       (default: [RawMin, max(data)] from device config)
+%   plotArranged      - Use probe geometry layout for subplots [logical]
+%                       (default: true when all channels plotted)
+%   lineProps         - Line properties for good channels [cell array]
+%                       (default: {'LineWidth', 1})
+%   rejectedLineProps - Line properties for rejected channels [cell array]
+%                       (default: {'--', 'LineWidth', 1})
+%
+% Outputs:
+%   figHandle - Handle to the created figure [figure handle]
+%               Only returned when output argument is requested.
+%
+% Example:
+%   % Basic raw data plot
+%   data = pf2.Import.SampleData.fNIR2000();
+%   pf2.Data.Plot.Raw(data);
+%
+%   % Plot specific channels and wavelengths
+%   pf2.Data.Plot.Raw(data, 1:5, true, 730);
+%
+%   % Custom line styling with markers disabled
+%   pf2.Data.Plot.Raw(data, 'all', false, 'all', [], true, ...
+%       {'LineWidth', 2, 'Color', 'b'});
+%
+% Notes:
+%   - Requires valid device configuration for probe geometry
+%   - Rejected channels (fchMask=0) shown with 'X', marginal (0.5) with '~'
+%   - Data cursor mode enabled for interactive inspection
+%   - Large numbers of markers may prompt for confirmation (slow rendering)
+%
+% See also: pf2.Data.Plot.Oxy, pf2.Data.Plot, pf2.Settings.SelectDevice
 
 validFnirs = @(x) (iscell(x) || isstruct(x));
 validChannels = @(x) (isnumeric(x) || ischar(x));

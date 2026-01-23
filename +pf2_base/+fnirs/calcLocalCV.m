@@ -1,5 +1,41 @@
 function [CVx] = calcLocalCV(x,N)
-%Calculates absolute-valued coefficient of variation for use in SMAR technique
+% CALCLOCALCV Calculate local coefficient of variation for SMAR technique
+%
+% Computes the local coefficient of variation (CV = std/mean) in a sliding
+% window. Used internally by pf2_SMAR and pf2_SMAR2 for motion artifact
+% detection. The CV is calculated as: CV = sqrt(variance) / abs(mean).
+%
+% Reference:
+%   Ayaz, H. et al. (2010). Sliding-window motion artifact rejection for
+%   Functional Near-Infrared Spectroscopy. Conf Proc IEEE Eng Med Biol Soc.
+%
+% Syntax:
+%   CVx = calcLocalCV(x)
+%   CVx = calcLocalCV(x, N)
+%
+% Inputs:
+%   x - Input signal matrix [T x C double] where T=samples, C=channels
+%       Can be raw intensity, optical density, or hemoglobin data.
+%   N - Window length in samples (default: 500)
+%       Larger windows provide more stable CV estimates but less temporal
+%       resolution. Minimum value: 1.
+%
+% Outputs:
+%   CVx - Coefficient of variation matrix [T-N x C double]
+%         Output is shorter than input by N samples (no CV for first N points).
+%         Returns NaN matrix if signal length <= N.
+%
+% Algorithm:
+%   1. For each position n in sliding window: compute local mean over [n:n+N]
+%   2. Compute local variance: sum((x - mean)^2) / N
+%   3. Calculate CV: sqrt(variance) / abs(mean)
+%
+% Example:
+%   % Compute CV with 100-sample window
+%   CV = calcLocalCV(rawData, 100);
+%   artifacts = CV > 0.025;  % Threshold for artifact detection
+%
+% See also: pf2_SMAR, pf2_SMAR2, std, mean
 
 if nargin<1
     error('Not enough Input arguments');

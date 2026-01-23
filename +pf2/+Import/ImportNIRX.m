@@ -1,5 +1,66 @@
 function [fNIR] = ImportNIRX(folderDIR,channelCheck)
-%ImportNIRX imports data from NIRX device recordings
+% IMPORTNIRX Import fNIRS data from NIRx system recordings
+%
+% Reads fNIRS data from NIRx systems (NIRScout, NIRSport) which store data
+% across multiple files including wavelength data (.wl1, .wl2), header
+% information (.hdr), and optionally .nirs files containing probe geometry.
+% Supports both legacy file formats and newer JSON-based configurations.
+%
+% Reference:
+%   Internal pf2 implementation for NIRx file format.
+%   NIRx Medical Technologies, LLC. https://nirx.net/
+%
+% Syntax:
+%   fNIR = pf2.Import.ImportNIRX()
+%   fNIR = pf2.Import.ImportNIRX(folderDIR)
+%   fNIR = pf2.Import.ImportNIRX(folderDIR, channelCheck)
+%
+% Inputs:
+%   folderDIR    - Path to NIRx recording folder or .hdr/.nirs file [char | string]
+%                  If omitted, a file selection dialog opens.
+%                  Can be either:
+%                    - Full path to the .hdr or .nirs file
+%                    - Path to folder containing NIRx recording files
+%   channelCheck - Run channel quality check GUI after import (default: true)
+%                  Set to false to skip interactive quality assessment.
+%
+% Outputs:
+%   fNIR - Standard pf2 fNIRS data structure containing:
+%          .raw       - Raw intensity data [T x C double]
+%          .time      - Time vector in seconds [T x 1 double]
+%          .fs        - Sampling frequency in Hz [double]
+%          .markers   - Event markers [M x 2: time, value]
+%          .fchMask   - Channel quality mask [1 x C: 1=good, 0=bad]
+%          .info      - Recording metadata and probe information
+%          .probeinfo - Device and probe geometry structure
+%          .Aux       - Auxiliary data from .nirs file (if available)
+%
+% Algorithm:
+%   1. Locate all relevant files in the recording folder
+%   2. Parse .hdr file for sampling rate, wavelengths, and channel config
+%   3. Load wavelength data from .wl1, .wl2 files (or .nirs file)
+%   4. Extract probe geometry from .nirs file or JSON config
+%   5. Parse markers from .hdr or .tri files
+%   6. Generate 2D probe layout from 3D positions
+%
+% Example:
+%   % Import with file dialog
+%   data = pf2.Import.ImportNIRX();
+%
+%   % Import from specific folder
+%   data = pf2.Import.ImportNIRX('/path/to/recording/2024-01-15_001.hdr');
+%
+%   % Import without channel check for batch processing
+%   data = pf2.Import.ImportNIRX(folderPath, false);
+%
+% Notes:
+%   - Supports NIRSport and NIRScout systems
+%   - Automatically detects short-separation channels (SD < 2cm)
+%   - Spatial units in .nirs files are converted from mm to cm
+%   - Subject demographics read from _description.json if available
+%   - Changes working directory during import, then restores original
+%
+% See also: pf2.Import.ImportSNIRF, pf2.Import.ImportNIR, pf2.Import.ImportHitachiMES
 
 if(nargin<2)
    channelCheck=true; 

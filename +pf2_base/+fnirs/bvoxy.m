@@ -1,12 +1,108 @@
 function [HbO, HbR, Total, HbDiff,CBSI,channels,time,units,DPF_factor]=bvoxy(varargin)
-% Blood Volume and Oxygenation calculation.
-% Part of ProcessFNIRS2
-% Uses channel information to calculate hemoglobin changes from changes in
-% light intensity
+% BVOXY Convert optical density to hemoglobin concentrations via Beer-Lambert law
 %
-% bvoxy(data,ChannelNumbers,Wavelengths,baselineSamples,DPF,DeviceCoefs,'isOD',true);
-
-% Will return as fNIR struct if only one output is given
+% Applies the modified Beer-Lambert law (MBLL) to convert optical density
+% changes at two wavelengths into changes in oxygenated (HbO) and
+% deoxygenated (HbR) hemoglobin concentrations. This is the core Stage 2
+% transformation in the fNIRS processing pipeline.
+%
+% The Beer-Lambert law relates optical density changes to chromophore
+% concentration changes:
+%   delta_OD = epsilon * delta_C * d * DPF
+%
+% Where:
+%   epsilon = molar extinction coefficient (wavelength-dependent)
+%   delta_C = concentration change
+%   d       = source-detector distance
+%   DPF     = differential pathlength factor (accounts for scattering)
+%
+% References:
+%   Modified Beer-Lambert Law:
+%     Delpy, D. T. et al. (1988). Estimation of optical pathlength through
+%     tissue from direct time of flight measurement. Phys. Med. Biol. 33(12).
+%
+%   DPF Calculation:
+%     Scholkmann, F. & Wolf, M. (2013). General equation for the differential
+%     pathlength factor of the frontal human head depending on wavelength
+%     and age. J. Biomed. Opt. 18(10), 105004. DOI: 10.1117/1.JBO.18.10.105004
+%
+%   Extinction Coefficients:
+%     Prahl, S. A. Tabulated molar extinction coefficient for hemoglobin.
+%     http://omlc.org/spectra/hemoglobin/
+%
+% Syntax:
+%   fNIR = bvoxy(data, channels, wavelengths, distanceSrcDet)
+%   fNIR = bvoxy(data, channels, wavelengths, distanceSrcDet, baselineSamples)
+%   fNIR = bvoxy(..., age)
+%   fNIR = bvoxy(..., 'DiffPathlengthFactor', dpf)
+%   fNIR = bvoxy(..., 'NoPathlength', true)
+%   fNIR = bvoxy(..., 'isOD', true)
+%   [HbO, HbR, Total, HbDiff, CBSI, ch, t, units, DPF] = bvoxy(...)
+%
+% Inputs:
+%   data            - Raw light intensity or optical density [T x C_raw]
+%                     T = time samples, C_raw = all raw channels (2 per optode)
+%   channels        - Channel numbers for each column [1 x C_raw]
+%                     Optode number (>0), time (0), or marker (<0)
+%   wavelengths     - Wavelength in nm for each column [1 x C_raw]
+%                     Typically ~730nm and ~850nm for two-wavelength systems
+%   distanceSrcDet  - Source-detector separation in cm [1 x N_optodes]
+%                     Typically 2.5-3 cm for standard fNIRS
+%   baselineSamples - Sample indices for baseline calculation (default: 1:50)
+%                     Baseline mean is subtracted before conversion.
+%   age             - Subject age in years for DPF calculation (default: 25)
+%                     Used only when DPF mode is 'Calc' (age-dependent).
+%
+% Name-Value Parameters:
+%   'DiffPathlengthFactor' - Fixed DPF value to use (bypasses age calculation)
+%                            Typical adult value: 5.93 (van der Zee, 1992)
+%   'NoPathlength'         - If true, skip DPF correction (default: false)
+%                            Output units become mM*mm instead of uM.
+%   'coefs'                - Custom extinction coefficients [N_wv x 3]
+%                            Format: [wavelength, eHbO, eHbR]
+%   'isOD'                 - If true, input is already optical density
+%                            (default: false, assumes raw intensity)
+%
+% Outputs:
+%   HbO        - Oxygenated hemoglobin changes [T x N_optodes]
+%   HbR        - Deoxygenated hemoglobin changes [T x N_optodes]
+%   Total      - Total hemoglobin: HbO + HbR [T x N_optodes]
+%   HbDiff     - Differential: HbO - HbR [T x N_optodes]
+%   CBSI       - Correlation-based signal improvement [T x N_optodes]
+%                CBSI = (HbO - alpha*HbR) / 2, where alpha = std(HbO)/std(HbR)
+%   channels   - Channel numbers for output columns [1 x N_optodes]
+%   time       - Time vector extracted from input [T x 1]
+%   units      - Output concentration units: 'uM' or 'mM*mm'
+%   DPF_factor - DPF value(s) used in conversion
+%
+% Algorithm:
+%   1. Separate channels by wavelength (< 805nm and > 805nm)
+%   2. Calculate baseline mean for each channel
+%   3. Convert intensity to optical density: OD = -log10(I / I_baseline)
+%   4. Compute DPF from age or use fixed value
+%   5. Apply Beer-Lambert law to solve for HbO and HbR
+%   6. Calculate derived metrics (Total, Diff, CBSI)
+%
+% Example:
+%   % Basic usage with sample data
+%   data = pf2.Import.SampleData.fNIR2000();
+%   [HbO, HbR] = bvoxy(data.raw, data.info.header.channels, ...
+%       data.info.header.wavelengths, data.info.header.SD);
+%
+%   % With age-dependent DPF for 30-year-old subject
+%   fNIR = bvoxy(data.raw, channels, wavelengths, SD, 1:100, 30);
+%
+%   % With fixed DPF
+%   fNIR = bvoxy(data.raw, channels, wavelengths, SD, ...
+%       'DiffPathlengthFactor', 5.93);
+%
+% Notes:
+%   - Returns struct when called with single output argument
+%   - Currently supports two-wavelength systems only
+%   - Marker columns are preserved in output (appended with -1 channel IDs)
+%
+% See also: processStageRaw2OD, processStageFilterHb, pf2_Intensity2OD,
+%           processFNIRS2
 
 p = inputParser;
 validScalarPosNum = @(x) isnumeric(x) && isscalar(x) && (x > 0);

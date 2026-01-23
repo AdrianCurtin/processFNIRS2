@@ -1,6 +1,102 @@
-
 function [outDataOD,outDataRaw]=processStageRaw2OD(method,data,fs,time,rawMask,fMarkers,fAux,channelNumbers,wavelengths,probeInfo,fNIR_input,showGUIerrors)
- % Raw data processing
+% PROCESSSTAGERAW2OD Stage 1 processing: Raw intensity to Optical Density
+%
+% Executes the first stage of the fNIRS processing pipeline, applying a
+% configurable chain of processing methods to raw light intensity data.
+% Methods can include motion artifact correction, filtering, ambient
+% subtraction, and conversion to optical density (log transform).
+%
+% This function is typically called internally by processFNIRS2() but can
+% be used directly for custom processing workflows.
+%
+% Reference:
+%   Internal pf2 implementation. Processing methods are documented in
+%   their respective function files (e.g., pf2_SMAR, pf2_lpf, pf2_TDDR).
+%
+% Syntax:
+%   [outDataOD, outDataRaw] = processStageRaw2OD(method, data, fs, time, ...
+%       rawMask, fMarkers, fAux, channelNumbers, wavelengths, probeInfo, ...
+%       fNIR_input, showGUIerrors)
+%
+% Inputs:
+%   method         - Method configuration struct with fields:
+%                    .name - Method display name (string)
+%                    .F    - Cell array of function specifications
+%                    Each F{i} contains: .f (function name), .args (argument
+%                    names), .argvals (argument values), .output (output names)
+%                    If empty, uses PF2.stageRawMethod from global state.
+%   data           - Raw light intensity matrix [T x C_raw]
+%                    T = samples, C_raw = all raw channels (including dark)
+%   fs             - Sampling frequency in Hz
+%   time           - Time vector [T x 1] in seconds
+%   rawMask        - Channel validity mask [1 x C_raw]
+%                    1 = valid channel, 0 = invalid/masked
+%   fMarkers       - Event markers [M x 3] (time, code, duration)
+%   fAux           - Auxiliary data struct (physiology, accelerometer, etc.)
+%   channelNumbers - Channel identifier mapping [1 x C_raw]
+%                    Positive values = optode numbers
+%                    Zero = time column
+%                    Negative = marker/metadata columns
+%   wavelengths    - Wavelength for each column [1 x C_raw]
+%                    >0 = light wavelength in nm (e.g., 730, 850)
+%                    0  = dark/ambient channel
+%                    <0 = metadata column
+%   probeInfo      - Probe geometry struct from loadDeviceCfg()
+%   fNIR_input     - Complete fNIRS data struct (for functions needing full context)
+%   showGUIerrors  - Display error dialogs in GUI mode (default: false)
+%
+% Outputs:
+%   outDataOD      - Processed optical density data [T x C_raw]
+%                    After all Stage 1 methods including log transform.
+%                    OD = -log10(I / I_baseline)
+%   outDataRaw     - Processed raw data before OD conversion [T x C_raw]
+%                    Captured just before Intensity2OD is applied.
+%                    Useful for QC visualization and debugging.
+%
+% Method Chain Execution:
+%   For each function in method.F:
+%     1. Parse declared arguments and match to available data
+%     2. Special argument names are auto-filled:
+%        'x'              -> data matrix (valid channels only)
+%        'fs'             -> sampling frequency
+%        'fTime'          -> time vector
+%        'fchMask'        -> channel mask (valid channels)
+%        'ftimeChMask'    -> time-channel mask [T x C]
+%        'fChannelNumbers'-> channel IDs
+%        'fChannelSD'     -> source-detector distances
+%        'fProbeInfo'     -> probe geometry struct
+%        'fMarkers'       -> event markers
+%        'fAux'           -> auxiliary data
+%        'fAmbient'       -> dark channel data
+%        'fNIRstruct'     -> full fNIRS struct
+%     3. Execute function and capture outputs
+%     4. Update data, masks based on declared outputs ('x', 'fchMask', 'ftimeChMask')
+%
+% Algorithm:
+%   1. Initialize output data and time-channel mask
+%   2. Identify valid channels (wavelength > 0 and mask = true)
+%   3. For each function in method chain:
+%      a. Build argument list from available data
+%      b. Execute function on valid channels
+%      c. Update data matrix and masks from outputs
+%   4. Apply NaN to masked time-channel positions
+%   5. Convert to optical density: OD = -log10(I/baseline)
+%
+% Global Variables Used:
+%   PF2 - Contains default method (PF2.stageRawMethod) if none provided
+%
+% Example:
+%   % Use default method from PF2
+%   [od, raw] = pf2_base.fnirs.processStageRaw2OD([], rawData, 10, time, ...
+%       mask, markers, aux, chNums, wavelengths, probe, fData, false);
+%
+%   % Use specific method
+%   method = pf2.Methods.Raw.GetMethod('x2_lpf_smar');
+%   [od, raw] = pf2_base.fnirs.processStageRaw2OD(method, data, fs, ...
+%       time, mask, markers, aux, chNums, wavelengths, probe, fData, false);
+%
+% See also: processStageFilterHb, bvoxy, processFNIRS2, pf2_initialize,
+%           pf2_SMAR, pf2_lpf, pf2_MotionCorrectTDDR, pf2_Intensity2OD
  
  if(nargin<12)
     showGUIerrors=false; 

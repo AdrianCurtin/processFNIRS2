@@ -1,27 +1,70 @@
 function [ figHandle ] = ROI(fNIR,rois2plot,showMarkers,bioMlist,baseline,ylimit,lineProps,rejectedLineProps)
-%pf2.Data.Plot.ROI
-%   plots an individual or ROIs (provided they have been built and
-%   calculated
-% specify an individual ROI index to plot that or leave blank or 'all' to plot
-%       Can use ROI names to plot ex'ROI1'
+% ROI Plot hemoglobin time series for regions of interest
 %
-% showMarkers argument can be an array of markers, strings of marker
-% labels, or just true/false to plot all
+% Creates time series plots of hemoglobin concentration changes for
+% pre-defined regions of interest (ROIs). ROIs must be built prior to
+% plotting using ROI construction functions. Supports multiple biomarkers,
+% baseline subtraction, and event marker overlay.
 %
-% bioMlist is the list of biomarkers that Plot.Oxy will use, defaults to
-% just HbO/HbR
+% Syntax:
+%   pf2.Data.Plot.ROI(fNIR)
+%   pf2.Data.Plot.ROI(fNIR, rois2plot)
+%   pf2.Data.Plot.ROI(fNIR, rois2plot, showMarkers, bioMlist)
+%   pf2.Data.Plot.ROI(fNIR, rois2plot, showMarkers, bioMlist, baseline, ylimit)
+%   figHandle = pf2.Data.Plot.ROI(..., lineProps, rejectedLineProps)
 %
-% baseline will accept a time (ex 10s) for a baseline at the beginning of the plot
-%   can be negative indexed from the end or accepts an FNIRS struct to
-%   baseline from
-% 
-% ylimit will force the ylimit of each plot to a specific value
+% Inputs:
+%   fNIR              - fNIRS data structure with ROI field [struct]
+%                       Must contain 'ROI' field with 'info' table and
+%                       biomarker subfields (HbO, HbR, etc.).
+%   rois2plot         - ROIs to display [numeric | cell | char | 'all']
+%                       (default: all ROIs) Can be numeric indices, logical
+%                       array, ROI names as cell array, or 'all'.
+%   showMarkers       - Display event markers [logical | numeric | 'all']
+%                       (default: true) If numeric, specifies marker codes.
+%   bioMlist          - Biomarkers to plot [cell array of strings | 'all']
+%                       (default: {'HbO', 'HbR'})
+%                       Options: 'HbO', 'HbR', 'HbDiff', 'HbTotal', 'CBSI'
+%   baseline          - Baseline correction specification [numeric | struct | logical]
+%                       (default: false, no baseline)
+%                       - Positive number: baseline duration from start (seconds)
+%                       - Negative number: baseline from end of recording
+%                       - [start, end]: explicit baseline window
+%                       - fNIRS struct: use as baseline reference
+%                       - true: use default 10s baseline
+%   ylimit            - Y-axis limits [1x2 numeric | scalar]
+%                       (default: auto from data range)
+%                       Scalar value creates symmetric limits [-val, val].
+%   lineProps         - Line properties for good ROIs [cell array]
+%                       (default: {'LineWidth', 1})
+%   rejectedLineProps - Line properties for rejected ROIs [cell array]
+%                       (default: {'--', 'LineWidth', 1})
 %
+% Outputs:
+%   figHandle - Handle to the created figure [figure handle]
+%               Only returned when output argument is requested.
 %
-% lineprops will be passed along to all polots
+% Example:
+%   % Plot all ROIs with default settings
+%   data = pf2.Import.SampleData.fNIR2000();
+%   processed = processFNIRS2(data);
+%   % Build ROIs first (required)
+%   processed = pf2.Probe.ROI.Build(processed, {{1:4, 'FrontalL'}, {5:8, 'FrontalR'}});
+%   pf2.Data.Plot.ROI(processed);
 %
-% rejectedLineProps will just be passed on to rejected Optodes
-%   (fchMask<rejectLevel)
+%   % Plot specific ROI with baseline correction
+%   pf2.Data.Plot.ROI(processed, 'FrontalL', true, {'HbO'}, 10);
+%
+%   % Plot multiple biomarkers with custom y-limits
+%   pf2.Data.Plot.ROI(processed, 1:2, false, {'HbO','HbR','HbDiff'}, false, [-5 5]);
+%
+% Notes:
+%   - ROIs must be built before plotting (see pf2.Probe.ROI.Build)
+%   - Rejected ROIs (fchMask<=RejectLevel) shown with dashed lines
+%   - Uses standard biomarker colors from pf2_base.getBioColors()
+%   - Baseline window shown with vertical dashed lines when specified
+%
+% See also: pf2.Data.Plot.Oxy, pf2.Probe.ROI.Build, pf2.Data.Plot.AuxData
 
 global PF2
 if(~isfield(PF2,'RejectLevel'))

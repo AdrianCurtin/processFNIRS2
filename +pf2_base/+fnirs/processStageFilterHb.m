@@ -1,5 +1,123 @@
 function outData=processStageFilterHb(method,data,fs,probeInfo,ProcessRejected,showGUIerrors)
-% Oxy data processing
+% PROCESSSTAGEFILTERHB Stage 3 processing: Filter hemoglobin concentrations
+%
+% Executes the third stage of the fNIRS processing pipeline, applying a
+% configurable chain of post-Beer-Lambert processing methods to hemoglobin
+% concentration data. Methods can include filtering, baseline correction,
+% artifact rejection (Takizawa), common average reference (CAR), and ROI
+% averaging.
+%
+% This function operates on all hemoglobin biomarkers simultaneously:
+% HbO, HbR, HbTotal, HbDiff, and CBSI, ensuring consistent processing
+% across all derived signals.
+%
+% Reference:
+%   Internal pf2 implementation. Processing methods are documented in
+%   their respective function files (e.g., pf2_TakizawaRejection, pf2_CAR).
+%
+%   Takizawa Rejection:
+%     Takizawa, R. et al. (2014). Neuroimaging-aided differential diagnosis.
+%     NeuroImage, 85, 498-507. DOI: 10.1016/j.neuroimage.2013.05.126
+%
+% Syntax:
+%   outData = processStageFilterHb(method, data, fs, probeInfo)
+%   outData = processStageFilterHb(method, data, fs, probeInfo, ProcessRejected)
+%   outData = processStageFilterHb(method, data, fs, probeInfo, ProcessRejected, showGUIerrors)
+%
+% Inputs:
+%   method          - Method configuration struct with fields:
+%                     .name - Method display name (string)
+%                     .F    - Cell array of function specifications
+%                     Each F{i} contains: .f (function name), .args,
+%                     .argvals, .output
+%                     If missing .F field, returns data unchanged.
+%   data            - fNIRS data struct after Beer-Lambert conversion:
+%                     Required fields:
+%                       .HbO [T x C]      - Oxygenated hemoglobin
+%                       .HbR [T x C]      - Deoxygenated hemoglobin
+%                       .HbTotal [T x C]  - Total hemoglobin
+%                       .HbDiff [T x C]   - Differential hemoglobin
+%                       .CBSI [T x C]     - Correlation-based signal improvement
+%                       .channels [1 x C] - Channel identifiers
+%                       .fchMask [1 x C]  - Channel validity mask
+%                       .time [T x 1]     - Time vector
+%                       .markers [M x 3]  - Event markers
+%                     Optional fields:
+%                       .Aux              - Auxiliary data struct
+%                       .ROI              - Pre-computed ROI data
+%                       .ftimeChMask [T x C] - Time-varying channel mask
+%   fs              - Sampling frequency in Hz
+%   probeInfo       - Probe geometry struct from loadDeviceCfg()
+%   ProcessRejected - Override mask to include rejected channels (logical)
+%                     (default: false). Set true to process all channels
+%                     regardless of fchMask, useful for visualization.
+%   showGUIerrors   - Display error dialogs in GUI mode (default: false)
+%
+% Outputs:
+%   outData         - Processed fNIRS data struct with fields:
+%                     .HbO, .HbR, .HbTotal, .HbDiff, .CBSI - Filtered biomarkers
+%                     .fchMask    - Updated if methods reject channels
+%                     .ftimeChMask - Updated for time-varying rejection
+%                     .ROI        - Updated if ROI methods applied
+%                     All other input fields are preserved.
+%
+% Biomarker Fields Processed:
+%   HbO     - Oxygenated hemoglobin concentration
+%   HbR     - Deoxygenated hemoglobin concentration
+%   HbTotal - Total hemoglobin (HbO + HbR)
+%   HbDiff  - Differential hemoglobin (HbO - HbR)
+%   CBSI    - Cerebral blood saturation index
+%
+% Method Chain Execution:
+%   For each function in method.F:
+%     1. Parse declared arguments and match to available data
+%     2. Special argument names are auto-filled:
+%        'x'              -> biomarker matrix (iterates over all)
+%        'fs'             -> sampling frequency
+%        'fTime'          -> time vector
+%        'fchMask'        -> channel mask
+%        'ftimeChMask'    -> time-channel mask
+%        'fChannelNumbers'-> channel IDs
+%        'fChannelSD'     -> source-detector distances
+%        'fProbeInfo'     -> probe geometry struct
+%        'fMarkers'       -> event markers
+%        'fAux'           -> auxiliary data
+%        'fNIRstruct'     -> full fNIRS struct
+%     3. Execute function on each biomarker field
+%     4. Update masks based on declared outputs
+%     5. Process ROI data if ROI output declared
+%
+% Algorithm:
+%   1. Initialize valid channel mask from data.fchMask
+%   2. For each function in method chain:
+%      a. Build argument list from available data
+%      b. For each biomarker (HbO, HbR, HbTotal, HbDiff, CBSI):
+%         - Execute function on valid channels
+%         - Update biomarker data and masks
+%      c. Apply same processing to ROI data if present
+%   3. Set invalid channels/time points to NaN
+%   4. Build default ROIs if ROI.info defined but ROI data missing
+%
+% Global Variables Used:
+%   PF2 - Contains processing configuration
+%
+% Example:
+%   % Apply Takizawa rejection and low-pass filter
+%   method = pf2.Methods.Oxy.GetMethod('takizawa_easy_lpf');
+%   filtered = pf2_base.fnirs.processStageFilterHb(method, hbData, 10, ...
+%       probe, false, false);
+%
+%   % Process including rejected channels for visualization
+%   filtered = pf2_base.fnirs.processStageFilterHb(method, hbData, 10, ...
+%       probe, true, false);
+%
+% Notes:
+%   - Invalid channels are set to NaN in output
+%   - ROI data is processed with same methods if present
+%   - If ROI.info exists but ROI.HbO is empty, builds ROIs via nanmean
+%
+% See also: processStageRaw2OD, bvoxy, processFNIRS2, pf2_TakizawaRejection,
+%           pf2_CAR, pf2_build_nanmean_ROI, pf2_lpf
 
 if(nargin<6)
     showGUIerrors=false;

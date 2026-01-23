@@ -1,27 +1,68 @@
 function [ figHandle ] = AuxData(fNIR,rois2plot,showMarkers,bioMlist,baseline,ylimit,lineProps,rejectedLineProps)
-%pf2.Data.Plot.ROI
-%   plots an individual or ROIs (provided they have been built and
-%   calculated
-% specify an individual ROI index to plot that or leave blank or 'all' to plot
-%       Can use ROI names to plot ex'ROI1'
+% AUXDATA Plot auxiliary temporal data alongside ROI hemoglobin signals
 %
-% showMarkers argument can be an array of markers, strings of marker
-% labels, or just true/false to plot all
+% Creates time series plots combining auxiliary data (accelerometer,
+% physiology, etc.) with ROI-averaged hemoglobin concentrations. Useful
+% for visualizing relationships between external measures and brain
+% hemodynamics. Supports baseline correction and event marker overlay.
 %
-% bioMlist is the list of biomarkers that Plot.Oxy will use, defaults to
-% just HbO/HbR
+% Syntax:
+%   pf2.Data.Plot.AuxData(fNIR)
+%   pf2.Data.Plot.AuxData(fNIR, rois2plot)
+%   pf2.Data.Plot.AuxData(fNIR, rois2plot, showMarkers, bioMlist)
+%   pf2.Data.Plot.AuxData(fNIR, rois2plot, showMarkers, bioMlist, baseline, ylimit)
+%   figHandle = pf2.Data.Plot.AuxData(..., lineProps, rejectedLineProps)
 %
-% baseline will accept a time (ex 10s) for a baseline at the beginning of the plot
-%   can be negative indexed from the end or accepts an FNIRS struct to
-%   baseline from
-% 
-% ylimit will force the ylimit of each plot to a specific value
+% Inputs:
+%   fNIR              - fNIRS data structure with ROI and Aux fields [struct]
+%                       Must contain 'ROI' field with 'info' table and
+%                       biomarker data, plus auxiliary data to display.
+%   rois2plot         - ROIs to display [numeric | cell | char | 'all']
+%                       (default: all ROIs) Can be numeric indices, logical
+%                       array, ROI names as cell array, or 'all'.
+%   showMarkers       - Display event markers [logical | numeric | 'all']
+%                       (default: true) If numeric, specifies marker codes.
+%   bioMlist          - Biomarkers to plot [cell array of strings | 'all']
+%                       (default: {'HbO', 'HbR'})
+%                       Options: 'HbO', 'HbR', 'HbDiff', 'HbTotal', 'CBSI'
+%   baseline          - Baseline correction specification [numeric | struct | logical]
+%                       (default: false, no baseline)
+%                       - Positive number: baseline duration from start (seconds)
+%                       - Negative number: baseline from end of recording
+%                       - [start, end]: explicit baseline window
+%                       - fNIRS struct: use as baseline reference
+%                       - true: use default 10s baseline
+%   ylimit            - Y-axis limits [1x2 numeric | scalar]
+%                       (default: auto from data range)
+%                       Scalar value creates symmetric limits [-val, val].
+%   lineProps         - Line properties for good data [cell array]
+%                       (default: {'LineWidth', 1})
+%   rejectedLineProps - Line properties for rejected channels [cell array]
+%                       (default: {'--', 'LineWidth', 1})
 %
+% Outputs:
+%   figHandle - Handle to the created figure [figure handle]
+%               Only returned when output argument is requested.
 %
-% lineprops will be passed along to all polots
+% Example:
+%   % Load data with auxiliary channels
+%   data = pf2.Import.ImportNIR('datafile.nir');
+%   processed = processFNIRS2(data);
 %
-% rejectedLineProps will just be passed on to rejected Optodes
-%   (fchMask<rejectLevel)
+%   % Build ROIs and plot with auxiliary data
+%   processed = pf2.Probe.ROI.Build(processed, {{1:9, 'PFC'}});
+%   pf2.Data.Plot.AuxData(processed);
+%
+%   % Plot specific ROI with baseline and markers
+%   pf2.Data.Plot.AuxData(processed, 'PFC', true, {'HbO','HbR'}, 10, [-2 2]);
+%
+% Notes:
+%   - Requires ROI field to be populated (see pf2.Probe.ROI.Build)
+%   - Auxiliary data displayed depends on what is available in fNIR.Aux
+%   - Rejected channels indicated with 'X' or '~' markers
+%   - Data cursor mode enabled for interactive value inspection
+%
+% See also: pf2.Data.Plot.ROI, pf2.Data.Plot.Oxy, pf2.Probe.ROI.Build
 
 global PF2
 if(~isfield(PF2,'RejectLevel'))

@@ -1,13 +1,84 @@
-
 function [contrastTable,contrastCoefTable]=autoContrast(mdl,pThreshold)
-
-%autoContrast provides the post-hoc testing for the provided model with a
-%specified pThreshold used to stop the testing at the anova level
-
-% The function performs slightly differently according to whether or not
-% the model was generated using an intercept and attempts to only test
-% hypotheses of interest. Both the raw p-values and bonferroni corrected
-% values are presented
+% AUTOCONTRAST Automated post-hoc contrast testing for linear mixed-effects models
+%
+% Performs automated post-hoc contrast testing for fitted LME models,
+% generating all relevant pairwise and reference-level comparisons based on
+% significant ANOVA terms. The function intelligently handles both intercept
+% and no-intercept models, generating appropriate contrasts for main effects
+% and interactions.
+%
+% This function is designed for fNIRS statistical analysis where multiple
+% experimental conditions are compared, automatically identifying which
+% contrasts are scientifically meaningful based on the model structure.
+%
+% Reference:
+%   Internal exploreFNIRS implementation. For general contrast methodology:
+%   Searle, S.R., Speed, F.M., & Milliken, G.A. (1980). Population marginal
+%   means in the linear model: An alternative to least squares means.
+%   The American Statistician, 34(4), 216-221.
+%
+% Syntax:
+%   contrastTable = autoContrast(mdl)
+%   contrastTable = autoContrast(mdl, pThreshold)
+%   [contrastTable, contrastCoefTable] = autoContrast(mdl, pThreshold)
+%
+% Inputs:
+%   mdl        - Fitted linear mixed-effects model (LinearMixedModel object)
+%                Typically from fitlme() with fNIRS biomarker as response.
+%   pThreshold - ANOVA p-value threshold for including terms (default: 0.1)
+%                Only terms with ANOVA p < pThreshold are tested for contrasts.
+%                Set higher (e.g., 0.2) to include more exploratory contrasts.
+%
+% Outputs:
+%   contrastTable    - Table of contrast results with columns:
+%                      deltaE       - Estimated difference
+%                      SD           - Pooled standard deviation
+%                      F            - F-statistic from coefTest
+%                      df1          - Numerator degrees of freedom
+%                      df2          - Denominator degrees of freedom (Satterthwaite)
+%                      pVal         - Uncorrected p-value
+%                      pVal_corr    - Bonferroni-corrected p-value (within group)
+%                      sig          - Significance stars (* p<0.05, ** p<0.01, *** p<0.001)
+%                      coefContrasts - Contrast coefficient vector
+%   contrastCoefTable - (Optional) Additional coefficient details
+%
+% Contrast Types Generated:
+%   For intercept models (default fitlme):
+%   - Effect vs Intercept: Tests if condition differs from reference
+%   - Effect + Intercept vs 0: Tests if condition differs from zero
+%   - Level vs Level: Pairwise comparisons within factors
+%
+%   For no-intercept models (-1 + ...):
+%   - Effect vs 0: Tests if each level differs from zero
+%   - Level vs Level: All pairwise comparisons
+%
+%   For interactions (A:B):
+%   - Simple effects: A:B vs A (effect of B at level of A)
+%   - Simple effects: A:B vs B (effect of A at level of B)
+%
+% Effect Size Measures:
+%   - Hedges' g: deltaE / pooled SD (both groups)
+%   - Glass's delta: deltaE / SD of comparison group
+%
+% Notes:
+%   - Uses Satterthwaite approximation for degrees of freedom
+%   - Bonferroni correction is applied within ANOVA term groups
+%   - "vs 0" contrasts are grouped separately (no correction between them)
+%   - Returns empty table if no ANOVA terms reach pThreshold
+%   - Designed for use within exploreFNIRS.plot.barchart
+%
+% Example:
+%   % Fit LME model for fNIRS channel data
+%   mdl = fitlme(dataTable, 'HbO ~ Condition*Time + (1|SubjectID)');
+%
+%   % Get contrasts with default threshold
+%   contrasts = exploreFNIRS.fx.autoContrast(mdl);
+%   disp(contrasts);
+%
+%   % More exploratory analysis with higher threshold
+%   contrasts = exploreFNIRS.fx.autoContrast(mdl, 0.2);
+%
+% See also: exploreFNIRS.plot.barchart, fitlme, coefTest, anova
 
 if(nargin<2)
     pThreshold=0.1; % Value at which an anova term is considered eligible for post-hoc testing

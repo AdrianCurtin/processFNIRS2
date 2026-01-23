@@ -1,6 +1,76 @@
 function [Xcorr, maskCV, MA_idx]=pf2_SMAR2(x,N,chNum,tauArtifact,tauClean,minSeg)
-% Implementation of Sliding Motion Artificat Rejection algorithim from Ayaz, 2010
-% Updated with expansion to remove artifacts from start
+% PF2_SMAR2 Enhanced Sliding Motion Artifact Rejection (v2.0) for fNIRS data
+%
+% An improved version of the SMAR algorithm with adaptive thresholding and
+% artifact region expansion. Uses the temporal derivative of the coefficient
+% of variation (dCV) for more robust artifact detection, and expands artifact
+% regions to capture onset/offset transitions.
+%
+% Key improvements over pf2_SMAR:
+%   - Adaptive thresholds based on median CV of the signal
+%   - Two-threshold approach (artifact detection + clean boundary)
+%   - Artifact region expansion to capture full artifact extent
+%   - Wavelength pairing: rejects both wavelengths if either has artifact
+%   - Minimum segment merging to avoid isolated artifact islands
+%
+% Reference:
+%   Ayaz, H. et al. (2010). Sliding-window motion artifact rejection for
+%   Functional Near-Infrared Spectroscopy. Conf Proc IEEE Eng Med Biol Soc.
+%
+% Syntax:
+%   [Xcorr, maskCV, MA_idx] = pf2_SMAR2(x)
+%   [Xcorr, maskCV, MA_idx] = pf2_SMAR2(x, N)
+%   [Xcorr, maskCV, MA_idx] = pf2_SMAR2(x, N, chNum, tauArtifact, tauClean, minSeg)
+%
+% Inputs:
+%   x           - Input signal matrix [T x C] where T=samples, C=channels
+%                 Typically optical density data after log transform
+%   N           - Window length in samples for CV calculation (default: 10)
+%                 Typical range: 5-20 samples. Odd values recommended.
+%   chNum       - Channel number mapping [1 x C] (default: 1:size(x,2))
+%                 Used to pair wavelengths: channels with same chNum are
+%                 grouped, and if any channel in a group has an artifact,
+%                 all channels in that group are masked.
+%   tauArtifact - Artifact detection threshold multiplier (default: 3)
+%                 Threshold = median(CV)*2 + std(upperCV)*tauArtifact
+%                 Typical range: 2-5. Lower = more aggressive rejection.
+%   tauClean    - Clean boundary threshold multiplier (default: 1)
+%                 Used to expand artifact regions to "clean" boundaries.
+%                 Should be less than tauArtifact.
+%   minSeg      - Minimum clean segment length in samples (default: N/2)
+%                 Short clean segments between artifacts are merged.
+%                 Prevents fragmented masking.
+%
+% Outputs:
+%   Xcorr   - Corrected signal matrix [T x C], same size as input
+%             Artifact samples are replaced with NaN values
+%   maskCV  - Logical mask [T+2 x C] indicating artifacts (true = artifact)
+%             Note: Padded by 1 sample at start and end for edge handling
+%   MA_idx  - Cell array {1 x C} of artifact segment indices
+%             Each cell contains [Mx2] matrix with [start_idx, end_idx]
+%             rows for each detected artifact segment
+%
+% Algorithm:
+%   1. Compute local CV and its temporal derivative (dCV) in sliding window
+%   2. Calculate adaptive thresholds from median and upper-tail std of CV
+%   3. Mark samples where |dCV| exceeds artifact threshold
+%   4. Expand marked regions to clean threshold boundaries
+%   5. Apply wavelength pairing (if chNum has duplicates)
+%   6. Merge short inter-artifact segments (< minSeg)
+%   7. Replace masked samples with NaN
+%
+% Example:
+%   % Basic usage
+%   [corrected, mask, idx] = pf2_SMAR2(odData);
+%
+%   % With wavelength pairing (channels 1-18 for wavelength 1, 1-18 for wavelength 2)
+%   chNum = [1:18, 1:18];
+%   [corrected, mask, idx] = pf2_SMAR2(odData, 10, chNum);
+%
+%   % Conservative settings (less rejection)
+%   [corrected, mask, idx] = pf2_SMAR2(odData, 10, [], 4, 2, 10);
+%
+% See also: pf2_SMAR, pf2_fnirs_MARA, pf2_MotionCorrectTDDR, calcLocalCV
 
 if nargin<1
     error('Not enough Input arguments');

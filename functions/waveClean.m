@@ -1,6 +1,58 @@
-function [cleanOD_out] = waveClean( dataIn,level,alpha,convert2OD,showPlot )
-%WAVECLEAN Summary of this function goes here
-%   Detailed explanation goes here
+function [cleanOD_out] = waveClean(dataIn, level, alpha, convert2OD, showPlot)
+% WAVECLEAN Wavelet-based motion artifact removal for fNIRS signals
+%
+% Applies wavelet decomposition with statistical thresholding to remove
+% motion artifacts from fNIRS optical density signals. Uses Daubechies
+% wavelets and p-value based coefficient rejection.
+%
+% Reference:
+%   Molavi, B. & Dumont, G.A. (2012). Wavelet-based motion artifact removal
+%   for functional near-infrared spectroscopy. Physiol. Meas. 33(2), 259.
+%
+% Syntax:
+%   cleanOD = waveClean(dataIn)
+%   cleanOD = waveClean(dataIn, level)
+%   cleanOD = waveClean(dataIn, level, alpha)
+%   cleanOD = waveClean(dataIn, level, alpha, convert2OD, showPlot)
+%
+% Inputs:
+%   dataIn     - Input signal matrix [T x C] where T=samples, C=channels
+%                Should be optical density data (or raw if convert2OD=true)
+%   level      - Wavelet decomposition level (default: 5)
+%                Higher levels capture slower artifact components.
+%                Signal must have at least 2^level samples.
+%   alpha      - Significance level for coefficient rejection (default: 0.1)
+%                Coefficients with p < alpha are zeroed (artifact removal).
+%                Lower alpha = less aggressive cleaning.
+%   convert2OD - If true, convert input from raw intensity to OD (default: 0)
+%                Output will be converted back to intensity.
+%   showPlot   - If true, display diagnostic plots (default: false)
+%
+% Outputs:
+%   cleanOD_out - Cleaned signal matrix [T x C], same size as input
+%                 Motion artifacts are attenuated while preserving signal.
+%
+% Algorithm:
+%   1. Apply forward wavelet transform (Daubechies-10) at specified level
+%   2. Estimate noise standard deviation using MAD of detail coefficients
+%   3. Zero detail coefficients with p-value < alpha (artifact signatures)
+%   4. Reconstruct signal via inverse wavelet transform
+%   5. Average overlapping reconstructions for signals > 2^level samples
+%
+% Notes:
+%   - Requires WaveLab toolbox (automatically initialized via setup_wavelab)
+%   - Beta version - use with caution and validate results
+%   - Signal length must be at least 2^level samples
+%   - Processing time increases with signal length and number of channels
+%
+% Example:
+%   % Clean optical density data with default settings
+%   cleanedOD = waveClean(odData);
+%
+%   % More aggressive cleaning with level 6 decomposition
+%   cleanedOD = waveClean(odData, 6, 0.05);
+%
+% See also: pf2_MotionCorrectWavelet, pf2_SMAR, pf2_MotionCorrectTDDR
 
 
 disp('Wave Clean - Beta 01');

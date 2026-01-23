@@ -1,65 +1,64 @@
-function [ outFNIR, pFit] = Resample(varargin)
-%Data.Resample returns time averaged fNIR values according to segLength
-% effectively resamples data
-%   Data.Resample(fNIR,segmentLength,blLength,blfNIR,'centerOnT0',false,'timeOutMode','start','nanRejectionLevel',0.7)
+function [outFNIR, pFit] = Resample(varargin)
+% RESAMPLE Downsample and time-average fNIRS data
 %
-%Seg length determines the segment length in seconds, resampling to
-%fs=1/segLength
-%blLength determines the baseline length in seconds, entering 0 will
-%disable baseline performance
-%blfNIR uses alternate fNIR struct for baseline
-%centerOnT0 will try to use T0 in the included timepoints
-%timeOutMode will change the .time output to reflect the start/end/midpoint
-%of the chosen semgent
-%nanRejectionLevel = fraction of values missing before signal is returned
-%as nan, defaults to 70%
-
-%Outputting two arguments will perform polyfit and return the mean values after
-%interpolation performed
-
-%f=0.51; %sampling frequency
-
-% Usage examples
-% Data.Resample(fnirData,10) : Resample data to one sample per 10 seconds (0.1hz)
-%                       No baselining performed
-%       Equivalent to Data.Resample('fNIR',fnirData,'segmentLength',10);
-% Data.Resample(fnirData,5,5) : Resample data to one sample per 5 seconds, use
-%                        first 5 seconds as a baseline period
-%       Equivalent to Data.Resample('fNIR',fnirData,'segmentLength',5,'blLength',5);
+% Resamples fNIRS data to a lower sampling rate by averaging samples within
+% time bins. Useful for reducing data size, matching sampling rates between
+% devices, or computing block averages for analysis.
 %
-% Data.Resample(fnirData,1,'blfNIR',baselineData) : Resample data to 1 sample per second, use
-%                        baselineData fNIR struct as a baseline period
-%                       using a baseline period overrrides blLength
-%                       argument
+% Syntax:
+%   outFNIR = pf2.Data.Resample(fNIR, segmentLength)
+%   outFNIR = pf2.Data.Resample(fNIR, segmentLength, blLength)
+%   outFNIR = pf2.Data.Resample(..., 'Name', Value)
+%   [outFNIR, pFit] = pf2.Data.Resample(...)  % With polynomial fit
 %
-% Data.Resample(fnirData,10,'centerOnT0',true) : Resample data to one sample per 10 seconds (0.1hz)
-%                       No baselining performed. Forces the inclusion of
-%                       t=0 as a sample. ie all times will be relative to
-%                       t0 (0s,10s,20s,30s) and fNIR data will be binned
-%                       within each categoty, sample at 5s would be moved
-%                       into the [0:10s] bin
-%                           Otherwise if first sample is at 5s time would
-%                           be   (5s,15s,25s)...
-%       Equivalent to Data.Resample('fNIR',fnirData,'segmentLength',10,'centerOnT0',true);
+% Inputs:
+%   fNIR              - fNIRS data structure (raw or processed)
+%   segmentLength     - Duration of each output sample in seconds (default: 1)
+%                       Output sampling rate = 1/segmentLength Hz
+%   blLength          - Baseline period length in seconds (optional)
+%                       First blLength seconds used for baseline subtraction.
+%                       Set to 0 or omit to skip baseline correction.
+%   'blfNIR'          - Separate fNIRS struct to use as baseline source
+%                       Overrides blLength when provided
+%   'centerOnT0'      - Align bins to t=0 reference point (default: false)
+%                       If true: bins are [...,-10:0, 0:10, 10:20,...]
+%                       If false: bins start at first sample time
+%   'centerOnTime'    - Align bins to specific time (overrides centerOnT0)
+%   'timeOutMode'     - Output time representation (default: 'start')
+%                       'start': Return bin start time
+%                       'mid': Return bin midpoint time
+%                       'end': Return bin end time
+%   'nanRejectionLevel' - Fraction of NaN values to reject bin (default: 0.7)
+%                       Bins with >70% NaN values return NaN
+%   'specifiedTimepoints' - Resample at specific times instead of regular grid
+%   'averageAux'      - Also average auxiliary data (default: false)
+%   'flattenAux'      - Flatten auxiliary to single value (default: false)
+%   'trimAux'         - Trim auxiliary to match output length (default: false)
+%   'polyDegree'      - Polynomial degree for trend fitting (default: 1)
 %
-%Data.Resample(fnirData,10,'centerOnT0',true,'timeOutMode','start')
-%                   A sample at t=5, placed within the bin [0:10s] would
-%                   returns the .time structure as the start of the bin
-%                   [0.000001:10]  would return 0s as the sample time
-%Data.Resample(fnirData,10,'centerOnT0',true,'timeOutMode','mid')
-%                   A sample at t=5, placed within the bin [0:10s] would
-%                   returns the .time structure would return 5s as the sample time
-%Data.Resample(fnirData,10,'centerOnT0',true,'timeOutMode','end')
-%                   A sample at t=5, placed within the bin [0:10s] would
-%                   returns the .time structure would return 10s as the sample time
+% Outputs:
+%   outFNIR           - Resampled fNIRS structure with:
+%                       All fields downsampled to new rate
+%                       .fs updated to 1/segmentLength
+%   pFit              - Polynomial fit coefficients (if 2 outputs requested)
 %
-% Data.Resample(fnirData,10,'nanRejectionLevel',0.5) : Resample data to one sample per 10 seconds (0.1hz)
-%                       No baselining performed, Segments with more than
-%                       50% of the values listed as nan are rejected
-%                       (includes baseline)
-% Data.Resample(fnirData,'specifiedTimepoints', provide data resampled at
-% specific timepoints)
-% 
+% Algorithm:
+%   1. Create time bins based on segmentLength and alignment options
+%   2. For each bin, compute nanmean of all samples in bin
+%   3. If baseline specified, subtract baseline mean from each bin
+%   4. Reject bins exceeding nanRejectionLevel
+%
+% Example:
+%   % Resample to 0.1 Hz (10-second bins)
+%   resampled = pf2.Data.Resample(data, 10);
+%
+%   % Resample with 5-second baseline, centered on t0
+%   resampled = pf2.Data.Resample(data, 10, 5, 'centerOnT0', true);
+%
+%   % Resample at specific timepoints
+%   resampled = pf2.Data.Resample(data, 'specifiedTimepoints', [0 10 20 30]);
+%
+% See also: pf2.Data.Split, pf2.Data.SetT0, pf2.Data.Concatenate
 
 p=inputParser;
 
@@ -411,29 +410,29 @@ for b = 1:length(bioMlist)
         end
 
         if(getPolyAvg)
-            pFit.ROI.(curB)=nan([numSegs,numCh,polyDegree+1]);
+            pFit.ROI.(curB)=nan([numSegs,numROI,polyDegree+1]);
             bioFitVal=sprintf('%s_val',curB);
-            pFit.ROI.(bioFitVal)=nan([numSegs,numCh]);
+            pFit.ROI.(bioFitVal)=nan([numSegs,numROI]);
             
             
-            for chIdx=1:length(validCh)
-                ch=validCh(chIdx);
+            for chIdx=1:length(validCh_roi)
+                ch=validCh_roi(chIdx);
                 validIdx=~isnan(fB(:,ch));
                 for segIdx=1:numSegs
                     tSeg=validIdx&fTimeInd==segIdx;
                     tSegTimeRem=fTime(tSeg)-times_start(segIdx);
-                    
-                    pFit.(bioFitVal)(segIdx,ch,1:polyDegree+1)=mpolyfit(tSegTimeRem,fB(tSeg,ch),polyDegree);
-                    pFit.(curB)(segIdx,ch)=polyval(reshape(pFit.(bioFitVal)(segIdx,ch,:),[polyDegree+1,1,1]),times_end(segIdx)-segLength/2);
+
+                    pFit.ROI.(bioFitVal)(segIdx,ch,1:polyDegree+1)=mpolyfit(tSegTimeRem,fB(tSeg,ch),polyDegree);
+                    pFit.ROI.(curB)(segIdx,ch)=polyval(reshape(pFit.ROI.(bioFitVal)(segIdx,ch,:),[polyDegree+1,1,1]),times_end(segIdx)-segLength/2);
                 end
             end
-    
+
             if(~isempty(blLength)&&blLength>0)
-                pFit.(curB)=pFit.(curB)-repmat(blfNIR.(curB),[numSegs,1]);
+                pFit.ROI.(curB)=pFit.ROI.(curB)-repmat(blfNIR.ROI.(curB),[numSegs,1]);
             elseif(~isempty(blLength)&&isnan(blLength))
-                pFit.(curB)=nan([numSegs,numCh]);
+                pFit.ROI.(curB)=nan([numSegs,numROI]);
             else
-                %pFit.(curB)=pFit.(curB);
+                %pFit.ROI.(curB)=pFit.ROI.(curB);
             end
         end
     end
@@ -520,7 +519,7 @@ if(~isempty(outFNIR.segmentTimes))
             outFNIR.datetime=outFNIR.t0+(duration(0,0,outFNIR.segmentTimes(:,1)));
         end
     else %Return midpoint
-        outFNIR.time=time; %mean(outFNIR.segmentTimes,2); %returns effective "sample point" as midpoint of segmentTimes
+        outFNIR.time=timeSeries; %mean(outFNIR.segmentTimes,2); %returns effective "sample point" as midpoint of segmentTimes
         if(isfield(outFNIR,'t0')&&isdatetime(outFNIR.t0))
             outFNIR.datetime=outFNIR.t0+(duration(0,0,outFNIR.time));
         end

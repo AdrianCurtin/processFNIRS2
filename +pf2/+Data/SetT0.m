@@ -1,7 +1,46 @@
 function outFNIR=SetT0(fnirStruct,t0time)
-
-%This function takes an incoming fNIRstruct and shifts the time such that
-%t0 is now 0;
+% SETT0 Shift time alignment of fNIRS data to a new reference point
+%
+% Adjusts the time vector and related temporal fields in an fNIRS struct
+% so that the specified time point becomes the new t0 (time zero). This is
+% useful for aligning data to stimulus onset, baseline periods, or for
+% synchronizing multiple datasets.
+%
+% Syntax:
+%   outFNIR = pf2.Data.SetT0(fnirStruct, t0time)
+%
+% Inputs:
+%   fnirStruct - fNIRS data structure containing time field [struct]
+%                Must contain at least a 'time' field. May also contain
+%                't0', 'datetime', 'markers', and 'Aux' fields which will
+%                all be adjusted accordingly.
+%   t0time     - New time reference point [double | duration | datetime]
+%                If numeric: time offset in seconds to subtract from time
+%                If duration: converted to seconds and subtracted
+%                If datetime: requires fnirStruct to have 't0' or 'datetime'
+%                field for proper alignment calculation
+%
+% Outputs:
+%   outFNIR - Modified fNIRS struct with shifted time values [struct]
+%             The 'time' field will be adjusted so that t0time corresponds
+%             to time=0. Marker times and Aux data times are also shifted.
+%
+% Example:
+%   % Shift time so that 10 seconds becomes the new t0
+%   data = pf2.Import.SampleData.fNIR2000();
+%   shiftedData = pf2.Data.SetT0(data, 10);
+%   fprintf('New time range: %.1f to %.1f\n', min(shiftedData.time), max(shiftedData.time));
+%
+%   % Align to a specific datetime
+%   data.t0 = datetime('now');
+%   alignedData = pf2.Data.SetT0(data, datetime('now') + seconds(5));
+%
+% Notes:
+%   - All time-dependent fields are updated: time, markers, Aux subfields
+%   - If datetime field exists, t0 is recalculated from datetime
+%   - Marker times in column 1 are shifted by the same offset
+%
+% See also: pf2.Data.Split, pf2.Data.GetMarkers, pf2.Data.Resample
 
 outFNIR=fnirStruct;
 
@@ -68,9 +107,19 @@ end
 
 if(pf2_base.isnestedfield(outFNIR,'Aux')) && ~isempty(outFNIR.Aux)
     auxFields=fields(outFNIR.Aux);
+    % Skip known time fields that are handled separately below
+    timeFieldNames = {'t', 'time', 'Time', 'elapsedTime'};
     for f=1:length(auxFields)
     	curFieldName=auxFields{f};
-        outFNIR.Aux.(curFieldName)(:,1) = outFNIR.Aux.(curFieldName)(:,1) -tDiff; 
+        % Skip if this is a known time field (handled below) or not a numeric array
+        if ismember(curFieldName, timeFieldNames)
+            continue;
+        end
+        curField = outFNIR.Aux.(curFieldName);
+        % Only modify numeric arrays with at least 2D where column 1 might be time
+        if isnumeric(curField) && ismatrix(curField) && size(curField,1) > 1 && size(curField,2) >= 1
+            outFNIR.Aux.(curFieldName)(:,1) = curField(:,1) - tDiff;
+        end
     end
 end
 

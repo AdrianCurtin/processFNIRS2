@@ -1,6 +1,51 @@
-function outFNIR=Concatonate(fNIR_objs,varargin)
-
-%// function that merges two fNIRS probes together into one fNIR struct
+function outFNIR = Concatenate(fNIR_objs, varargin)
+% CONCATENATE Merge multiple fNIRS devices/probes into a single structure
+%
+% Combines processed fNIRS data from multiple devices or probes into a
+% unified structure with all channels accessible together. Automatically
+% resamples to the lowest common sampling rate and aligns time vectors.
+% Useful for multi-device experiments (e.g., frontal + parietal coverage).
+%
+% Syntax:
+%   outFNIR = pf2.Data.Concatenate(fNIR_objs)
+%   outFNIR = pf2.Data.Concatenate(fNIR1, fNIR2)
+%
+% Inputs:
+%   fNIR_objs - Cell array of processed fNIRS structures {fNIR1, fNIR2, ...}
+%               Each structure must contain HbO, HbR, and other oxy fields.
+%               Alternatively, pass two structs directly as separate arguments.
+%
+% Outputs:
+%   outFNIR   - Merged fNIRS structure containing:
+%               .HbO, .HbR, .HbTotal, .HbDiff, .CBSI [T x C_total]
+%                   All biomarker fields concatenated horizontally
+%               .channels - Cell array with probe:channel identifiers ('1:1', '2:3')
+%               .probeNum - Vector mapping each channel to source probe [1 x C_total]
+%               .probe{i} - Original probe data preserved for reference
+%               .fchMask - Merged channel validity mask
+%               .time - Unified time vector at lowest sampling rate
+%
+% Algorithm:
+%   1. Identify lowest sampling rate among all inputs
+%   2. Resample all data to common rate, centered on t0
+%   3. Create unified time vector spanning all data
+%   4. Concatenate biomarker fields horizontally
+%   5. Preserve original probe information in .probe{} cell array
+%
+% Notes:
+%   - All inputs must be processed (contain HbO field)
+%   - Raw data is not concatenated (stored in .probe{i}.raw)
+%   - Warns if time ranges don't overlap
+%   - Channel identifiers become 'probeNum:channelNum' strings
+%
+% Example:
+%   % Merge frontal and parietal probes
+%   merged = pf2.Data.Concatenate({frontalData, parietalData});
+%
+%   % Alternative syntax with two structs
+%   merged = pf2.Data.Concatenate(frontalData, parietalData);
+%
+% See also: pf2.Data.ConcatenateHorizontal, pf2.Data.Resample, pf2.Data.Split
 
 centerOnT0=true;
 
@@ -92,7 +137,7 @@ for i=1:length(fNIR_objs) %use Slowest fNIR file as reference
      fMinTime=nanmin(fNIR_objs{i}.time);
      
      fMinIdx=find(fNIR_objs{i}.time==fMinTime);
-     fLength=size(fNIR_objs{i}.time);
+     fLength=length(fNIR_objs{i}.time);
      fNumCh=length(fNIR_objs{i}.channels);
      
      outFNIR.probeNum(curCh:fNumCh+curCh-1)=i;

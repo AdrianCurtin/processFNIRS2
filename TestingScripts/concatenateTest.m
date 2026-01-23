@@ -8,8 +8,8 @@ x2=pf2.Import.SampleData.fNIR1200;
 x=pf2(pf2.Data.SetT0(x,min(x.time)));
 x2=pf2(pf2.Data.SetT0(x2,min(x2.time)));
 
-%% Concatonate fNIRS Files
-x3=pf2.Data.Concatonate(x,x2);
+%% Concatenate fNIRS Files
+x3=pf2.Data.Concatenate(x,x2);
 
 %% Plot Default
 
@@ -31,6 +31,6 @@ pf2.Data.Plot.Oxy(x3,[],1)
 
 pf2.Data.Plot.Oxy(x3)
 
-%% Display concatonated data
+%% Display concatenated data
 
 pf2(x3);

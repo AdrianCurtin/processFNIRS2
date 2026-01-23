@@ -1,18 +1,64 @@
 function [outAvg,highestTier,outHarr]=hierarchicalAverage(arr,hierachy,funcAvg)
-
-% hierarchicalAverage takes two arguments, a numerica array arr ([x,N]) 
-% and a hierachy structure size ([y,N])
-
-% Averaging is performed itteratively such that each level in the hierarchy
-% is averaged together.
-
-% funcAvg is used to perform averaging or other operation
-
-% ex: arr=[10,10,5,5,2,2]
-% hierachy(:,1)={'Subject1';'Subject1';'Subject1';'Subject1';'Subject2';'Subject2'}
-% hierachy(:,2)={1;1;2;2;1;1};
-
-% Will return [7.5,2] and highestTier of {'Subject1';'Subject2'}
+% HIERARCHICALAVERAGE Perform hierarchical (nested) averaging of data
+%
+% Computes averages iteratively through a hierarchy of grouping levels,
+% ensuring proper within-subject averaging before between-subject pooling.
+% Essential for fNIRS group analysis where multiple trials/conditions are
+% nested within subjects.
+%
+% This function prevents pseudoreplication by first averaging within the
+% lowest hierarchy level, then progressively averaging up through higher
+% levels. The hierarchy is processed from bottom (most specific) to top
+% (most general).
+%
+% Syntax:
+%   outAvg = hierarchicalAverage(arr, hierarchy)
+%   [outAvg, highestTier] = hierarchicalAverage(arr, hierarchy)
+%   [outAvg, highestTier, outHarr] = hierarchicalAverage(arr, hierarchy, funcAvg)
+%
+% Inputs:
+%   arr      - Data array to average [N x M] where N = observations
+%              Can be numeric array, cell array, or table.
+%              Each row is one observation, columns are variables.
+%   hierarchy - Grouping structure [N x L] where L = hierarchy levels
+%              Column 1 = highest level (e.g., Subject)
+%              Column L = lowest level (e.g., Trial)
+%              Can be cell array (strings/numbers) or numeric array.
+%   funcAvg  - Averaging function (default: @nanmean)
+%              Function handle or string name of function.
+%              Must accept (data, dim) arguments.
+%
+% Outputs:
+%   outAvg      - Averaged data [K x M] where K = unique highest-level groups
+%   highestTier - Labels for each row in outAvg from hierarchy column 1
+%   outHarr     - Encoded hierarchy array (for debugging)
+%
+% Algorithm:
+%   1. Encode hierarchy levels to numeric indices
+%   2. Starting from lowest level, average rows with same group ID
+%   3. Move up hierarchy, averaging at each level
+%   4. Return final averages at highest (subject) level
+%
+% Example:
+%   % Average trial data within subjects
+%   arr = [10; 10; 5; 5; 2; 2];
+%   hierarchy(:,1) = {'Subject1';'Subject1';'Subject1';'Subject1';'Subject2';'Subject2'};
+%   hierarchy(:,2) = {1; 1; 2; 2; 1; 1};
+%
+%   [avg, subjects] = hierarchicalAverage(arr, hierarchy);
+%   % Returns avg = [7.5; 2], subjects = {'Subject1'; 'Subject2'}
+%   % Subject1: mean([mean([10,10]), mean([5,5])]) = mean([10,5]) = 7.5
+%   % Subject2: mean([2,2]) = 2
+%
+%   % Use custom function (e.g., median)
+%   [avg, subjects] = hierarchicalAverage(arr, hierarchy, @nanmedian);
+%
+% Notes:
+%   - Rows with identical hierarchy values are averaged together
+%   - NaN values are handled by nanmean (ignored in averaging)
+%   - Order of hierarchy columns matters: column 1 is topmost grouping
+%
+% See also: nanmean, grpstats, exploreFNIRS
 
 
 if(nargin==3)

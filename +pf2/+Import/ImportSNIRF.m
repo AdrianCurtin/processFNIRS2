@@ -1,11 +1,61 @@
 function [fNIR] = ImportSNIRF(filepath, channelCheck, varargin)
-%ImportSNIRF imports data from SNIRF device recordings
+% IMPORTSNIRF Import fNIRS data from SNIRF format files
 %
-%   filepath - Path to the SNIRF file (optional, will prompt if not provided)
-%   channelCheck - Whether to run channel quality checks (default: true)
-%   varargin - Additional parameters to pass to the SNIRF loader
+% Reads fNIRS data stored in the Shared Near Infrared Spectroscopy Format
+% (SNIRF), a standardized HDF5-based file format for fNIRS data. The SNIRF
+% format enables interoperability between different fNIRS analysis software
+% packages. This function extracts raw intensity data, probe geometry,
+% stimulus markers, auxiliary data, and metadata from SNIRF files.
 %
-%   Returns a fNIR structure with the imported data
+% Reference:
+%   SNIRF Specification v1.1 (2023). Shared Near Infrared Spectroscopy
+%   Format. https://github.com/fNIRS/snirf
+%
+% Syntax:
+%   fNIR = pf2.Import.ImportSNIRF()
+%   fNIR = pf2.Import.ImportSNIRF(filepath)
+%   fNIR = pf2.Import.ImportSNIRF(filepath, channelCheck)
+%   fNIR = pf2.Import.ImportSNIRF(filepath, channelCheck, Name, Value, ...)
+%
+% Inputs:
+%   filepath     - Path to the SNIRF file [char | string]
+%                  If omitted or empty, a file selection dialog opens.
+%                  Supports both .snirf (HDF5) and .jsnirf (JSON) formats.
+%   channelCheck - Run channel quality check GUI after import (default: true)
+%                  Set to false to skip interactive quality assessment.
+%   varargin     - Additional name-value pairs passed to loadsnirf()
+%                  See pf2_base.external.jsnirfy.loadsnirf for options.
+%
+% Outputs:
+%   fNIR - Standard pf2 fNIRS data structure containing:
+%          .raw       - Raw intensity data [T x C double]
+%          .time      - Time vector in seconds [T x 1 double]
+%          .fs        - Sampling frequency in Hz [double]
+%          .markers   - Event markers [M x 3: time, value, duration]
+%          .fchMask   - Channel quality mask [1 x C: 1=good, 0=bad]
+%          .info      - Metadata from SNIRF metaDataTags
+%          .t0        - Recording start datetime (if available)
+%          .probeinfo - Device and probe geometry structure
+%          .Aux       - Auxiliary data (if present in file)
+%
+% Example:
+%   % Import with file dialog and channel check
+%   data = pf2.Import.ImportSNIRF();
+%
+%   % Import specific file, skip channel check
+%   data = pf2.Import.ImportSNIRF('subject01.snirf', false);
+%
+%   % Process imported data
+%   processed = processFNIRS2(data);
+%
+% Notes:
+%   - Normalized data is automatically de-normalized if RawMax is available
+%   - Length units are converted to mm internally (cm input is multiplied by 10)
+%   - Short-separation channels (SD < 20mm) are automatically detected
+%   - Probe layout is automatically generated from 3D optode positions
+%
+% See also: pf2.Import.ImportNIR, pf2.Import.ImportNIRX, pf2.Export.asSNIRF,
+%           pf2_base.external.jsnirfy.loadsnirf
 
 if nargin < 2
    channelCheck = true; 

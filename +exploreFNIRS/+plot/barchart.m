@@ -1,4 +1,83 @@
 function barchart(handles,exSettings,exGby,gbyVars, showBarChart,showTopo)
+% BARCHART Create bar charts with error bars and LME analysis for exploreFNIRS
+%
+% Generates grouped bar charts displaying fNIRS biomarker data across
+% experimental conditions with optional error bars, violin plots, and
+% linear mixed-effects (LME) statistical modeling. Supports topographic
+% display of ANOVA F-statistics across the probe.
+%
+% Reference:
+%   Internal exploreFNIRS visualization. Uses barweb for grouped bar charts
+%   (Bolu Ajiboye, 2005, MATLAB File Exchange). LME analysis uses MATLAB's
+%   fitlme with Satterthwaite degrees of freedom approximation.
+%
+% Syntax:
+%   barchart(handles, exSettings, exGby, gbyVars, showBarChart, showTopo)
+%
+% Inputs:
+%   handles      - GUI handles structure from exploreFNIRS
+%   exSettings   - Settings structure containing:
+%                  .curInfoGroup   - Variable for X-axis grouping
+%                  .ChannelMode    - 'fNIR', 'ROI', or 'Aux'
+%                  .ylim_fixed     - Use consistent Y-axis across subplots
+%                  .ylim_manual    - Use manually specified Y-axis limits
+%                  .plot_bar_ga    - Show grand average bars
+%                  .plot_bar_all   - Show individual data points
+%                  .plot_bar_err   - Show error bars
+%                  .plot_bar_err_feature - Error type ('SEM','SD','IQR', etc.)
+%                  .plot_bar_err_mult - Error bar multiplier
+%                  .plot_bar_feature - Summary statistic ('Mean','Median')
+%                  .LME_enable     - Enable LME statistical analysis
+%                  .LME_randomFxStr - Random effects formula (e.g., '1|SubjectID')
+%                  .LME_all_interactions - Include all interaction terms
+%                  .topoSigThrehold - {type, value} for significance threshold
+%   exGby        - Array of grouped-by data structures containing:
+%                  .gbyTables     - Table with subject-level data
+%                  .gbyGrandBar   - Grand average structure with biomarker data
+%                  .gbyFNIRS_blk  - Block-level fNIRS data
+%   gbyVars      - Cell array of grouping variable names
+%   showBarChart - Logical flag to display bar chart (false for stats only)
+%   showTopo     - Logical flag to display topographic ANOVA maps
+%
+% Outputs:
+%   (No direct outputs - creates figures and populates ExFNIRS global)
+%
+% Global Variables Modified:
+%   ExFNIRS.curChartModels        - Cell array of fitted LME models
+%   ExFNIRS.curChartModelsAIC     - AIC values for model comparison
+%   ExFNIRS.curChartModelsANOVA   - ANOVA tables for each model
+%   ExFNIRS.curChartModelsCoefficents_pval - p-values table
+%   ExFNIRS.curChartModelsCoefficents_tstat - t-statistics table
+%   ExFNIRS.curChartModelsANOVACoefficents_pval - ANOVA p-values
+%   ExFNIRS.curChartModelsANOVACoefficents_Fstat - F-statistics
+%   ExFNIRS.curMdlFits            - Model fit p-values
+%
+% Error Bar Options:
+%   'SEM'          - Standard error of the mean
+%   'SD'           - Standard deviation
+%   'MaxMin'       - Range (minimum to maximum)
+%   'IQR'          - Interquartile range with outliers as points
+%   'IQR-NoOutliers' - IQR without outlier display
+%   'Violin'       - Violin plot showing full distribution
+%
+% LME Model Output:
+%   - Fixed effects coefficients with Satterthwaite DFs
+%   - ANOVA table with F-statistics
+%   - Model comparison against null (intercept-only) model
+%   - Automatic contrast generation
+%
+% Notes:
+%   - Called internally by exploreFNIRS GUI
+%   - Topographic mode displays F-statistics with FDR correction
+%   - Data cursor shows group statistics on click
+%   - Console output includes formatted statistics tables
+%
+% Example:
+%   % Called internally from exploreFNIRS GUI
+%   exploreFNIRS.plot.barchart(handles, exSettings, exGby, gbyVars, true, false);
+%
+% See also: exploreFNIRS.plot.scatter, exploreFNIRS.plot.temporal,
+%           exploreFNIRS.fx.performFDR, exploreFNIRS.fx.autoContrast
 
 curInfoGroup=exSettings.curInfoGroup;
 

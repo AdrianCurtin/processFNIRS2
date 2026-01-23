@@ -1,17 +1,73 @@
-function [fNIR] = ImportNIR(nir_filename,mrk_filename,channelCheck)
-% Function to import .nir files produced by COBI Studio software
-% Assumes time is firs line in data
-
-% Change Log
-% 4/30/2019 - Fixed error where incomplete baseline would result in an
-% error
-% 3/29/2019 - modified so that mrk_filename can be loaded as cell list of filenames, variable names also changed
-%			- added separate functions for manual and automatic file loading. Manual marker now uses strsplit to avoid scientific notation errors and fscanf
-%			- fixed an error where lack of info field would crash import
-% 2/1/2019  - modified function so that output is contained in an fNIR struct rather than as separate baseline arguments
-%			- markers are now output in fNIR.markers   (instead of just markers)
-%			- marker header info and other info is now found in fNIR.info.mrkheaders
-%			- changed default so that baseline data is included seamlessley with other datasets as a continous dataset
+function [fNIR] = ImportNIR(nir_filename, mrk_filename, channelCheck)
+% IMPORTNIR Import fNIRS data from fNIR Devices/Biopac .nir files
+%
+% Imports raw fNIRS data from COBI Studio software (.nir files) used with
+% fNIR Devices systems (fNIR 1000, fNIR 2000, etc.) and Biopac fNIRS devices.
+% Automatically loads associated marker files and optionally displays a
+% channel quality check GUI.
+%
+% Syntax:
+%   fNIR = pf2.Import.ImportNIR()                          % GUI file selection
+%   fNIR = pf2.Import.ImportNIR(nir_filename)              % Load specific file
+%   fNIR = pf2.Import.ImportNIR(nir_filename, mrk_filename)
+%   fNIR = pf2.Import.ImportNIR(nir_filename, mrk_filename, channelCheck)
+%   fNIR = pf2.Import.ImportNIR(nir_filename, true)        % Auto-find markers
+%   fNIR = pf2.Import.ImportNIR(nir_filename, false, false) % Skip marker & check
+%
+% Inputs:
+%   nir_filename  - Path to .nir data file (optional)
+%                   If empty or not provided, opens file selection dialog.
+%   mrk_filename  - Marker file specification (optional):
+%                   - String: Path to specific .mrk file
+%                   - Cell array: Multiple marker files to merge
+%                   - true: Auto-search for .mrk files (default)
+%                   - false: Skip marker loading
+%   channelCheck  - Display channel quality GUI (default: true)
+%                   Shows raw light intensity for visual quality assessment.
+%                   Cached results are reused unless forced.
+%
+% Outputs:
+%   fNIR          - fNIRS data structure containing:
+%                   .raw [T x C] - Raw light intensity data
+%                   .time [T x 1] - Time vector in seconds
+%                   .fs - Sampling frequency in Hz
+%                   .fchMask [1 x C] - Channel validity mask (1=good, 0=bad)
+%                   .markers [M x 3] - Event markers (time, code, duration)
+%                   .info - Metadata structure:
+%                       .header - File header information
+%                       .mrkheaders - Marker file headers
+%                       .filename - Source file path
+%                       .probename - Device configuration name
+%
+% Marker Auto-Search:
+%   When mrk_filename is true or omitted, searches for:
+%   - {fileroot}.mrk
+%   - {fileroot}_C.mrk
+%   - {fileroot}_biopac.mrk
+%   - {fileroot}_*.mrk (any matching pattern)
+%
+% Notes:
+%   - Time column is assumed to be first column in data
+%   - Baseline data is included as continuous recording (t < 0)
+%   - Channel check results are cached in {filename}_pf2mask.mat
+%   - Requires device configuration to be loaded (pf2.Settings.SelectDevice)
+%
+% Example:
+%   % Interactive file selection
+%   data = pf2.Import.ImportNIR();
+%
+%   % Load specific file with auto marker detection
+%   data = pf2.Import.ImportNIR('subject01.nir');
+%
+%   % Load without channel check GUI (batch processing)
+%   data = pf2.Import.ImportNIR('subject01.nir', true, false);
+%
+% See also: pf2.Import.ImportSNIRF, pf2.Import.ImportNIRX, pf2.Export.asNIR
+%
+% Change Log:
+%   4/30/2019 - Fixed incomplete baseline error
+%   3/29/2019 - Cell array marker support, strsplit parsing
+%   2/1/2019 - Output as fNIR struct, continuous baseline
 
 fNIR=[]; % placeholder initializations
 data=[]; 

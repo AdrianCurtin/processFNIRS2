@@ -1,9 +1,51 @@
 function [ figHandle ] = ArrangedValues(varargin)
-%pf2.Data.Plot.ArrangedValues
+% ARRANGEDVALUES Display per-channel values in probe-arranged subplot grid
 %
-% Uses an imagemap to change the color of each cell based on data2plot
+% Creates a visualization where each fNIRS channel is displayed as a separate
+% subplot positioned according to the probe layout geometry. Each subplot is
+% colored according to the corresponding data value using an image colormap.
+% This function is useful for displaying spatial distributions of channel-level
+% metrics such as signal quality, statistical values, or averaged responses.
 %
-% ArrangedValues(fNIR,data2plot,minVal,maxVal,suptitleString,clrBarTitle)
+% Reference:
+%   Internal pf2 implementation for probe-based visualization.
+%
+% Syntax:
+%   ArrangedValues(data2plot)
+%   ArrangedValues(data2plot, fNIR)
+%   ArrangedValues(data2plot, fNIR, minVal, maxVal)
+%   ArrangedValues(data2plot, fNIR, minVal, maxVal, titleString, clrBarTitle)
+%   figHandle = ArrangedValues(...)
+%   ArrangedValues(..., 'includeSS', false)
+%
+% Inputs:
+%   data2plot   - Values to display for each channel [1 x C double]
+%                 Must have one value per optode/channel in the probe.
+%   fNIR        - fNIRS data structure containing probe info (default: {})
+%                 If empty, attempts to load from global setF or prompts user.
+%   minVal      - Minimum value for color scale (default: min(data2plot))
+%   maxVal      - Maximum value for color scale (default: max(data2plot))
+%   titleString - Title displayed above the plot (default: '')
+%   clrBarTitle - Title for the colorbar (default: '')
+%   'includeSS' - Include short separation channels (default: true)
+%                 Set to false to exclude short separation channels.
+%
+% Outputs:
+%   figHandle - Handle to the created figure (optional)
+%
+% Example:
+%   % Display signal quality per channel
+%   data = pf2.Import.SampleData.fNIR2000();
+%   processed = processFNIRS2(data);
+%   snr = std(processed.HbO);
+%   pf2.Probe.Plot.ArrangedValues(snr, processed, [], [], 'SNR', 'Std Dev');
+%
+%   % Display t-statistics from analysis
+%   tvals = randn(1, 18);  % Example t-values
+%   pf2.Probe.Plot.ArrangedValues(tvals, processed, -3, 3, 'T-Statistics');
+%
+% See also: pf2.Probe.Plot.ImageValues, pf2.Probe.Plot.InterpolateValues,
+%           pf2.Data.Plot.Oxy, pf2_base.pf2_plotArranged
 
 p = inputParser;
 
@@ -52,7 +94,7 @@ if(isempty(cfgFilePath)||~contains(cfgFilePath,'.cfg'))
     
     disp('No device specified. Please load device configuration');
     probeInfo=pf2_base.loadDeviceCfg([],true);
-    if(~isempty(probeInfo))
+    if(isempty(probeInfo))
         error('No valid devices selected');
     end
     

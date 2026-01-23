@@ -1,8 +1,53 @@
 function [ imgOut ] = ImageROIvalues(fNIR,data2plot,minVal,maxVal,titleString,clrBarTitle)
-%pf2.Data.Plot.ImageROIvalues
+% IMAGEROIVALUES Display per-ROI values as a 2D image heatmap
 %
-% Uses an imagemap to change the color of each cell based on data2plot
+% Creates a 2D image visualization where each region of interest (ROI) is
+% colored according to its data value. All channels belonging to the same ROI
+% are filled with the same color. This function is useful for displaying
+% ROI-level statistics or averaged responses while preserving the spatial
+% relationship between ROIs in the probe layout.
 %
+% Reference:
+%   Internal pf2 implementation for ROI-based visualization.
+%
+% Syntax:
+%   ImageROIvalues(fNIR, data2plot)
+%   ImageROIvalues(fNIR, data2plot, minVal, maxVal)
+%   ImageROIvalues(fNIR, data2plot, minVal, maxVal, titleString)
+%   ImageROIvalues(fNIR, data2plot, minVal, maxVal, titleString, clrBarTitle)
+%   imgOut = ImageROIvalues(...)
+%
+% Inputs:
+%   fNIR        - fNIRS data structure containing ROI.info field
+%                 ROI.info must be a table with 'Optodes' column specifying
+%                 which channels belong to each ROI.
+%   data2plot   - Values to display for each ROI [1 x R double]
+%                 Must have one value per ROI defined in fNIR.ROI.info.
+%   minVal      - Minimum value for color scale (default: min(data2plot))
+%   maxVal      - Maximum value for color scale (default: max(data2plot))
+%   titleString - Title displayed above the plot (default: '')
+%   clrBarTitle - Title for the colorbar (default: '')
+%
+% Outputs:
+%   imgOut - Handle to the image object (optional)
+%
+% Notes:
+%   - Requires fNIR.ROI.info to be defined before calling this function
+%   - ROIs must not contain duplicate channels (overlapping ROIs not supported)
+%
+% Example:
+%   % Define ROIs and plot ROI-averaged HbO
+%   data = pf2.Import.SampleData.fNIR2000();
+%   processed = processFNIRS2(data);
+%   processed = pf2.Probe.ROI.defineROI(processed, {1:6, 7:12, 13:18}, ...
+%                                       {'Left', 'Center', 'Right'});
+%   roiMeans = [mean(processed.HbO(:,1:6), 'all'), ...
+%               mean(processed.HbO(:,7:12), 'all'), ...
+%               mean(processed.HbO(:,13:18), 'all')];
+%   pf2.Probe.Plot.ImageROIvalues(processed, roiMeans, [], [], 'ROI Means');
+%
+% See also: pf2.Probe.Plot.ImageValues, pf2.Probe.Plot.InterpolateROIvalues,
+%           pf2.Probe.ROI.defineROI, pf2_base.fnirs.buildROI
 
 
 if(~isempty(fNIR)&&~pf2_base.isnestedfield(fNIR,'ROI.info')&&~isempty(fNIR.info))

@@ -1,5 +1,41 @@
 function SetMethod(oxy_method)
-% This function is a wrapper for the 'oxy_method' argument in pf2
+% SETMETHOD Select the active oxy processing method for Stage 3 processing
+%
+% Sets the hemoglobin processing method used during Stage 3 of processFNIRS2.
+% The method defines the sequence of filtering, artifact rejection, and
+% post-processing functions applied to hemoglobin concentration data (HbO,
+% HbR, etc.) after Beer-Lambert conversion. If no method is specified,
+% displays available methods and prompts for selection.
+%
+% Syntax:
+%   pf2.Methods.Oxy.SetMethod(oxy_method)
+%   pf2.Methods.Oxy.SetMethod(methodIndex)
+%   pf2.Methods.Oxy.SetMethod()
+%
+% Inputs:
+%   oxy_method - Method identifier, one of:
+%                - String/char: Method name (e.g., 'takizawa_easy_lpf')
+%                - Numeric: Method index from the available methods list
+%                If omitted, displays method list and prompts for input.
+%
+% Example:
+%   % Set method by name
+%   pf2.Methods.Oxy.SetMethod('takizawa_easy_lpf');
+%
+%   % Set method by index
+%   pf2.Methods.Oxy.SetMethod(3);
+%
+%   % Interactive selection (displays list, prompts for number)
+%   pf2.Methods.Oxy.SetMethod();
+%
+%   % Typical workflow
+%   pf2.Methods.Oxy.List();                     % View available methods
+%   pf2.Methods.Oxy.SetMethod('medfilt_car');   % Select median filter + CAR
+%   data = processFNIRS2(rawData);              % Process with selected method
+%
+% See also: pf2.Methods.Oxy.List, pf2.Methods.Oxy.DescribeMethod,
+%           pf2.Methods.Oxy.ConfigureMethods, pf2.Methods.Raw.SetMethod,
+%           processFNIRS2
 
 if(nargin<1)
     fprintf(2,'No method provided, Please select a method\n');

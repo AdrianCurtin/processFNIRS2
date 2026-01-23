@@ -1,14 +1,64 @@
 function [snirfData] = asSNIRF(fNIRcells, filepath, normalizeRaw, stripExtraRawChannels)
-%Takes fNIR struct and packages the .snirf file with improved Python compatibility
-%   Use to construct .snirf files for export and packaging
+% ASSNIRF Export fNIRS data to SNIRF format
 %
-%   fNIRcells - FNIR structure or cell array of structures
-%   filepath - Output file location (optional, will prompt if not provided)
-%   normalizeRaw - Whether to normalize raw data (false by default)
-%   stripExtraRawChannels - Whether to remove dark channels 
-%       (time and marker signals are always removed)
+% Converts pf2 fNIRS data structures to the standardized SNIRF format for
+% interoperability with other fNIRS analysis tools (Homer3, MNE-Python,
+% FieldTrip, etc.). Generates HDF5-based .snirf files compliant with the
+% SNIRF specification v1.1.
 %
-%   Returns the generated SNIRF data structure
+% Reference:
+%   SNIRF format specification: https://github.com/fNIRS/snirf
+%
+% Syntax:
+%   snirfData = pf2.Export.asSNIRF(fNIR)                    % GUI save dialog
+%   snirfData = pf2.Export.asSNIRF(fNIR, filepath)          % Save to path
+%   snirfData = pf2.Export.asSNIRF(fNIRcells, filepath)     % Multiple runs
+%   snirfData = pf2.Export.asSNIRF(..., normalizeRaw, stripExtraRawChannels)
+%
+% Inputs:
+%   fNIRcells            - fNIRS data structure or cell array of structures
+%                          Each structure should contain .raw, .time, .fs, etc.
+%                          Multiple structures create multiple /nirs groups.
+%   filepath             - Output file path (optional)
+%                          If not provided, opens save dialog.
+%                          Extension .snirf is added if missing.
+%   normalizeRaw         - Normalize raw data before export (default: false)
+%                          If true, scales data for improved compatibility.
+%   stripExtraRawChannels - Remove dark/ambient channels from export (default: false)
+%                          Time and marker columns are always removed.
+%
+% Outputs:
+%   snirfData            - Generated SNIRF data structure
+%                          Can be used for inspection or further manipulation.
+%
+% SNIRF Structure Created:
+%   /formatVersion       - '1.1'
+%   /nirs/               - (or /nirs1/, /nirs2/, etc. for multiple runs)
+%       /data/           - Time series data
+%           /dataTimeSeries [T x C]
+%           /time [T x 1]
+%       /probe/          - Probe geometry
+%           /sourcePos, /detectorPos, /wavelengths, etc.
+%       /metaDataTags/   - Subject and session info
+%       /stim/           - Stimulus/marker events
+%
+% Notes:
+%   - Creates output directory if it doesn't exist
+%   - Uses jsnirfy library for HDF5 writing
+%   - Probe geometry requires device config to be loaded
+%   - Python compatibility improvements over standard SNIRF writers
+%
+% Example:
+%   % Export single dataset
+%   pf2.Export.asSNIRF(processedData, 'subject01.snirf');
+%
+%   % Export multiple runs in one file
+%   pf2.Export.asSNIRF({run1, run2, run3}, 'session.snirf');
+%
+%   % Export with GUI file selection
+%   snirfStruct = pf2.Export.asSNIRF(data);
+%
+% See also: pf2.Import.ImportSNIRF, pf2.Export.asNIR, savesnirf
 
 if(nargin < 1)
     error('No fnir file specified!');

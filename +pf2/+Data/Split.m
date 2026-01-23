@@ -1,55 +1,62 @@
 function [outfNIR] = Split(varargin)
-%pf2.Data.Split Splice fNIRS segment according to start/end times and optionally rebaseline data
-%   pf2.Data.Split(fNIR,startTime,endTime,segmentLength,relative,blLength,blStartTime,blfNIR)
-%   Detailed explanation goes here
-% If only start time is given, returns segment from startTime to end
-% If an end time or segmentLength is defined returns segment from startTime
-% to endTime or (startTime+segmentLength)
-% If relative is set to true, startTime and endTime are both relative arguments
-% from the start of the segment (ie t=0 is min(time))
+% SPLIT Extract time segment from fNIRS data with optional baseline correction
 %
-% If blLength or blStartTime are defined then the segment is baselined
-% according to the given data. Please use both arguments. 
-%   Default baseline length will be used if not provided
-%   blStartTime will be set to startTime if not provided
-%       please note this time is also affected by the relative flag
-%bl, length of baseline in seconds, if zero then data is not baselined
-%blStart, start time of basline in seconds (absolute time or relative)
-% Usage examples
-% pf2.Data.Split(fnirData,561) : Returns segment of data from t=561s to end
-%       Equivalent to pf2.Data.Split('fNIR',fnirData,'startTime',561);
+% Extracts a portion of fNIRS data between specified start and end times.
+% Can apply baseline correction using either a portion of the extracted
+% segment or a separate baseline recording.
 %
-% pf2.Data.Split(fnirData,200,282) : Returns segment of data from t=200 to t=282s
-%       Equivalent to pf2.Data.Split('fNIR',fnirData,'startTime',200,'endTime',282);
+% Syntax:
+%   outfNIR = pf2.Data.Split(fNIR, startTime)
+%   outfNIR = pf2.Data.Split(fNIR, startTime, endTime)
+%   outfNIR = pf2.Data.Split(..., 'Name', Value)
 %
-% pf2.Data.Split(fnirData,200,'segmentLength',40) : Returns segment of data from t=200 to t=240s
-%       Equivalent to pf2.Data.Split('fNIR',fnirData,'startTime',200,'segmentLength',40);
+% Inputs:
+%   fNIR           - fNIRS data structure
+%   startTime      - Start time in seconds (absolute or relative)
+%                    If only startTime given, extracts from startTime to end
+%   endTime        - End time in seconds (optional)
+%   'segmentLength' - Alternative to endTime: duration in seconds
+%                    endTime = startTime + segmentLength
+%   'relative'     - Time interpretation flag (default: false)
+%                    false: Times are absolute (from t=0 of recording)
+%                    true: Times are relative to min(fNIR.time)
+%   'blLength'     - Baseline period duration in seconds
+%                    Subtracts baseline mean from extracted segment
+%   'blStartTime'  - Baseline start time (default: 0 or startTime if relative)
+%   'blfNIR'       - Separate fNIRS struct to use as baseline source
+%                    Overrides blLength and blStartTime when provided
 %
-% pf2.Data.Split(fnirData,10,50,'relative',true) : Returns segment of data from 10s after 
-%               the begining of the segment(min(fnirData.time) to 50s after
-%       Equivalent to pf2.Data.Split('fNIR',fnirData,'startTime',10,'endTime',50,'relative','true');
+% Outputs:
+%   outfNIR        - Extracted fNIRS structure containing:
+%                    All fields truncated to requested time range
+%                    Baseline-corrected if baseline options specified
 %
-% pf2.Data.Split(fnirData,20,'segmentLength',60,'relative',true) : Returns segment of data from 20s after 
-%               the begining of the segment(min(fnirData.time) to 60s after
-%               the start time (20s+60s=80s)
-%        
-%       Equivalent to pf2.Data.Split('fNIR',fnirData,'startTime',20,'segmentLength',60,'relative','true');
+% Algorithm:
+%   1. Convert relative times to absolute if needed
+%   2. Find sample indices for start/end times
+%   3. Extract all data fields for time range
+%   4. If baseline specified:
+%      a. Extract baseline period
+%      b. Compute mean for each channel
+%      c. Subtract from extracted segment
 %
-% pf2.Data.Split(fnirData,20,100,'blLength',10) : Returns segment of data from t=20 to t=100s
-%               with the first 10seconds of the segment (t=0:10) used as
-%               the baseline period for the segment (t=20:100)
-%       Equivalent to pf2.Data.Split('fNIR',fnirData,'startTime',20,'endTime',100,'blLength',10);
+% Example:
+%   % Extract from t=561s to end
+%   segment = pf2.Data.Split(data, 561);
 %
-% pf2.Data.Split(fnirData,20,100,'blLength',10,'blStartTime',20) : Returns segment of data from t=20 to t=100s
-%               with the the segment (t=20:30) used as
-%               the baseline period for the segment (t=20:100)
-%       Equivalent to pf2.Data.Split('fNIR',fnirData,'startTime',20,'endTime',100,'blLength',10,'blStartTime',20);
+%   % Extract t=200 to t=282
+%   segment = pf2.Data.Split(data, 200, 282);
 %
-% pf2.Data.Split(fnirData,20,100,'blfNIR',baseline_fnirdata) : Returns segment of data from t=20 to t=100s
-%               with the entire fNIR struct baseline_fnirdata used as
-%               the baseline period for the segment (t=20:100)
-%       Equivalent to pf2.Data.Split('fNIR',fnirData,'startTime',20,'endTime',100,'blfNIR',baseline_fnirdata);
-
+%   % Extract 60s segment starting 20s after recording begins (relative)
+%   segment = pf2.Data.Split(data, 20, 'segmentLength', 60, 'relative', true);
+%
+%   % Extract with 10s baseline at start
+%   segment = pf2.Data.Split(data, 20, 100, 'blLength', 10);
+%
+%   % Extract using separate baseline recording
+%   segment = pf2.Data.Split(data, 20, 100, 'blfNIR', baselineData);
+%
+% See also: pf2.Data.Resample, pf2.Data.GetMarkers, pf2.Data.SetT0
 
 
 p=inputParser;
@@ -583,7 +590,7 @@ function [outAuxStruct] = recursiveAuxFlatten(aux_in,nir_time,parent_time_in)
                 end
                 
                 auxFieldHasTime(f)=true;
-                curTimeNames=timeTableVar(1);
+                curTimeNames=timeTableVar{1};
                 auxVarNames(ismember(auxVarNames,validTimeFields))=[];
             elseif(~isempty(local_time)&&auxFieldsSize(f,1)==szLocalTime(1)&&~alreadyFlattened)
                  t_aux=local_time;

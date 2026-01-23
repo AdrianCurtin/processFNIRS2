@@ -1,13 +1,94 @@
 function [ h, imgOut ] = InterpolateValues3D(varargin)
-
-%pf2.Probe.Plot.InterpolateValues3D
+% INTERPOLATEVALUES3D Create 3D brain surface visualization with interpolated fNIRS data
 %
-% Uses an imagemap to change the color of each cell based on data2plot
-% fNIR is a data structure that contains the fNIRS structure info,
-% data2plot houses the numbers themselves
+% Generates a 3D brain surface visualization with fNIRS channel data projected
+% onto the cortical surface. Values are interpolated across the brain mesh
+% using nearest-neighbor or weighted distance methods. Supports MNI and
+% Talairach coordinate systems, multiple probe configurations, EEG 10-20
+% electrode positions, Brodmann area overlays, and various visualization options.
 %
-% Short separation channels are not presented here and are skipped
+% Reference:
+%   Brain mesh coordinates based on MNI/ICBM templates.
+%   10-20 EEG positions from: Koessler, L. et al. (2009). Automated cortical
+%   projection of EEG sensors. NeuroImage, 46(1), 64-72.
 %
+% Syntax:
+%   InterpolateValues3D(data2plot)
+%   InterpolateValues3D(data2plot, fNIR)
+%   InterpolateValues3D(data2plot, fNIR, minVal, maxVal)
+%   InterpolateValues3D(data2plot, fNIR, minVal, maxVal, titleString, colorbarStr)
+%   [h, imgOut] = InterpolateValues3D(...)
+%   InterpolateValues3D(ax, ...)  % Plot to specific axes
+%
+% Inputs:
+%   data2plot     - Values to display for each channel [1 x C double] or
+%                   cell array for multi-probe {[1xC1], [1xC2], ...}
+%                   Pass [] to show probe geometry without data coloring.
+%   fNIR          - fNIRS data structure or probe name string (default: {})
+%                   For multi-probe, pass cell array of structs/names.
+%   minVal        - Minimum value(s) for color scale (default: min(data2plot))
+%                   For two-sided, pass [negMin, posMin].
+%   maxVal        - Maximum value(s) for color scale (default: max(data2plot))
+%   titleString   - Title displayed above the plot (default: '')
+%   colorbarStr   - Title for the colorbar (default: '')
+%
+% Name-Value Parameters:
+%   'ax'                - Target axes handle (default: gca)
+%   'ChannelLabels'     - Show channel number labels (default: true)
+%   'SDLabels'          - Show source/detector labels (default: varies)
+%   'I1020_labels'      - Show 10-20 EEG labels (default: false)
+%                         Can be true/false or cell array of electrode names.
+%   'useHighRes'        - Use high-resolution brain mesh (default: true)
+%   'cmap'              - Colormap for positive values (default: 'hotCropped')
+%   'cmap_lower'        - Colormap for negative values (default: 'winter')
+%   'labelfontsize'     - Font size for labels (default: 10)
+%   'labelfontcolor'    - Font color for labels (default: 'k')
+%   'labelspherecolors' - Colors for source/detector spheres (default: ["r","y","w"])
+%   'brainColor'        - Base brain surface color (default: [0.92, 0.68, 0.68])
+%   'brainAlpha'        - Brain surface transparency (default: 1)
+%   'showColorbar'      - Display colorbar (default: true)
+%   'initCamPosition'   - Initial camera position (default: 'auto')
+%                         Options: 'auto', 'front', 'back', 'top', 'left', 'right', 'face'
+%                         Or numeric [x, y, z] position.
+%   'logScale'          - Use logarithmic color scale (default: false)
+%   'interpolateType'   - Interpolation method (default: 'nearest')
+%                         Options: 'nearest', 'linear', 'quadratic', 'cubic'
+%   'bufferDistance'    - Buffer around optodes in mm (default: auto)
+%   'includeSS'         - Include short separation channels (default: varies)
+%   'useTalairach'      - Use Talairach coordinates (default: false, uses MNI)
+%   'BrodmannAreas'     - Highlight Brodmann areas (default: false)
+%                         Set true for all areas, or [9,10,46] for specific areas.
+%   'showScattering'    - Show light scattering paths (default: false)
+%   'optodeLines'       - Show optode direction lines (default: false)
+%   'animated'          - Optimize for animation (default: false)
+%
+% Outputs:
+%   h      - Handle to the axes containing the visualization
+%   imgOut - RGB image capture of the rendered figure [H x W x 3 uint8]
+%
+% Example:
+%   % Basic 3D visualization of HbO data
+%   data = pf2.Import.SampleData.fNIR2000();
+%   processed = processFNIRS2(data);
+%   hboVals = processed.HbO(100, :);  % Single timepoint
+%   pf2.Probe.Plot.InterpolateValues3D(hboVals, processed, -1, 1, 'HbO');
+%
+%   % Show probe geometry without data
+%   pf2.Probe.Plot.InterpolateValues3D([], processed, 'initCamPosition', 'front');
+%
+%   % Multi-probe visualization
+%   pf2.Probe.Plot.InterpolateValues3D({hbo1, hbo2}, {fnir1, fnir2});
+%
+%   % Show with Brodmann areas
+%   pf2.Probe.Plot.InterpolateValues3D([], processed, 'BrodmannAreas', [9,10,46]);
+%
+% Notes:
+%   - Requires cerebro_mdl.mat brain mesh data file
+%   - Short separation channels are excluded by default when data is provided
+%   - Uses 'animated' mode for video generation to avoid redrawing static elements
+%
+% See also: pf2.Probe.Plot.showProbe3D, pf2.Probe.Plot.InterpolateValues,
+%           pf2.Probe.Plot.ImageValues, exploreFNIRS
 tic
 isStructOrEmpty=@(x) isstruct(x)||isempty(x);
 isStringOrChar=@(x)isstring(x)||ischar(x);
@@ -491,8 +572,7 @@ else
 end
 
 if(show1020)
-    c1020=load('cerebro_1020_table.mat'); %estimation of 10-20 coordinates
-    c1020=c1020.c1020;
+    c1020=pf2_base.getAsset('cerebro_1020'); %estimation of 10-20 coordinates
     
     if(p.Results.useTalairach)
         txyz=pf2_base.external.icbm_fsl2tal([c1020.mx,c1020.my,c1020.mz]);
@@ -632,21 +712,9 @@ end
 % TAL EEG locations from Automated cortical projection of EEG sensors: Anatomical correlation via the international 10–10 system
 h=gca;
 if(useHighRes)
-    if(isfield(h,'UserData')&&isfield(h.UserData,'cMdl_high'))
-        cerebro_mdl=h.UserData.cMdl_high;
-    else
-        cerebro_mdl=load('cerebro_mdl.mat');    %high res model
-        cerebro_mdl=cerebro_mdl.cerebro_mdl;
-        h.UserData.cMdl_high=cerebro_mdl;
-    end
+    cerebro_mdl=pf2_base.getAsset('cerebro_mdl', 'cache', h);    %high res model
 else
-    if(isfield(h,'UserData')&&isfield(h.UserData,'cMdl_low'))
-        cerebro_mdl=h.UserData.cMdl_low;
-    else
-        cerebro_mdl=load('cerebro_mdl_05.mat');    %high res model
-        cerebro_mdl=cerebro_mdl.cerebro_mdl;
-        h.UserData.cMdl_low=cerebro_mdl;
-    end
+    cerebro_mdl=pf2_base.getAsset('cerebro_mdl_05', 'cache', h); %low res model
 end
 
 %
@@ -751,13 +819,7 @@ end
 
 if(p.Results.showVoxelBrain&&(isempty(itemsToSkipPlot)||~contains(itemsToSkipPlot,'BrainVoxel')))
     h=ax;
-    if(isfield(h,'UserData')&&isfield(h.UserData,'mni_t1'))
-        mni_t1=h.UserData.mni_t1;
-    else
-        mni_t1=load('mni_t1.mat');
-        mni_t1=mni_t1.mni_t1;
-        h.UserData.mni_t1=mni_t1;
-    end
+    mni_t1=pf2_base.getAsset('mni_t1', 'cache', h);
     
     center=[91,127,73];
     szM=size(mni_t1);
@@ -788,13 +850,7 @@ if(p.Results.showVoxelBrain&&(isempty(itemsToSkipPlot)||~contains(itemsToSkipPlo
     
     if(p.Results.useVoxelBrodmannAreas)
         h=ax;
-        if(isfield(h,'UserData')&&isfield(h.UserData,'brdm'))
-            brdm=h.UserData.brdm;
-        else
-            brdm=load('brodmann.mat');
-            brdm=brdm.brdm;
-            h.UserData.brdm=brdm;
-        end
+        brdm=pf2_base.getAsset('brodmann', 'cache', h);
         
         
         brdm=brdm(1:voxelRes:end,1:voxelRes:end,1:voxelRes:end);
@@ -1039,16 +1095,10 @@ else % No data to plot, everything is brain and anatomy
         
         
         if(p.Results.useVoxelBrodmannAreas)
-            
+
             h=ax;
-            if(isfield(h,'UserData')&&isfield(h.UserData,'brdm'))
-                brdm=h.UserData.brdm;
-            else
-                brdm=load('brodmann.mat');
-                brdm=brdm.brdm;
-                h.UserData.brdm=brdm;
-            end
-            
+            brdm=pf2_base.getAsset('brodmann', 'cache', h);
+
             center=[90,126,72];
             szB=size(brdm);
             
@@ -1446,14 +1496,9 @@ end
 
 
 if(p.Results.showReference&&(isempty(itemsToSkipPlot)))
-    %% Test code for calibration
-    path4debug=mfilename('fullpath');
-    
-    [path4debug]=fileparts(path4debug);
-    
-    path4debug=sprintf('%s/../../../',path4debug);
-    
-    [img,map,alpha] = imread(sprintf('%s%s',path4debug,'sideprofile_mid.png'));     % Load a sample image
+    %% Reference brain images
+    imgData = pf2_base.getAsset('sideprofile');
+    img = imgData.img; map = imgData.map; alpha = imgData.alpha;
     
     %https://www.openanatomy.org/atlases/nac/brain-2017-01/viewer/#!/view/33316a96-32f2-47f4-b5e0-a6225be09803/state/9dc9a3eb-7805-4b2b-943f-0b6e63ba488f
     
@@ -1538,11 +1583,11 @@ if(p.Results.showReference&&(isempty(itemsToSkipPlot)))
     
     
     h.Tag='BrainRef';
-    [img,map,alpha] = imread(sprintf('%s%s',path4debug,'rcSlice.png'));     % Load a sample image
-    
-    
+    imgData = pf2_base.getAsset('rcSlice');
+    img = imgData.img; map = imgData.map; alpha = imgData.alpha;
+
     imgXY=size(img);
-    
+
     if(p.Results.useTalairach)
         xMid=-1;
         yMid=-7;
@@ -1577,14 +1622,12 @@ if(p.Results.showReference&&(isempty(itemsToSkipPlot)))
         'FaceColor','texturemap','FaceLighting','none','AlphaData',alpha,'FaceAlpha','texture');
     hold off
     h.Tag='BrainRef';
-    
-    
-    [img,map,alpha]  = imread(sprintf('%s%s',path4debug,'topprofile.png'));     % Load a sample image
-    
-    
+
+    imgData = pf2_base.getAsset('topprofile');
+    img = imgData.img; map = imgData.map; alpha = imgData.alpha;
+
     imgXY=size(img);
-    
-    
+
     if(p.Results.useTalairach)
         xMid=1;
         yMid=-16;

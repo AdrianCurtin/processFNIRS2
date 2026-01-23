@@ -1,8 +1,39 @@
-
 function mergedTables=mergeGbyTablesWide(gbyTables,bioMarkers,channels,times,exportAux,exportROI,optodeNames)
-% hObject    handle to pushbutton_export_csv (see GCBO)
-% eventdata  reserved - to be defined in a future version of MATLAB
-% handles    structure with handles and user data (see GUIDATA)
+% MERGEGBYTABLESWIDE Merge grouped fNIRS tables into wide format for export
+%
+% Combines multiple grouped-by tables from exploreFNIRS analysis into a
+% single wide-format table suitable for spreadsheet analysis (Excel, etc.).
+% Wide format has one row per subject with columns for each channel/biomarker.
+%
+% Syntax:
+%   mergedTables = mergeGbyTablesWide(gbyTables, bioMarkers, channels, ...
+%       times, exportAux, exportROI, optodeNames)
+%
+% Inputs:
+%   gbyTables    - Cell array of grouped data tables from exploreFNIRS
+%   bioMarkers   - Cell array of biomarker names to include
+%                  Default: {'HbO','HbR','HbDiff','HbTotal','CBSI'}
+%   channels     - Vector of channel indices to export (default: [] = all)
+%   times        - Time points to include (default: [] = all)
+%   exportAux    - Include auxiliary data (default: false)
+%   exportROI    - Include ROI-averaged data (default: false)
+%   optodeNames  - Cell array of optode/channel names (default: numbers)
+%
+% Outputs:
+%   mergedTables - Combined table in wide format with columns:
+%                  Subject, Group, HbO_Ch1, HbO_Ch2, ..., HbR_Ch1, ...
+%
+% Notes:
+%   - Wide format is preferred for ANOVA in SPSS or Excel pivot tables
+%   - Column names follow pattern: BioMarker_Channel
+%   - One row per subject/condition combination
+%
+% Example:
+%   % Export all biomarkers for channels 1-18
+%   wideTable = mergeGbyTablesWide(gbyData, {'HbO','HbR'}, 1:18);
+%   writetable(wideTable, 'export_wide.csv');
+%
+% See also: mergeGbyTablesLong, exploreFNIRS
 
 if(nargin<6)
     exportROI=false;
