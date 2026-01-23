@@ -8,3 +8,4 @@ sampledata/sampleNIR_CH.mat
 .vscode/launch.json
 .vscode/settings.json
 *.md
+internal/

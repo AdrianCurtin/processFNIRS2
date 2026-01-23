@@ -1,4 +1,4 @@
-# processFNIRS2 v0.8.1
+# processFNIRS2 v0.9
 
 ## Overview
 processFNIRS2 is a modular MATLAB toolbox designed for processing functional Near-Infrared Spectroscopy (fNIRS) data. The toolbox provides a flexible framework for importing, processing, analyzing, and visualizing fNIRS data from multiple device manufacturers.
@@ -127,25 +127,27 @@ pf2.export.asSNIRF(myprocesseddata, 'myexport.snirf');
 ```
 
 ### Advanced Analysis with exploreFNIRS
-For more advanced data exploration and analysis, use the exploreFNIRS module:
+For group-level data exploration and statistical analysis, use the exploreFNIRS module:
 ```matlab
-% Basic usage
-exploreFNIRS(myprocesseddata);
+% Load multiple processed subjects into a cell array
+allData = {subject1, subject2, subject3, ...};
 
-% With additional options
-exploreFNIRS(myprocesseddata, 'timeShiftTo0', true, 'blStart', 0, 'blEnd', 5, ...
+% Launch exploreFNIRS GUI
+exploreFNIRS(allData);
+
+% With configuration options
+exploreFNIRS(allData, 'timeShiftTo0', true, 'blStart', 0, 'blEnd', 5, ...
              'blockStart', 5, 'blockEnd', 65, 'barSegmentLength', 60);
 ```
 
 exploreFNIRS features:
-- Group-level analysis
-- Statistical modeling with LME
-- Various visualization options:
-  - Temporal plots: `exploreFNIRS.plot.temporal()`
-  - Bar charts: `exploreFNIRS.plot.barchart()`
-  - Scatter plots: `exploreFNIRS.plot.scatter()`
+- Group-level analysis with hierarchical averaging
+- Linear mixed-effects modeling with Satterthwaite degrees of freedom
+- Visualization: temporal plots, bar charts, scatter plots, topographic maps
 - FDR correction: `exploreFNIRS.fx.performFDR()`
 - Data export: `exploreFNIRS.export.mergeGbyTablesWide()` / `mergeGbyTablesLong()`
+
+See [ExploreFNIRS_README.md](ExploreFNIRS_README.md) for detailed documentation.
 
 ## Settings Configuration
 Adjust common settings using the Settings module:

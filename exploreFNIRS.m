@@ -27,46 +27,7 @@ function varargout = exploreFNIRS(varargin) % exploreFNIRS(data,timeShiftTo0,blS
 %	Parametric plots for correlation
 %	Ability to plot/analyze aux data
 
-% Change Log
-% 3/19/2019 Added ability to get mean and average values for Auxillary
-%           channels, Channels are exported currently when uising Long Format only
-%            Also changed long format output to default to channelXbiomarker instead of channel only for columns
-% 2/4/2019  Renamed .Total to .HbTotal
-% 1/25/2019	Added multi biomarker plotting for Topographic maps
-%           Added long format biomarker export
-% 1/24/2019 Changed default behavior to disable single entry or unused info fields
-%			Added internal wide table merging
-%			Added support for LME model building (outputs when enabled and a barchart is produced, or topographic map)
-%			Currently supports two model structures     Time*BioM*Factor1*Factor2.... (all interactions) or Time*BioM*Factor1+Time*BioM*Factor2+.... (minimal interactions)
-%				Optionally uses infofield as a covariate  Time*BioM*InfoCov*(Factor1+/*Factor2+/*Factor3...) (follows same rules above for interactions
-%			Added ability to plot topographic maps using LME models
-% 1/18/2019 Added ability to use separate info  field as a groupby parameter
-%			Added support for shaded error bars in scatter plots
-%			Added ability to sort manual GUI colors (up/down)
-% 1/17/2019 Added support for shaded error bars in temporal plots
-%			Added support for scatterplots (using the info field data from barchart)
-%				Includes nonparametric modes, correlation statistics, errors, and more
-% 1/16/2019 Added support for datacursor in plots to visualize information
-% 			Added ability to fix ylimits automatically or manually assign them
-%			Added ability of one groupby parameter to be used to split plots (plotby)
-%			Added support for categorical count in infofield barcharts
-% 1/15/2019 Added ability to plot data from info field as barchart
-%			Added support for exporting barchartdata as mat file 
-%			Added support and configuration for hierarchical averaging (within subject averaging to prevent multisampling of participants)
-% 1/14/2019 Added support for variable arguments to assign values to baseline,block, plot,times, automatic time shifting and other parameters
-% 			Now missing values are labeled as missing
-%			Added support for subgroups
-%			Added support for grandAverage plots (temporal)
-%			Added grandaverage error plot support
-%			Added default biomarker color scheme
-%			Added option to mark baseline&task start/end with vertical lines
-%			Added ability to export barchart data (merged with original table) as CSV
-%			Added ability to plot barcharts
-%			Added ability to defined and load custom colors
-% 1/13/2019 Added ability to plot individual FNIRS data (temporal)
-%			Added grandaverage resampling for all segments
-% 1/12/2019 Initial Version
-	
+% See CHANGELOG.md for version history
 
 % EXPLOREFNIRS MATLAB code for exploreFNIRS.fig
 %      EXPLOREFNIRS, by itself, creates a new EXPLOREFNIRS or raises the existing

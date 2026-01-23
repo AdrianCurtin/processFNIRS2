@@ -17,36 +17,7 @@ function varargout = processFNIRS2(varargin)
 %       Add suppport for channel rejection
 %       Add support for mean addition (but more flexibly)
 
-% Change Log
-% 3/8/2019 - Bug fix for viewing window in PF2GUI
-% 2/4/2019 - Renamed .Total to .TotalHb
-% 1/23/2019 - Process: Added support for DPFmode 'None', similar to Hitachi systems. 
-%						Note: units for this field are in mM*mm instead of uM and the quantity is not multiplied by the SD separation distance or a DPF factor
-% 1/22/2019 - Process: Changed default behavior for DPF to use Scholtz 2013 age/wavelength dependent calculations instead of 5.93
-%						Added 'DPFmode' parameter to change this behavior.
-%						Removed support for manufacturer chromophore absorbance, now uses interpolated values from published absorbance
-%				GUI:  Added ability to switch between DPF techniques (fixed, and calculated)
-% 1/12/2019 - GUI: Added field to show subject/trial information beflow device info (info struct in fNIRS)
-% 1/11/2019 - Process: Added support for dark channel/Sourcedetector distance,time, auxillary, dark inputs as optional parameters in method functions
-%			  GUI: Added support for information tags to show plot info 
-%				ConfigureMethods: Added support for adding and editing functions to available function lists
-% 1/10/2019 - GUI: Added support for PF2_Analyze() a custom function that receives the FNIRS struct for processing (resting state or other custom functionality)
-% 1/9/2019 - ConfigureMethods: Added function to clean names for storage automatically
-% 1/8/2019 - GUI: Added Pre-Post processed options for topographic plots
-% 1/7/2019 - Process: Added support for import methods via argument callback
-%					GUI:support for channel masking/rejection visualization
-% 1/6/2019 - Process: Split GUI from non-gui processFNIRS2 for performance reasons (takes GUI 1 second to load per call)
-% 1/5/2019 - Process: Split raw processing and added OD conversion as non-optional part of Raw stage
-%					Process: added multiple commandline argument inputs (varargin) to set and change configurations
-%					GUI: Added marker visualization support, added option to plot OD
-% 1/4/2019 - Process: Changed implementation so channel processing is parralellized
-%					Implemented Oxy Processing functionality
-%					GUI:Added linked topographic plots (arrangment stored in device cfg files)
-%					GUI:Added Relative2View Baselining (baselines at start of viewing window for visualization)
-%			ConfigureMethods: Added function descriptions
-% 1/3/2019 - ConfigureMethods: Modified method storage (pack/unpack methods)
-% 6/28/2019 - Initial Version: Support for select functions, raw processing visualization at multiple stages, selection of viewing window, biomarkers and channels
-
+% See CHANGELOG.md for version history
 
 global PF2
 global setF

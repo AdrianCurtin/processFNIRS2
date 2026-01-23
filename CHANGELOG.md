@@ -1,5 +1,59 @@
 # Changelog
 
+## v0.9 (2026-01-23)
+API Standardization & Comprehensive Testing Infrastructure
+
+### Breaking Changes
+- **camelCase API migration**: All public API functions now use camelCase naming convention
+  - `pf2.Import.*` → `pf2.import.*`
+  - `pf2.Export.*` → `pf2.export.*`
+  - `pf2.Data.*` → `pf2.data.*`
+  - `pf2.Process.*` → `pf2.process.*`
+  - `pf2.Methods.*` → `pf2.methods.*`
+  - `pf2.Settings.*` → `pf2.settings.*`
+  - `pf2.Probe.*` → `pf2.probe.*`
+
+### New Features
+- Added comprehensive unit testing infrastructure using MATLAB's unittest framework
+- Added integration tests for full processing pipeline validation
+- Added synthetic fNIRS data generators with configurable physiological and artifact components
+- Added quick validation scripts for rapid sanity checking
+
+### Testing Infrastructure
+
+**Test Runners:**
+- `pf2_base.tests.runAllTests()` - Run complete test suite
+- `pf2_base.tests.runQuickTests()` - Run fast validation tests
+
+**Unit Tests:**
+- `ImportNIRTest` - NIR file import validation
+- `DataStructureTest` - fNIRS struct invariant validation
+- `SignalProcessingTest` - Filter function testing
+- `DataManipulationTest` - Resample, concatenate, split operations
+- `BeerLambertTest` - Beer-Lambert conversion (bvoxy, Intensity2OD)
+- `TDDRTest` - TDDR motion correction algorithm
+- `ROIDefinitionTest` - ROI definition and configuration
+- `ROIBuildingTest` - ROI aggregation (nanmean, PCA)
+- `ExportTest` - NIR and SNIRF export functions
+- `FDRTest` - FDR statistical correction (Benjamini-Hochberg, two-step)
+- `MethodConfigTest` - Processing method configuration
+- `AuxDataTest` - Auxiliary data handling
+
+**Integration Tests:**
+- `FullPipelineTest` - End-to-end processing pipeline tests
+- `RoundtripTest` - SNIRF import/export roundtrip validation
+
+**Synthetic Data Generators:**
+- `generateFNIRS` - Realistic raw fNIRS data with HRF, cardiac, respiratory signals
+- `generateHemoglobin` - Synthetic HbO/HbR concentration data
+- `generateNoise` - White, pink, and brown noise generation
+- `generateArtifacts` - Motion artifact generation (spikes, steps, drift)
+- `generatePhysiological` - Cardiac and respiratory signal generation
+
+**Documentation:**
+- Added `testing_plan.md` - Comprehensive testing strategy document
+- Added `golden/README.md` - Golden file infrastructure documentation
+
 ## v0.8.1 (2026-01-23)
 Documentation & SNIRF Improvements
 
