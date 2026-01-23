@@ -7,3 +7,4 @@ sampledata/sampleNIR_CH.mat
 *.mexmaci64
 .vscode/launch.json
 .vscode/settings.json
+*.md
