@@ -103,7 +103,7 @@ function outData=processStageFilterHb(method,data,fs,probeInfo,ProcessRejected,s
 %
 % Example:
 %   % Apply Takizawa rejection and low-pass filter
-%   method = pf2.Methods.Oxy.GetMethod('takizawa_easy_lpf');
+%   method = pf2.methods.oxy.GetMethod('takizawa_easy_lpf');
 %   filtered = pf2_base.fnirs.processStageFilterHb(method, hbData, 10, ...
 %       probe, false, false);
 %

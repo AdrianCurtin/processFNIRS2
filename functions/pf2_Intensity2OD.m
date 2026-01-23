@@ -30,7 +30,7 @@ function dod = pf2_Intensity2OD( d )
 %
 % Example:
 %   % Convert raw intensity to OD
-%   data = pf2.Import.SampleData.fNIR2000();
+%   data = pf2.import.sampleData.fNIR2000();
 %   od = pf2_Intensity2OD(data.raw);
 %   fprintf('OD range: [%.3f, %.3f]\n', min(od(:)), max(od(:)));
 %

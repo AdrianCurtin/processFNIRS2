@@ -37,7 +37,7 @@ function [fData] = pf2_updateCurrentDevice(fData,cfgFilePath)
 %
 % Example:
 %   % Update device settings from data's embedded probe name
-%   data = pf2.Import.ImportNIR('myfile.nir');
+%   data = pf2.import.importNIR('myfile.nir');
 %   data = pf2_base.pf2_updateCurrentDevice(data);
 %
 %   % Explicitly specify device configuration

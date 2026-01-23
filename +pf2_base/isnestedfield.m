@@ -28,7 +28,7 @@ function isvalidfield=isnestedfield(var,nestedFieldString)
 %
 % Example:
 %   % Check nested field in fNIRS data structure
-%   data = pf2.Import.SampleData.fNIR2000();
+%   data = pf2.import.sampleData.fNIR2000();
 %   hasHeader = isnestedfield(data, 'info.header');  % true
 %   hasSubID = isnestedfield(data, 'info.SubjectID');  % true
 %   hasBadPath = isnestedfield(data, 'info.header.nonexistent');  % false

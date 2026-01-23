@@ -1263,16 +1263,16 @@ if(ExFNIRS.UpdateNeeded==2||~isfield(ExFNIRS,'curPreprocessedFNIR'))
        fprintf('Resampling and baselining fNIRS %i of %i\n',i,numSegs2Process);
        
        if(ExFNIRS.settings.use_baseline)
-            ExFNIRS.curPreprocessedFNIR.baseline{i}=pf2.Data.Split(ExFNIRS.curPreprocessedFNIR.fNIR{i},ExFNIRS.settings.baseline_start,ExFNIRS.settings.baseline_end); %baselining is handled in processing section
-            ExFNIRS.curPreprocessedFNIR.gbyFNIRS_blk{i}=pf2.Data.Resample(ExFNIRS.curPreprocessedFNIR.gbyFNIRS{i}, ExFNIRS.settings.barchart_resample_size,'centerOnTime',ExFNIRS.settings.block_start,'timeOutMode','start','blfNIR',ExFNIRS.curPreprocessedFNIR.baseline{i},'averageAux',true,'flattenAux',true,'trimAux',false);
+            ExFNIRS.curPreprocessedFNIR.baseline{i}=pf2.data.split(ExFNIRS.curPreprocessedFNIR.fNIR{i},ExFNIRS.settings.baseline_start,ExFNIRS.settings.baseline_end); %baselining is handled in processing section
+            ExFNIRS.curPreprocessedFNIR.gbyFNIRS_blk{i}=pf2.data.resample(ExFNIRS.curPreprocessedFNIR.gbyFNIRS{i}, ExFNIRS.settings.barchart_resample_size,'centerOnTime',ExFNIRS.settings.block_start,'timeOutMode','start','blfNIR',ExFNIRS.curPreprocessedFNIR.baseline{i},'averageAux',true,'flattenAux',true,'trimAux',false);
             
-            ExFNIRS.curPreprocessedFNIR.gbyFNIRS{i}=pf2.Data.Resample(ExFNIRS.curPreprocessedFNIR.gbyFNIRS{i}, ExFNIRS.settings.grandavg_resample_size,'centerOnTime',ExFNIRS.settings.block_start,'timeOutMode','start','blfNIR',ExFNIRS.curPreprocessedFNIR.baseline{i},'averageAux',true,'flattenAux',true,'trimAux',false);
+            ExFNIRS.curPreprocessedFNIR.gbyFNIRS{i}=pf2.data.resample(ExFNIRS.curPreprocessedFNIR.gbyFNIRS{i}, ExFNIRS.settings.grandavg_resample_size,'centerOnTime',ExFNIRS.settings.block_start,'timeOutMode','start','blfNIR',ExFNIRS.curPreprocessedFNIR.baseline{i},'averageAux',true,'flattenAux',true,'trimAux',false);
             ExFNIRS.curPreprocessedFNIR.gbyFNIRS{i}.time=ExFNIRS.curPreprocessedFNIR.gbyFNIRS{i}.time+ExFNIRS.settings.block_start; %change time so that 0 is start of block
        else
             ExFNIRS.curPreprocessedFNIR.baseline{i}=[];
-            ExFNIRS.curPreprocessedFNIR.gbyFNIRS_blk{i}=pf2.Data.Resample(ExFNIRS.curPreprocessedFNIR.gbyFNIRS{i}, ExFNIRS.settings.barchart_resample_size,'centerOnTime',ExFNIRS.settings.block_start,'timeOutMode','start','averageAux',true,'flattenAux',true,'trimAux',false);
+            ExFNIRS.curPreprocessedFNIR.gbyFNIRS_blk{i}=pf2.data.resample(ExFNIRS.curPreprocessedFNIR.gbyFNIRS{i}, ExFNIRS.settings.barchart_resample_size,'centerOnTime',ExFNIRS.settings.block_start,'timeOutMode','start','averageAux',true,'flattenAux',true,'trimAux',false);
             
-            ExFNIRS.curPreprocessedFNIR.gbyFNIRS{i}=pf2.Data.Resample(ExFNIRS.curPreprocessedFNIR.gbyFNIRS{i}, ExFNIRS.settings.grandavg_resample_size,'centerOnTime',ExFNIRS.settings.block_start,'timeOutMode','start','averageAux',true,'flattenAux',true,'trimAux',false);
+            ExFNIRS.curPreprocessedFNIR.gbyFNIRS{i}=pf2.data.resample(ExFNIRS.curPreprocessedFNIR.gbyFNIRS{i}, ExFNIRS.settings.grandavg_resample_size,'centerOnTime',ExFNIRS.settings.block_start,'timeOutMode','start','averageAux',true,'flattenAux',true,'trimAux',false);
        end
     end
 
@@ -1381,8 +1381,8 @@ else
     exploreFNIRS.processMethods([],cur_oxy_method);
 end
 
-[strsOxy,iOxy]=pf2.Methods.Oxy();
-[strsRaw,iRaw]=pf2.Methods.Raw();
+[strsOxy,iOxy]=pf2.methods.oxy();
+[strsRaw,iRaw]=pf2.methods.raw();
 
 set(handles.listbox_oxy_methods,'String',strsOxy);
 set(handles.listbox_oxy_methods,'Value',find(iOxy));
@@ -1843,9 +1843,9 @@ fprintf(fileID,'Feature: %s\n',settings.plot_bar_feature);
 
 fprintf(fileID,'\n');
 
-rawMethodDescrip=pf2.Methods.Raw.DescribeMethod();
+rawMethodDescrip=pf2.methods.raw.describeMethod();
 fprintf(fileID,'%s\n',rawMethodDescrip);
-oxyMethodDescrip=pf2.Methods.Oxy.DescribeMethod();
+oxyMethodDescrip=pf2.methods.oxy.describeMethod();
 fprintf(fileID,'%s\n',oxyMethodDescrip);
 
 
@@ -2014,7 +2014,7 @@ for i=numEx:-1:1
     end
     
     if( ExFNIRS.settings.timeShiftTo0)
-        ExFNIRS.data{i}=pf2.Data.SetT0(ExFNIRS.data{i},min(ExFNIRS.data{i}.time));
+        ExFNIRS.data{i}=pf2.data.setT0(ExFNIRS.data{i},min(ExFNIRS.data{i}.time));
     end
     
     if(isfield(ExFNIRS.data{i},'info'))

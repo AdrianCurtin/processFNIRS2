@@ -56,7 +56,7 @@ if(~isfield(fNIR, 'probeNum'))
         [~,wvb]=unique(probeInfo.Wavelength);
         wavelengths=probeInfo.Wavelength(wvb); %unsort here
     end
-    figHandle = pf2.Data.Plot.Raw(fNIR,channels,showMarkers,wavelengths,ylimit,plotArranged,lineProps,rejectedLineProps);
+    figHandle = pf2.data.plot.raw(fNIR,channels,showMarkers,wavelengths,ylimit,plotArranged,lineProps,rejectedLineProps);
     return;
 end
 
@@ -88,7 +88,7 @@ for j=1:length(probes_index)
     figHandle(j) = RawHelper(fNIR_i,plotChannels,showMarkers,wavelengths_i,ylimit,plotArranged,lineProps,rejectedLineProps);
 end
 
-    function [ figHandle ] = RawHelper(fNIR,channels,showMarkers,wavelengths,ylimit,plotArranged,lineProps,rejectedLineProps)
+    function [ figHandle ] = rawHelper(fNIR,channels,showMarkers,wavelengths,ylimit,plotArranged,lineProps,rejectedLineProps)
         %pf2.Plot.Raw
         %   plots an individual channels or autoarranged plot of the channelss based on the device
         

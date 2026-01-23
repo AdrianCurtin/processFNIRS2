@@ -51,7 +51,7 @@ function [data, assetPath] = getAsset(assetName, varargin)
 %   % Get path only
 %   [~, path] = pf2_base.getAsset('sideprofile', 'pathOnly', true);
 %
-% See also: pf2.Probe.Plot.InterpolateValues3D, imread, load
+% See also: pf2.probe.plot.interpolateValues3D, imread, load
 
 % Parse inputs
 p = inputParser;

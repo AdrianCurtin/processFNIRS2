@@ -8,8 +8,8 @@ else
    processOxyOnly=false; 
 end
 
-strsOxy=pf2.Methods.Oxy();
-strsRaw=pf2.Methods.Raw();
+strsOxy=pf2.methods.oxy();
+strsRaw=pf2.methods.raw();
 
 if(~isfield(ExFNIRS,'processedData')||(size(ExFNIRS.processedData,1)~=length(strsOxy)*length(strsRaw))) 
     ExFNIRS.processedData=cell(length(strsOxy)*length(strsRaw),3);
@@ -65,7 +65,7 @@ if(~any(curRawMatchIdx&curOxyMatchIdx))
        if(~isempty(data{i})&&length(data{i}.time)>1)
            if(processOxyOnly)
                if(isfield(data{i},'HbO'))
-                   data{i}=pf2.Process.ProcessOxy(data{i});
+                   data{i}=pf2.process.processOxy(data{i});
                else
                    warning('Data file for item %i has no Oxy Data, attempting to process with ''None''\n',data{i});
                    data{i}=pf2(data{i});
@@ -73,8 +73,8 @@ if(~any(curRawMatchIdx&curOxyMatchIdx))
            else
                data{i}=pf2(data{i});
            end
-           data{i}=pf2.Data.ApplyChannelMask(data{i});
-           data{i}=pf2.Data.Resample(data{i},ExFNIRS.settings.grandavg_resample_size,'centerOnT0',true,'timeOutMode','end','averageAux',false,'flattenAux',true);
+           data{i}=pf2.data.applyChannelMask(data{i});
+           data{i}=pf2.data.resample(data{i},ExFNIRS.settings.grandavg_resample_size,'centerOnT0',true,'timeOutMode','end','averageAux',false,'flattenAux',true);
        end
     end
 

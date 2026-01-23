@@ -33,24 +33,24 @@ processFNIRS2 is a modular MATLAB toolbox designed for processing functional Nea
 ### Quick Start Guide
 ```matlab
 % Import data
-mydata = pf2.Import.ImportNIR('myNIRSfile.nir');
+mydata = pf2.import.importNIR('myNIRSfile.nir');
 
 % Configure processing methods
 processFNIRS2(); % Opens GUI for method configuration
 % Or select methods programmatically:
-pf2.Methods.Raw.SetMethod('MyRawMethod');
-pf2.Methods.Oxy.SetMethod('MyOxyMethod');
+pf2.methods.raw.setMethod('MyRawMethod');
+pf2.methods.oxy.setMethod('MyOxyMethod');
 
 % Process data
 myprocesseddata = processFNIRS2(mydata);
 
 % Visualize data
-pf2.Data.Plot.Oxy(myprocesseddata);
-pf2.Data.Plot.ROI(myprocesseddata);
+pf2.data.plot.oxy(myprocesseddata);
+pf2.data.plot.roi(myprocesseddata);
 
 % Export data
-pf2.Export.asNIR(myprocesseddata, 'myexport.nir');
-pf2.Export.asSNIRF(myprocesseddata, 'myexport.snirf');
+pf2.export.asNIR(myprocesseddata, 'myexport.nir');
+pf2.export.asSNIRF(myprocesseddata, 'myexport.snirf');
 
 % Explore and analyze data
 exploreFNIRS(myprocesseddata);
@@ -60,45 +60,45 @@ exploreFNIRS(myprocesseddata);
 
 ### Data Import
 Use functions in the `pf2.Import` module to load data from various fNIRS devices:
-- `pf2.Import.ImportNIR`: Import fNIR Devices/Biopac files
-- `pf2.Import.ImportHitachiMES`: Import Hitachi ETG-4000 files
-- `pf2.Import.ImportNIRX`: Import NIRx system files
-- `pf2.Import.ImportSNIRF`: Import SNIRF format files
-- `pf2.Import.SampleData`: Load example datasets included with the toolbox
+- `pf2.import.importNIR`: Import fNIR Devices/Biopac files
+- `pf2.import.importHitachiMES`: Import Hitachi ETG-4000 files
+- `pf2.import.importNIRX`: Import NIRx system files
+- `pf2.import.importSNIRF`: Import SNIRF format files
+- `pf2.import.sampleData`: Load example datasets included with the toolbox
 
 ### Data Manipulation
 The toolbox provides various functions for manipulating fNIRS data:
-- `pf2.Data.ApplyChannelMask`: Set bad channels to NaN
-- `pf2.Data.GetMarkers`: Find specific markers in the data
-- `pf2.Data.Resample`: Resample or average fNIRS data
-- `pf2.Data.SetT0`: Shift time to align with experiment start
-- `pf2.Data.Split`: Split fNIRS segments based on time points
-- `pf2.Data.Plot`: Visualize fNIRS data (Oxy, Raw, ROI, AuxData)
+- `pf2.data.applyChannelMask`: Set bad channels to NaN
+- `pf2.data.getMarkers`: Find specific markers in the data
+- `pf2.data.resample`: Resample or average fNIRS data
+- `pf2.data.setT0`: Shift time to align with experiment start
+- `pf2.data.split`: Split fNIRS segments based on time points
+- `pf2.data.plot`: Visualize fNIRS data (Oxy, Raw, ROI, AuxData)
 - `pf2.Export`: Export data to NIR or SNIRF formats
 
 ### Method Configuration
 processFNIRS2 uses a two-stage processing pipeline:
 1. **Raw processing** (Raw → Optical Density)
-   - Configure and select methods using `pf2.Methods.Raw`
+   - Configure and select methods using `pf2.methods.Raw`
    - Common preprocessing includes: motion artifact correction, filtering, CAR, etc.
 
 2. **Oxy processing** (Optical Density → Hemoglobin)
-   - Configure and select methods using `pf2.Methods.Oxy`
+   - Configure and select methods using `pf2.methods.Oxy`
    - Processing includes: Beer-Lambert conversion, filtering, ROI analysis, etc.
 
 Methods can be configured through the GUI or programmatically:
 ```matlab
 % Open method configuration GUI
-pf2.Methods.Raw.ConfigureMethods();
-pf2.Methods.Oxy.ConfigureMethods();
+pf2.methods.raw.configureMethods();
+pf2.methods.oxy.configureMethods();
 
 % List available methods
-pf2.Methods.Raw.List();
-pf2.Methods.Oxy.List();
+pf2.methods.raw.List();
+pf2.methods.oxy.List();
 
 % Set methods programmatically
-pf2.Methods.Raw.SetMethod('MyRawMethod');
-pf2.Methods.Oxy.SetMethod('MyOxyMethod');
+pf2.methods.raw.setMethod('MyRawMethod');
+pf2.methods.oxy.setMethod('MyOxyMethod');
 ```
 
 ### Data Processing
@@ -108,22 +108,22 @@ Process data using the selected methods:
 myprocesseddata = processFNIRS2(mydata);
 
 % Process specific stages only
-myrawprocessed = pf2.Process.ProcessRaw(mydata);
-myoxyprocessed = pf2.Process.ProcessOxy(myrawprocessed);
+myrawprocessed = pf2.process.processRaw(mydata);
+myoxyprocessed = pf2.process.processOxy(myrawprocessed);
 ```
 
 ### Visualization and Export
 Visualize and export your processed data:
 ```matlab
 % Visualize different aspects of the data
-pf2.Data.Plot.Oxy(myprocesseddata);      % Plot oxygenation data
-pf2.Data.Plot.Raw(myprocesseddata);      % Plot raw intensity data
-pf2.Data.Plot.ROI(myprocesseddata);      % Plot region of interest data
-pf2.Data.Plot.AuxData(myprocesseddata);  % Plot auxiliary data
+pf2.data.plot.oxy(myprocesseddata);      % Plot oxygenation data
+pf2.data.plot.raw(myprocesseddata);      % Plot raw intensity data
+pf2.data.plot.roi(myprocesseddata);      % Plot region of interest data
+pf2.data.plot.auxData(myprocesseddata);  % Plot auxiliary data
 
 % Export data to different formats
-pf2.Export.asNIR(myprocesseddata, 'myexport.nir');
-pf2.Export.asSNIRF(myprocesseddata, 'myexport.snirf');
+pf2.export.asNIR(myprocesseddata, 'myexport.nir');
+pf2.export.asSNIRF(myprocesseddata, 'myexport.snirf');
 ```
 
 ### Advanced Analysis with exploreFNIRS
@@ -151,15 +151,15 @@ exploreFNIRS features:
 Adjust common settings using the Settings module:
 ```matlab
 % Baseline settings
-pf2.Settings.Baseline.SetBaselineStartTime(0);
-pf2.Settings.Baseline.SetBaselineLength(5);
+pf2.settings.baseline.setBaselineStartTime(0);
+pf2.settings.baseline.setBaselineLength(5);
 
 % DPF (Differential Path Length) settings
-pf2.Settings.DPF.SetDPFmode('Calc'); % 'None', 'Fixed', or 'Calc'
-pf2.Settings.DPF.SetFixedDPF(5.93);
+pf2.settings.dpf.setDPFmode('Calc'); % 'None', 'Fixed', or 'Calc'
+pf2.settings.dpf.setFixedDPF(5.93);
 
 % Device selection
-pf2.Settings.SelectDevice('fNIR_Devices_fNIR1200_16ch.cfg');
+pf2.settings.selectDevice('fNIR_Devices_fNIR1200_16ch.cfg');
 ```
 
 ## File Structure
@@ -194,25 +194,25 @@ processFNIRS2 is laid out in the following manner:
 - **GUI**: Shortcut for accessing the GUI
 - **Help**: Access to help documentation
 - **Import**: Functions to import fNIRS files
-  - ImportHitachiMES: Import Hitachi Probes
-  - ImportNIRX: Import NIRx files
-  - ImportNIR: Import fNIR Devices/Biopac files
-  - ImportSNIRF: Import SNIRF format files
-  - SampleData: Load sample data included with the toolbox
+  - importHitachiMES: Import Hitachi Probes
+  - importNIRX: Import NIRx files
+  - importNIR: Import fNIR Devices/Biopac files
+  - importSNIRF: Import SNIRF format files
+  - sampleData: Load sample data included with the toolbox
 - **Methods**: Functions to change and modify processing methods
   - Oxy: Oxy conversion pipeline methods
   - Raw: Raw domain pipeline methods
 - **Process**: Process fNIR segment data
-  - ProcessOxy: Run the Oxy Pipeline only
-  - ProcessRaw: Run the Raw Pipeline only
+  - processOxy: Run the Oxy Pipeline only
+  - processRaw: Run the Raw Pipeline only
 - **Settings**: Change settings related to processing
   - Baseline: Change baseline time settings
   - DPF: Change mode of Differential Path Length
-  - SelectDevice: Reload device settings for FNIRS probe
+  - selectDevice: Reload device settings for FNIRS probe
 
 ## Troubleshooting Tips
 - When importing data for the first time, verify that the probe configuration is correct
-- If you get errors about DPF factors, check the settings using `pf2.Settings.DPF`
+- If you get errors about DPF factors, check the settings using `pf2.settings.DPF`
 - For visualization issues, try running with default methods first
 - If having trouble loading the software, check the MATLAB preference directory (`prefdir`) and delete any related settings files
 - Remember that GUI settings are for visualization only and don't affect your data
@@ -225,8 +225,8 @@ Access this location using the MATLAB command: `prefdir`
 For detailed function documentation, use MATLAB's `help` command:
 ```matlab
 help processFNIRS2
-help pf2.Methods.Raw
-help pf2.Import.ImportNIR
+help pf2.methods.Raw
+help pf2.import.importNIR
 ```
 
 ## License

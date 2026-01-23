@@ -58,7 +58,7 @@ function [ hrf ] = buildHRF(fs,t, alpha1,alpha2,beta1,beta2,c )
 %   hrf = buildHRF(10, 20, 5, 15, 0.8, 0.8, 1/7);
 %
 %   % Use for stimulus convolution
-%   data = pf2.Import.SampleData.fNIR2000();
+%   data = pf2.import.sampleData.fNIR2000();
 %   stim = zeros(size(data.time));
 %   stim(data.markers(:,1)) = 1;  % Delta functions at markers
 %   expected = conv(stim, hrf(:,2), 'same');  % Predicted response

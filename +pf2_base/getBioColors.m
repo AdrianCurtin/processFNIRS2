@@ -40,6 +40,6 @@ function colorsTable=getBioColors()
 %   % Access specific color
 %   hboColor = colors.HbO;  % [0.797, 0.145, 0.160]
 %
-% See also: pf2_getFNIRSbiomFields, pf2.Data.Plot.Oxy, pf2_plotArranged
+% See also: pf2_getFNIRSbiomFields, pf2.data.plot.oxy, pf2_plotArranged
 
 colorsTable=table([204/256,37/256,41/256],[57/256,106/256,177/256],[0.2,0.2,0.2],[107/256,76/256,154/256],[0,0.7,0.7],'VariableNames',{'HbO','HbR','HbDiff','HbTotal','CBSI'});

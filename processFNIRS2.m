@@ -227,11 +227,11 @@ cfgRawImportPath=p.Results.ImportRawMethods;
 cfgOxyImportPath=p.Results.ImportOxyMethods;
 
 if(~strcmp(cfgRawImportPath,'NA'))
-    pf2.Methods.Raw.ImportMethods(cfgRawImportPath);
+    pf2.methods.raw.importMethods(cfgRawImportPath);
 end
 
 if(~strcmp(cfgOxyImportPath,'NA'))
-    pf2.Methods.Oxy.ImportMethods(cfgOxyImportPath);
+    pf2.methods.oxy.importMethods(cfgOxyImportPath);
 end
 
 if(isempty(data)||(isstruct(data)&&isfield(data,'info')&&~isfield(data,'raw')&&~isfield(data,'HbO')))

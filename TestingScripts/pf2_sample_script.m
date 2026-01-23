@@ -5,7 +5,7 @@ runSkip=true; % if you press run just to see the example, this will skip some op
 % Example: Loading FNIRS data from a .nir file
 
 %load fNIRS data from FNIR devices model 1100 (same layout as 1200)
-[fNIR]=pf2.Import.ImportNIR('sampleNIR.nir','sampleNIR.mrk');
+[fNIR]=pf2.import.importNIR('sampleNIR.nir','sampleNIR.mrk');
 
 % Assign subject age/ other information
 fNIR.info.SubjectID='TestSubject1';

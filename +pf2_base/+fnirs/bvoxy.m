@@ -85,7 +85,7 @@ function [HbO, HbR, Total, HbDiff,CBSI,channels,time,units,DPF_factor]=bvoxy(var
 %
 % Example:
 %   % Basic usage with sample data
-%   data = pf2.Import.SampleData.fNIR2000();
+%   data = pf2.import.sampleData.fNIR2000();
 %   [HbO, HbR] = bvoxy(data.raw, data.info.header.channels, ...
 %       data.info.header.wavelengths, data.info.header.SD);
 %

@@ -35,7 +35,7 @@ function y = detrend_nan(x,restoreMean)
 %
 % Example:
 %   % Detrend fNIRS signal with motion artifacts (NaN gaps)
-%   data = pf2.Import.SampleData.fNIR2000();
+%   data = pf2.import.sampleData.fNIR2000();
 %   signal = data.HbO(:,1);  % Get first channel
 %   signal([100:110, 500:520]) = NaN;  % Simulate artifact gaps
 %   detrended = detrend_nan(signal);  % Remove drift, keep mean

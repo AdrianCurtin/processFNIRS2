@@ -3,8 +3,8 @@ function fnir=applyfMask(fnir)
 
 global PF2
 
-warning('Please replace with pf2.Data.ApplyChannelMask');
+warning('Please replace with pf2.data.applyChannelMask');
 
-fnir=pf2.Data.ApplyChannelMask(fnir);
+fnir=pf2.data.applyChannelMask(fnir);
 
 end

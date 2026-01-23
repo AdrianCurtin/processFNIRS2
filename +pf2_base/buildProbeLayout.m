@@ -43,7 +43,7 @@ function optLayout2D = buildProbeLayout(optPosX, optPosY, optPosZ)
 %       plot(data(:, i));
 %   end
 %
-% See also: loadDeviceCfg, fitProbe2D, pf2.Probe.Plot.ArrangedValues
+% See also: loadDeviceCfg, fitProbe2D, pf2.probe.plot.arrangedValues
 
 % Delegate to fitProbe2D which contains the actual implementation
 if nargin < 3

@@ -91,7 +91,7 @@ function [outDataOD,outDataRaw]=processStageRaw2OD(method,data,fs,time,rawMask,f
 %       mask, markers, aux, chNums, wavelengths, probe, fData, false);
 %
 %   % Use specific method
-%   method = pf2.Methods.Raw.GetMethod('x2_lpf_smar');
+%   method = pf2.methods.raw.GetMethod('x2_lpf_smar');
 %   [od, raw] = pf2_base.fnirs.processStageRaw2OD(method, data, fs, ...
 %       time, mask, markers, aux, chNums, wavelengths, probe, fData, false);
 %

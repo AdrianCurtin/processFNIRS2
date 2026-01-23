@@ -1,12 +1,12 @@
 function varargout=getFNIRS(varargin)
-% This function is a wrapper function for pf2.Data.Split
+% This function is a wrapper function for pf2.data.split
 
-%warning('Please replace with pf2.Data.Split()\n');
+%warning('Please replace with pf2.data.split()\n');
 
 if(nargout>0)
-    varargout{1:nargout}=pf2.Data.Split(varargin{:});
+    varargout{1:nargout}=pf2.data.split(varargin{:});
 else
-   pf2.Data.Split(varargin{:}); 
+   pf2.data.split(varargin{:}); 
 
 end
 

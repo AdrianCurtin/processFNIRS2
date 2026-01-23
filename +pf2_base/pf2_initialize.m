@@ -65,7 +65,7 @@ function pf2_initialize()
 %       disp('Already initialized');
 %   end
 %
-% See also: processFNIRS2, pf2.Methods.Raw.SetMethod, pf2.Settings.SetDPFmode
+% See also: processFNIRS2, pf2.methods.raw.setMethod, pf2.settings.SetDPFmode
 
 global PF2
 

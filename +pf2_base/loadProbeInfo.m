@@ -42,7 +42,7 @@ function probeInfo = loadProbeInfo(fNIR, buildProbeLayout, includeSS)
 %
 % Example:
 %   % Get probe info from loaded data
-%   data = pf2.Import.ImportNIR('myfile.nir');
+%   data = pf2.import.importNIR('myfile.nir');
 %   probeInfo = pf2_base.loadProbeInfo(data);
 %   fprintf('Probe has %d channels\n', length(probeInfo.ChannelNumbers));
 %

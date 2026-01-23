@@ -1201,10 +1201,10 @@ if(showTopo)
                                         minVal(2)=-1*min(abs(passingVals));
                                         switch(exSettings.ChannelMode)
                                             case 'fNIR'
-                                                pf2.Data.Plot.ImageValues([],curT,minVal,[],coefNames{c},'t-Stat');%,7,11,2,1,false,'[Hb-Oxy] Natural High Vs. Low',12,'hot',true)
+                                                pf2.data.plot.ImageValues([],curT,minVal,[],coefNames{c},'t-Stat');%,7,11,2,1,false,'[Hb-Oxy] Natural High Vs. Low',12,'hot',true)
                                             case 'ROI'
                                                 roiInfo=ExFNIRS.currentROI;
-                                                pf2.Data.Plot.ImageValues([],mapROIvaluesToCh(roiInfo,curT),minVal,[],coefNames{c},'t-Stat');%,7,11,2,1,false,'[Hb-Oxy] Natural High Vs. Low',12,'hot',true)
+                                                pf2.data.plot.ImageValues([],mapROIvaluesToCh(roiInfo,curT),minVal,[],coefNames{c},'t-Stat');%,7,11,2,1,false,'[Hb-Oxy] Natural High Vs. Low',12,'hot',true)
                                         end
                                     else
                                         plot(0,0);
@@ -1286,10 +1286,10 @@ if(showTopo)
                                         
                                         switch(exSettings.ChannelMode)
                                             case 'fNIR'
-                                                pf2.Probe.Plot.InterpolateValues3D(curF,[],estimatedPval_min,[],titleSTR,'F-val','bufferDistance',1);%InterpolateValues(fNIR,data2plot,minVal,maxVal,bufferMult,titleString,clrBarTitle
+                                                pf2.probe.plot.interpolateValues3D(curF,[],estimatedPval_min,[],titleSTR,'F-val','bufferDistance',1);%InterpolateValues(fNIR,data2plot,minVal,maxVal,bufferMult,titleString,clrBarTitle
                                             case 'ROI'
                                                 roiInfo=ExFNIRS.currentROI;
-                                                pf2.Probe.Plot.InterpolateROIvalues(mapROIvaluesToCh(roiInfo,curF),[],'ROIinfo',roiInfo,'minVal',estimatedPval_min,'maxVal',[],'bufferMult',1,'titleString',titleSTR,'clrBarTitle','F-val');%,7,11,2,1,false,'[Hb-Oxy] Natural High Vs. Low',12,'hot',true)
+                                                pf2.probe.plot.interpolateROIvalues(mapROIvaluesToCh(roiInfo,curF),[],'ROIinfo',roiInfo,'minVal',estimatedPval_min,'maxVal',[],'bufferMult',1,'titleString',titleSTR,'clrBarTitle','F-val');%,7,11,2,1,false,'[Hb-Oxy] Natural High Vs. Low',12,'hot',true)
                                         end
                                 end
                                 
@@ -1345,7 +1345,7 @@ if(showTopo)
                                     %
                                     %                             numROI=size(ExFNIRS.currentROI,1);
                                     %                             vals=abs(curT(1:numROI));
-                                    %                             pf2.Data.Plot.InterpolateROIvalues(roiInfo,vals,minVal,maxVal,1,coefNames{c},'tstat');%,7,11,2,1,false,'[Hb-Oxy] Natural High Vs. Low',12,'hot',true)
+                                    %                             pf2.data.plot.InterpolateROIvalues(roiInfo,vals,minVal,maxVal,1,coefNames{c},'tstat');%,7,11,2,1,false,'[Hb-Oxy] Natural High Vs. Low',12,'hot',true)
                             end
                             if(c==1) % first column
                                 ylabel_with_space(selectedBioM(b));
@@ -1373,7 +1373,7 @@ if(showTopo)
                                     %
                                     %                             numROI=size(ExFNIRS.currentROI,1);
                                     %                             vals=abs(curT(1:numROI));
-                                    %                             pf2.Data.Plot.InterpolateROIvalues(roiInfo,vals,minVal,maxVal,1,coefNames{c},'tstat');%,7,11,2,1,false,'[Hb-Oxy] Natural High Vs. Low',12,'hot',true)
+                                    %                             pf2.data.plot.InterpolateROIvalues(roiInfo,vals,minVal,maxVal,1,coefNames{c},'tstat');%,7,11,2,1,false,'[Hb-Oxy] Natural High Vs. Low',12,'hot',true)
                             end
                             if(a==1) % first column
                                 ylabel_with_space(selectedBioM(b));

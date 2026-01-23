@@ -61,7 +61,7 @@ function probeInfo=loadDeviceCfg(deviceCfgFilename,includeSSchannels,loadFromGlo
 %   global setF
 %   disp(setF.device.Info.Name);
 %
-% See also: buildProbeLayout, loadProbeInfo, pf2.Settings.SelectDevice,
+% See also: buildProbeLayout, loadProbeInfo, pf2.settings.selectDevice,
 %           fitProbe2D, pf2_initialize
 
 % Set default values for input arguments

@@ -180,9 +180,9 @@ auxFieldVarNames={};
 for i=1:numfSeg % Resample and find max/min and num channels
     if(resample)
         if(centerOnT0)
-            FNIRScellArray{i}=pf2.Data.Resample(FNIRScellArray{i},resampleSize,'centerOnT0',centerOnT0,'timeOutMode','start','averageAux',true,'flattenAux',true,'trimAux',true);
+            FNIRScellArray{i}=pf2.data.resample(FNIRScellArray{i},resampleSize,'centerOnT0',centerOnT0,'timeOutMode','start','averageAux',true,'flattenAux',true,'trimAux',true);
         else
-            FNIRScellArray{i}=pf2.Data.Resample(FNIRScellArray{i},resampleSize,'centerOnT0',centerOnT0,'averageAux',true,'flattenAux',true,'trimAux',true);
+            FNIRScellArray{i}=pf2.data.resample(FNIRScellArray{i},resampleSize,'centerOnT0',centerOnT0,'averageAux',true,'flattenAux',true,'trimAux',true);
         end
 
 
