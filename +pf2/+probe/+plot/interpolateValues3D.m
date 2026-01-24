@@ -187,6 +187,10 @@ centerCamPos=[0,-20,0];
 addParameter(p, 'camTarget', centerCamPos, validCamPosition); % Target Camera location
 addParameter(p, 'camUp', [0,0,1] , validCamPosition); % Target Camera location
 addParameter(p, 'animated', false, @islogical); % Optimizes for animation (By not redrawing certain things when possible)
+addParameter(p, 'savePath', '', @(x) ischar(x) || isstring(x));
+addParameter(p, 'saveWidth', [], @(x) isempty(x) || isnumeric(x));
+addParameter(p, 'saveHeight', [], @(x) isempty(x) || isnumeric(x));
+addParameter(p, 'saveDPI', 150, @isnumeric);
 
 
 parse(p,varargin{:});
@@ -199,6 +203,10 @@ clrBarTitle = p.Results.colorbarStr;
 projectmode = p.Results.interpolateType;
 bufferDistance=p.Results.bufferDistance;
 include_ss=p.Results.includeSS;
+savePath = p.Results.savePath;
+saveWidth = p.Results.saveWidth;
+saveHeight = p.Results.saveHeight;
+saveDPI = p.Results.saveDPI;
 
 
 bufferDistance=nan;
@@ -1670,9 +1678,15 @@ h=ax;
 
 if (nargout > 0)
     h=ax;
-    
+
     frame=getframe(ax);
     imgOut = frame.cdata;
+end
+
+% Save figure if requested
+if ~isempty(savePath)
+    fig = gcf();
+    pf2_base.plot.saveFigure(fig, savePath, saveWidth, saveHeight, saveDPI);
 end
 
 toc

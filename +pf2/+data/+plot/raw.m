@@ -1,85 +1,102 @@
-function [ figHandle ] = raw(varargin)
+function [ figHandle ] = raw(fNIR, varargin)
 % RAW Plot raw light intensity data from fNIRS acquisition
 %
 % Creates time series plots of raw fNIRS intensity data, optionally
 % arranged according to probe geometry. Supports wavelength selection,
-% marker overlay, and visual indication of rejected channels. Useful for
-% quality assessment of raw data before processing.
+% marker overlay, and visual indication of rejected channels.
 %
 % Syntax:
-%   pf2.data.plot.raw(fNIR)
-%   pf2.data.plot.raw(fNIR, channels)
-%   pf2.data.plot.raw(fNIR, channels, showMarkers, wavelengths)
-%   pf2.data.plot.raw(fNIR, channels, showMarkers, wavelengths, ylimit, plotArranged)
-%   figHandle = pf2.data.plot.raw(..., lineProps, rejectedLineProps)
+%   pf2.data.plot.raw(fNIR)                      % All channels
+%   pf2.data.plot.raw(fNIR, channels)            % Specific channels
+%   pf2.data.plot.raw(fNIR, ..., Name, Value)    % With options
 %
 % Inputs:
-%   fNIR              - fNIRS data structure [struct]
-%                       Must contain 'raw' [T x C] and 'time' [T x 1] fields.
-%   channels          - Channels to plot [numeric array | logical | 'all']
-%                       (default: all channels, enables arranged plot)
-%                       Can be channel numbers or logical index.
-%   showMarkers       - Display event markers on plots [logical | numeric | 'all']
-%                       (default: true) If numeric, specifies marker codes to show.
-%   wavelengths       - Wavelengths to include [numeric array | 'all']
-%                       (default: all available wavelengths from probe config)
-%                       Common values: 730, 850 nm.
-%   ylimit            - Y-axis limits for all subplots [1x2 numeric]
-%                       (default: [RawMin, max(data)] from device config)
-%   plotArranged      - Use probe geometry layout for subplots [logical]
-%                       (default: true when all channels plotted)
-%   lineProps         - Line properties for good channels [cell array]
-%                       (default: {'LineWidth', 1})
-%   rejectedLineProps - Line properties for rejected channels [cell array]
-%                       (default: {'--', 'LineWidth', 1})
+%   fNIR      - fNIRS data structure with 'raw' and 'time' fields
+%   channels  - (optional) Channels to plot: numeric, logical, or 'all'
 %
-% Outputs:
-%   figHandle - Handle to the created figure [figure handle]
-%               Only returned when output argument is requested.
+% Options (Name-Value):
+%   'markers'     - true (default), false, or numeric array of codes
+%   'wavelengths' - [] (all), or specific wavelength values [730, 850]
+%   'ylim'        - [] (auto), or [min max]
+%   'arranged'    - [] (auto), true, or false
+%   'interactive' - true (default), false to skip prompts (for batch/headless)
+%   'savePath'    - '' (default), filename to save figure (.png, .pdf, .fig)
+%   'saveWidth'   - [] (default), figure width in pixels
+%   'saveHeight'  - [] (default), figure height in pixels
+%   'saveDPI'     - 150 (default), resolution for raster formats
 %
 % Example:
-%   % Basic raw data plot
-%   data = pf2.import.sampleData.fNIR2000();
-%   pf2.data.plot.raw(data);
-%
-%   % Plot specific channels and wavelengths
-%   pf2.data.plot.raw(data, 1:5, true, 730);
-%
-%   % Custom line styling with markers disabled
-%   pf2.data.plot.raw(data, 'all', false, 'all', [], true, ...
-%       {'LineWidth', 2, 'Color', 'b'});
-%
-% Notes:
-%   - Requires valid device configuration for probe geometry
-%   - Rejected channels (fchMask=0) shown with 'X', marginal (0.5) with '~'
-%   - Data cursor mode enabled for interactive inspection
-%   - Large numbers of markers may prompt for confirmation (slow rendering)
+%   pf2.data.plot.raw(data)                      % Simple
+%   pf2.data.plot.raw(data, 5)                   % Channel 5
+%   pf2.data.plot.raw(data, 1:5)                 % Channels 1-5
+%   pf2.data.plot.raw(data, 'wavelengths', 730)  % Single wavelength
+%   pf2.data.plot.raw(data, 5, 'markers', false) % No markers
 %
 % See also: pf2.data.plot.oxy, pf2.data.plot, pf2.settings.selectDevice
 
-validFnirs = @(x) (iscell(x) || isstruct(x));
-validChannels = @(x) (isnumeric(x) || ischar(x));
-validWavelength = @(x) (isnumeric(x) || ischar(x));
+% Validate fNIR input
+if ~isstruct(fNIR)
+    error('pf2:InvalidInput', 'First argument must be a fNIRS data structure');
+end
 
-p=inputParser;
-addRequired(p, 'fNIR', validFnirs);
-addOptional(p, 'channels', [], validChannels);
-addOptional(p, 'showMarkers', true, @islogical);
-addOptional(p, 'wavelengths', [], validWavelength);
-addOptional(p, 'ylimit', [], @isnumeric);
-addOptional(p, 'plotArranged', false, @islogical);
-addOptional(p, 'lineProps', {'LineWidth', 1}, @iscell);
-addOptional(p, 'rejectedLineProps', {'--', 'LineWidth', 1}, @iscell);
+% Parameter names for detection
+paramNames = {'markers', 'showmarkers', 'wavelengths', 'ylim', 'ylimit', ...
+              'arranged', 'plotarranged', 'lineprops', 'rejectedlineprops', ...
+              'interactive', 'savepath', 'savewidth', 'saveheight', 'savedpi'};
 
-parse(p, varargin{:});
-fNIR = p.Results.fNIR;
-channels = p.Results.channels;
-showMarkers = p.Results.showMarkers;
+% Extract positional 'channels' argument if present
+channels = [];
+nvStart = 1;
+
+if ~isempty(varargin)
+    firstArg = varargin{1};
+    if isnumeric(firstArg) || islogical(firstArg) || ...
+       (ischar(firstArg) && strcmpi(firstArg, 'all'))
+        channels = firstArg;
+        nvStart = 2;
+    elseif ischar(firstArg) || isstring(firstArg)
+        if ~ismember(lower(char(firstArg)), paramNames)
+            channels = firstArg;
+            nvStart = 2;
+        end
+    end
+end
+
+% Parse name-value pairs
+p = inputParser;
+p.CaseSensitive = false;
+addParameter(p, 'markers', true, @(x) islogical(x) || isnumeric(x));
+addParameter(p, 'showMarkers', [], @(x) islogical(x) || isnumeric(x) || isempty(x));  % Legacy
+addParameter(p, 'wavelengths', [], @(x) isnumeric(x) || ischar(x));
+addParameter(p, 'ylim', [], @isnumeric);
+addParameter(p, 'ylimit', [], @isnumeric);  % Legacy
+addParameter(p, 'arranged', [], @(x) islogical(x) || isempty(x));
+addParameter(p, 'plotArranged', [], @(x) islogical(x) || isempty(x));  % Legacy
+addParameter(p, 'lineProps', {'LineWidth', 1}, @iscell);
+addParameter(p, 'rejectedLineProps', {'--', 'LineWidth', 1}, @iscell);
+addParameter(p, 'interactive', true, @islogical);
+addParameter(p, 'savePath', '', @(x) ischar(x) || isstring(x));
+addParameter(p, 'saveWidth', [], @(x) isempty(x) || isnumeric(x));
+addParameter(p, 'saveHeight', [], @(x) isempty(x) || isnumeric(x));
+addParameter(p, 'saveDPI', 150, @isnumeric);
+
+parse(p, varargin{nvStart:end});
+
+% Assign parsed values (with legacy fallbacks)
+showMarkers = p.Results.markers;
+if ~isempty(p.Results.showMarkers), showMarkers = p.Results.showMarkers; end
 wavelengths = p.Results.wavelengths;
-ylimit = p.Results.ylimit;
-plotArranged = p.Results.plotArranged;
+ylimit = p.Results.ylim;
+if ~isempty(p.Results.ylimit), ylimit = p.Results.ylimit; end
+plotArranged = p.Results.arranged;
+if ~isempty(p.Results.plotArranged), plotArranged = p.Results.plotArranged; end
 lineProps = p.Results.lineProps;
 rejectedLineProps = p.Results.rejectedLineProps;
+interactive = p.Results.interactive;
+savePath = p.Results.savePath;
+saveWidth = p.Results.saveWidth;
+saveHeight = p.Results.saveHeight;
+saveDPI = p.Results.saveDPI;
 
 
 global PF2
@@ -90,32 +107,14 @@ if(isfield(fNIR,'fchMask'))
     rejectLevel=PF2.RejectLevel;
 end
 
-if(nargin<8||isempty(rejectedLineProps))
-    rejectedLineProps={'--','LineWidth',1};
-end
-
-if(nargin<7||isempty(lineProps))
-    lineProps={'LineWidth',1};
-end
-
-
-
-if(nargin<6)
-    plotArranged=false;  % plot when channels is all or empty
-end
-
-if(nargin<5)
-   ylimit=[]; % will use max device info to plot
-end
-
-
-if(nargin<3)
-   showMarkers=true;  %will plot all markers 
-end
-
-if(nargin<2||isempty(channels)||(ischar(channels)&&strcmpi(channels,'all')))
-    plotArranged=true; %Enabled when all channels are plot
-    channels=[];
+% Handle default plotArranged (true when all channels)
+if isempty(channels) || (ischar(channels) && strcmpi(channels, 'all'))
+    if isempty(plotArranged)
+        plotArranged = true;  % Enabled when all channels are plotted
+    end
+    channels = [];
+elseif isempty(plotArranged)
+    plotArranged = false;
 end
 
 if(any(logical(channels))&&any(~isnumeric(channels)))
@@ -231,8 +230,12 @@ tooManyLabels = 200 / numch2plot;
 % Handle too many markers prompt (numMarkers already computed by helper)
 plotTonsOfMarkers = false;
 if ~isempty(showMarkers) && any(numMarkers > tooManyMarkers)
-    user_entry = input('Enable TonsOfMarkers Mode? (Can be VERY slow) y/n: ', 's');
-    plotTonsOfMarkers = ismember(lower(user_entry), {'1', 'y', 'yes'});
+    if interactive
+        user_entry = input('Enable TonsOfMarkers Mode? (Can be VERY slow) y/n: ', 's');
+        plotTonsOfMarkers = ismember(lower(user_entry), {'1', 'y', 'yes'});
+    else
+        warning('pf2:TooManyMarkers', 'Too many markers to display (>%d). Use ''interactive'', true to enable.', round(tooManyMarkers));
+    end
 end
 
 printOnce = false;
@@ -356,13 +359,22 @@ for optIdx = 1:length(channels)
     
     xlabel(sprintf('Opt %i',optNum));
     ylabel('Intensity');
-    
 
+
+end
+
+% Add figure title from processingInfo if available
+pf2_base.plot.addProcessingInfoTitle(fNIR, gcf());
+
+% Save figure if requested
+if ~isempty(savePath)
+    fig = gcf();
+    pf2_base.plot.saveFigure(fig, savePath, saveWidth, saveHeight, saveDPI);
 end
 
 end
 
- 
+
 function txt = myupdatefcn(pointDataTip, event_obj)
 
  hAxes=get(pointDataTip,'Parent');

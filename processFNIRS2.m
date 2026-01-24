@@ -529,7 +529,10 @@ if(nargout>0)
        if(isfield(fData,'info'))
            outfNIR.info=fData.info;
        end
-       
+
+       % Store processing context for reproducibility and plot enhancement
+       outfNIR.processingInfo = buildProcessingInfo(PF2, setF);
+
        if(exist('outfNIR'))
            
            varargout={outfNIR};
@@ -681,5 +684,57 @@ end
 end
 
 
+function info = buildProcessingInfo(PF2, setF)
+% BUILDPROCESSINGINFO Create processing info struct for output
+%
+% Captures the processing settings used so plots can display them
+% and analyses can be reproduced.
 
+info = struct();
+info.timestamp = datetime('now');
 
+% DPF settings
+if isfield(PF2, 'dpf_mode')
+    info.dpfMode = PF2.dpf_mode;
+end
+if isfield(PF2, 'curDPF_fixed')
+    info.dpfValue = PF2.curDPF_fixed;
+end
+if isfield(PF2, 'curDPF_age')
+    info.subjectAge = PF2.curDPF_age;
+end
+
+% Baseline settings
+if isfield(PF2, 'baseline')
+    if isfield(PF2.baseline, 'startTime')
+        info.baselineStart = PF2.baseline.startTime;
+    end
+    if isfield(PF2.baseline, 'blLength')
+        info.baselineLength = PF2.baseline.blLength;
+    end
+end
+
+% Processing methods
+if isfield(PF2, 'stageRawMethod') && isfield(PF2.stageRawMethod, 'name')
+    info.rawMethod = PF2.stageRawMethod.name;
+end
+if isfield(PF2, 'stageOxyMethod') && isfield(PF2.stageOxyMethod, 'name')
+    info.oxyMethod = PF2.stageOxyMethod.name;
+end
+
+% Device info
+if isstruct(setF) && isfield(setF, 'device') && isfield(setF.device, 'Info')
+    if isfield(setF.device.Info, 'DeviceName')
+        info.deviceName = setF.device.Info.DeviceName;
+    end
+    if isfield(setF.device.Info, 'DefaultSamplingRate')
+        info.samplingRate = setF.device.Info.DefaultSamplingRate;
+    end
+end
+
+% Quality control
+if isfield(PF2, 'RejectLevel')
+    info.rejectLevel = PF2.RejectLevel;
+end
+
+end

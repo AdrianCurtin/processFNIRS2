@@ -81,7 +81,14 @@ else
     pf2ChannelCheck.multiFigure=get(handles.checkbox_multiFigureMode,'Value');
 end
 
-delete pf2ChannelCheck.maskIndicators;
+% Clean up existing graphics handles if they exist
+if isfield(pf2ChannelCheck, 'maskIndicators') && ~isempty(pf2ChannelCheck.maskIndicators)
+    for i = 1:length(pf2ChannelCheck.maskIndicators)
+        if ~isempty(pf2ChannelCheck.maskIndicators{i}) && isvalid(pf2ChannelCheck.maskIndicators{i})
+            delete(pf2ChannelCheck.maskIndicators{i});
+        end
+    end
+end
 pf2ChannelCheck.maskIndicators = [];
 pf2ChannelCheck.plotHandles =[];
 pf2ChannelCheck.mainPlotHandle =[];
@@ -174,11 +181,7 @@ end
 
 if(isfield(pf2ChannelCheck,'filepath')&&~isempty(pf2ChannelCheck.filepath))
     [pathstr, name, ext] = fileparts(pf2ChannelCheck.filepath);
-    if(length(pathstr)>0)
-        filestr=[pathstr,'/',name,'_CH.mat'];
-    else
-        filestr=[name,'_CH.mat'];
-    end
+    filestr = buildChannelMaskPath(pathstr, name);
     
 
     if exist(filestr, 'file') == 2
@@ -339,7 +342,32 @@ for i=1:pf2ChannelCheck.numChannels
         pf2ChannelCheck.statsWV2.mean(i)=nanmean(data830(:));
         pf2ChannelCheck.statsWV2.std(i)=nanmean(data830(:));
     end
-    
+
+end
+
+% Pre-compute noisy channel flags (cached for fast lookup in plotChannelMini)
+pf2ChannelCheck.isNoisy = (pf2ChannelCheck.statsWV1.cov > pf2ChannelCheck.noisyThreshold) | ...
+                          (pf2ChannelCheck.statsWV2.cov > pf2ChannelCheck.noisyThreshold);
+
+% Initialize view time range
+pf2ChannelCheck.viewTimeStart = min(pf2ChannelCheck.nirsData.time);
+pf2ChannelCheck.viewTimeEnd = max(pf2ChannelCheck.nirsData.time);
+
+% Pre-compute downsampled data for mini plots (100 points max)
+miniMaxPoints = 100;
+channelsFilter = pf2ChannelCheck.ChannelNumbers > 0;
+[pf2ChannelCheck.miniTimeX, miniDataY] = smartDownsample(pf2ChannelCheck.nirsData.time, ...
+                                                          pf2ChannelCheck.nirsData.raw(:, channelsFilter), ...
+                                                          miniMaxPoints);
+% Store per-channel data and max values
+pf2ChannelCheck.miniDataCache = cell(1, pf2ChannelCheck.numChannels);
+pf2ChannelCheck.miniMaxVal = zeros(1, pf2ChannelCheck.numChannels);
+for i = 1:pf2ChannelCheck.numChannels
+    curCh = find(pf2ChannelCheck.nirsData.probeinfo.Probe{pf2ChannelCheck.probeNum}.TableCh(channelsFilter,:).OptodeNumber == i);
+    if ~isempty(curCh)
+        pf2ChannelCheck.miniDataCache{i} = miniDataY(:, curCh);
+        pf2ChannelCheck.miniMaxVal(i) = max(0.01, nanmax(nanmax(miniDataY(:, curCh))));
+    end
 end
 
 if(pf2ChannelCheck.multiFigure)
@@ -675,8 +703,8 @@ function [handle]= plotChannel(ch, plotMarkers, withTitle, mainPlot)
             if(isfield(pf2ChannelCheck,'selectionIndicator') && ishandle(pf2ChannelCheck.selectionIndicator))
                 pf2ChannelCheck.selectionIndicator.Visible = "off";
             end
-            if exist('pf2ChannelCheck.selectionIndicator')
-                delete pf2ChannelCheck.selectionIndicator
+            if isfield(pf2ChannelCheck, 'selectionIndicator') && ~isempty(pf2ChannelCheck.selectionIndicator) && isvalid(pf2ChannelCheck.selectionIndicator)
+                delete(pf2ChannelCheck.selectionIndicator);
             end
             pf2ChannelCheck.selectionIndicator = text(mean(xl), mean(yl), 'O', 'HorizontalAlignment', 'center', 'FontSize', 60, 'Color', [0.2,0.2,0.2],'HitTest','off');
         end
@@ -724,77 +752,152 @@ function [handle]= plotChannel(ch, plotMarkers, withTitle, mainPlot)
     
     % Force redraw only when strictly necessary
     drawnow limitrate;
-    
+
+
+function plotChannelMini(ch)
+% PLOTCHANNELMINI Fast mini-plot for channel overview grid
+%   Uses pre-computed cached data for instant rendering.
+
+    global pf2ChannelCheck
+    global pf2ChannelCheckHandles
+
+    % Use pre-computed cached data (no computation needed!)
+    if isempty(pf2ChannelCheck.miniDataCache{ch})
+        return;
+    end
+
+    timeX = pf2ChannelCheck.miniTimeX;
+    dataY = pf2ChannelCheck.miniDataCache{ch};
+    maxVal = pf2ChannelCheck.miniMaxVal(ch);
+    numLines = size(dataY, 2);
+
+    % Set up axes for click handling
+    channelTag = sprintf('ChAxes%i', ch);
+    set(gca, 'Tag', channelTag);
+    set(gca, 'ButtonDownFcn', @markUnmarkChannelFcn);
+
+    hold off;
+
+    % Initialize mini plot handles if needed
+    if ~isfield(pf2ChannelCheck, 'miniPlotHandles')
+        pf2ChannelCheck.miniPlotHandles = cell(1, pf2ChannelCheck.numChannels);
+    end
+
+    % Plot or update lines - use thin lines for speed
+    if isempty(pf2ChannelCheck.miniPlotHandles) || length(pf2ChannelCheck.miniPlotHandles) < ch || isempty(pf2ChannelCheck.miniPlotHandles{ch})
+        % Create new plots
+        pf2ChannelCheck.miniPlotHandles{ch} = gobjects(numLines, 1);
+        for i = 1:numLines
+            pf2ChannelCheck.miniPlotHandles{ch}(i) = plot(timeX, dataY(:, i), 'LineWidth', 1, 'HitTest', 'on');
+            set(pf2ChannelCheck.miniPlotHandles{ch}(i), 'Tag', channelTag);
+            set(pf2ChannelCheck.miniPlotHandles{ch}(i), 'ButtonDownFcn', @markUnmarkChannelFcn);
+            hold on;
+        end
+    else
+        % Update existing plots (just update data - handles already exist)
+        for i = 1:numLines
+            if i <= length(pf2ChannelCheck.miniPlotHandles{ch}) && isvalid(pf2ChannelCheck.miniPlotHandles{ch}(i))
+                set(pf2ChannelCheck.miniPlotHandles{ch}(i), 'XData', timeX, 'YData', dataY(:, i));
+            else
+                pf2ChannelCheck.miniPlotHandles{ch}(i) = plot(timeX, dataY(:, i), 'LineWidth', 1, 'HitTest', 'on');
+                set(pf2ChannelCheck.miniPlotHandles{ch}(i), 'Tag', channelTag);
+                set(pf2ChannelCheck.miniPlotHandles{ch}(i), 'ButtonDownFcn', @markUnmarkChannelFcn);
+            end
+            hold on;
+        end
+    end
+
+    % Set axis limits
+    xlim([pf2ChannelCheck.viewTimeStart, pf2ChannelCheck.viewTimeEnd]);
+    if pf2ChannelCheck.autoscale
+        ylim([0, maxVal * 1.2]);
+    else
+        ylim([0, pf2ChannelCheck.globalstats.max * 1.1]);
+    end
+
+    xl = xlim();
+    yl = ylim();
+
+    % Initialize mini mask indicators if needed
+    if ~isfield(pf2ChannelCheck, 'miniMaskIndicators')
+        pf2ChannelCheck.miniMaskIndicators = cell(1, pf2ChannelCheck.numChannels);
+    end
+
+    % Create or update rejection indicator (X or ~)
+    if length(pf2ChannelCheck.miniMaskIndicators) < ch || isempty(pf2ChannelCheck.miniMaskIndicators{ch})
+        pf2ChannelCheck.miniMaskIndicators{ch} = text(mean(xl), mean(yl), '', ...
+            'HorizontalAlignment', 'center', 'FontSize', 30, 'Visible', 'off', 'HitTest', 'on');
+        set(pf2ChannelCheck.miniMaskIndicators{ch}, 'ButtonDownFcn', @markUnmarkChannelFcn);
+        set(pf2ChannelCheck.miniMaskIndicators{ch}, 'Tag', channelTag);
+    end
+
+    % Update mask indicator
+    if pf2ChannelCheck.fchMask(ch) == 0
+        set(pf2ChannelCheck.miniMaskIndicators{ch}, 'Visible', 'on', 'String', 'X', 'Color', [1, 0, 0]);
+    elseif pf2ChannelCheck.fchMask(ch) == 0.5
+        set(pf2ChannelCheck.miniMaskIndicators{ch}, 'Visible', 'on', 'String', '~', 'Color', [0.91, 0.41, 0.17]);
+    else
+        set(pf2ChannelCheck.miniMaskIndicators{ch}, 'Visible', 'off');
+    end
+
+    % Simple noise indicator - use cached isNoisy flag
+    if pf2ChannelCheck.mark_noisy && pf2ChannelCheck.isNoisy(ch)
+        set(gca, 'Color', [1, 0.98, 0.94]);  % Light orange/peach tint
+    else
+        set(gca, 'Color', 'white');
+    end
+
+    % Show selection highlight for current channel
+    if pf2ChannelCheck.curChannel == ch
+        if ~isfield(pf2ChannelCheck, 'miniSelectionIndicator') || isempty(pf2ChannelCheck.miniSelectionIndicator) || ~isvalid(pf2ChannelCheck.miniSelectionIndicator)
+            pf2ChannelCheck.miniSelectionIndicator = text(mean(xl), mean(yl), 'O', ...
+                'HorizontalAlignment', 'center', 'FontSize', 50, 'Color', [0.2, 0.2, 0.2], 'HitTest', 'off');
+        else
+            set(pf2ChannelCheck.miniSelectionIndicator, 'Parent', gca, 'Position', [mean(xl), mean(yl), 0]);
+        end
+    end
+
+    hold off;
+
+    % Hide tick labels for compact display
+    if pf2ChannelCheck.smallMode
+        set(gca, 'XTick', [], 'YTick', []);
+    end
+
+
 function statStr=getChannelStatStr(ch)
 
 global pf2ChannelCheck
 
 statStr='Stat Wv1 Wv2 All';
 
-testStr=sprintf('%.5f',pf2ChannelCheck.globalstats.cov);
-testStr=strsplit(testStr,'.');
+% Calculate significant digits based on magnitude of global stats
+maxSigDig = 5;
+sigdigmean = calcSigDigits(pf2ChannelCheck.globalstats.mean, maxSigDig);
+sigdigstd = calcSigDigits(pf2ChannelCheck.globalstats.std, maxSigDig);
+sigdigcov = calcSigDigits(pf2ChannelCheck.globalstats.cov, maxSigDig);
 
-testStrMean=sprintf('%.5f',pf2ChannelCheck.globalstats.mean);
-testStrMean=strsplit(testStrMean,'.');
-testStrStd=sprintf('%.5f',pf2ChannelCheck.globalstats.std);
-testStrStd=strsplit(testStrStd,'.');
+% Format each row using dynamic precision
+statStr = appendStatRow(statStr, 'm:', sigdigmean, ...
+    pf2ChannelCheck.statsWV1.mean(ch), pf2ChannelCheck.statsWV2.mean(ch), pf2ChannelCheck.stats.mean(ch));
+statStr = appendStatRow(statStr, 's:', sigdigstd, ...
+    pf2ChannelCheck.statsWV1.std(ch), pf2ChannelCheck.statsWV2.std(ch), pf2ChannelCheck.stats.std(ch));
+statStr = appendStatRow(statStr, 'Cv', sigdigcov, ...
+    pf2ChannelCheck.statsWV1.cov(ch), pf2ChannelCheck.statsWV2.cov(ch), pf2ChannelCheck.stats.cov(ch));
 
-maxSigDig=5;
 
-sigdigcov=max(0,maxSigDig-length(testStr{1}));
-sigdigmean=max(0,maxSigDig-length(testStrMean{1}));
-sigdigstd=max(0,maxSigDig-length(testStrStd{1}));
+function sigdig = calcSigDigits(value, maxSigDig)
+% Calculate appropriate significant digits based on value magnitude
+    testStr = sprintf('%.5f', value);
+    parts = strsplit(testStr, '.');
+    sigdig = max(0, maxSigDig - length(parts{1}));
 
-switch(sigdigmean)
-    case 6
-        statStr=sprintf('%s\nm: %.6f %.6f %.6f',statStr,pf2ChannelCheck.statsWV1.mean(ch),pf2ChannelCheck.statsWV2.mean(ch),pf2ChannelCheck.stats.mean(ch));
-    case 5
-        statStr=sprintf('%s\nm: %.5f %.5f %.5f',statStr,pf2ChannelCheck.statsWV1.mean(ch),pf2ChannelCheck.statsWV2.mean(ch),pf2ChannelCheck.stats.mean(ch));
-    case 4
-        statStr=sprintf('%s\nm: %.4f %.4f %.4f',statStr,pf2ChannelCheck.statsWV1.mean(ch),pf2ChannelCheck.statsWV2.mean(ch),pf2ChannelCheck.stats.mean(ch));
-    case 3
-        statStr=sprintf('%s\nm: %.3f %.3f %.3f',statStr,pf2ChannelCheck.statsWV1.mean(ch),pf2ChannelCheck.statsWV2.mean(ch),pf2ChannelCheck.stats.mean(ch));
-    case 2
-        statStr=sprintf('%s\nm: %.2f %.2f %.2f',statStr,pf2ChannelCheck.statsWV1.mean(ch),pf2ChannelCheck.statsWV2.mean(ch),pf2ChannelCheck.stats.mean(ch));
-    case 1
-        statStr=sprintf('%s\nm: %.1f %.1f %.1f',statStr,pf2ChannelCheck.statsWV1.mean(ch),pf2ChannelCheck.statsWV2.mean(ch),pf2ChannelCheck.stats.mean(ch));
-    case 0
-        statStr=sprintf('%s\nm: %.0f %.0f %.0f',statStr,pf2ChannelCheck.statsWV1.mean(ch),pf2ChannelCheck.statsWV2.mean(ch),pf2ChannelCheck.stats.mean(ch));
-end
 
-switch(sigdigstd)
-    case 6
-        statStr=sprintf('%s\ns: %.6f %.6f %.6f',statStr,pf2ChannelCheck.statsWV1.std(ch),pf2ChannelCheck.statsWV2.std(ch),pf2ChannelCheck.stats.std(ch));
-    case 5
-        statStr=sprintf('%s\ns: %.5f %.5f %.5f',statStr,pf2ChannelCheck.statsWV1.std(ch),pf2ChannelCheck.statsWV2.std(ch),pf2ChannelCheck.stats.std(ch));
-    case 4
-        statStr=sprintf('%s\ns: %.4f %.4f %.4f',statStr,pf2ChannelCheck.statsWV1.std(ch),pf2ChannelCheck.statsWV2.std(ch),pf2ChannelCheck.stats.std(ch));
-    case 3
-        statStr=sprintf('%s\ns: %.3f %.3f %.3f',statStr,pf2ChannelCheck.statsWV1.std(ch),pf2ChannelCheck.statsWV2.std(ch),pf2ChannelCheck.stats.std(ch));
-    case 2
-        statStr=sprintf('%s\ns: %.2f %.2f %.2f',statStr,pf2ChannelCheck.statsWV1.std(ch),pf2ChannelCheck.statsWV2.std(ch),pf2ChannelCheck.stats.std(ch));
-    case 1
-        statStr=sprintf('%s\ns: %.1f %.1f %.1f',statStr,pf2ChannelCheck.statsWV1.std(ch),pf2ChannelCheck.statsWV2.std(ch),pf2ChannelCheck.stats.std(ch));
-    case 0
-        statStr=sprintf('%s\ns: %.0f %.0f %.0f',statStr,pf2ChannelCheck.statsWV1.std(ch),pf2ChannelCheck.statsWV2.std(ch),pf2ChannelCheck.stats.std(ch));
-end
-
-switch(sigdigcov)
-    case 6
-        statStr=sprintf('%s\nCv %.6f %.6f %.6f',statStr,pf2ChannelCheck.statsWV1.cov(ch),pf2ChannelCheck.statsWV2.cov(ch),pf2ChannelCheck.stats.cov(ch));
-    case 5
-        statStr=sprintf('%s\nCv %.5f %.5f %.5f',statStr,pf2ChannelCheck.statsWV1.cov(ch),pf2ChannelCheck.statsWV2.cov(ch),pf2ChannelCheck.stats.cov(ch));
-    case 4
-        statStr=sprintf('%s\nCv %.4f %.4f %.4f',statStr,pf2ChannelCheck.statsWV1.cov(ch),pf2ChannelCheck.statsWV2.cov(ch),pf2ChannelCheck.stats.cov(ch));
-    case 3
-        statStr=sprintf('%s\nCv %.3f %.3f %.3f',statStr,pf2ChannelCheck.statsWV1.cov(ch),pf2ChannelCheck.statsWV2.cov(ch),pf2ChannelCheck.stats.cov(ch));
-    case 2
-        statStr=sprintf('%s\nCv %.2f %.2f %.2f',statStr,pf2ChannelCheck.statsWV1.cov(ch),pf2ChannelCheck.statsWV2.cov(ch),pf2ChannelCheck.stats.cov(ch));
-    case 1
-        statStr=sprintf('%s\nCv %.1f %.1f %.1f',statStr,pf2ChannelCheck.statsWV1.cov(ch),pf2ChannelCheck.statsWV2.cov(ch),pf2ChannelCheck.stats.cov(ch));
-    case 0
-        statStr=sprintf('%s\nCv %.0f %.0f %.0f',statStr,pf2ChannelCheck.statsWV1.cov(ch),pf2ChannelCheck.statsWV2.cov(ch),pf2ChannelCheck.stats.cov(ch));
-end
+function outStr = appendStatRow(inStr, label, precision, val1, val2, val3)
+% Append a formatted statistics row with dynamic precision
+    fmtSpec = sprintf('%%.%df %%.%df %%.%df', precision, precision, precision);
+    valStr = sprintf(fmtSpec, val1, val2, val3);
+    outStr = sprintf('%s\n%s %s', inStr, label, valStr);
 
 
 
@@ -859,28 +962,22 @@ function updateChannels(handles, forceUpdate)
     if(nargin<2)
         forceUpdate = false;
     end
-    
-    % OPTIMIZATION: Only update current channel in full detail
+
+    % Plot current channel in full detail (main view)
     axes(pf2ChannelCheckHandles.mainCurAxesHandle);
     plotChannel(pf2ChannelCheck.curChannel, pf2ChannelCheck.showMarkers, true, true);
-    
-    % For other channels, only update if necessary
+
+    % Use fast mini-plot for all channel overview panels
     for i=1:pf2ChannelCheck.numChannels
-        if i ~= pf2ChannelCheck.curChannel
-            % Check if axis needs update (e.g., channel status changed)
-            needsUpdate = forceUpdate; % Set criteria for when update is needed
-            
-            if needsUpdate
-                axes(pf2ChannelCheckHandles.chAxesHandles{i});
-                plotChannel(i, false);
-            end
-        else
+        needsUpdate = forceUpdate || (i == pf2ChannelCheck.curChannel);
+
+        if needsUpdate
             axes(pf2ChannelCheckHandles.chAxesHandles{i});
-            plotChannel(i, false);
+            plotChannelMini(i);  % Use fast mini-plot version
         end
     end
-    
-    % Reduce redraw frequency
+
+    % Single redraw at the end
     drawnow limitrate;
     
 
@@ -895,7 +992,7 @@ global pf2ChannelCheckHandles
 
 pf2ChannelCheck.fchMask(pf2ChannelCheck.curChannel)=0;
 axes(pf2ChannelCheckHandles.chAxesHandles{pf2ChannelCheck.curChannel});
-plotChannel(pf2ChannelCheck.curChannel,false);
+plotChannelMini(pf2ChannelCheck.curChannel);
 axes(pf2ChannelCheckHandles.mainCurAxesHandle);
 plotChannel(pf2ChannelCheck.curChannel,pf2ChannelCheck.showMarkers,true, true);
 
@@ -910,7 +1007,7 @@ global pf2ChannelCheck
 global pf2ChannelCheckHandles
 pf2ChannelCheck.fchMask(pf2ChannelCheck.curChannel)=0.5;
 axes(pf2ChannelCheckHandles.chAxesHandles{pf2ChannelCheck.curChannel});
-plotChannel(pf2ChannelCheck.curChannel,false);
+plotChannelMini(pf2ChannelCheck.curChannel);
 axes(pf2ChannelCheckHandles.mainCurAxesHandle);
 plotChannel(pf2ChannelCheck.curChannel,pf2ChannelCheck.showMarkers,true, true);
 
@@ -928,7 +1025,7 @@ global pf2ChannelCheck
 global pf2ChannelCheckHandles
 pf2ChannelCheck.fchMask(pf2ChannelCheck.curChannel)=1;
 axes(pf2ChannelCheckHandles.chAxesHandles{pf2ChannelCheck.curChannel});
-plotChannel(pf2ChannelCheck.curChannel,false);
+plotChannelMini(pf2ChannelCheck.curChannel);
 axes(pf2ChannelCheckHandles.mainCurAxesHandle);
 plotChannel(pf2ChannelCheck.curChannel,pf2ChannelCheck.showMarkers,true);
 
@@ -963,13 +1060,8 @@ end
 %If not already loaded write output
 if(isfield(pf2ChannelCheck,'fchMask')&&~isempty(pf2ChannelCheck.fchMask)&&~isempty(pf2ChannelCheck.filepath))
    % doc fileparts:
-    [pathstr, name, ext] = fileparts(pf2ChannelCheck.filepath);
-    pathstr=sprintf('%s/',pathstr);
-    filestr=sprintf('%s_CH.mat',name);
-    if(length(pathstr)>1)
-        filestr=[pathstr,filestr];
-    end
-    %filestr=[pathstr,'/',name,'_CH.mat'];
+    [pathstr, name, ~] = fileparts(pf2ChannelCheck.filepath);
+    filestr = buildChannelMaskPath(pathstr, name);
     if(~skipSave)
         pf2ChannelCheck.saved=true;
         
@@ -1052,7 +1144,7 @@ function markUnmarkChannel(ch, eventdata)
     
     % Update only the channels that changed
     axes(pf2ChannelCheckHandles.chAxesHandles{ch});
-    plotChannel(ch, false);
+    plotChannelMini(ch);
     
     % Only update the main display if the current channel changed
     if oldChannel ~= ch
@@ -1088,13 +1180,8 @@ function savebutton_Callback(hObject, eventdata, handles)
   
 global pf2ChannelCheck
 if(isfield(pf2ChannelCheck,'filepath')&&~isempty(pf2ChannelCheck.filepath))
-    [pathstr, name, ext] = fileparts(pf2ChannelCheck.filepath);
-    pathstr=sprintf('%s/',pathstr);
-    filestr=sprintf('%s_CH.mat',name);
-    if(length(pathstr)>1)
-        filestr=[pathstr,filestr];
-    end
-    %filestr=[pathstr,'/',name,'_CH.mat'];
+    [pathstr, name, ~] = fileparts(pf2ChannelCheck.filepath);
+    filestr = buildChannelMaskPath(pathstr, name);
     fchMask=pf2ChannelCheck.fchMask;
     save(filestr,'fchMask');
     
@@ -1230,7 +1317,7 @@ axes(pf2ChannelCheckHandles.mainCurAxesHandle);
 plotChannel(pf2ChannelCheck.curChannel,pf2ChannelCheck.showMarkers,true, true);
 
 axes(pf2ChannelCheckHandles.chAxesHandles{pf2ChannelCheck.curChannel});
-plotChannel(pf2ChannelCheck.curChannel,false,false);
+plotChannelMini(pf2ChannelCheck.curChannel);
 
 % --- Executes during object creation, after setting all properties.
 function marker_listbox_CreateFcn(hObject, eventdata, handles)
@@ -1333,10 +1420,10 @@ axes(pf2ChannelCheckHandles.mainCurAxesHandle);
 plotChannel(pf2ChannelCheck.curChannel,pf2ChannelCheck.showMarkers,true, true);
 
 axes(pf2ChannelCheckHandles.chAxesHandles{prevChannel});
-plotChannel(prevChannel,pf2ChannelCheck.showMarkers,false, false);
+plotChannelMini(prevChannel);
 
 axes(pf2ChannelCheckHandles.chAxesHandles{pf2ChannelCheck.curChannel});
-plotChannel(pf2ChannelCheck.curChannel,pf2ChannelCheck.showMarkers,false, false);
+plotChannelMini(pf2ChannelCheck.curChannel);
 
 % --- Executes on button press in pushbutton_next.
 function pushbutton_next_Callback(hObject, eventdata, handles)
@@ -1360,15 +1447,11 @@ end
 axes(pf2ChannelCheckHandles.mainCurAxesHandle);
 plotChannel(pf2ChannelCheck.curChannel,pf2ChannelCheck.showMarkers,true, true);
 
-axes(pf2ChannelCheckHandles.mainCurAxesHandle);
-plotChannel(pf2ChannelCheck.curChannel,pf2ChannelCheck.showMarkers,true, true);
-
 axes(pf2ChannelCheckHandles.chAxesHandles{prevChannel});
-plotChannel(prevChannel,pf2ChannelCheck.showMarkers,false, false);
+plotChannelMini(prevChannel);
 
 axes(pf2ChannelCheckHandles.chAxesHandles{pf2ChannelCheck.curChannel});
-plotChannel(pf2ChannelCheck.curChannel,pf2ChannelCheck.showMarkers,false, false);
-
+plotChannelMini(pf2ChannelCheck.curChannel);
 
 
 % --- Executes on button press in checkbox_autoscale.
@@ -1404,11 +1487,22 @@ function [downsampledTime, downsampledData] = smartDownsample(time, data, maxPoi
     if len > maxPoints
         % Calculate step size based on visible points
         step = max(1, floor(len/maxPoints));
-        
+
         % Basic downsampling for large datasets
         downsampledData = data(1:step:end, :);
         downsampledTime = time(1:step:end);
     else
         downsampledData = data;
         downsampledTime = time;
+    end
+
+
+function filestr = buildChannelMaskPath(pathstr, name)
+% BUILDCHANNELMASKPATH Construct channel mask file path
+%   Uses fullfile for cross-platform compatibility
+    filename = sprintf('%s_CH.mat', name);
+    if ~isempty(pathstr)
+        filestr = fullfile(pathstr, filename);
+    else
+        filestr = filename;
     end

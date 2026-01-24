@@ -9,6 +9,27 @@ API Standardization, Testing Infrastructure & Context-Based Processing
   - Enables parallel processing with different settings per worker
   - Supports serialization via `toStruct()`/`fromStruct()` for saving analysis settings
   - Pass via `processFNIRS2(data, 'Context', ctx)` parameter
+- **processingInfo in output data** - Processed data now includes `fNIR.processingInfo` struct
+  - Stores all processing settings used (DPF mode/value, baseline, methods, device)
+  - Enables reproducibility by documenting exactly how data was processed
+  - Plots automatically display device name, method, and DPF settings in figure title
+- **Improved plotting functions** (`pf2.data.plot.oxy`, `raw`, `roi`, `auxData`)
+  - Hybrid argument pattern: positional for common args, name-value for options
+  - Auto-generated figure titles from processingInfo (e.g., "fNIR2000C | x5_TDDR | DPF(age=25)")
+  - Added `interactive` parameter to control GUI prompts for headless/batch processing
+  - Added save functionality: `savePath`, `saveWidth`, `saveHeight`, `saveDPI` parameters
+  - Input validation with clear error messages
+- **Improved probe plotting functions** (all `pf2.probe.plot.*` functions)
+  - Added save parameters to all visualization functions:
+    - `arrangedValues`, `imageValues`, `imageROIvalues`
+    - `interpolateValues`, `interpolateROIvalues`, `interpolateValues3D`
+  - Supports .png, .pdf, .fig, .svg, .eps, .tif, .jpg output formats
+  - Configurable output dimensions and resolution
+- **New helper function**: `pf2_base.plot.saveFigure` for centralized figure saving
+- **Bug fixes in probe plots**:
+  - Fixed `imageROIvalues.m` inverted error check that blocked valid data
+  - Fixed `roi.m` incorrect fchMask reference (was using channel mask instead of ROI mask)
+- **Refactored `auxData.m`**: Full refactor to use inputParser with hybrid argument pattern
 - Moved `processStageOD2Hb` to external function `pf2_base.fnirs.processStageOD2Hb`
 
 ### Breaking Changes

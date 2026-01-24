@@ -1,4 +1,4 @@
-function [ imgOut ] = imageROIvalues(fNIR,data2plot,minVal,maxVal,titleString,clrBarTitle)
+function [ imgOut ] = imageROIvalues(fNIR, data2plot, varargin)
 % IMAGEROIVALUES Display per-ROI values as a 2D image heatmap
 %
 % Creates a 2D image visualization where each region of interest (ROI) is
@@ -7,70 +7,79 @@ function [ imgOut ] = imageROIvalues(fNIR,data2plot,minVal,maxVal,titleString,cl
 % ROI-level statistics or averaged responses while preserving the spatial
 % relationship between ROIs in the probe layout.
 %
-% Reference:
-%   Internal pf2 implementation for ROI-based visualization.
-%
 % Syntax:
-%   ImageROIvalues(fNIR, data2plot)
-%   ImageROIvalues(fNIR, data2plot, minVal, maxVal)
-%   ImageROIvalues(fNIR, data2plot, minVal, maxVal, titleString)
-%   ImageROIvalues(fNIR, data2plot, minVal, maxVal, titleString, clrBarTitle)
-%   imgOut = ImageROIvalues(...)
+%   pf2.probe.plot.imageROIvalues(fNIR, data2plot)
+%   pf2.probe.plot.imageROIvalues(fNIR, data2plot, Name, Value)
+%   imgOut = pf2.probe.plot.imageROIvalues(...)
 %
 % Inputs:
 %   fNIR        - fNIRS data structure containing ROI.info field
-%                 ROI.info must be a table with 'Optodes' column specifying
-%                 which channels belong to each ROI.
 %   data2plot   - Values to display for each ROI [1 x R double]
-%                 Must have one value per ROI defined in fNIR.ROI.info.
-%   minVal      - Minimum value for color scale (default: min(data2plot))
-%   maxVal      - Maximum value for color scale (default: max(data2plot))
-%   titleString - Title displayed above the plot (default: '')
-%   clrBarTitle - Title for the colorbar (default: '')
+%
+% Options (Name-Value):
+%   'minVal'      - Minimum value for color scale (default: min(data2plot))
+%   'maxVal'      - Maximum value for color scale (default: max(data2plot))
+%   'title'       - Title displayed above the plot (default: '')
+%   'colorbarTitle' - Title for the colorbar (default: '')
+%   'savePath'    - '' (default), filename to save figure (.png, .pdf, .fig)
+%   'saveWidth'   - [] (default), figure width in pixels
+%   'saveHeight'  - [] (default), figure height in pixels
+%   'saveDPI'     - 150 (default), resolution for raster formats
 %
 % Outputs:
 %   imgOut - Handle to the image object (optional)
 %
-% Notes:
-%   - Requires fNIR.ROI.info to be defined before calling this function
-%   - ROIs must not contain duplicate channels (overlapping ROIs not supported)
-%
 % Example:
-%   % Define ROIs and plot ROI-averaged HbO
-%   data = pf2.import.sampleData.fNIR2000();
-%   processed = processFNIRS2(data);
-%   processed = pf2.probe.roi.defineROI(processed, {1:6, 7:12, 13:18}, ...
-%                                       {'Left', 'Center', 'Right'});
-%   roiMeans = [mean(processed.HbO(:,1:6), 'all'), ...
-%               mean(processed.HbO(:,7:12), 'all'), ...
-%               mean(processed.HbO(:,13:18), 'all')];
-%   pf2.probe.plot.imageROIvalues(processed, roiMeans, [], [], 'ROI Means');
+%   pf2.probe.plot.imageROIvalues(data, roiMeans)
+%   pf2.probe.plot.imageROIvalues(data, roiMeans, 'minVal', -2, 'maxVal', 2)
+%   pf2.probe.plot.imageROIvalues(data, roiMeans, 'title', 'ROI Means', ...
+%                                  'savePath', 'roi_plot.png')
 %
 % See also: pf2.probe.plot.imageValues, pf2.probe.plot.interpolateROIvalues,
 %           pf2.probe.roi.defineROI, pf2_base.fnirs.buildROI
 
+% Validate fNIR input
+if ~isstruct(fNIR)
+    error('pf2:InvalidInput', 'First argument must be a fNIRS data structure');
+end
 
 if(~isempty(fNIR)&&~pf2_base.isnestedfield(fNIR,'ROI.info')&&~isempty(fNIR.info))
     error('No ROI information in the fNIR struct, unable to plot data');
 end
 
-if(nargin<6)
-    clrBarTitle='';
+% Parse name-value pairs
+p = inputParser;
+p.CaseSensitive = false;
+addParameter(p, 'minVal', [], @(x) isempty(x) || isnumeric(x));
+addParameter(p, 'maxVal', [], @(x) isempty(x) || isnumeric(x));
+addParameter(p, 'title', '', @(x) ischar(x) || isstring(x));
+addParameter(p, 'colorbarTitle', '', @(x) ischar(x) || isstring(x));
+addParameter(p, 'savePath', '', @(x) ischar(x) || isstring(x));
+addParameter(p, 'saveWidth', [], @(x) isempty(x) || isnumeric(x));
+addParameter(p, 'saveHeight', [], @(x) isempty(x) || isnumeric(x));
+addParameter(p, 'saveDPI', 150, @isnumeric);
+
+parse(p, varargin{:});
+
+minVal = p.Results.minVal;
+maxVal = p.Results.maxVal;
+titleString = p.Results.title;
+clrBarTitle = p.Results.colorbarTitle;
+savePath = p.Results.savePath;
+saveWidth = p.Results.saveWidth;
+saveHeight = p.Results.saveHeight;
+saveDPI = p.Results.saveDPI;
+
+% Set defaults for min/max if not provided
+if isempty(maxVal)
+    maxVal = nanmax(data2plot);
 end
 
-if(nargin<5)
-   titleString=''; 
+if isempty(minVal)
+    minVal = nanmin(data2plot);
 end
 
-if(nargin<4||isempty(maxVal))
-    maxVal=nanmax(data2plot);
-end
-
-if(nargin<3||isempty(minVal))
-   minVal=nanmin(data2plot); 
-end
-
-if(~isempty(fNIR)&&pf2_base.isnestedfield(fNIR,'info.probename')&&isfield(fNIR.info,'probename')&&~contains(fNIR.info.probename,'Unknown')) 
+if(~isempty(fNIR)&&pf2_base.isnestedfield(fNIR,'info.probename')&&isfield(fNIR.info,'probename')&&~contains(fNIR.info.probename,'Unknown'))
     %try to load the probename cfg file
     cfgFilePath=sprintf('%s.cfg',fNIR.info.probename);
 else
@@ -79,15 +88,15 @@ end
 
 
 if(~isempty(fNIR)&&(isempty(cfgFilePath)||~contains(cfgFilePath,'.cfg')))
-    
+
     warning('Missing or invalid configuration file path\n')
-    
+
     disp('No device specified. Please load device configuration');
     probeInfo=pf2_base.loadDeviceCfg([],true);
-    if(~isempty(probeInfo))
+    if(isempty(probeInfo))
         error('No valid devices selected');
     end
-    
+
 elseif(~isempty(fNIR)&&~isempty(cfgFilePath)) % If we're not looking at the GUI, doesn't matter
     probeInfo=pf2_base.loadDeviceCfg(cfgFilePath,true);
 end
@@ -99,7 +108,7 @@ if(~isempty(fNIR)&&pf2_base.isnestedfield(probeInfo,'Probe'))
     end
     probeInfo=probeInfo.Probe{probeNum};
 elseif(~isempty(fNIR))
-   error('Unable to identify probe'); 
+   error('Unable to identify probe');
 end
 
 numROI=size(fNIR.ROI.info,1);
@@ -121,12 +130,12 @@ allCh=[];
 
 for roiIdx=1:numROI
     curCh=fNIR.ROI.info.Optodes{roiIdx};
-    
+
     for(optIdx=1:length(curCh))
         optNum=probeInfo.ChannelList(curCh(optIdx));
 
         optPos=probeInfo.OptLayout2D{optNum};
-        
+
         optPos([2])=1-optPos([2])-optPos([4]); %flips y vertical axis
 
         x1=round(optPos(1)*imgSize);
@@ -138,10 +147,10 @@ for roiIdx=1:numROI
             imgData(y1:y2,x1:x2)=data2plot(roiIdx);
         end
     end
-    
+
     allCh=[allCh,curCh];
     if(length(unique(allCh))>length(allCh))
-        error('ROIs contain duplicate channels'); 
+        error('ROIs contain duplicate channels');
     end
 end
 imgData=imgData(end:-1:1,:);
@@ -169,6 +178,12 @@ end
 
 if(~isempty(titleString))
     title(titleString);
+end
+
+% Save figure if requested
+if ~isempty(savePath)
+    fig = gcf();
+    pf2_base.plot.saveFigure(fig, savePath, saveWidth, saveHeight, saveDPI);
 end
 
 end

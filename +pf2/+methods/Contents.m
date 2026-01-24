@@ -1,5 +1,5 @@
 % pf2.methods - Processing method management
-% processFNIRS2 v0.8
+% processFNIRS2 v0.9
 %
 % List Methods:
 %   methods           - List all available methods (raw + oxy)
@@ -14,6 +14,8 @@
 %   describeMethod    - Display method documentation
 %   configureMethods  - GUI for creating/editing methods
 %   importMethods     - Import method config file
+%   create            - Create new method programmatically (no GUI)
+%   addFunction       - Add processing function to existing method
 %
 % Oxy Method Functions (pf2.methods.oxy.*):
 %   list              - List available oxy methods
@@ -21,6 +23,8 @@
 %   describeMethod    - Display method documentation
 %   configureMethods  - GUI for creating/editing methods
 %   importMethods     - Import method config file
+%   create            - Create new method programmatically (no GUI)
+%   addFunction       - Add processing function to existing method
 %
 % Common Methods:
 %   describeCurrentMethods - Show currently selected methods

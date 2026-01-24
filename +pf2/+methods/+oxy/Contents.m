@@ -1,5 +1,5 @@
 % pf2.methods.oxy - Oxy processing stage method management (Stage 3)
-% processFNIRS2 v0.8
+% processFNIRS2 v0.9
 %
 % Stage 3 post-processes hemoglobin concentrations with:
 %   - Artifact rejection (Takizawa criterion)
@@ -17,6 +17,10 @@
 %   configureMethods  - GUI for creating/editing method chains
 %   importMethods     - Import method definitions from config file
 %
+% CLI Method Creation:
+%   create            - Create new method programmatically (no GUI)
+%   addFunction       - Add processing function to existing method
+%
 % Example:
 %   % List methods
 %   pf2.methods.oxy.list();
@@ -29,6 +33,11 @@
 %
 %   % View description
 %   pf2.methods.oxy.describeMethod('takizawa_hard_car');
+%
+%   % Create method via CLI (no GUI)
+%   pf2.methods.oxy.create('myOxyMethod');
+%   pf2.methods.oxy.addFunction('myOxyMethod', 'pf2_takizawa', ...
+%       {'x','fchMask','threshold'}, {'x','fchMask',0.75}, 'Output','fchMask');
 %
 % Common Oxy Methods:
 %   None              - No post-processing

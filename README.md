@@ -143,14 +143,30 @@ end
 Visualize and export your processed data:
 ```matlab
 % Visualize different aspects of the data
-pf2.data.plot.oxy(myprocesseddata);      % Plot oxygenation data
-pf2.data.plot.raw(myprocesseddata);      % Plot raw intensity data
-pf2.data.plot.roi(myprocesseddata);      % Plot region of interest data
-pf2.data.plot.auxData(myprocesseddata);  % Plot auxiliary data
+pf2.data.plot.oxy(myprocesseddata);                   % Plot all channels
+pf2.data.plot.oxy(myprocesseddata, 5);                % Single channel
+pf2.data.plot.oxy(myprocesseddata, 'baseline', 10);   % With 10s baseline
+pf2.data.plot.oxy(myprocesseddata, 1:5, 'ylim', [-2 2]);  % Channels 1-5, fixed y
+pf2.data.plot.raw(myprocesseddata);                   % Plot raw intensity data
+pf2.data.plot.roi(myprocesseddata);                   % Plot region of interest data
+pf2.data.plot.auxData(myprocesseddata);               % Plot auxiliary data
+
+% Plots automatically show device, method, and DPF info in title
+% e.g., "fNIR2000C | x5_TDDR | DPF(age=25)"
 
 % Export data to different formats
 pf2.export.asNIR(myprocesseddata, 'myexport.nir');
 pf2.export.asSNIRF(myprocesseddata, 'myexport.snirf');
+```
+
+### Processing Metadata
+Processed data includes `processingInfo` for reproducibility:
+```matlab
+% Access processing settings used
+myprocesseddata.processingInfo.dpfMode        % 'None', 'Fixed', 'Calc'
+myprocesseddata.processingInfo.rawMethod      % e.g., 'x5_TDDR'
+myprocesseddata.processingInfo.deviceName     % e.g., 'fNIR2000C'
+myprocesseddata.processingInfo.timestamp      % When processed
 ```
 
 ### Advanced Analysis with exploreFNIRS

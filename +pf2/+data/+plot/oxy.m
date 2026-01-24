@@ -1,4 +1,4 @@
-function [figHandle] = oxy(varargin)
+function [figHandle] = oxy(fNIR, varargin)
 % OXY Plot hemoglobin concentration time series
 %
 % Creates time series plots of processed fNIRS hemoglobin data (HbO, HbR,
@@ -7,82 +7,110 @@ function [figHandle] = oxy(varargin)
 % visual distinction of rejected channels.
 %
 % Syntax:
-%   pf2.data.plot.oxy(fNIR)                          % Plot all channels
-%   pf2.data.plot.oxy(fNIR, channel)                 % Plot specific channel
-%   pf2.data.plot.oxy(fNIR, 'all')                   % Explicit all channels
-%   pf2.data.plot.oxy(..., 'Name', Value)            % With options
-%   figHandle = pf2.data.plot.oxy(...)               % Return figure handle
+%   pf2.data.plot.oxy(fNIR)                      % All channels
+%   pf2.data.plot.oxy(fNIR, channels)            % Specific channels
+%   pf2.data.plot.oxy(fNIR, ..., Name, Value)    % With options
 %
 % Inputs:
-%   fNIR          - Processed fNIRS structure with HbO, HbR fields
-%   channels      - Channel(s) to plot (optional):
-%                   - Numeric: Specific channel number(s)
-%                   - 'all' or []: All channels in probe arrangement
-%   'markers'     - Marker display options:
-%                   - true: Show all markers (default)
-%                   - false: Hide markers
-%                   - Numeric array: Show only specified marker codes
-%   'bioMlist'    - Biomarkers to plot (default: {'HbO', 'HbR'})
-%                   Options: 'HbO', 'HbR', 'HbTotal', 'HbDiff', 'CBSI'
-%   'baseline'    - Baseline subtraction:
-%                   - Numeric: Seconds from start for baseline period
-%                   - Negative: Index from end of recording
-%                   - fNIR struct: Use separate data as baseline
-%   'ylimit'      - Y-axis limits [min max] for all subplots
-%   'plotArranged' - Force probe arrangement layout (default: false)
-%   'lineProps'   - Line properties for all plots (cell array)
-%                   Default: {'LineWidth', 1}
-%   'rejectedLineProps' - Line properties for rejected channels
-%                   Default: {'--', 'LineWidth', 1}
-%   'showMarkers' - Display event markers (default: true)
+%   fNIR      - Processed fNIRS structure with HbO, HbR fields
+%   channels  - (optional) Channels to plot: numeric, logical, or 'all'
 %
-% Outputs:
-%   figHandle     - Handle to the created figure
-%
-% Notes:
-%   - Requires processed data (must contain HbO field)
-%   - Probe arrangement uses device configuration subplot layout
-%   - Rejected channels (fchMask < RejectLevel) shown with dashed lines
-%   - Standard biomarker colors: HbO=red, HbR=blue, HbTotal=green
+% Options (Name-Value):
+%   'markers'     - true (default), false, or numeric array of codes
+%   'biomarkers'  - {'HbO','HbR'} (default), or 'all', or specific list
+%   'baseline'    - false (default), or seconds, or [start,end]
+%   'ylim'        - [] (auto), or [min max]
+%   'interactive' - true (default), false to skip prompts (for batch/headless)
+%   'savePath'    - '' (default), filename to save figure (.png, .pdf, .fig)
+%   'saveWidth'   - [] (default), figure width in pixels
+%   'saveHeight'  - [] (default), figure height in pixels
+%   'saveDPI'     - 150 (default), resolution for raster formats
 %
 % Example:
-%   % Basic plot of all channels
-%   pf2.data.plot.oxy(processedData);
+%   pf2.data.plot.oxy(data)                      % Simple
+%   pf2.data.plot.oxy(data, 5)                   % Channel 5
+%   pf2.data.plot.oxy(data, 1:5)                 % Channels 1-5
+%   pf2.data.plot.oxy(data, 'baseline', 10)      % With 10s baseline
+%   pf2.data.plot.oxy(data, 5, 'ylim', [-2 2])   % Channel 5, fixed y-axis
 %
-%   % Plot specific channel with custom biomarkers
-%   pf2.data.plot.oxy(data, 5, 'bioMlist', {'HbO', 'HbR', 'HbTotal'});
-%
-%   % Plot with baseline subtraction
-%   pf2.data.plot.oxy(data, 'baseline', 10);  % 10s baseline
-%
-% See also: pf2.data.plot.raw, pf2.data.plot.roi, pf2.probe.plot.imageValues
+% See also: pf2.data.plot.raw, pf2.data.plot.roi, pf2.probe.plot
 
-validFnirs = @(x) (iscell(x) || isstruct(x));
-validChannels = @(x) (isnumeric(x) || ischar(x));
-validbioMlist = @(x) (iscell(x) || ischar(x));
+% Validate fNIR input
+if ~isstruct(fNIR)
+    error('pf2:InvalidInput', 'First argument must be a fNIRS data structure');
+end
 
-p=inputParser;
-addRequired(p, 'fNIR', validFnirs);
-addOptional(p, 'channels', [], validChannels);
-addOptional(p, 'markers', [], @isnumeric);
-addOptional(p, 'bioMlist', {'HbO', 'HbR'}, validbioMlist);
-addOptional(p, 'baseline', false, @isnumeric);
-addOptional(p, 'ylimit', [], @isnumeric);
-addOptional(p, 'plotArranged', false, @islogical);
-addOptional(p, 'lineProps', {'LineWidth', 1}, @iscell);
-addOptional(p, 'rejectedLineProps', {'--', 'LineWidth', 1}, @iscell);
-addOptional(p, 'showMarkers', true, @islogical);
+% Parameter names for detection
+paramNames = {'markers', 'biomarkers', 'biomlist', 'baseline', 'ylim', ...
+              'ylimit', 'arranged', 'plotarranged', 'lineprops', ...
+              'rejectedlineprops', 'showmarkers', 'interactive', ...
+              'savepath', 'savewidth', 'saveheight', 'savedpi'};
 
-parse(p, varargin{:});
-fNIR = p.Results.fNIR;
-channels = p.Results.channels;
-showMarkers = p.Results.showMarkers;
-bioMlist = p.Results.bioMlist;
+% Extract positional 'channels' argument if present
+channels = [];
+nvStart = 1;  % Where name-value pairs start in varargin
+
+if ~isempty(varargin)
+    firstArg = varargin{1};
+    % If first arg is numeric/logical/or 'all', it's channels
+    if isnumeric(firstArg) || islogical(firstArg) || ...
+       (ischar(firstArg) && strcmpi(firstArg, 'all'))
+        channels = firstArg;
+        nvStart = 2;
+    elseif ischar(firstArg) || isstring(firstArg)
+        % Check if it's a parameter name
+        if ~ismember(lower(char(firstArg)), paramNames)
+            % Not a param name, treat as channels specifier
+            channels = firstArg;
+            nvStart = 2;
+        end
+    end
+end
+
+% Parse name-value pairs
+p = inputParser;
+p.CaseSensitive = false;
+addParameter(p, 'markers', true, @(x) islogical(x) || isnumeric(x));
+addParameter(p, 'biomarkers', {'HbO', 'HbR'}, @(x) iscell(x) || ischar(x));
+addParameter(p, 'bioMlist', {}, @(x) iscell(x) || ischar(x));  % Legacy
+addParameter(p, 'baseline', false, @(x) isnumeric(x) || islogical(x) || isstruct(x));
+addParameter(p, 'ylim', [], @isnumeric);
+addParameter(p, 'ylimit', [], @isnumeric);  % Legacy
+addParameter(p, 'arranged', [], @(x) islogical(x) || isempty(x));
+addParameter(p, 'plotArranged', [], @(x) islogical(x) || isempty(x));  % Legacy
+addParameter(p, 'lineProps', {'LineWidth', 1}, @iscell);
+addParameter(p, 'rejectedLineProps', {'--', 'LineWidth', 1}, @iscell);
+addParameter(p, 'showMarkers', [], @(x) islogical(x) || isnumeric(x) || isempty(x));
+addParameter(p, 'interactive', true, @islogical);
+addParameter(p, 'savePath', '', @(x) ischar(x) || isstring(x));
+addParameter(p, 'saveWidth', [], @(x) isempty(x) || isnumeric(x));
+addParameter(p, 'saveHeight', [], @(x) isempty(x) || isnumeric(x));
+addParameter(p, 'saveDPI', 150, @isnumeric);
+
+parse(p, varargin{nvStart:end});
+
+% Assign parsed values (with legacy fallbacks)
+showMarkers = p.Results.markers;
+if ~isempty(p.Results.showMarkers), showMarkers = p.Results.showMarkers; end
+bioMlist = p.Results.biomarkers;
+if ~isempty(p.Results.bioMlist), bioMlist = p.Results.bioMlist; end
 baseline = p.Results.baseline;
-ylimit = p.Results.ylimit;
-plotArranged = p.Results.plotArranged;
+ylimit = p.Results.ylim;
+if ~isempty(p.Results.ylimit), ylimit = p.Results.ylimit; end
+plotArranged = p.Results.arranged;
+if ~isempty(p.Results.plotArranged), plotArranged = p.Results.plotArranged; end
 lineProps = p.Results.lineProps;
 rejectedLineProps = p.Results.rejectedLineProps;
+interactive = p.Results.interactive;
+savePath = p.Results.savePath;
+saveWidth = p.Results.saveWidth;
+saveHeight = p.Results.saveHeight;
+saveDPI = p.Results.saveDPI;
+
+% Default plotArranged
+if isempty(plotArranged)
+    plotArranged = false;
+end
 
 
 global PF2
@@ -214,8 +242,12 @@ tooManyLabels = 200 / numch2plot;
 % Handle too many markers prompt (numMarkers already computed by helper)
 plotTonsOfMarkers = false;
 if ~isempty(showMarkers) && any(numMarkers > tooManyMarkers)
-    user_entry = input('Enable TonsOfMarkers Mode? (Can be VERY slow) y/n: ', 's');
-    plotTonsOfMarkers = ismember(lower(user_entry), {'1', 'y', 'yes'});
+    if interactive
+        user_entry = input('Enable TonsOfMarkers Mode? (Can be VERY slow) y/n: ', 's');
+        plotTonsOfMarkers = ismember(lower(user_entry), {'1', 'y', 'yes'});
+    else
+        warning('pf2:TooManyMarkers', 'Too many markers to display (>%d). Use ''interactive'', true to enable.', round(tooManyMarkers));
+    end
 end
 
 printOnce = false;
@@ -346,10 +378,19 @@ for optIdx = 1:length(channels)
     end
 end
 
+% Add figure title from processingInfo if available
+pf2_base.plot.addProcessingInfoTitle(fNIR, gcf());
+
+% Save figure if requested
+if ~isempty(savePath)
+    fig = gcf();
+    pf2_base.plot.saveFigure(fig, savePath, saveWidth, saveHeight, saveDPI);
+end
+
 end
 
 
- 
+
 function txt = myupdatefcn(pointDataTip, event_obj)
 
  hAxes=get(pointDataTip,'Parent');

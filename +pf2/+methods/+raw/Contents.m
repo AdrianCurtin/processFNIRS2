@@ -1,5 +1,5 @@
 % pf2.methods.raw - Raw processing stage method management (Stage 1)
-% processFNIRS2 v0.8
+% processFNIRS2 v0.9
 %
 % Stage 1 converts raw light intensity to optical density with:
 %   - Motion artifact correction (SMAR, TDDR, MARA, Wavelet)
@@ -16,6 +16,10 @@
 %   configureMethods  - GUI for creating/editing method chains
 %   importMethods     - Import method definitions from config file
 %
+% CLI Method Creation:
+%   create            - Create new method programmatically (no GUI)
+%   addFunction       - Add processing function to existing method
+%
 % Example:
 %   % List methods
 %   pf2.methods.raw.list();
@@ -28,6 +32,10 @@
 %
 %   % View description
 %   pf2.methods.raw.describeMethod('x5_TDDR');
+%
+%   % Create method via CLI (no GUI)
+%   pf2.methods.raw.create('myMethod');
+%   pf2.methods.raw.addFunction('myMethod', 'pf2_TDDR', {'x','fs'}, {'x','fs'});
 %
 % Common Raw Methods:
 %   x1_lpf          - Low-pass filter only

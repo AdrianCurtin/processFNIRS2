@@ -78,6 +78,10 @@ addOptional(p, 'maxVal', [], @isnumeric);
 addOptional(p, 'titleString', '', isStringOrChar);
 addOptional(p, 'clrBarTitle', '', isStringOrChar);
 addParameter(p, 'bufferDistance', 1, @isnumeric);
+addParameter(p, 'savePath', '', @(x) ischar(x) || isstring(x));
+addParameter(p, 'saveWidth', [], @(x) isempty(x) || isnumeric(x));
+addParameter(p, 'saveHeight', [], @(x) isempty(x) || isnumeric(x));
+addParameter(p, 'saveDPI', 150, @isnumeric);
 
 parse(p, varargin{:});
 
@@ -88,6 +92,10 @@ minVal = p.Results.minVal;
 maxVal = p.Results.maxVal;
 fNIR = p.Results.fNIR;
 data2plot = p.Results.data2plot;
+savePath = p.Results.savePath;
+saveWidth = p.Results.saveWidth;
+saveHeight = p.Results.saveHeight;
+saveDPI = p.Results.saveDPI;
 
 if(isempty(minVal))
     minVal=nanmin(data2plot);
@@ -562,6 +570,12 @@ end
 
 if(~isempty(titleString))
     title(titleString);
+end
+
+% Save figure if requested
+if ~isempty(savePath)
+    fig = gcf();
+    pf2_base.plot.saveFigure(fig, savePath, saveWidth, saveHeight, saveDPI);
 end
 
 end
