@@ -112,6 +112,33 @@ myrawprocessed = pf2.process.processRaw(mydata);
 myoxyprocessed = pf2.process.processOxy(myrawprocessed);
 ```
 
+### Context-Based Processing
+For isolated, reproducible processing (useful for testing, parallel processing, or saving analysis settings):
+```matlab
+% Create a context from current settings
+ctx = pf2_base.ProcessingContext.fromGlobals();
+
+% Modify settings without affecting globals
+ctx.dpfMode = 'Fixed';
+ctx.dpfFixedValue = 6.0;
+ctx.baselineLength = 5;
+ctx.setRawMethod('x5_TDDR');
+ctx.setOxyMethod('takizawa_easy');
+
+% Process with isolated settings
+result = processFNIRS2(mydata, 'Context', ctx);
+
+% Save settings for reproducibility
+save('my_analysis_settings.mat', '-struct', ctx.toStruct());
+
+% Parallel processing with different ages
+parfor i = 1:numSubjects
+    ctx = pf2_base.ProcessingContext.fromGlobals();
+    ctx.subjectAge = ages(i);
+    results{i} = processFNIRS2(data{i}, 'Context', ctx);
+end
+```
+
 ### Visualization and Export
 Visualize and export your processed data:
 ```matlab

@@ -58,7 +58,7 @@ function processFNIRS2_GUI_OpeningFcn(hObject, eventdata, handles, varargin)
 
 global PF2
 global setF
-global outputData 
+global outputData
 
 
 [~,pf2ver,~]=pf2_base.pf2version();
@@ -70,12 +70,13 @@ warning('OFF','MATLAB:table:RowsAddedExistingVars');
 %Load default paramaters here
 
 if(isempty(PF2))
-   pf2_base.pf2_initialize(); 
+   pf2_base.pf2_initialize();
 end
 
-
-PF2.GUIPF2=struct();
-PF2.GUIPF2.processWindowOnly=false; %GUI option to only process the current window of data
+% Initialize GUI context from globals (encapsulates processing settings)
+PF2.GUIPF2 = struct();
+PF2.GUIPF2.ctx = pf2_base.GUIContext.fromGlobals();
+PF2.GUIPF2.processWindowOnly = false; %GUI option to only process the current window of data
 
 
 %%
@@ -165,14 +166,22 @@ PF2.stageRawMethod.name=rawMethodStr;
 PF2.stageOxyMethod=pf2_base.pf2_unpackMethod(PF2.myOxyMethods.cfg.(oxyMethodStr));
 PF2.stageOxyMethod.name=oxyMethodStr;
 
+% Update context with selected methods
+PF2.GUIPF2.ctx.rawMethod = PF2.stageRawMethod;
+PF2.GUIPF2.ctx.rawMethodName = rawMethodStr;
+PF2.GUIPF2.ctx.oxyMethod = PF2.stageOxyMethod;
+PF2.GUIPF2.ctx.oxyMethodName = oxyMethodStr;
+
 PF2.GUIPF2.handles=handles;
 PF2.GUIPF2.figHandle=handles.figure1;
-PF2.GUIPF2.curDPF_age=PF2.curDPF_age;   %Default age for differential pathlenght factor calculation.
-PF2.GUIPF2.curDPF_fixed=PF2.curDPF_fixed;   %Default age for differential pathlenght factor calculation.
-PF2.GUIPF2.dpf_mode=PF2.dpf_mode; 
+
+% Legacy fields (for backward compatibility with code not yet using context)
+PF2.GUIPF2.curDPF_age=PF2.curDPF_age;
+PF2.GUIPF2.curDPF_fixed=PF2.curDPF_fixed;
+PF2.GUIPF2.dpf_mode=PF2.dpf_mode;
 
 PF2.GUIPF2.baseline=PF2.baseline;
-PF2.GUIPF2.baseline.relative2View=false; %GUI option to rebaseline to start of view when moving window, processor intensive
+PF2.GUIPF2.baseline.relative2View=false; %GUI option to rebaseline to start of view when moving window
 PF2.GUIPF2.baseline.blLength=PF2.baseline.blLength;
 
 PF2.GUIPF2.stageRawMethod=PF2.stageRawMethod;
@@ -507,61 +516,77 @@ global PF2
 
 
 function outData=processStageOD2Hb(data,subAge)
- % Beer-Lambert conversion
+% PROCESSSTAGEOD2HB Beer-Lambert conversion (GUI wrapper)
+%
+% Wraps pf2_base.fnirs.processStageOD2Hb with GUI-specific baseline modes:
+%   - processWindowOnly: uses current view window for baseline
+%   - relative2View: calculates baseline relative to view start time
 
 global setF
 global PF2
 global outputData
 
+probeIdx = 1;
+curProbe = setF.device.Probe{probeIdx};
 
-probeIdx=1;
-curProbe=setF.device.Probe{probeIdx};
+% Determine if we can use standard external function or need GUI-specific logic
+useViewRelativeBaseline = PF2.GUIPF2.baseline.relative2View == 1 || PF2.GUIPF2.processWindowOnly;
 
-if(outputData.DirtyBaseline&&~PF2.GUIPF2.processWindowOnly)
-    baselineSamples=1:length(PF2.GUIPF2.data.time);
-elseif(outputData.DirtyBaseline&&PF2.GUIPF2.processWindowOnly)
-        baselineSamples=PF2.GUIPF2.data.timeInd;
-else
-    if(PF2.GUIPF2.baseline.relative2View==1||PF2.GUIPF2.processWindowOnly)
-        startTime=PF2.GUIPF2.view.startTime+PF2.GUIPF2.baseline.windowStartTime;
-        endTime=PF2.GUIPF2.view.startTime+PF2.GUIPF2.baseline.windowStartTime+PF2.GUIPF2.baseline.blLength;
-    else
-        startTime=min(PF2.GUIPF2.data.time)+PF2.GUIPF2.baseline.startTime;
-        endTime=startTime+PF2.GUIPF2.baseline.blLength;
+if ~useViewRelativeBaseline
+    % Standard processing - use external function directly
+    baseline = struct('startTime', PF2.GUIPF2.baseline.startTime, ...
+                      'blLength', PF2.GUIPF2.baseline.blLength);
+
+    if isempty(subAge)
+        subAge = PF2.GUIPF2.curDPF_age;
     end
 
-    startSample=find(PF2.GUIPF2.data.time>=startTime,1);
-    endSample=find(PF2.GUIPF2.data.time>=endTime,1);
-    baselineSamples=startSample:endSample;
-
-end
-
-
-if(strcmp(PF2.GUIPF2.dpf_mode,'None'))
-    NoPathlength=true;
+    outData = pf2_base.fnirs.processStageOD2Hb(data, PF2.GUIPF2.data.time, subAge, ...
+        outputData.DirtyBaseline, curProbe, baseline, ...
+        PF2.GUIPF2.dpf_mode, PF2.GUIPF2.curDPF_fixed, PF2.GUIPF2.curDPF_age);
 else
-    NoPathlength=false;
+    % GUI-specific: view-relative or window-only baseline
+    % Must compute baseline samples manually
+
+    if outputData.DirtyBaseline && ~PF2.GUIPF2.processWindowOnly
+        baselineSamples = 1:length(PF2.GUIPF2.data.time);
+    elseif outputData.DirtyBaseline && PF2.GUIPF2.processWindowOnly
+        baselineSamples = PF2.GUIPF2.data.timeInd;
+    else
+        % View-relative baseline calculation
+        if isfield(PF2.GUIPF2.baseline, 'windowStartTime')
+            windowStartTime = PF2.GUIPF2.baseline.windowStartTime;
+        else
+            windowStartTime = 0;
+        end
+        startTime = PF2.GUIPF2.view.startTime + windowStartTime;
+        endTime = startTime + PF2.GUIPF2.baseline.blLength;
+
+        startSample = find(PF2.GUIPF2.data.time >= startTime, 1);
+        endSample = find(PF2.GUIPF2.data.time >= endTime, 1);
+        baselineSamples = startSample:endSample;
+    end
+
+    % Determine DPF settings
+    NoPathlength = strcmp(PF2.GUIPF2.dpf_mode, 'None');
+    if strcmp(PF2.GUIPF2.dpf_mode, 'Fixed')
+        fixedDPF = PF2.GUIPF2.curDPF_fixed;
+    else
+        fixedDPF = 0;
+    end
+
+    if isempty(subAge)
+        subAge = PF2.GUIPF2.curDPF_age;
+    end
+
+    % Call bvoxy directly for GUI-specific cases
+    [outData.HbO, outData.HbR, outData.HbTotal, outData.HbDiff, outData.CBSI, ...
+        outData.channels, ~, outData.units, outData.DPF_factor] = ...
+        pf2_base.fnirs.bvoxy(data, curProbe.TableCh.OptodeNumber, ...
+        curProbe.TableCh.Wavelength, curProbe.TableOpt.SD, baselineSamples, ...
+        subAge, [], true, 'NoPathlength', NoPathlength, 'DiffPathlengthFactor', fixedDPF);
+    outData.time = PF2.GUIPF2.data.time;
 end
-
-if(strcmp(PF2.GUIPF2.dpf_mode,'Fixed'))
-    fixedDPF=PF2.GUIPF2.curDPF_fixed;
-else
-    fixedDPF=0;
-end
-
-if(isempty(subAge))
-    subAge=PF2.GUIPF2.curDPF_age;
-end
-    
-[outData.HbO, outData.HbR, outData.HbTotal, outData.HbDiff,outData.CBSI,outData.channels,~,outData.units,outData.DPF_factor]=...
-    pf2_base.fnirs.bvoxy(data,curProbe.TableCh.OptodeNumber,curProbe.TableCh.Wavelength,curProbe.TableOpt.SD,baselineSamples,subAge,[],true,'NoPathlength',NoPathlength,'DiffPathlengthFactor',fixedDPF);
-outData.time=PF2.GUIPF2.data.time;
-
-                                                          %BASELINE
-                                                          %START/END
-%[fNIR.oxy,fNIR.bv_805,fNIR.bv,fNIR.hbo,fNIR.hbr] = bvoxy (1,min(se,60),ss,se,fNIR.fin.raw_730,fNIR.fin.raw_805,fNIR.fin.raw_850);
-
-%outData=data;
 
 
 
@@ -1366,26 +1391,8 @@ end
 
 time=PF2.GUIPF2.data.time;
 
-startInd=find(PF2.GUIPF2.view.startTime<=time);
-if(isempty(startInd))
-    startInd=1;
-else
-    startInd=startInd(1);
-end
-endInd=find(PF2.GUIPF2.view.endTime<=time);
-if(isempty(endInd))
-    endInd=length(time);
-else
-    endInd=endInd(1);
-end
-if(endInd<startInd)
-    x=endInd;
-    endInd=startInd;
-    startInd=x;
-end
-
-inds=1:length(time);
-timeInd=inds>=startInd&inds<=endInd;
+% Use helper function for time index calculation
+[timeInd, startInd, endInd] = pf2_base.gui.getTimeIndices(time, PF2.GUIPF2.view.startTime, PF2.GUIPF2.view.endTime);
 
 
 
@@ -1492,18 +1499,10 @@ if(~isempty(data))
     num2Plot=length(plotIdx);
 
     if(PF2.GUIPF2.view.LightColorAuto)
-        [wvUnique]=sort(unique(round(PF2.curWvSet)));
-        wvUnique(isnan(wvUnique))=[];
-         cc=lines(length(wvUnique));%linspecer(length(wvUnique),'qualitative');
-
-        rInd=zeros(1,num2Plot);
-        for i=1:length(wvUnique)
-            rInd=rInd+(PF2.curWvSet(plotIdx)==wvUnique(i)).*i;
-
-        end
-        cIndex=cc(rInd,:);
+        % Use helper for wavelength-based coloring
+        [cIndex, ~] = pf2_base.gui.getWavelengthColors(PF2.curWvSet, plotIdx);
     else
-        cc=lines(num2Plot);%linspecer(num2Plot,'qualitative');
+        cc=lines(num2Plot);
         cIndex=cc;
     end
 
@@ -1599,23 +1598,15 @@ if(~isempty(data)&&~isempty(plotSingleTable))
     num2Plot=length(plotIdx);
 
     if(PF2.GUIPF2.view.LightColorAuto)
-        [wvUnique]=sort(unique(round(PF2.curWvSet)));
-        wvUnique(isnan(wvUnique))=[];
-         cc=lines(length(wvUnique));%linspecer(length(wvUnique),'qualitative');
-
-        rInd=zeros(1,num2Plot);
-        for i=1:length(wvUnique)
-            rInd=rInd+(PF2.curWvSet(plotIdx)==wvUnique(i)).*i;
-
-        end
-        cIndex=cc(rInd,:);
+        % Use helper for wavelength-based coloring
+        [cIndex, ~] = pf2_base.gui.getWavelengthColors(PF2.curWvSet, plotIdx);
     else
-        cc=lines(num2Plot);%linspecer(num2Plot,'qualitative');
+        cc=lines(num2Plot);
         cIndex=cc;
     end
 
 
-    
+
     for i=1:num2Plot
        h=plot(stageAxesHandles{2},PF2.GUIPF2.data.time(timeInd),data(timeInd,plotIdx(i)),'color',cIndex(i,:)); 
        set(h,'Tag',sprintf('Ch%i_%inm',PF2.curChSet(plotIdx(i)),PF2.curWvSet(plotIdx(i))));
@@ -2837,27 +2828,9 @@ end
 
 time=PF2.GUIPF2.data.time;
 
-startInd=find(PF2.GUIPF2.view.startTime<=time);
-if(isempty(startInd))
-    startInd=1;
-else
-    startInd=startInd(1);
-end
-endInd=find(PF2.GUIPF2.view.endTime<=time);
-if(isempty(endInd))
-    endInd=length(time);
-else
-    endInd=endInd(1);
-end
+% Use helper function for time index calculation
+[timeInd, ~, ~] = pf2_base.gui.getTimeIndices(time, PF2.GUIPF2.view.startTime, PF2.GUIPF2.view.endTime);
 
-if(endInd<startInd)
-    x=endInd;
-    endInd=startInd;
-    startInd=x;
-end
-
-inds=1:length(time);
-timeInd=inds>=startInd&inds<=endInd;
 if(preProcessed)
     data=PF2.GUIPF2.data.stage{4};
 else
@@ -3027,30 +3000,8 @@ end
 
 time=PF2.GUIPF2.data.time;
 
-startInd=find(PF2.GUIPF2.view.startTime<=time);
-if(isempty(startInd))
-    startInd=1;
-else
-    startInd=startInd(1);
-end
-endInd=find(PF2.GUIPF2.view.endTime<=time);
-if(isempty(endInd))
-    endInd=length(time);
-else
-    endInd=endInd(1);
-end
-if(endInd<startInd)
-    x=endInd;
-    endInd=startInd;
-    startInd=x;
-end
-if(endInd<startInd)
-    x=endInd;
-    endInd=startInd;
-    startInd=x;
-end
-inds=1:length(time);
-timeInd=inds>=startInd&inds<=endInd;
+% Use helper function for time index calculation
+[timeInd, ~, ~] = pf2_base.gui.getTimeIndices(time, PF2.GUIPF2.view.startTime, PF2.GUIPF2.view.endTime);
 
 if(preProcessed==true)
     data=PF2.GUIPF2.data.stage{1};
@@ -3101,18 +3052,10 @@ if(~isempty(data))
             num2Plot=length(plotIdx);
 
             if(PF2.GUIPF2.view.LightColorAuto)
-                [wvUnique]=sort(unique(round(PF2.curWvSet)));
-                wvUnique(isnan(wvUnique))=[];
-                 cc=lines(length(wvUnique));%linspecer(length(wvUnique),'qualitative');
-
-                rInd=zeros(1,num2Plot);
-                for i=1:length(wvUnique)
-                    rInd=rInd+(PF2.curWvSet(plotIdx)==wvUnique(i)).*i;
-
-                end
-                cIndex=cc(rInd,:);
+                % Use helper for wavelength-based coloring
+                [cIndex, ~] = pf2_base.gui.getWavelengthColors(PF2.curWvSet, plotIdx);
             else
-                cc=lines(num2Plot);%linspecer(num2Plot,'qualitative');
+                cc=lines(num2Plot);
                 cIndex=cc;
             end
 

@@ -142,37 +142,8 @@ end
 
 
 
-if(pf2_base.isnestedfield(fNIR,'info.probename')&&isfield(fNIR.info,'probename')&&~contains(fNIR.info.probename,'Unknown')) 
-    %try to load the probename cfg file
-    cfgFilePath=sprintf('%s.cfg',fNIR.info.probename);
-else
-    cfgFilePath='';
-end
-
-
-if(isempty(cfgFilePath)||~contains(cfgFilePath,'.cfg'))
-    
-    warning('Missing or invalid configuration file path\n')
-    
-    disp('No device specified. Please load device configuration');
-    probeInfo=pf2_base.loadDeviceCfg([],true);
-    if(~isempty(probeInfo))
-        error('No valid devices selected');
-    end
-    
-elseif(~isempty(cfgFilePath)) % If we're not looking at the GUI, doesn't matter
-    probeInfo=pf2_base.loadDeviceCfg(cfgFilePath,false);
-end
-
-if(pf2_base.isnestedfield(probeInfo,'Probe'))
-    deviceInfo=probeInfo.Info;
-    if(~isfield(deviceInfo,'numberProbes')||deviceInfo.numberProbes==1)
-        probeNum=1;
-    end
-    probeInfo=probeInfo.Probe{probeNum};
-else
-   error('Unable to identify probe'); 
-end
+% Load probe info using helper
+probeInfo = pf2_base.plot.loadProbeInfo(fNIR, false);
 
 
 if(isempty(rois2plot))
@@ -222,100 +193,22 @@ else
    return; 
 end
 
-if(~isfield(fNIR,'markers')||isempty(fNIR.markers))
-   showMarkers=false; 
-end
+% Process markers using helper
+tooManyMarkers = 100;
+tooManyLabels = 10;
+[showMarkers, showMarkersIdx, curMarkers, numMarkers] = ...
+    pf2_base.plot.processMarkers(fNIR, showMarkers, tooManyMarkers);
 
-if(ischar(showMarkers)&&strcmpi(showMarkers,'all'))
-    showMarkers=true;
-end
-
-if(islogical(showMarkers))
-    if(~showMarkers)
-        showMarkers=[];
-    else
-        [showMarkers,~,showMarkersIdx]=unique(fNIR.markers(:,2));
-    end
-elseif(isnumeric(showMarkers))
-    [uMarkers,~,showMarkersIdxTemp]=unique(fNIR.markers(:,2));
-    showMarkersIdx=nan(size(showMarkersIdxTemp));
-    showMarkersUidx=find(ismember(uMarkers,showMarkers));
-    for i=1:length(showMarkersUidx)
-        showMarkersIdx(showMarkersIdxTemp==(showMarkersUidx(i)))=i;
-    end
-    showMarkers=uMarkers(showMarkersUidx);
-end
-
-if(isfield(fNIR,'markers')&&~isempty(showMarkers))
-    curMarkers=fNIR.markers;
-    if(~isnumeric(curMarkers)&&isfield(curMarkers,'data'))
-        curMarkers=curMarkers.data;
-    end
+% Handle too many markers prompt
+plotTonsOfMarkers = false;
+if ~isempty(showMarkers) && any(numMarkers > tooManyMarkers)
+    user_entry = input('Enable TonsOfMarkers Mode? (Can be VERY slow) y/n: ', 's');
+    plotTonsOfMarkers = ismember(lower(user_entry), {'1', 'y', 'yes'});
 end
 
 
-tooManyMarkers=100;
-tooManyLabels=10;
-if(~isempty(showMarkers))
-    plotTonsOfMarkers=[];
-    numMarkers=zeros(1,length(showMarkers));
-    for i=1:length(showMarkers)
-        numMarkers(i)=sum(showMarkersIdx==i);
-        if(numMarkers(i)>tooManyMarkers&&isempty(plotTonsOfMarkers))
-            fprintf(2,'Warning: Over %i markers for marker %i\n',tooManyMarkers,i);
-            user_entry = input(sprintf('Enable TonsOfMarkers Mode?\n(Can be VERY slow)\ny/n: '), 's');
-            user_entry=lower(user_entry);
-            switch user_entry
-                case '1'
-                    plotTonsOfMarkers=true;
-                case '0'
-                    plotTonsOfMarkers=false;
-                case 'y'
-                    plotTonsOfMarkers=true;
-                case 'n'
-                    plotTonsOfMarkers=false;
-                case 'yes'
-                    plotTonsOfMarkers=true;
-                case 'no'
-                    plotTonsOfMarkers=false;
-            end
-        end
-    end
-    if(isempty(plotTonsOfMarkers))
-       plotTonsOfMarkers=false; 
-    end
-end
-
-
-if(islogical(baseline)&&baseline&&any(~isnumeric(baseline))) 
-    baseline=10;
-    fNIR=pf2.data.split(fNIR,'blLength',baseline,'relative',true);
-    baseline=[nan,baseline];
-elseif(~any(~isnumeric(baseline))&&length(baseline)==1&&baseline>0&&baseline<(tmax-tmin))
-    fNIR=pf2.data.split(fNIR,'blLength',baseline,'relative',true);
-    baseline=[nan,baseline];
-elseif(~any(~isnumeric(baseline))&&length(baseline)==1&&baseline<0&&baseline>(tmin-tmax)) %from end
-    if(baseline(1)<0)
-        baseline(1)=tmax-tmin+baseline(1);
-        baseline(2)=tmax-tmin;
-    end
-    fNIR=pf2.data.split(fNIR,'blStartTime',baseline(1),'blEndTime',baseline(2),'relative',true);
-    baseline=baseline+tmin;
-elseif(any(isnumeric(baseline))&&length(baseline)==2) %from end
-    if(baseline(1)<0)
-        baseline(1)=tmax+baseline(1)-tmin;
-    end
-    if(baseline(2)<0)
-        baseline(2)=tmax+baseline(2)-tmin; 
-    end
-    fNIR=pf2.data.split(fNIR,'blStartTime',baseline(1),'blEndTime',baseline(2),'relative',true);
-    baseline=baseline+tmin;
-elseif(isstruct(baseline)&&isfield(baseline,'time')&&isfield(baseline,bioMlist{1}))
-    fNIR=pf2.data.split(fNIR,tmin,tmax,'blfNIR',baseline);
-    baseline=[];
-else
-   baseline=[]; 
-end
+% Apply baseline correction using helper
+[fNIR, baseline] = pf2_base.plot.processBaseline(fNIR, baseline, bioMlist);
 
 
  t=fNIR.time;

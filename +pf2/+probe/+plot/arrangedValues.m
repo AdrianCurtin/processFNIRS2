@@ -80,37 +80,8 @@ if(isempty(minVal))
    minVal=nanmin(data2plot); 
 end
 
-if(pf2_base.isnestedfield(fNIR,'info.probename')&&isfield(fNIR.info,'probename')&&~contains(fNIR.info.probename,'Unknown')) 
-    %try to load the probename cfg file
-    cfgFilePath=sprintf('%s.cfg',fNIR.info.probename);
-else
-    cfgFilePath='';
-end
-
-
-if(isempty(cfgFilePath)||~contains(cfgFilePath,'.cfg'))
-    
-    warning('Missing or invalid configuration file path\n')
-    
-    disp('No device specified. Please load device configuration');
-    probeInfo=pf2_base.loadDeviceCfg([],true);
-    if(isempty(probeInfo))
-        error('No valid devices selected');
-    end
-    
-elseif(~isempty(cfgFilePath)) % If we're not looking at the GUI, doesn't matter
-    probeInfo=pf2_base.loadDeviceCfg(cfgFilePath,true);
-end
-
-if(pf2_base.isnestedfield(probeInfo,'Probe'))
-    deviceInfo=probeInfo.Info;
-    if(~isfield(deviceInfo,'numberProbes')||deviceInfo.numberProbes==1)
-        probeNum=1;
-    end
-    probeInfo=probeInfo.Probe{probeNum};
-else
-   error('Unable to identify probe'); 
-end
+% Load probe info using helper
+probeInfo = pf2_base.plot.loadProbeInfo(fNIR, true);
 
 
 if(include_ss&&size(probeInfo.OptPos,1)>length(data2plot)&&sum(~probeInfo.TableOpt.IsShortSeparation)==length(data2plot))   include_ss=false;

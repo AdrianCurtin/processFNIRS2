@@ -70,12 +70,17 @@ addParameter(p,'DirtyBaseline',false,@islogical); % turn to use the entire mean 
 addParameter(p,'FixedDPF',PF2.curDPF_fixed,validScalarPosNum); %set default uniwavelength DPF
 addParameter(p,'DPFmode',PF2.dpf_mode,validDPFmode); %set role of DPF in mBLL calculations
 addParameter(p,'RejectLevel',PF2.RejectLevel,@(x) isnumeric(x)&&isscalar(x)&&x<1&&x>=0); %set the level at which a channel is rejected (fChMask)
+addParameter(p,'Context',[],@(x) isempty(x) || isa(x, 'pf2_base.ProcessingContext')); %optional ProcessingContext for isolated processing
 
 
 addParameter(p,'ImportOxyMethods','NA',@ischar);  %Path for Oxy methods cfg file to import
 addParameter(p,'ImportRawMethods','NA',@ischar);  %Path for Raw methods cfg file to import
 
 parse(p,varargin{:});
+
+% Handle ProcessingContext if provided
+ctx = p.Results.Context;
+useContext = ~isempty(ctx);
 
 outputData.ProcessOxy=~p.Results.SkipOxy;
 outputData.ProcessRaw=~p.Results.SkipRaw;
@@ -105,7 +110,8 @@ else
     cfgFilePath='';
 end
 
-ShowGUI=p.Results.ShowGUI||isempty(varargin)||(nargout==0&&~isempty(data));
+% Don't show GUI if Context is provided (context implies headless processing)
+ShowGUI=p.Results.ShowGUI||isempty(varargin)||(nargout==0&&~isempty(data)&&isempty(p.Results.Context));
 
 if(isfield(data,'probeinfo')&&~isempty(data.probeinfo))
     setF.device=data.probeinfo;
@@ -157,40 +163,104 @@ if(ShowGUI)
     return
 end
 
-PF2.baseline.startTime=p.Results.blStartTime;
-PF2.baseline.blLength=p.Results.blLength;
+% Apply settings - use context if provided, otherwise use parameters/globals
+if useContext
+    % Use context settings (isolated from globals)
+    ctxBaseline.startTime = ctx.baselineStartTime;
+    ctxBaseline.blLength = ctx.baselineLength;
+    ctxDPF_fixed = ctx.dpfFixedValue;
+    ctxDPF_age = ctx.subjectAge;
+    ctxDPF_mode = ctx.dpfMode;
+    ctxRejectLevel = ctx.rejectLevel;
 
-outputData.DirtyBaseline=p.Results.DirtyBaseline||PF2.baseline.blLength==0;
-
-
-PF2.curDPF_fixed=p.Results.FixedDPF;
-PF2.curDPF_age=p.Results.defaultSubjectAge;
-PF2.dpf_mode=p.Results.DPFmode;
-
-rawMethodStr=p.Results.Raw_Method;
-oxyMethodStr=p.Results.Oxy_Method;
-
-if(pf2_base.isnestedfield(PF2,sprintf('myRawMethods.cfg.%s',rawMethodStr)))
-    if(pf2_base.isnestedfield(PF2,'stageRawMethod.name')&&~strcmpi(PF2.stageRawMethod.name,rawMethodStr))
-       fprintf('Setting Raw Method to: %s\n',rawMethodStr); 
+    % Override with explicit parameters if provided
+    if ~any(strcmp(p.UsingDefaults, 'blStartTime'))
+        ctxBaseline.startTime = p.Results.blStartTime;
     end
-    
-    PF2.stageRawMethod=pf2_base.pf2_unpackMethod(PF2.myRawMethods.cfg.(rawMethodStr));
-    PF2.stageRawMethod.name=rawMethodStr;
-else
-    error('Unable to find method named: %s',oxyMethodStr);
-end
-
-
-if(pf2_base.isnestedfield(PF2,sprintf('myOxyMethods.cfg.%s',oxyMethodStr)))
-    if(pf2_base.isnestedfield(PF2,'stageOxyMethod.name')&&~strcmpi(PF2.stageOxyMethod.name,oxyMethodStr))
-       fprintf('Setting Oxy Method to: %s\n',oxyMethodStr); 
+    if ~any(strcmp(p.UsingDefaults, 'blLength'))
+        ctxBaseline.blLength = p.Results.blLength;
     end
-    
-    PF2.stageOxyMethod=pf2_base.pf2_unpackMethod(PF2.myOxyMethods.cfg.(oxyMethodStr));
-    PF2.stageOxyMethod.name=oxyMethodStr;
+    if ~any(strcmp(p.UsingDefaults, 'FixedDPF'))
+        ctxDPF_fixed = p.Results.FixedDPF;
+    end
+    if ~any(strcmp(p.UsingDefaults, 'defaultSubjectAge'))
+        ctxDPF_age = p.Results.defaultSubjectAge;
+    end
+    if ~any(strcmp(p.UsingDefaults, 'DPFmode'))
+        ctxDPF_mode = p.Results.DPFmode;
+    end
+    if ~any(strcmp(p.UsingDefaults, 'RejectLevel'))
+        ctxRejectLevel = p.Results.RejectLevel;
+    end
+
+    outputData.DirtyBaseline = ctx.dirtyBaseline || p.Results.DirtyBaseline || ctxBaseline.blLength == 0;
+
+    % Get methods from context
+    if isfield(ctx.rawMethod, 'F') && ~isempty(ctx.rawMethod.F)
+        ctxRawMethod = ctx.rawMethod;
+    else
+        % Fall back to 'None' method
+        ctxRawMethod = pf2_base.pf2_unpackMethod(PF2.myRawMethods.cfg.None);
+        ctxRawMethod.name = 'None';
+    end
+
+    if isfield(ctx.oxyMethod, 'F') && ~isempty(ctx.oxyMethod.F)
+        ctxOxyMethod = ctx.oxyMethod;
+    else
+        % Fall back to 'None' method
+        ctxOxyMethod = pf2_base.pf2_unpackMethod(PF2.myOxyMethods.cfg.None);
+        ctxOxyMethod.name = 'None';
+    end
+
+    % Use device from context if available
+    if ~isempty(fieldnames(ctx.device))
+        setF.device = ctx.device;
+    end
 else
-    error('Unable to find method named: %s',oxyMethodStr);
+    % Original behavior - use globals
+    PF2.baseline.startTime=p.Results.blStartTime;
+    PF2.baseline.blLength=p.Results.blLength;
+    ctxBaseline = PF2.baseline;
+
+    outputData.DirtyBaseline=p.Results.DirtyBaseline||PF2.baseline.blLength==0;
+
+
+    PF2.curDPF_fixed=p.Results.FixedDPF;
+    PF2.curDPF_age=p.Results.defaultSubjectAge;
+    PF2.dpf_mode=p.Results.DPFmode;
+    ctxDPF_fixed = PF2.curDPF_fixed;
+    ctxDPF_age = PF2.curDPF_age;
+    ctxDPF_mode = PF2.dpf_mode;
+    ctxRejectLevel = PF2.RejectLevel;
+
+    rawMethodStr=p.Results.Raw_Method;
+    oxyMethodStr=p.Results.Oxy_Method;
+
+    if(pf2_base.isnestedfield(PF2,sprintf('myRawMethods.cfg.%s',rawMethodStr)))
+        if(pf2_base.isnestedfield(PF2,'stageRawMethod.name')&&~strcmpi(PF2.stageRawMethod.name,rawMethodStr))
+           fprintf('Setting Raw Method to: %s\n',rawMethodStr);
+        end
+
+        PF2.stageRawMethod=pf2_base.pf2_unpackMethod(PF2.myRawMethods.cfg.(rawMethodStr));
+        PF2.stageRawMethod.name=rawMethodStr;
+    else
+        error('Unable to find method named: %s',rawMethodStr);
+    end
+
+
+    if(pf2_base.isnestedfield(PF2,sprintf('myOxyMethods.cfg.%s',oxyMethodStr)))
+        if(pf2_base.isnestedfield(PF2,'stageOxyMethod.name')&&~strcmpi(PF2.stageOxyMethod.name,oxyMethodStr))
+           fprintf('Setting Oxy Method to: %s\n',oxyMethodStr);
+        end
+
+        PF2.stageOxyMethod=pf2_base.pf2_unpackMethod(PF2.myOxyMethods.cfg.(oxyMethodStr));
+        PF2.stageOxyMethod.name=oxyMethodStr;
+    else
+        error('Unable to find method named: %s',oxyMethodStr);
+    end
+
+    ctxRawMethod = PF2.stageRawMethod;
+    ctxOxyMethod = PF2.stageOxyMethod;
 end
 
 
@@ -366,7 +436,7 @@ if(~isempty(data))
     curOptTable=curProbe.TableOpt;
     
     
-    rawMask=ismember(channelNumbers,curProbe.TableOpt.OptodeNum(reshape(fData.fchMask>PF2.RejectLevel|outputData.ProcessRejected,1,numOptodes)));
+    rawMask=ismember(channelNumbers,curProbe.TableOpt.OptodeNum(reshape(fData.fchMask>ctxRejectLevel|outputData.ProcessRejected,1,numOptodes)));
 
    %varargout=processFNIRdata(); 
    
@@ -377,9 +447,9 @@ if(~isempty(data))
 
    if(outputData.ProcessRaw)
         
-        [fData.stage{3},fData.stage{2}]=pf2_base.fnirs.processStageRaw2OD(PF2.stageRawMethod,fData.stage{1},fData.fs,fData.time,rawMask,fMarkers,fAux,channelNumbers,wavelengths,curOptTable,data); % Raw data processing
+        [fData.stage{3},fData.stage{2}]=pf2_base.fnirs.processStageRaw2OD(ctxRawMethod,fData.stage{1},fData.fs,fData.time,rawMask,fMarkers,fAux,channelNumbers,wavelengths,curOptTable,data); % Raw data processing
         if(outputData.ProcessOxy)
-            fData.stage{4}=processStageOD2Hb(fData.stage{3},fData.time,fData.info.Age,outputData.DirtyBaseline,curProbe); % Beer-Lambert conversion
+            fData.stage{4}=pf2_base.fnirs.processStageOD2Hb(fData.stage{3},fData.time,fData.info.Age,outputData.DirtyBaseline,curProbe,ctxBaseline,ctxDPF_mode,ctxDPF_fixed,ctxDPF_age); % Beer-Lambert conversion
         end
         if(pf2_base.isnestedfield(fData,'ROI.info'))
             fData.stage{4}.ROI.info=fData.ROI.info; %Regenerate from info
@@ -395,12 +465,12 @@ if(~isempty(data))
         end
     end
     if(outputData.ProcessOxy)
-        fData.stage{4}.fchMask=fData.fchMask>PF2.RejectLevel;
+        fData.stage{4}.fchMask=fData.fchMask>ctxRejectLevel;
         fData.stage{4}.Aux=fData.Aux;
         fData.stage{4}.markers=fData.markers;
         fData.stage{4}.time=fData.time;
-        
-        fData.stage{5}=pf2_base.fnirs.processStageFilterHb(PF2.stageOxyMethod,fData.stage{4},fData.fs,curOptTable,outputData.ProcessRejected); % Oxy data processing
+
+        fData.stage{5}=pf2_base.fnirs.processStageFilterHb(ctxOxyMethod,fData.stage{4},fData.fs,curOptTable,outputData.ProcessRejected); % Oxy data processing
     else
         %fData.stage{5}=fData.stage{4};
     end
@@ -477,55 +547,7 @@ clearVarsOnClose();
 end
 
 
-function outData=processStageOD2Hb(data,time,subjectAge,DirtyBaseline,curProbe)
- % Beer-Lambert conversion
-
-
-global PF2
-
-if(strcmp(PF2.dpf_mode,'None'))
-    NoPathlength=true;
-else
-    NoPathlength=false;
-end
-
-if(strcmp(PF2.dpf_mode,'Fixed'))
-    fixedDPF=PF2.curDPF_fixed;
-else
-    fixedDPF=0;
-end
-
-if(isempty(subjectAge))
-    subjectAge=PF2.curDPF_age;
-end
-
-if(DirtyBaseline) %use nanmean of entire segment asa baseline
-    baselineSamples=1:length(time);
-else
-    startTime=min(time)+PF2.baseline.startTime;
-    endTime=startTime+PF2.baseline.blLength;
-
-    startSample=find(time>=startTime,1);
-    endSample=find(time>=endTime,1);
-    baselineSamples=startSample:endSample;
-end
-
-
-curTableOpt=curProbe.TableOpt;
-curTableCh=curProbe.TableCh;
-
-data=data(:,curTableCh.isCh);
-curTableCh=curTableCh(curTableCh.isCh,:);
-
-[outData.HbO, outData.HbR, outData.HbTotal, outData.HbDiff,outData.CBSI,outData.channels,~,outData.units,outData.DPF_factor]=...
-    pf2_base.fnirs.bvoxy(data,curTableCh.OptodeNumber,curTableCh.Wavelength,curTableOpt.SD,baselineSamples,subjectAge,[],true,'NoPathlength',NoPathlength,'DiffPathlengthFactor',fixedDPF);
-outData.time=time;
-                                                          %BASELINE
-                                                          %START/END
-%[fNIR.oxy,fNIR.bv_805,fNIR.bv,fNIR.hbo,fNIR.hbr] = bvoxy (1,min(se,60),ss,se,fNIR.fin.raw_730,fNIR.fin.raw_805,fNIR.fin.raw_850);
-
-%outData=data;  
-end
+% processStageOD2Hb moved to pf2_base.fnirs.processStageOD2Hb
 
 
 

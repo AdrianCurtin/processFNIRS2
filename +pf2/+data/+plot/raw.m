@@ -127,42 +127,8 @@ end
 
 
 
-if(isfield(fNIR,'probeinfo'))
-    probeInfo=fNIR.probeinfo;
-else
-    
-if(pf2_base.isnestedfield(fNIR,'info.probename')&&isfield(fNIR.info,'probename')&&~contains(fNIR.info.probename,'Unknown')) 
-    %try to load the probename cfg file
-    cfgFilePath=sprintf('%s.cfg',fNIR.info.probename);
-else
-    cfgFilePath='';
-end
-
-
-if(isempty(cfgFilePath)||~contains(cfgFilePath,'.cfg'))
-    
-    warning('Missing or invalid configuration file path\n')
-    
-    disp('No device specified. Please load device configuration');
-    probeInfo=pf2_base.loadDeviceCfg([],true);
-    if(~isempty(probeInfo))
-        error('No valid devices selected');
-    end
-    
-elseif(~isempty(cfgFilePath)) % If we're not looking at the GUI, doesn't matter
-    probeInfo=pf2_base.loadDeviceCfg(cfgFilePath,plotArranged);
-end
-
-end
-if(pf2_base.isnestedfield(probeInfo,'Probe'))
-    deviceInfo=probeInfo.Info;
-    if(~isfield(deviceInfo,'numberProbes')||deviceInfo.numberProbes==1)
-        probeNum=1;
-    end
-    probeInfo=probeInfo.Probe{probeNum};
-else
-   error('Unable to identify probe'); 
-end
+% Load probe info using helper
+[probeInfo, deviceInfo] = pf2_base.plot.loadProbeInfo(fNIR, plotArranged);
 
 
 
@@ -245,36 +211,11 @@ else
    return; 
 end
 
-if(~isfield(fNIR,'markers')||isempty(fNIR.markers))
-   showMarkers=false; 
-end
-
-if(ischar(showMarkers)&&strcmpi(showMarkers,'all'))
-    showMarkers=true;
-end
-
-if(islogical(showMarkers))
-    if(~showMarkers)
-        showMarkers=[];
-    else
-        [showMarkers,~,showMarkersIdx]=unique(fNIR.markers(:,2));
-    end
-elseif(isnumeric(showMarkers))
-    [uMarkers,~,showMarkersIdxTemp]=unique(fNIR.markers(:,2));
-    showMarkersIdx=nan(size(showMarkersIdxTemp));
-    showMarkersUidx=find(ismember(uMarkers,showMarkers));
-    for i=1:length(showMarkersUidx)
-        showMarkersIdx(showMarkersIdxTemp==(showMarkersUidx(i)))=i;
-    end
-    showMarkers=uMarkers(showMarkersUidx);
-end
-
-if(isfield(fNIR,'markers')&&~isempty(showMarkers))
-    curMarkers=fNIR.markers;
-    if(~isnumeric(curMarkers)&&isfield(curMarkers,'data'))
-        curMarkers=curMarkers.data;
-    end
-end
+% Process markers using helper
+numch2plot = length(channels);
+tooManyMarkers = 1500 / numch2plot;
+[showMarkers, showMarkersIdx, curMarkers, numMarkers] = ...
+    pf2_base.plot.processMarkers(fNIR, showMarkers, tooManyMarkers);
 
 
 
@@ -285,68 +226,36 @@ elseif(length(ylimit)>2||isempty(ylimit))
 end
 
 
-numch2plot=length(channels);
-tooManyLabels=200/numch2plot;
+tooManyLabels = 200 / numch2plot;
 
-tooManyMarkers=1500/numch2plot;
-
-if(~isempty(showMarkers))
-    plotTonsOfMarkers=[];
-    numMarkers=zeros(1,length(showMarkers));
-    for i=1:length(showMarkers)
-        numMarkers(i)=sum(showMarkersIdx==i);
-        if(numMarkers(i)>tooManyMarkers&&isempty(plotTonsOfMarkers))
-            fprintf(2,'Warning: ~ %.0f markers for marker %i\n',tooManyMarkers,i);
-            user_entry = input(sprintf('Enable TonsOfMarkers Mode?\n(Can be VERY slow)\ny/n: '), 's');
-            user_entry=lower(user_entry);
-            switch user_entry
-                case '1'
-                    plotTonsOfMarkers=true;
-                case '0'
-                    plotTonsOfMarkers=false;
-                case 'y'
-                    plotTonsOfMarkers=true;
-                case 'n'
-                    plotTonsOfMarkers=false;
-                case 'yes'
-                    plotTonsOfMarkers=true;
-                case 'no'
-                    plotTonsOfMarkers=false;
-            end
-        end
-    end
-    if(isempty(plotTonsOfMarkers))
-       plotTonsOfMarkers=false; 
-    end
+% Handle too many markers prompt (numMarkers already computed by helper)
+plotTonsOfMarkers = false;
+if ~isempty(showMarkers) && any(numMarkers > tooManyMarkers)
+    user_entry = input('Enable TonsOfMarkers Mode? (Can be VERY slow) y/n: ', 's');
+    plotTonsOfMarkers = ismember(lower(user_entry), {'1', 'y', 'yes'});
 end
 
-printOnce=false; % flag for multiple printing
-flagOnce=false;
+printOnce = false;
+flagOnce = false;
 
-if(isfield(probeInfo,'OptPos'))
-	optLayout=probeInfo.OptPos.subplot_layout_ss;
-elseif(isfield(probeInfo,'OptPos'))
-	optLayout=probeInfo.OptPos.OptPos.subplot_layout;
+if isfield(probeInfo, 'OptPos')
+    optLayout = probeInfo.OptPos.subplot_layout_ss;
 else
-   plotArranged=false; 
+    plotArranged = false;
 end
 
-h=cell(0);
-for(optIdx=1:length(channels))
-    optNum=channels(optIdx);
-    if(plotArranged)
-        if optNum > numel(optLayout) 
-            continue
-        else
-            optPos=optLayout{optNum};
-            optPos([2])=1-optPos([2])-optPos([4]); %flips y vertical axis
-            optPos([3,4])=optPos([3,4]).*[0.65,0.9];
-            optPos([1,2])=optPos([1,2])+0.03;
-            h{optIdx}= axes('Position',optPos,'Box','on');
+h = cell(0);
+for optIdx = 1:length(channels)
+    optNum = channels(optIdx);
+    if plotArranged
+        % Use helper for position calculation
+        optPos = pf2_base.plot.getOptodePosition(optLayout, optNum, [0.65, 0.9], [0.03, 0]);
+        if isempty(optPos)
+            continue;
         end
-        
+        h{optIdx} = axes('Position', optPos, 'Box', 'on');
     else
-        h{optIdx}=subplot(length(channels),1,optIdx);
+        h{optIdx} = subplot(length(channels), 1, optIdx);
     end
     
     gh=gcf();

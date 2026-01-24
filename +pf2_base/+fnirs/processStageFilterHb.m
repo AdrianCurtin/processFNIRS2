@@ -151,8 +151,20 @@ if(pf2_base.isnestedfield(data,'ROI.HbO')&&~isempty(data.ROI))
 end
 
 global PF2
+
+% Fallback to global method if none provided
+if isempty(method)
+    if ~isfield(PF2, 'stageOxyMethod')
+        disp('No oxy method configured');
+        outData = data;
+        return;
+    else
+        method = PF2.stageOxyMethod;
+    end
+end
+
 if(~isfield(method,'F'))
-    disp('No stage2 processing method left');
+    disp('No stage2 processing method specified');
     outData=data;
     %outData.HbO(:,validChannels)=medfilt1(outData.HbO(:,validChannels),25);
     %outData.HbR(:,validChannels)=medfilt1(outData.HbR(:,validChannels),25);

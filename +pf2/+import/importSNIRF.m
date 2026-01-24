@@ -325,12 +325,16 @@ for p = 1:1 % Just one probe for now
         if isnan(opt_list(i))
             continue;
         end
-        if ismember(opt_list(i), reindexed_lookup(:, 2))
-            reindexed_list(i) = reindexed_lookup(opt_list(i), 1);
+        % Find if this optode number was already seen
+        matchIdx = find(reindexed_lookup(:, 2) == opt_list(i), 1);
+        if ~isempty(matchIdx)
+            % Use the previously assigned index for this optode number
+            reindexed_list(i) = reindexed_lookup(matchIdx, 1);
         else
-            reindexed_lookup(opt_list(i), 1) = next_index;
-            reindexed_lookup(opt_list(i), 2) = opt_list(i);
-            
+            % Assign new sequential index
+            reindexed_lookup(next_index, 1) = next_index;
+            reindexed_lookup(next_index, 2) = opt_list(i);
+
             reindexed_list(i) = next_index;
             next_index = next_index + 1;
         end
@@ -547,15 +551,14 @@ for p = 1:1 % Just one probe for now
     device.Info.NumberChannels = device.Info.NumberChannels + numCh;
 
      % Map wavelengths to channels
-    for c = 1:numOpt
-   
+    for c = 1:numCh
         device.Probe{p}.TableOpt.Ch(c, :) = (find(device.Probe{p}.ChannelNumbers == device.Probe{p}.ChannelList(c)));
         wvIdxToMatch = device.Probe{p}.wvI(device.Probe{p}.TableOpt.Ch(c, :));
         if ~any(isnan(wvIdxToMatch))
             device.Probe{p}.TableOpt.wv(c, :) = device.Probe{p}.Wavelength(wvIdxToMatch);
         end
-        
-        device.Probe{p}.TableOpt.Label{c} = sprintf('Opt%i', device.Probe{p}.ChannelList(c));
+
+        device.Probe{p}.TableOpt.Label{c} = sprintf('Ch%i', device.Probe{p}.ChannelList(c));
     end
     
     % Generate probe layout

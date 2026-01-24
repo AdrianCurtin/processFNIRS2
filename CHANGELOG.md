@@ -1,7 +1,15 @@
 # Changelog
 
 ## v0.9 (2026-01-23)
-API Standardization & Comprehensive Testing Infrastructure
+API Standardization, Testing Infrastructure & Context-Based Processing
+
+### New Features
+- **ProcessingContext class** for isolated, reproducible processing
+  - Encapsulates all processing settings (DPF, baseline, methods, device)
+  - Enables parallel processing with different settings per worker
+  - Supports serialization via `toStruct()`/`fromStruct()` for saving analysis settings
+  - Pass via `processFNIRS2(data, 'Context', ctx)` parameter
+- Moved `processStageOD2Hb` to external function `pf2_base.fnirs.processStageOD2Hb`
 
 ### Breaking Changes
 - **camelCase API migration**: All public API functions now use camelCase naming convention
@@ -38,10 +46,13 @@ API Standardization & Comprehensive Testing Infrastructure
 - `FDRTest` - FDR statistical correction (Benjamini-Hochberg, two-step)
 - `MethodConfigTest` - Processing method configuration
 - `AuxDataTest` - Auxiliary data handling
+- `ProcessingContextTest` - Context class creation, validation, serialization
+- `ProcessStageOD2HbTest` - Beer-Lambert conversion stage testing
 
 **Integration Tests:**
 - `FullPipelineTest` - End-to-end processing pipeline tests
 - `RoundtripTest` - SNIRF import/export roundtrip validation
+- `ProcessingContextIntegrationTest` - Context isolation, parallel processing simulation
 
 **Synthetic Data Generators:**
 - `generateFNIRS` - Realistic raw fNIRS data with HRF, cardiac, respiratory signals
@@ -53,6 +64,10 @@ API Standardization & Comprehensive Testing Infrastructure
 **Documentation:**
 - Added `testing_plan.md` - Comprehensive testing strategy document
 - Added `golden/README.md` - Golden file infrastructure documentation
+
+### Bug Fixes
+- Fixed SNIRF import optode reindexing crash when optode numbers exceed array dimensions
+- Fixed SNIRF import channel mapping loop iterating over wrong count (numOpt vs numCh)
 
 ## v0.8.1 (2026-01-23)
 Documentation & SNIRF Improvements
