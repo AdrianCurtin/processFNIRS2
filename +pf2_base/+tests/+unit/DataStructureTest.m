@@ -114,16 +114,17 @@ classdef DataStructureTest < matlab.unittest.TestCase
                 'Time vector must be monotonically increasing');
         end
 
-        function testMarkersHasThreeColumns(testCase)
-            % Verify markers matrix has exactly 3 columns when not empty
+        function testMarkersHasExpectedColumns(testCase)
+            % Verify markers matrix has at least 3 columns when not empty
             %
-            % Marker format: [time, value, duration]
+            % Marker format: [time, value, duration, amplitude]
+            % Columns 1-3 are required; column 4 (amplitude) defaults to 1
 
             data = testCase.rawData;
 
             if ~isempty(data.markers)
-                testCase.verifyEqual(size(data.markers, 2), 3, ...
-                    'Markers must have 3 columns: [time, value, duration]');
+                testCase.verifyGreaterThanOrEqual(size(data.markers, 2), 3, ...
+                    'Markers must have at least 3 columns: [time, value, duration]');
             else
                 testCase.verifyTrue(true, 'Empty markers array is valid');
             end

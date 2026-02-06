@@ -1,4 +1,4 @@
-# processFNIRS2 v0.9
+# processFNIRS2 v1.0.0
 
 ## Overview
 processFNIRS2 is a modular MATLAB toolbox designed for processing functional Near-Infrared Spectroscopy (fNIRS) data. The toolbox provides a flexible framework for importing, processing, analyzing, and visualizing fNIRS data from multiple device manufacturers.
@@ -59,7 +59,7 @@ exploreFNIRS(myprocesseddata);
 ## Processing Pipeline
 
 ### Data Import
-Use functions in the `pf2.Import` module to load data from various fNIRS devices:
+Use functions in the `pf2.import` module to load data from various fNIRS devices:
 - `pf2.import.importNIR`: Import fNIR Devices/Biopac files
 - `pf2.import.importHitachiMES`: Import Hitachi ETG-4000 files
 - `pf2.import.importNIRX`: Import NIRx system files
@@ -74,16 +74,16 @@ The toolbox provides various functions for manipulating fNIRS data:
 - `pf2.data.setT0`: Shift time to align with experiment start
 - `pf2.data.split`: Split fNIRS segments based on time points
 - `pf2.data.plot`: Visualize fNIRS data (Oxy, Raw, ROI, AuxData)
-- `pf2.Export`: Export data to NIR or SNIRF formats
+- `pf2.export`: Export data to NIR or SNIRF formats
 
 ### Method Configuration
 processFNIRS2 uses a two-stage processing pipeline:
 1. **Raw processing** (Raw → Optical Density)
-   - Configure and select methods using `pf2.methods.Raw`
+   - Configure and select methods using `pf2.methods.raw`
    - Common preprocessing includes: motion artifact correction, filtering, CAR, etc.
 
 2. **Oxy processing** (Optical Density → Hemoglobin)
-   - Configure and select methods using `pf2.methods.Oxy`
+   - Configure and select methods using `pf2.methods.oxy`
    - Processing includes: Beer-Lambert conversion, filtering, ROI analysis, etc.
 
 Methods can be configured through the GUI or programmatically:
@@ -93,12 +93,19 @@ pf2.methods.raw.configureMethods();
 pf2.methods.oxy.configureMethods();
 
 % List available methods
-pf2.methods.raw.List();
-pf2.methods.oxy.List();
+pf2.methods.raw.list();
+pf2.methods.oxy.list();
 
 % Set methods programmatically
 pf2.methods.raw.setMethod('MyRawMethod');
 pf2.methods.oxy.setMethod('MyOxyMethod');
+
+% Create, modify, and share methods (new in v1.0.0)
+pf2.methods.raw.create('MyCustomMethod');
+pf2.methods.raw.editFunction('MyCustomMethod', 'pf2_lpf', struct('freq_cut', 0.08));
+pf2.methods.raw.exportMethod('MyCustomMethod', 'my_method.mat');
+pf2.methods.raw.importMethod('shared_method.mat');
+pf2.methods.raw.delete('OldMethod');
 ```
 
 ### Data Processing
@@ -178,15 +185,38 @@ allData = {subject1, subject2, subject3, ...};
 % Launch exploreFNIRS GUI
 exploreFNIRS(allData);
 
-% With configuration options
-exploreFNIRS(allData, 'timeShiftTo0', true, 'blStart', 0, 'blEnd', 5, ...
-             'blockStart', 5, 'blockEnd', 65, 'barSegmentLength', 60);
+% Or use the scriptable Experiment class (no GUI needed)
+ex = exploreFNIRS.core.Experiment(allData);
+ex.select('Group', {'Control', 'Treatment'});
+ex.groupby({'Group', 'Condition'});
+ex.aggregate();
+
+% Headless plots
+fig = ex.plotTemporal('Biomarkers', {'HbO'}, 'Channels', 1:5);
+fig = ex.plotBar('Biomarker', 'HbO', 'TimeWindow', [5, 25]);
+
+% ROI-based plotting
+fig = ex.plotTemporal('Biomarkers', {'HbO'}, 'ROIs', 'all');
+
+% Connectivity analysis
+connResults = ex.connectivity('Method', 'pearson');
+
+% Hyperscanning analysis
+hsResults = ex.hyperscanning('PairBy', 'Dyad', 'Method', 'coherence');
+
+% Export
+longTable = ex.exportLong();
 ```
 
 exploreFNIRS features:
+- **Scriptable Experiment class** for complete headless group analysis
 - Group-level analysis with hierarchical averaging
+- **Connectivity analysis** with 5 coupling methods (Pearson, Spearman, xcorr, coherence, wavelet coherence)
+- **Hyperscanning** with subject pairing, dyad/group computation, and permutation testing
+- **Block-wise analysis** for connectivity and hyperscanning
 - Linear mixed-effects modeling with Satterthwaite degrees of freedom
 - Visualization: temporal plots, bar charts, scatter plots, topographic maps
+- **Headless plotting** with ROI support (plotTemporal, plotBar)
 - FDR correction: `exploreFNIRS.fx.performFDR()`
 - Data export: `exploreFNIRS.export.mergeGbyTablesWide()` / `mergeGbyTablesLong()`
 
@@ -211,9 +241,9 @@ pf2.settings.selectDevice('fNIR_Devices_fNIR1200_16ch.cfg');
 - `processFNIRS2.m`: Main function for processing fNIRS data
 - `pf2.m`: Convenience wrapper for processFNIRS2
 - `exploreFNIRS.m`: Group-level analysis GUI
-- `+pf2/`: User-facing API (Import, Export, Data, Methods, Settings, Probe)
-- `+pf2_base/`: Internal infrastructure and utilities
-- `+exploreFNIRS/`: Group analysis functions (plot, export, fx, dataset)
+- `+pf2/`: User-facing API (import, export, data, methods, settings, probe)
+- `+pf2_base/`: Internal infrastructure, utilities, and tests (300+ tests)
+- `+exploreFNIRS/`: Group analysis (core, connectivity, coupling, hyperscanning, plot, export, fx, dataset)
 - `base_functions/`: Utility functions (legacy)
 - `GUI/`: User interface components (legacy, GUIDE-based)
 - `functions/`: Signal processing algorithms (filters, motion correction, etc.)
@@ -222,42 +252,42 @@ pf2.settings.selectDevice('fNIR_Devices_fNIR1200_16ch.cfg');
 
 ## Overall Structure
 processFNIRS2 is laid out in the following manner:
-- **Data**: Functions to manipulate individual fNIRS segments
-  - ApplyChannelMask: Set bad channels to nan
-  - GetMarkers: Find timepoints of markers in a regex style
-  - Resample: Resample or average fNIRS data
-  - SetT0: Shift fNIRS time to match start of experiment
-  - Split: Split fNIRS segment based on different input times
-  - **Plot**: Functions to visualize fNIRS data
-    - AuxData: Plot auxiliary data channels
-    - Oxy: Plot oxygenation data
-    - ROI: Plot Region of Interest data
-    - Raw: Plot raw intensity data
-  - **Export**: Functions to export fNIRS data
+- **data**: Functions to manipulate individual fNIRS segments
+  - applyChannelMask: Set bad channels to nan
+  - getMarkers: Find timepoints of markers in a regex style
+  - resample: Resample or average fNIRS data
+  - setT0: Shift fNIRS time to match start of experiment
+  - split: Split fNIRS segment based on different input times
+  - **plot**: Functions to visualize fNIRS data
+    - auxData: Plot auxiliary data channels
+    - oxy: Plot oxygenation data
+    - roi: Plot Region of Interest data
+    - raw: Plot raw intensity data
+  - **export**: Functions to export fNIRS data
     - asNIR: Export to NIR file format
     - asSNIRF: Export to SNIRF file format
-- **GUI**: Shortcut for accessing the GUI
-- **Help**: Access to help documentation
-- **Import**: Functions to import fNIRS files
+- **gui**: Shortcut for accessing the GUI
+- **help**: Access to help documentation
+- **import**: Functions to import fNIRS files
   - importHitachiMES: Import Hitachi Probes
   - importNIRX: Import NIRx files
   - importNIR: Import fNIR Devices/Biopac files
   - importSNIRF: Import SNIRF format files
   - sampleData: Load sample data included with the toolbox
-- **Methods**: Functions to change and modify processing methods
-  - Oxy: Oxy conversion pipeline methods
-  - Raw: Raw domain pipeline methods
-- **Process**: Process fNIR segment data
+- **methods**: Functions to change and modify processing methods
+  - oxy: Oxy conversion pipeline methods
+  - raw: Raw domain pipeline methods
+- **process**: Process fNIR segment data
   - processOxy: Run the Oxy Pipeline only
   - processRaw: Run the Raw Pipeline only
-- **Settings**: Change settings related to processing
-  - Baseline: Change baseline time settings
-  - DPF: Change mode of Differential Path Length
+- **settings**: Change settings related to processing
+  - baseline: Change baseline time settings
+  - dpf: Change mode of Differential Path Length
   - selectDevice: Reload device settings for FNIRS probe
 
 ## Troubleshooting Tips
 - When importing data for the first time, verify that the probe configuration is correct
-- If you get errors about DPF factors, check the settings using `pf2.settings.DPF`
+- If you get errors about DPF factors, check the settings using `pf2.settings.dpf`
 - For visualization issues, try running with default methods first
 - If having trouble loading the software, check the MATLAB preference directory (`prefdir`) and delete any related settings files
 - Remember that GUI settings are for visualization only and don't affect your data
@@ -270,7 +300,7 @@ Access this location using the MATLAB command: `prefdir`
 For detailed function documentation, use MATLAB's `help` command:
 ```matlab
 help processFNIRS2
-help pf2.methods.Raw
+help pf2.methods.raw
 help pf2.import.importNIR
 ```
 

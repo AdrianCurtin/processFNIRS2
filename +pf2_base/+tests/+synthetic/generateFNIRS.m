@@ -67,8 +67,8 @@ function data = generateFNIRS(varargin)
 %          time     - Time vector [T x 1] in seconds
 %          fs       - Sampling frequency in Hz
 %          fchMask  - Channel mask [1 x nChannels], all ones (all good)
-%          markers  - Event markers [M x 3] from hrfOnsets
-%                     Format: [time, value, duration]
+%          markers  - Event markers [M x 4] from hrfOnsets
+%                     Format: [time, value, duration, amplitude]
 %          info     - Metadata struct with:
 %                     .header.filename = 'synthetic'
 %                     .probename = 'synthetic'
@@ -237,10 +237,11 @@ if opts.addHRF
     end
 
     % Create markers from HRF onsets
-    markers = zeros(length(hrfOnsets), 3);
+    markers = zeros(length(hrfOnsets), 4);
     markers(:, 1) = hrfOnsets(:);  % Time
     markers(:, 2) = 1;              % Marker value
     markers(:, 3) = 0;              % Duration (impulse)
+    markers(:, 4) = 1;              % Amplitude (default)
 end
 
 %% Add cardiac artifact (heartbeat)

@@ -60,6 +60,7 @@ global PF2
 global setF
 global outputData
 
+pf2_base.applyLightTheme(hObject);
 
 [~,pf2ver,~]=pf2_base.pf2version();
 set(handles.uipanel_device_info,'Title',sprintf('ProcessFNIRS2 %s',pf2ver));

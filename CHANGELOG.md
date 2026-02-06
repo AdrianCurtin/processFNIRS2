@@ -1,5 +1,72 @@
 # Changelog
 
+## v1.0.0 (2026-02-06)
+Scriptable Group Analysis, Connectivity, Hyperscanning & Method CRUD
+
+### New Features
+
+**exploreFNIRS Scriptable API:**
+- **Experiment container class** (`+exploreFNIRS/+core/Experiment.m`) for fully scriptable group analysis without the GUI
+  - `select()`, `groupby()`, `aggregate()` methods for data organization
+  - `connectivity()` and `hyperscanning()` methods with block-wise support
+  - `plotTemporal()`, `plotBar()` wrappers that forward to headless plotting
+  - `exportLong()`, `exportWide()` for data export
+- **Headless plotting** (`+exploreFNIRS/+core/plotTemporal.m`, `plotBar.m`)
+  - Publication-ready temporal and bar chart plots without GUI
+  - ROI support via `'ROIs'` parameter (indices, names, or `'all'`)
+  - Configurable error bands (SEM/SD), layout (overlay/grid), and save options
+
+**Connectivity Analysis:**
+- **Connectivity module** (`+exploreFNIRS/+connectivity/`) with `computeMatrix`, `plotMatrix`, `plotBlockComparison`
+- **Coupling functions** (`+exploreFNIRS/+coupling/`) — Pearson, Spearman, cross-correlation, coherence, wavelet coherence
+- **Visualization** — `plotWcoherence` (time-freq heatmap), `plotWindowed` (windowed coupling time series)
+
+**Hyperscanning Analysis:**
+- **Hyperscanning module** (`+exploreFNIRS/+hyperscanning/`) with `pairSubjects`, `computeDyad`, `computeGroup`, `permutationTest`, `plotGroup`
+- Block-wise hyperscanning with struct array results
+
+**Block Definition & Extraction:**
+- `pf2.data.defineBlocks()` — convert markers to block struct array
+- `pf2.data.extractBlocks()` — extract fNIRS segments by block definitions
+- Positional API: `defineBlocks(data, [49,50], 30)` or name-value pairs
+
+**GLM & Short-Channel Regression:**
+- `pf2_base.fnirs.buildDesignMatrix()` — construct GLM design matrices from markers
+- `pf2_base.fnirs.fitGLM()` — fit general linear model to fNIRS data
+- `pf2_base.fnirs.shortChannelRegression()` — regress out short-channel signals
+- `functions/pf2_SSR.m` — short separation regression processing function
+
+**Method CRUD Operations:**
+- `pf2.methods.raw.create()` / `pf2.methods.oxy.create()` — create new methods programmatically
+- `pf2.methods.raw.delete()` / `pf2.methods.oxy.delete()` — delete methods
+- `pf2.methods.raw.editFunction()` / `removeFunction()` — modify method function chains
+- `pf2.methods.raw.exportMethod()` / `importMethod()` — portable method sharing
+- `pf2.methods.validateFunction()` — validate function compatibility
+
+**Other New Features:**
+- `pf2_base.normalizeMarkers()` — standardize marker codes across devices
+- `pf2_base.applyLightTheme()` — consistent light theme for figures
+- `+exploreFNIRS/+export/connectivityToTable.m` — export connectivity results as tables
+- `+exploreFNIRS/+core/getGroupColors.m` — consistent group coloring across plots
+
+### New Tests
+- **ConnectivityTest.m** — 31 tests covering all coupling functions, matrix computation, and block-wise connectivity
+- **BlockDefinitionTest.m** — 29 tests covering marker-to-block conversion and extraction
+- **GLMTest.m** — GLM design matrix and fitting tests
+- **SSRTest.m** — Short-channel regression tests
+- **HierarchicalAverageTest.m** — Hierarchical averaging validation
+- **NormalizeMarkersTest.m** — Marker normalization tests
+- **SplitTest.m** — Data splitting tests
+- **GoldenFileTest.m** — Regression testing with golden reference files
+- **testExperiment.m** — Experiment class integration tests
+- Test count: 225 → 300+ tests across 20+ test classes
+
+### Bug Fixes
+- Fixed `grandAvgFNIRS.m` crash when data lacks segmentTimes field
+- Fixed `plotTemporal.m` shadowing MATLAB builtins (`upper`/`lower` renamed to `upperBound`/`lowerBound`)
+
+---
+
 ## v0.9 (2026-01-23)
 API Standardization, Testing Infrastructure & Context-Based Processing
 

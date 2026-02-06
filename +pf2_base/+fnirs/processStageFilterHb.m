@@ -41,7 +41,7 @@ function outData=processStageFilterHb(method,data,fs,probeInfo,ProcessRejected,s
 %                       .channels [1 x C] - Channel identifiers
 %                       .fchMask [1 x C]  - Channel validity mask
 %                       .time [T x 1]     - Time vector
-%                       .markers [M x 3]  - Event markers
+%                       .markers [M x 4]  - Event markers (time, code, duration, amplitude)
 %                     Optional fields:
 %                       .Aux              - Auxiliary data struct
 %                       .ROI              - Pre-computed ROI data

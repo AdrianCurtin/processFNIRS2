@@ -12,7 +12,7 @@ function [markerTimes, tableMrkTimes, matchedPatterns] = getMarkers(varargin)
 %   [markerTimes, tableMrkTimes, matchedPatterns] = pf2.data.getMarkers(...)
 %
 % Inputs:
-%   fNIR           - fNIRS data structure with .markers field [M x 3]
+%   fNIR           - fNIRS data structure with .markers field [M x 4]
 %                    Or marker table/matrix directly
 %   markerCode     - Single marker code(s) to find:
 %                    - Scalar: Find all markers with this code

@@ -19,6 +19,16 @@
 % CLI Method Creation:
 %   create            - Create new method programmatically (no GUI)
 %   addFunction       - Add processing function to existing method
+%   editFunction      - Modify a function in a method by position
+%   removeFunction    - Remove processing function from method by position
+%   delete            - Delete an entire method permanently
+%
+% Method Sharing:
+%   exportMethod      - Export method to portable JSON file
+%   importMethod      - Import method from JSON file
+%
+% Validation:
+%   pf2.methods.validateFunction - Validate function configuration
 %
 % Example:
 %   % List methods

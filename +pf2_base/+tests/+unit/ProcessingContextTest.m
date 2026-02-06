@@ -404,6 +404,135 @@ classdef ProcessingContextTest < matlab.unittest.TestCase
             % ctx2 should be unchanged
             testCase.verifyEqual(ctx2.subjectAge, 25);
         end
+
+        %% Serialization Version Tests
+
+        function testToStructContainsVersion(testCase)
+            % TESTTOSTRUCTCONTAINSVERSION Verify contextVersion field exists
+            ctx = pf2_base.ProcessingContext();
+            s = ctx.toStruct();
+
+            testCase.verifyTrue(isfield(s, 'contextVersion'));
+            testCase.verifyEqual(s.contextVersion, '1.0');
+        end
+
+        function testToStructContainsCreated(testCase)
+            % TESTTOSTRUCTCONTAINSCREATED Verify created timestamp field
+            ctx = pf2_base.ProcessingContext();
+            s = ctx.toStruct();
+
+            testCase.verifyTrue(isfield(s, 'created'));
+            testCase.verifyClass(s.created, 'char');
+            testCase.verifyNotEmpty(s.created);
+        end
+
+        function testFromStructWithoutVersion(testCase)
+            % TESTFROMSTRUCTWITHOUTVERSION Legacy structs without version load correctly
+            s = struct();
+            s.dpfMode = 'Fixed';
+            s.dpfFixedValue = 6.0;
+
+            ctx = pf2_base.ProcessingContext.fromStruct(s);
+
+            testCase.verifyEqual(ctx.dpfMode, 'Fixed');
+            testCase.verifyEqual(ctx.dpfFixedValue, 6.0);
+        end
+
+        function testStructRoundtripPreservesVersion(testCase)
+            % TESTSTRUCTROUNDTRIPPRESERVESVERSION Version survives roundtrip
+            ctx1 = pf2_base.ProcessingContext();
+            s1 = ctx1.toStruct();
+
+            ctx2 = pf2_base.ProcessingContext.fromStruct(s1);
+            s2 = ctx2.toStruct();
+
+            testCase.verifyEqual(s2.contextVersion, '1.0');
+            testCase.verifyTrue(isfield(s2, 'created'));
+        end
+
+        %% fromStruct Edge Cases
+
+        function testFromStructEmpty(testCase)
+            % TESTFROMSTRUCTEMPTY Empty struct returns all defaults
+            s = struct();
+            ctx = pf2_base.ProcessingContext.fromStruct(s);
+
+            testCase.verifyEqual(ctx.dpfMode, 'Calc');
+            testCase.verifyEqual(ctx.dpfFixedValue, 5.93);
+            testCase.verifyEqual(ctx.subjectAge, 25);
+            testCase.verifyEqual(ctx.baselineLength, 10);
+            testCase.verifyEqual(ctx.rejectLevel, 0);
+        end
+
+        function testFromStructWithExtraFields(testCase)
+            % TESTFROMSTRUCTWITHEXTRAFIELDS Unknown fields silently ignored
+            s = struct();
+            s.dpfMode = 'Fixed';
+            s.unknownField = 42;
+            s.anotherExtra = 'hello';
+
+            ctx = pf2_base.ProcessingContext.fromStruct(s);
+
+            testCase.verifyEqual(ctx.dpfMode, 'Fixed');
+        end
+
+        function testFromStructPartialDPFOnly(testCase)
+            % TESTFROMSTRUCTPARTIALDPFONLY Partial struct sets DPF, defaults rest
+            s = struct();
+            s.dpfMode = 'Fixed';
+            s.dpfFixedValue = 7.5;
+
+            ctx = pf2_base.ProcessingContext.fromStruct(s);
+
+            testCase.verifyEqual(ctx.dpfMode, 'Fixed');
+            testCase.verifyEqual(ctx.dpfFixedValue, 7.5);
+            testCase.verifyEqual(ctx.baselineLength, 10);  % default
+            testCase.verifyEqual(ctx.rejectLevel, 0);      % default
+        end
+
+        function testFromStructPartialBaselineOnly(testCase)
+            % TESTFROMSTRUCTPARTIALBASELINEONLY Partial struct sets baseline, defaults rest
+            s = struct();
+            s.baselineStartTime = 5;
+            s.baselineLength = 20;
+
+            ctx = pf2_base.ProcessingContext.fromStruct(s);
+
+            testCase.verifyEqual(ctx.baselineStartTime, 5);
+            testCase.verifyEqual(ctx.baselineLength, 20);
+            testCase.verifyEqual(ctx.dpfMode, 'Calc');     % default
+            testCase.verifyEqual(ctx.subjectAge, 25);      % default
+        end
+
+        %% rejectLevel Boundary Tests
+
+        function testRejectLevelBoundaryZero(testCase)
+            % TESTREJECTLEVELBOUNDARYZERO rejectLevel = 0 is valid
+            ctx = pf2_base.ProcessingContext();
+            ctx.rejectLevel = 0;
+            testCase.verifyEqual(ctx.rejectLevel, 0);
+        end
+
+        function testRejectLevelBoundaryOne(testCase)
+            % TESTREJECTLEVELBOUNDARYONE rejectLevel = 1 is valid
+            ctx = pf2_base.ProcessingContext();
+            ctx.rejectLevel = 1;
+            testCase.verifyEqual(ctx.rejectLevel, 1);
+        end
+
+        function testRejectLevelAboveRange(testCase)
+            % TESTREJECTLEVELABOVERANGE rejectLevel = 1.1 errors
+            ctx = pf2_base.ProcessingContext();
+            testCase.verifyError(@() setfield(ctx, 'rejectLevel', 1.1), ...
+                'MATLAB:validators:mustBeInRange');
+        end
+
+        function testRejectLevelBelowRange(testCase)
+            % TESTREJECTLEVELBELOWRANGE rejectLevel = -0.1 errors
+            ctx = pf2_base.ProcessingContext();
+            testCase.verifyError(@() setfield(ctx, 'rejectLevel', -0.1), ...
+                'MATLAB:validators:mustBeInRange');
+        end
     end
 end
 

@@ -30,6 +30,11 @@ end
 % If not, install...
 if ~MEX_OK,
   disp('WaveLab detects that some or all of your MEX files are not installed,')
+  % Skip interactive prompt in batch/headless mode
+  if batchStartupOptionUsed
+    warning('WaveLab:MEXMissing', 'Some MEX files missing. Run InstallMEX interactively to compile.');
+    return;
+  end
   R=input('do you want to install them now? [[Yes]/No] \n','s');
 if strcmp(R,'') + strcmp(R,'Yes') | strcmp(R,'yes') | strcmp(R,'y') | strcmp(R,'Y') | strcmp(R,'YES'), 
   disp('INSTALLING MEX FILES, MAY TAKE A WHILE ...')

@@ -87,6 +87,8 @@ handles.output = hObject;
 % Update handles structure
 guidata(hObject, handles);
 
+pf2_base.applyLightTheme(hObject);
+
 initialize_gui(hObject, handles, false);
 
 global ExFNIRS
@@ -157,7 +159,7 @@ if(~isempty(p.Results.data)||~isfield(ExFNIRS,'data'))
         ExFNIRS.data=ExFNIRS.data';
     end
 elseif(~isempty(p.Results.filename))
-   exploreFNIRS.LoadEx(p.results.filename);
+   exploreFNIRS.loadEx(p.Results.filename);
 end
 
 
@@ -4328,7 +4330,7 @@ function pushbutton_exLoad_Callback(hObject, eventdata, handles)
 % eventdata  reserved - to be defined in a future version of MATLAB
 % handles    structure with handles and user data (see GUIDATA)
 
-exploreFNIRS.LoadEx();
+exploreFNIRS.loadEx();
 
 % --- Executes on button press in pushbutton_exSave.
 function pushbutton_exSave_Callback(hObject, eventdata, handles)
@@ -4336,7 +4338,7 @@ function pushbutton_exSave_Callback(hObject, eventdata, handles)
 % eventdata  reserved - to be defined in a future version of MATLAB
 % handles    structure with handles and user data (see GUIDATA)
 
-exploreFNIRS.SaveEx();
+exploreFNIRS.saveEx();
 
 
 % --- Executes on button press in pushbutton_plot_scatter_topo.

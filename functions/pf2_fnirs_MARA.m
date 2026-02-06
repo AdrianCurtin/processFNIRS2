@@ -1,58 +1,46 @@
 function [y] = pf2_fnirs_MARA(x,fs,T,L,alpha)
-%__________________________________________________________________________
-% Function to apply the movement artifact removal algorithm (MARA)
-% presented in Scholkmann et al. (2010). How to detect and reduce movement
-% artifacts in near-infrared imaging using moving standard deviation and 
-% spline interpolation. Physiological Measurement, 31, 649-662.
-
-% This version (v.1.1) is slightly different to the original approach
-% presented in the paper: Instead of using the spline
-% interpolation this version implements a smoothing based on local 
-% regression using weighted linear least squares and a 2nd degree 
-% polynomial model. This imrproves the reconstruction of the signal parts
-% that are affectes by the artifacts.
-
-% This version (v.1.2a) is updated by Adrian Curtin to allow segments which
-% have no artifacts to pass through and segments which are entirely artifacts to pass through, albeit
-% rejected
-
+% PF2_FNIRS_MARA Movement Artifact Removal Algorithm (MARA) for fNIRS
 %
-% INPUT
-% x:        Input signal
-% fs:       Sampling frequency [Hz]
-% L:        Length of the moving-window to calculate the moving standard
-%           deviation (MSD)
-% T:        Threshold for artifact detection
-% k:        half of the centered window length (w = 1 + 2*k)
-% alpha:    Parameter that defined how much high-frequency information should 
-%           be preserved by the removal of the artifact (i.e., it corresponds 
-%           to the length of the LOESS smoothing window)
+% Detects and removes motion artifacts from fNIRS signals using a moving
+% standard deviation (MSD) approach with LOESS smoothing. Artifact segments
+% are identified by thresholding the MSD, then reconstructed using local
+% regression with weighted linear least squares and a 2nd degree polynomial.
+%
+% Based on v1.1 by Dr. Felix Scholkmann (BORL, University Hospital Zurich).
+% v1.2a updated by Adrian Curtin to handle segments with no artifacts and
+% segments that are entirely artifacts.
+%
+% Reference:
+%   Scholkmann, F. et al. (2010). How to detect and reduce movement
+%   artifacts in near-infrared imaging using moving standard deviation and
+%   spline interpolation. Physiological Measurement, 31, 649-662.
+%
+% Syntax:
+%   y = pf2_fnirs_MARA(x, fs, T, L, alpha)
+%
+% Inputs:
+%   x     - Input signal matrix [T x C] where T=samples, C=channels
+%   fs    - Sampling frequency [Hz]
+%   T     - Threshold for artifact detection based on MSD amplitude
+%   L     - Length of the moving window for MSD calculation (samples)
+%   alpha - LOESS smoothing window length controlling high-frequency
+%           preservation during artifact reconstruction
+%
+% Outputs:
+%   y     - Denoised signal matrix [T x C], same size as input
+%
+% Example:
+%   % 10 Hz data, threshold 0.0005, window 100, LOESS alpha 4
+%   y = pf2_fnirs_MARA(rawData, 10, 0.0005, 100, 4);
+%
+%   % 50 Hz data with larger parameters
+%   y = pf2_fnirs_MARA(rawData, 50, 25, 300, 50);
+%
+% See also: pf2_SMAR, pf2_MotionCorrectTDDR, pf2_fnirs_MARA2
+%
+% Original author: Dr. Felix Scholkmann, Felix.Scholkmann@usz.ch
+% Version 1: 30 September 2008. v1.1: 29 May 2015. v1.2a: Adrian Curtin
 
-% OUTPUT:
-% y:        Denoised signal
-
-% Example 1: [y] = spm_fnirs_MARA(x1,10,0.0005,100,4);
-% (Here, the sampling frequency is 10 Hz, the threshold is 0.0005, the MSD window
-% length is 100 and 4 refers to the window for the LOESS smoothing.
-
-% Example 2: [y] = MARA_NIRSSPM(x6,50,25,300,50);
-% (Here, the sampling frequency is 50 Hz, the threshold is 25, the MSD window
-% length is 300 and 100 refers to the window for the LOESS smoothing.
-
-% NOTES:
-% (1) If the first sample is already a artifact, the algorithms produces
-% an error. This has to be fixed for the next release.
-% (2) If the treshold value T is below or above the range of the signal,
-% the algorithms stops and an error message is displayed.
-
-%__________________________________________________________________________
-% Dr. Felix Scholkmann, Biomedical Optics Research Laboratory (BORL), 
-% Universtiy Hospital Zurich, University of Zurich, Zurich, Switzerland
-% Felix.Scholkmann@usz.ch
-% Version 1: 30 September 2008. This version: 29 May 2015
-%_________________________________________________________________________
-
-%_________________________________________________________________________
 %%
 
 numCh=size(x,2);

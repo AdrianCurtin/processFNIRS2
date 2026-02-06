@@ -1,4 +1,32 @@
 function [uROI,uROInames,ExFNIRS_data]=standardizeROIs(ExFNIRS_data)
+% STANDARDIZEROIS Unify ROI definitions across multi-device fNIRS datasets
+%
+% Scans all fNIRS data segments for ROI definitions and creates a
+% standardized, device-qualified ROI table. ROI names are made unique per
+% device by appending '$deviceName'. All segments are then updated with
+% the unified ROI table so that cross-device group analysis can use
+% consistent ROI indices.
+%
+% Syntax:
+%   [uROI, uROInames, ExFNIRS_data] = exploreFNIRS.dataset.standardizeROIs(ExFNIRS_data)
+%
+% Inputs:
+%   ExFNIRS_data - Cell array of fNIRS data structs, each optionally
+%                  containing an ROI.info table with ROI definitions
+%
+% Outputs:
+%   uROI         - Table of unique ROIs with device-qualified row names,
+%                  an 'index' column for cross-device matching, and a
+%                  'DeviceCfg' column identifying the source device
+%   uROInames    - Cell array of unique ROI names (without device qualifier)
+%   ExFNIRS_data - Input data with ROI.info fields overwritten to use the
+%                  standardized, sorted ROI table
+%
+% Example:
+%   [uROI, names, data] = exploreFNIRS.dataset.standardizeROIs(data);
+%   disp(uROI);
+%
+% See also: exploreFNIRS.dataset.buildSegmentInfoTable, exploreFNIRS
 
 fprintf('Scanning ROI fields...\n');
 % searches for all unique ROI per device, one name allowed per d

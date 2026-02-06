@@ -177,6 +177,7 @@ for i=1:size(files,1)
             end
             [~,sortIdx]=sort(mrk(:,1));
             fNIR.markers=mrk(sortIdx,:);
+            fNIR.markers = pf2_base.normalizeMarkers(fNIR.markers);
             fNIR.Aux.NIRx=probeInfo.aux;
         end
         

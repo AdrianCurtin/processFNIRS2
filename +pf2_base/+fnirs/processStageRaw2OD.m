@@ -31,7 +31,7 @@ function [outDataOD,outDataRaw]=processStageRaw2OD(method,data,fs,time,rawMask,f
 %   time           - Time vector [T x 1] in seconds
 %   rawMask        - Channel validity mask [1 x C_raw]
 %                    1 = valid channel, 0 = invalid/masked
-%   fMarkers       - Event markers [M x 3] (time, code, duration)
+%   fMarkers       - Event markers [M x 4] (time, code, duration, amplitude)
 %   fAux           - Auxiliary data struct (physiology, accelerometer, etc.)
 %   channelNumbers - Channel identifier mapping [1 x C_raw]
 %                    Positive values = optode numbers

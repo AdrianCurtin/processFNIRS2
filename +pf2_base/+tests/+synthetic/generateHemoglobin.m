@@ -64,8 +64,8 @@ function data = generateHemoglobin(varargin)
 %          .time      - Time vector [T x 1] in seconds
 %          .fs        - Sampling frequency [scalar] in Hz
 %          .fchMask   - Channel mask [1 x nChannels] all ones (good)
-%          .markers   - Event markers [M x 3] from hrfOnsets if provided
-%                       Format: [time, value, duration]
+%          .markers   - Event markers [M x 4] from hrfOnsets if provided
+%                       Format: [time, value, duration, amplitude]
 %          .info      - Metadata struct with generation parameters
 %          .HbO       - Oxygenated hemoglobin [T x nChannels] in uM
 %          .HbR       - Deoxygenated hemoglobin [T x nChannels] in uM
@@ -208,7 +208,7 @@ function data = generateHemoglobin(varargin)
 
         % Create markers from onsets
         if ~isempty(validOnsets)
-            markers = [validOnsets(:), ones(length(validOnsets), 1), zeros(length(validOnsets), 1)];
+            markers = [validOnsets(:), ones(length(validOnsets), 1), zeros(length(validOnsets), 1), ones(length(validOnsets), 1)];
         end
     end
 

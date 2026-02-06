@@ -188,7 +188,65 @@ exploreFNIRS(allData);
 %    - Export statistics
 ```
 
-### Scriptable Analysis (Headless)
+### Scriptable Analysis (Headless) — New in v1.0.0
+
+The `Experiment` class enables complete group analysis without the GUI:
+
+```matlab
+% Create experiment from processed data
+ex = exploreFNIRS.core.Experiment(allData);
+
+% Filter and organize
+ex.select('Group', {'Control', 'Treatment'}, 'Condition', 'Task');
+ex.groupby({'Group', 'Condition'});
+ex.aggregate();
+
+% Headless temporal plot
+fig = ex.plotTemporal('Biomarkers', {'HbO'}, 'Channels', [1 5 10], ...
+    'SavePath', 'temporal.png', 'SaveDPI', 300);
+
+% Headless bar chart with time window
+fig = ex.plotBar('Biomarker', 'HbO', 'TimeWindow', [5 25], ...
+    'SavePath', 'bar.png');
+
+% ROI-based plotting
+fig = ex.plotTemporal('Biomarkers', {'HbO'}, 'ROIs', 'all');
+fig = ex.plotBar('Biomarker', 'HbO', 'ROIs', {'DLPFC_L', 'DLPFC_R'});
+
+% Export for external analysis
+longTable = ex.exportLong();
+wideTable = ex.exportWide();
+writetable(longTable, 'export_for_R.csv');
+```
+
+### Connectivity Analysis — New in v1.0.0
+
+```matlab
+% Compute connectivity matrices
+connResults = ex.connectivity('Method', 'pearson');
+fig = exploreFNIRS.connectivity.plotMatrix(connResults);
+
+% Block-wise connectivity
+connBlocks = ex.connectivity('Method', 'coherence', 'Blocks', blocks);
+fig = exploreFNIRS.connectivity.plotBlockComparison(connBlocks);
+
+% Export connectivity as table
+T = exploreFNIRS.export.connectivityToTable(connResults);
+```
+
+### Hyperscanning Analysis — New in v1.0.0
+
+```matlab
+% Pair subjects and compute inter-brain coupling
+hsResults = ex.hyperscanning('PairBy', 'Dyad', 'Method', 'wcoherence');
+
+% Group-level statistics with permutation testing
+groupStats = exploreFNIRS.hyperscanning.computeGroup(hsResults);
+pValues = exploreFNIRS.hyperscanning.permutationTest(hsResults, 1000);
+fig = exploreFNIRS.hyperscanning.plotGroup(groupStats);
+```
+
+### Other Scriptable Functions
 
 ```matlab
 % Build segment info table
@@ -196,10 +254,6 @@ segmentTable = exploreFNIRS.dataset.buildSegmentInfoTable(allData);
 
 % Standardize ROIs across subjects
 allData = exploreFNIRS.dataset.standardizeROIs(allData);
-
-% Export for external analysis
-longData = exploreFNIRS.export.mergeGbyTablesLong(gbyData);
-writetable(longData, 'export_for_R.csv');
 ```
 
 ## Scriptable Functions
@@ -208,10 +262,24 @@ The following functions can be used outside the GUI:
 
 | Package | Function | Purpose |
 |---------|----------|---------|
+| `+core` | `Experiment` | Main experiment container class |
+| `+core` | `plotTemporal` | Headless temporal plots with ROI support |
+| `+core` | `plotBar` | Headless bar charts with ROI support |
+| `+core` | `getGroupColors` | Consistent group coloring |
+| `+connectivity` | `computeMatrix` | Channel-pair connectivity matrices |
+| `+connectivity` | `plotMatrix` | Matrix visualization |
+| `+connectivity` | `plotBlockComparison` | Block-wise comparison |
+| `+coupling` | `pearson`, `spearman`, `xcorr`, `coherence`, `wcoherence` | Coupling functions |
+| `+hyperscanning` | `pairSubjects` | Pair subjects by criteria |
+| `+hyperscanning` | `computeDyad` | Dyad-level coupling |
+| `+hyperscanning` | `computeGroup` | Group-level statistics |
+| `+hyperscanning` | `permutationTest` | Permutation significance testing |
+| `+hyperscanning` | `plotGroup` | Group visualization |
 | `+dataset` | `buildSegmentInfoTable` | Create metadata table from structs |
 | `+dataset` | `standardizeROIs` | Align ROI definitions across subjects |
 | `+export` | `mergeGbyTablesLong` | Export to long format |
 | `+export` | `mergeGbyTablesWide` | Export to wide format |
+| `+export` | `connectivityToTable` | Export connectivity results |
 | `+fx` | `performFDR` | Benjamini-Hochberg FDR correction |
 | `+fx` | `performFDR_twostep` | Adaptive two-step FDR |
 | `+fx` | `autoContrast` | Generate post-hoc contrasts |

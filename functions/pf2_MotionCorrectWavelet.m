@@ -1,36 +1,38 @@
-% function dodWavelet = hmrMotionCorrectWavelet(dod,SD,iqr)
-%
-% UI NAME:
-% Wavelet_Motion_Correction
-%
-% Perform a wavelet transformation of the dod data and computes the
-% distribution of the wavelet coefficients. It sets the coefficient
-% exceeding iqr times the interquartile range to zero, because these are probably due
-% to motion artifacts. set iqr<0 to skip this function.
-% 
-% The algorithm follows in part the procedure described by
-% Molavi et al.,Physiol Meas, 33, 259-270 (2012).
-%
-% INPUTS:
-% dod -  delta_OD 
-% SD -   SD structure
-% iqr -  parameter used to compute the statistics (iqr = 1.5 is 1.5 times the
-%        interquartile range and is usually used to detect outliers). 
-%        Increasing it, it will delete fewer coefficients.
-%        If iqr<0 then this function is skipped. 
-% 
-%
-% OUTPUTS:
-% dodWavelet - dod after wavelet motion correction, same
-%              size as dod (Channels that are not in the active ml remain unchanged)
-%
-% LOG:
-% Script by Behnam Molavi bmolavi@ece.ubc.ca adapted for Homer2 by RJC
-% modified 10/17/2012 by S. Brigadoi
-%
-
-
 function [dodWavelet] = pf2_MotionCorrectWavelet(dod,iqr,turnon)
+% PF2_MOTIONCORRECTWAVELET Wavelet-based motion artifact correction
+%
+% Performs a wavelet decomposition of the signal and removes coefficients
+% that exceed iqr times the interquartile range, as these are likely due
+% to motion artifacts. Uses a shift-invariant discrete wavelet transform
+% with the db2 wavelet.
+%
+% Reference:
+%   Molavi, B. & Dumont, G. A. (2012). Wavelet-based motion artifact
+%   removal for functional near-infrared spectroscopy. Physiol Meas, 33,
+%   259-270. Adapted from Homer2 by Behnam Molavi and S. Brigadoi.
+%
+% Syntax:
+%   dodWavelet = pf2_MotionCorrectWavelet(dod, iqr)
+%   dodWavelet = pf2_MotionCorrectWavelet(dod, iqr, turnon)
+%
+% Inputs:
+%   dod    - Optical density signal [T x C double]
+%            T = time samples, C = channels
+%   iqr    - IQR multiplier for outlier detection (scalar, typical: 1.5)
+%            Higher values = fewer coefficients removed.
+%            Set iqr < 0 to skip correction (returns input unchanged).
+%   turnon - Enable flag (optional, scalar). If 0, skips correction.
+%
+% Outputs:
+%   dodWavelet - Motion-corrected optical density [T x C double]
+%                Same size as input. Invalid channels return NaN.
+%
+% Example:
+%   data = pf2.import.sampleData.fNIR2000();
+%   od = pf2_Intensity2OD(data.raw);
+%   corrected = pf2_MotionCorrectWavelet(od, 1.5);
+%
+% See also: pf2_MotionCorrectTDDR, pf2_SMAR, pf2_fnirs_MARA
 
 if exist('turnon')
    if turnon==0

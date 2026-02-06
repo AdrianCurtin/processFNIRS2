@@ -1,7 +1,31 @@
 function [colormapOut] = getColormap(colormapString)
-%GETCOLORMAP given an input string, returns a string to the appropriate
-%   allows extensible plotting for colormaps
-%   ex: 'lines' will
+% GETCOLORMAP Return a colormap function handle from a name string
+%
+% Resolves a colormap name to a function handle, supporting MATLAB builtin
+% colormaps, Brewer colormaps (via brewermap), and matplotlib-style
+% colormaps. Falls back to 'lines' if the name is not recognized.
+%
+% Syntax:
+%   colormapOut = exploreFNIRS.helper.getColormap(colormapString)
+%
+% Inputs:
+%   colormapString - Name of the colormap (char or string)
+%                    MATLAB builtins: 'parula', 'jet', 'hot', 'cool', etc.
+%                    Brewer: 'Set1', 'Paired', 'RdBu', 'Spectral', etc.
+%                    Matplotlib: 'viridis', 'plasma', 'inferno', 'tab10', etc.
+%
+% Outputs:
+%   colormapOut - Function handle that accepts N (number of colors)
+%                 and returns an [N x 3] RGB colormap matrix.
+%
+% Example:
+%   cmap = exploreFNIRS.helper.getColormap('viridis');
+%   colors = cmap(10);  % Get 10 colors
+%
+%   cmap = exploreFNIRS.helper.getColormap('Set1');
+%   colormap(cmap(8));
+%
+% See also: exploreFNIRS.helper.listColormaps, colormap
 
 matlabBuiltin={'parula','turbo','hsv','hot','cool','spring','summer','autumn','winter','gray','bone','copper','pink','jet','lines','colorcube','prism','flag','white'};
 if(contains(colormapString,matlabBuiltin))

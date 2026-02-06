@@ -1,8 +1,31 @@
 function [colormapNames] = listColormaps(colormapType)
+% LISTCOLORMAPS Return colormap names filtered by type
+%
+% Returns a cell array of colormap names from MATLAB built-in, Brewer,
+% and Matplotlib families, filtered by perceptual category.
+%
+% Syntax:
+%   colormapNames = exploreFNIRS.helper.listColormaps()
+%   colormapNames = exploreFNIRS.helper.listColormaps(colormapType)
+%
+% Inputs:
+%   colormapType - (optional) Category filter string (default: 'qualitative')
+%                  'qualitative' - Distinct-color maps for categorical data
+%                  'sequential'  - Single-hue gradient maps
+%                  'diverging'   - Two-hue maps centered on a midpoint
+%                  'all'         - All available colormaps
+%
+% Outputs:
+%   colormapNames - Cell array of colormap name strings
+%
+% Example:
+%   names = exploreFNIRS.helper.listColormaps('diverging');
+%   colormap(names{1});
+%
+% See also: colormap, brewermap
 if(nargin<1)
     colormapType='qualitative';
 end
-%LISTCOLORMAPS Given a colormap type, lists colormaps
 
 brewerBuiltin={'BrBG','Accent','BluesPuBuGn','PiYG','Dark2','BuGnPuRd','PRGn','Paired','BuPuPurples','PuOr','Pastel1','GnBuRdPu','RdBu','Pastel2','GreensReds','RdGy','Set1','GreysYlGn','RdYlBu','Set2','OrRdYlGnBu','RdYlGn','Set3','OrangesYlOrBr','Spectral','PuBuYlOrRd'};
 matlabBuiltin={'parula','turbo','hsv','hot','cool','spring','summer','autumn','winter','gray','bone','copper','pink','jet','lines','colorcube','prism','flag','white'};
@@ -35,6 +58,6 @@ switch(colormapType)
     case 'all'
         colormapNames=[qualitativeTypes,divergingTypes,sequentialTypes];
     otherwise
-        error('Please specify: qualitative,diverging,sequantial, or all');
+        error('Please specify: qualitative, diverging, sequential, or all');
 end
 

@@ -32,7 +32,7 @@ function [fNIR] = importNIR(nir_filename, mrk_filename, channelCheck)
 %                   .time [T x 1] - Time vector in seconds
 %                   .fs - Sampling frequency in Hz
 %                   .fchMask [1 x C] - Channel validity mask (1=good, 0=bad)
-%                   .markers [M x 3] - Event markers (time, code, duration)
+%                   .markers [M x 4] - Event markers (time, code, duration, amplitude)
 %                   .info - Metadata structure:
 %                       .header - File header information
 %                       .mrkheaders - Marker file headers
@@ -446,6 +446,7 @@ if(isfield(markers,'data'))
 else
     fNIR.markers=[];
 end
+fNIR.markers = pf2_base.normalizeMarkers(fNIR.markers);
 
 fNIR.info=[];
 

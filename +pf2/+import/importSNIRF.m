@@ -31,7 +31,7 @@ function [fNIR] = importSNIRF(filepath, channelCheck, varargin)
 %          .raw       - Raw intensity data [T x C double]
 %          .time      - Time vector in seconds [T x 1 double]
 %          .fs        - Sampling frequency in Hz [double]
-%          .markers   - Event markers [M x 3: time, value, duration]
+%          .markers   - Event markers [M x 4: time, value, duration, amplitude]
 %          .fchMask   - Channel quality mask [1 x C: 1=good, 0=bad]
 %          .info      - Metadata from SNIRF metaDataTags
 %          .t0        - Recording start datetime (if available)
@@ -108,11 +108,15 @@ if isfield(data.nirs, 'stim') && ~isempty(data.nirs.stim)
             continue;
         end
         
-        % Standard SNIRF stim data is [starttime, duration, value]
-        % We want [time, value, duration] for fNIR format
+        % Standard SNIRF stim data is [starttime, duration, value, ...]
+        % We want [time, value, duration, ...] for fNIR format
         if size(curStim.data, 2) >= 3
-            % Reorder columns to match fNIR format [time, value, duration]
+            % Reorder first 3 columns to match fNIR format [time, value, duration]
             curMarkerData = curStim.data(:, [1, 3, 2]);
+            % Carry through extra columns (e.g., amplitude)
+            if size(curStim.data, 2) > 3
+                curMarkerData = [curMarkerData, curStim.data(:, 4:end)];
+            end
             
             % Add stimulus name as a column if needed
             if isfield(curStim, 'name') && ~isempty(curStim.name)
@@ -139,6 +143,12 @@ if isfield(data.nirs, 'stim') && ~isempty(data.nirs.stim)
 else
     fNIR.markers = [];
 end
+fNIR.markers = pf2_base.normalizeMarkers(fNIR.markers);
+
+% Load BIDS events.tsv sidecar if markers are empty and file exists
+if isempty(fNIR.markers) || size(fNIR.markers, 1) == 0
+    fNIR.markers = loadBIDSevents(filepath);
+end
 
 % Extract nirs
 nirs = data.nirs;
@@ -153,6 +163,24 @@ end
 
 % Convert measurement list to table for easier handling
 measurementList = struct2table(data.measurementList);
+
+% Add dataTypeLabel column if not present (some SNIRF files use numeric dataType only)
+if ~ismember('dataTypeLabel', measurementList.Properties.VariableNames)
+    nML = height(measurementList);
+    labels = repmat({''}, nML, 1);
+    if ismember('dataType', measurementList.Properties.VariableNames)
+        % SNIRF spec: dataType=1 → CW amplitude (raw intensity)
+        for mi = 1:nML
+            switch measurementList.dataType(mi)
+                case 1,     labels{mi} = 'CW_amplitude';
+                case 51,    labels{mi} = 'raw-DC';
+                case 99999, labels{mi} = 'processed';
+                otherwise,  labels{mi} = sprintf('type_%d', measurementList.dataType(mi));
+            end
+        end
+    end
+    measurementList.dataTypeLabel = labels;
+end
 
 % Handle normalized data
 if isfield(metaDataTags, 'Normalized') && ...
@@ -177,12 +205,8 @@ device = [];
 
 % Handle time data
 if isfield(data, 'time')
-    if size(data.time, 1) > size(data.time, 2)
-        % Ensure time is a row vector
-        fNIR.time = data.time';
-    else
-        fNIR.time = data.time;
-    end
+    % Ensure time is a column vector [T x 1]
+    fNIR.time = data.time(:);
     
     % Calculate sampling rate from time data
     fNIR.fs = 1/nanmedian(diff(fNIR.time));
@@ -206,13 +230,24 @@ device.Info.TimeIsSampleCount = 0;
 % Get probe information
 probeInfo = nirs.probe;
 
-% Handle length unit conversion if needed
-if strcmp(metaDataTags.LengthUnit, 'cm')
-    % Convert from cm to mm for consistent internal representation
-    probeInfo.detectorPos3D = probeInfo.detectorPos3D * 10;
-    probeInfo.sourcePos3D = probeInfo.sourcePos3D * 10;
-    if isfield(probeInfo, 'landmarkPos3D')
-        probeInfo.landmarkPos3D = probeInfo.landmarkPos3D * 10;
+% Handle length unit conversion if needed (convert to mm internally)
+if isfield(metaDataTags, 'LengthUnit')
+    switch lower(metaDataTags.LengthUnit)
+        case 'm'
+            scaleFactor = 1000;
+        case 'cm'
+            scaleFactor = 10;
+        case 'mm'
+            scaleFactor = 1;
+        otherwise
+            scaleFactor = 1;
+    end
+    if scaleFactor ~= 1
+        probeInfo.detectorPos3D = probeInfo.detectorPos3D * scaleFactor;
+        probeInfo.sourcePos3D = probeInfo.sourcePos3D * scaleFactor;
+        if isfield(probeInfo, 'landmarkPos3D')
+            probeInfo.landmarkPos3D = probeInfo.landmarkPos3D * scaleFactor;
+        end
     end
 end
 
@@ -377,10 +412,18 @@ for p = 1:1 % Just one probe for now
     
     % Get source and detector positions
     srcXYZ = probeInfo.sourcePos3D;
-    srcXYZ_2d = probeInfo.sourcePos2D;
-    
+    if isfield(probeInfo, 'sourcePos2D')
+        srcXYZ_2d = probeInfo.sourcePos2D;
+    else
+        srcXYZ_2d = srcXYZ(:, 1:2);  % Project to XY plane
+    end
+
     detXYZ = probeInfo.detectorPos3D;
-    detXYZ_2d = probeInfo.detectorPos2D;
+    if isfield(probeInfo, 'detectorPos2D')
+        detXYZ_2d = probeInfo.detectorPos2D;
+    else
+        detXYZ_2d = detXYZ(:, 1:2);  % Project to XY plane
+    end
     
     % Store positions
     device.Probe{p}.SrcPosX = srcXYZ(:, 1);
@@ -546,18 +589,19 @@ for p = 1:1 % Just one probe for now
     device.Probe{p}.probeNum = 1;
     device.Probe{p}.wvI = reshape(measurementList.('wavelengthIndex'), [1, height(measurementList)]);
     device.Probe{p}.ChannelNumbers = uPairIdx';
-    device.Probe{p}.ChannelList = 1:numCh;
+    uniqueChannels = unique(device.Probe{p}.ChannelNumbers);
+    device.Probe{p}.ChannelList = uniqueChannels(uniqueChannels > 0);
     device.Probe{p}.Wavelength = probeInfo.wavelengths(:)';
-    device.Info.NumberChannels = device.Info.NumberChannels + numCh;
+    device.Info.NumberChannels = device.Info.NumberChannels + length(device.Probe{p}.ChannelList);
 
-     % Map wavelengths to channels
-    for c = 1:numCh
-        device.Probe{p}.TableOpt.Ch(c, :) = (find(device.Probe{p}.ChannelNumbers == device.Probe{p}.ChannelList(c)));
-        wvIdxToMatch = device.Probe{p}.wvI(device.Probe{p}.TableOpt.Ch(c, :));
+    % Map wavelengths to channels (variable width per optode)
+    for c = 1:length(device.Probe{p}.ChannelList)
+        chIdxMatch = find(device.Probe{p}.ChannelNumbers == device.Probe{p}.ChannelList(c));
+        device.Probe{p}.TableOpt.Ch(c, 1:length(chIdxMatch)) = chIdxMatch;
+        wvIdxToMatch = device.Probe{p}.wvI(chIdxMatch);
         if ~any(isnan(wvIdxToMatch))
-            device.Probe{p}.TableOpt.wv(c, :) = device.Probe{p}.Wavelength(wvIdxToMatch);
+            device.Probe{p}.TableOpt.wv(c, 1:length(chIdxMatch)) = device.Probe{p}.Wavelength(wvIdxToMatch);
         end
-
         device.Probe{p}.TableOpt.Label{c} = sprintf('Ch%i', device.Probe{p}.ChannelList(c));
     end
     
@@ -565,12 +609,21 @@ for p = 1:1 % Just one probe for now
     if buildProbeLayout
         if isfield(device.Probe{p}, 'OptPosX') && isfield(device.Probe{p}, 'OptPosY')
             if includeSSchannels
-                device.Probe{p}.OptLayout2D_ss = pf2_base.fitProbe2D(device.Probe{p}.OptPosX, device.Probe{p}.OptPosY, device.Probe{p}.OptPosZ);
+                try
+                    device.Probe{p}.OptLayout2D_ss = pf2_base.fitProbe2D(device.Probe{p}.OptPosX, device.Probe{p}.OptPosY, device.Probe{p}.OptPosZ);
+                catch
+                    device.Probe{p}.OptLayout2D_ss = setUpFalse2D(device.Probe{p}.NumOptodes);
+                end
             end
-            
-            device.Probe{p}.OptLayout2D = pf2_base.fitProbe2D(device.Probe{p}.OptPosX(~device.Probe{p}.IsShortSeparation), ...
-                device.Probe{p}.OptPosY(~device.Probe{p}.IsShortSeparation), ...
-                device.Probe{p}.OptPosZ(~device.Probe{p}.IsShortSeparation));
+
+            try
+                device.Probe{p}.OptLayout2D = pf2_base.fitProbe2D(device.Probe{p}.OptPosX(~device.Probe{p}.IsShortSeparation), ...
+                    device.Probe{p}.OptPosY(~device.Probe{p}.IsShortSeparation), ...
+                    device.Probe{p}.OptPosZ(~device.Probe{p}.IsShortSeparation));
+            catch
+                nLong = sum(~device.Probe{p}.IsShortSeparation);
+                device.Probe{p}.OptLayout2D = setUpFalse2D(nLong);
+            end
         else
             warning('buildProbeLayout option selected, but not enough information to generate Optode locations');
             device.Probe{p}.OptLayout2D = setUpFalse2D(device.Probe{p}.NumOptodes);
@@ -622,8 +675,8 @@ if isfield(nirs, 'aux') && ~isempty(nirs.aux)
     end
 end
 
-% Set channel quality mask (all good by default)
-fNIR.fchMask = ones(1, numCh);
+% Set channel quality mask (one per optode pair, all good by default)
+fNIR.fchMask = ones(1, device.Info.NumberChannels);
 
 
 % Save probe info
@@ -711,16 +764,92 @@ end
 function outStruct = stripStruct(structObj)
     % Clean up metadata structure by removing null characters and whitespace
     fieldsInStruct = fields(structObj);
-   
+
     outStruct = structObj;
-    
+
     for f = 1:length(fieldsInStruct)
         temp = structObj.(fieldsInStruct{f});
-        
+
         % Only process character/string data
         if ischar(temp) || isstring(temp)
             % Remove null characters and trim whitespace
             outStruct.(fieldsInStruct{f}) = strtrim(strrep(reshape(temp, [1, length(temp)]), char(0), ''));
         end
     end
+end
+
+function markers = loadBIDSevents(snirfPath)
+% LOADBIDSEVENTS Load markers from BIDS events.tsv sidecar file
+%
+% Looks for a companion _events.tsv file alongside the SNIRF file
+% following BIDS naming conventions. Parses onset, duration, trial_type,
+% and value columns into the pf2 marker format [time, value, duration, amplitude].
+%
+% Inputs:
+%   snirfPath - Full path to the SNIRF file
+%
+% Outputs:
+%   markers - Marker array [M x 4] or empty []
+
+markers = [];
+
+[parentDir, baseName, ~] = fileparts(snirfPath);
+
+% BIDS convention: replace _nirs.snirf with _events.tsv
+eventsName = regexprep(baseName, '_nirs$', '_events.tsv');
+eventsFile = fullfile(parentDir, eventsName);
+
+if ~isfile(eventsFile)
+    % Try without the _nirs suffix
+    eventsFile = fullfile(parentDir, [baseName '_events.tsv']);
+end
+
+if ~isfile(eventsFile)
+    return;
+end
+
+try
+    eventsTable = readtable(eventsFile, 'FileType', 'text', 'Delimiter', '\t');
+
+    if ~ismember('onset', eventsTable.Properties.VariableNames)
+        return;
+    end
+
+    onsets = eventsTable.onset;
+    nEvents = length(onsets);
+    durations = zeros(nEvents, 1);
+    values = ones(nEvents, 1);
+
+    % Duration column
+    if ismember('duration', eventsTable.Properties.VariableNames)
+        durations = eventsTable.duration;
+    end
+
+    % Value column (numeric codes)
+    if ismember('value', eventsTable.Properties.VariableNames)
+        if isnumeric(eventsTable.value)
+            values = eventsTable.value;
+        end
+    end
+
+    % If no numeric values, map trial_type strings to codes
+    if all(values == 1) && ismember('trial_type', eventsTable.Properties.VariableNames)
+        types = eventsTable.trial_type;
+        if iscell(types) || isstring(types)
+            [uniqueTypes, ~, typeIdx] = unique(types);
+            values = typeIdx;
+            fprintf('BIDS events: mapped %d trial types from %s\n', ...
+                length(uniqueTypes), eventsFile);
+            for t = 1:length(uniqueTypes)
+                fprintf('  %s = %d\n', uniqueTypes{t}, t);
+            end
+        end
+    end
+
+    markers = pf2_base.normalizeMarkers([onsets, values, durations, ones(nEvents, 1)]);
+
+catch e
+    fprintf('Warning: failed to load BIDS events from %s: %s\n', eventsFile, e.message);
+end
+
 end

@@ -1,13 +1,41 @@
 function [ figHandle ] = pf2_plotArranged(varargin)
-% pf2_plotArranged(fNIR,channels,showMarkers,wavelengths,ylimit,plotArranged,lineProps,rejectedLineProps)
-% This function plots and automatically arranges fNIRS data based on
-% the input values. Specify if raw or Oxy (or other) biomarkers
-%   It expects fNIR (the data struct), the channels to plot:
-%       (can be a number or a logical index)
-%      a set of wavelengths (ie: 730 or logical index)
-%   A specific ylimit ( to force all to use the same axes
-%   a boolean to plot the arranged channels
-%  Accepted line properties and for normal and rejected channels
+% PF2_PLOTARRANGED Plot fNIRS channels in device-arranged subplot layout
+%
+% Plots raw fNIRS data with channels arranged spatially according to the
+% device probe layout. Supports multi-probe devices, event markers,
+% wavelength selection, and visual indication of rejected channels.
+%
+% Syntax:
+%   pf2_plotArranged(fNIR)
+%   pf2_plotArranged(fNIR, channels)
+%   pf2_plotArranged(fNIR, channels, showMarkers, signalNames, ylimit, ...
+%       plotArranged, lineProps, rejectedLineProps, baseline, RawData)
+%   figHandle = pf2_plotArranged(...)
+%
+% Inputs:
+%   fNIR              - fNIRS data struct (required)
+%   channels          - Channel indices to plot (default: all)
+%                       Numeric array or logical mask.
+%   showMarkers       - Display event markers (default: true)
+%   signalNames       - Signal/wavelength names to plot (default: all)
+%   ylimit            - Y-axis limits [min max] (default: auto from device)
+%   plotArranged      - Use spatial arrangement (default: false, true if all)
+%   lineProps         - Line properties for good channels (default: {'LineWidth', 1})
+%   rejectedLineProps - Line properties for rejected channels (default: {'--', 'LineWidth', 1})
+%   baseline          - Show baseline indicator (default: false)
+%   RawData           - Plotting raw data flag (default: true)
+%
+% Outputs:
+%   figHandle - Handle(s) to created figure(s)
+%
+% Example:
+%   data = pf2.import.sampleData.fNIR2000();
+%   pf2_base.pf2_plotArranged(data);
+%
+%   % Plot specific channels
+%   pf2_base.pf2_plotArranged(data, [1 3 5]);
+%
+% See also: pf2.data.plot.raw, pf2.data.plot.oxy
 
 validFnirs = @(x) (iscell(x) || isstruct(x));
 validChannels = @(x) (isnumeric(x) || ischar(x));

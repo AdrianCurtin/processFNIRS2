@@ -66,6 +66,8 @@ handles.output = hObject;
 % Update handles structure
 guidata(hObject, handles);
 
+pf2_base.applyLightTheme(hObject);
+
 global pf2ChannelCheck
 
 if(isfield(pf2ChannelCheck,'autoscale'))

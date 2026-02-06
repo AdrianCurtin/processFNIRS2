@@ -9,3 +9,5 @@ sampledata/sampleNIR_CH.mat
 .vscode/settings.json
 *.md
 internal/
+benchmarks/data/
+benchmarks/results/

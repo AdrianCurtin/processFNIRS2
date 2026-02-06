@@ -1,40 +1,50 @@
 function fMask=pf2_TakizawaRejection(fNIR,strictCriteria)
-     %% Measures and optionally applies takizawa rejection criteria
-     %  this script will just measure the Takizawa critera for rejection
-     %  	Use applyMask =true to merge with the fchMask
-     %      Use strictCriteria =true to merge the strict criteria with the
-     %      mask   (uses "or" instead of "and" for the takizawa criteria
-     %               actual papers are somewhat ambiguous about the logic)
-     
-     %  Method was originally designed for use with the Hitachi Etg-4000
-     %  during a ~60 second verbal fluency task while sampling at 10hz
-     %      Some factors including unit conversion were adjusted in
-     %      order for this to be functional for other devices, namely
-     %          1)Aproximation of units in mM*mm instead of uM
-     %          2)Use/Conversion for alternate sampling frequencies
-     %          3)High frequency conversion calculated as percentage of
-     %          windows rather than 4 specific time periods
-     %          4)Instead of 1 artifact >0.15mMmm, a margin is specified
-     %          (windowsize/2)
-     
-     %      Due to differences in between the 2008 and 2014 methodologies,
-     %      band power calculations for rule 2(2008) are conducted but not used specifically
-     %      in rejection. These items appeared to be unit specific and may
-     %      not be good represenations on other devices. Therefore the 2014
-     %      rules are used because they are unitless.
-     %      Additionally the first rule for 2008 specificed the elimination
-     %      of channels with maximum digital and analog gain. This may be a
-     %      specific trait of the Hitachi system and so the alternate
-     %      method from 2014 using proportional standard deviation is used instead.
-     
-     %  References:        
-	 %  Takizawa Rejection criteria specificed in Supplementary Material I of:
-	 %  Takizawa, R., Kasai, K., Kawakubo, Y., Marumo, K., Kawasaki, S., Yamasue, H., et al. (2008). 
-     %      Reduced frontopolar activation during verbal fluency task in schizophrenia: a multi-channel near-infrared spectroscopy study. Schizophr. Res. 99, 250â€“62. doi:10.10numch/j.schres.2007.10.025.
-	 
-     % Updated criteria from 
-     %  Takizawa, R., Fukuda, M., Kawasaki, S., Kasai, K., Mimura, M., Pu, S., Noda, T., Niwa, S. ichi, Okazaki, Y., Suda, M., Takei, Y., Aoyama, Y., Narita, K., Mikuni, M., Kameyama, M., Uehara, T., Kinou, M., Koike, S., Ishii-Takahashi, A., Ichikawa, N., Fujiwara, M., Ohta, H., Tomioka, H., Yamagata, B., Yamanaka, K., Nakagome, K., Matsuda, T., Yoshida, S., Kono, S., Yabe, H., Miura, S., Nishimura, Y., Tanii, H., Inoue, K., Yokoyama, C., Takayanagi, Y., Takahashi, K., Nakakita, M., 2014. 
-     %      Neuroimaging-aided differential diagnosis of the depressive state. Neuroimage 85, 498–507. https://doi.org/10.1016/j.neuroimage.2013.05.126
+% PF2_TAKIZAWAREJECTION Automatic channel rejection using Takizawa criteria
+%
+% Evaluates four rules derived from Takizawa et al. (2008, 2014) to
+% identify artifactual fNIRS channels based on high-frequency noise,
+% low-frequency noise, zero-variance signals, and body movement artifacts.
+% Returns a logical channel mask suitable for use with fchMask.
+%
+% Originally designed for Hitachi ETG-4000 data during ~60 s verbal fluency
+% tasks at 10 Hz. Adaptations for other devices include:
+%   1) Unit approximation in mM*mm instead of uM
+%   2) Alternate sampling frequency support
+%   3) Proportional high-frequency window calculation
+%   4) Sliding margin for body movement detection
+%
+% The 2014 criteria (unitless) are preferred over 2008 band-power rules
+% for cross-device compatibility. Band-power values are computed but not
+% used in the final rejection decision.
+%
+% Reference:
+%   Takizawa, R. et al. (2008). Reduced frontopolar activation during
+%   verbal fluency task in schizophrenia: a multi-channel near-infrared
+%   spectroscopy study. Schizophr. Res. 99, 250-262.
+%   DOI: 10.1016/j.schres.2007.10.025
+%
+%   Takizawa, R. et al. (2014). Neuroimaging-aided differential diagnosis
+%   of the depressive state. NeuroImage 85, 498-507.
+%   DOI: 10.1016/j.neuroimage.2013.05.126
+%
+% Syntax:
+%   fMask = pf2_TakizawaRejection(fNIR)
+%   fMask = pf2_TakizawaRejection(fNIR, strictCriteria)
+%
+% Inputs:
+%   fNIR           - Processed fNIRS struct with fields: HbO, HbR, HbTotal,
+%                    time, units, DPF_factor
+%   strictCriteria - (optional) Logical, use OR instead of AND for
+%                    combining rejection rules (default: false)
+%
+% Outputs:
+%   fMask - Logical channel mask [1 x C] where 1=good, 0=rejected
+%
+% Example:
+%   fMask = pf2_TakizawaRejection(processedData);
+%   fMask = pf2_TakizawaRejection(processedData, true);  % strict mode
+%
+% See also: pf2_SMAR, pf2.data.applyChannelMask
      
      if(nargin<2)
          strictCriteria=false; % Uses Or instead of And for rejection criteria
@@ -154,7 +164,7 @@ function fMask=pf2_TakizawaRejection(fNIR,strictCriteria)
 
     fsHz=L2; %frequency at 1 hz
     point1hz=find(freqvec>0.1,1); %should be approximately L/(10*fs)
-    onehz=find(freqvec>1);  % Should be approximately L/fs
+    onehz=find(freqvec>1,1);  % Should be approximately L/fs
 
     if(isempty(onehz))
         onehz=length(freqvec);

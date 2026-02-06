@@ -216,6 +216,8 @@ classdef ProcessingContext < handle
             %   save('settings.mat', '-struct', 's');
 
             s = struct();
+            s.contextVersion = '1.0';
+            s.created = char(datetime('now', 'Format', 'yyyy-MM-dd''T''HH:mm:ss'));
             s.dpfMode = obj.dpfMode;
             s.dpfFixedValue = obj.dpfFixedValue;
             s.subjectAge = obj.subjectAge;
@@ -367,6 +369,7 @@ end
 function mustBeInRange(value, minVal, maxVal)
     % Custom validator for rejectLevel
     if value < minVal || value > maxVal
-        error('Value must be between %g and %g', minVal, maxVal);
+        error('MATLAB:validators:mustBeInRange', ...
+            'Value must be between %g and %g', minVal, maxVal);
     end
 end

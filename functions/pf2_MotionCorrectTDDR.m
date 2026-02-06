@@ -1,25 +1,43 @@
-% function dodTDDR = pf2_MotionCorrectTDDR(dod,sample_rate)
-%
-% Corrects motion artifacts by computing the temporal derivative of the dod signal, 
-% applying robust regression to reduce magnitude of outlying fluctuations, then 
-% integrating to get the corrected signal.
-%
-% This function follows the procedure described in:
-% Fishburn, F. A. et al. (2019). Temporal Derivative Distribution Repair (TDDR): A motion correction method for fNIRS. NeuroImage, 184, 171-179.
-%
-% INPUTS:
-% dod:         delta_OD
-% SD:          SD structure (removed in this version)
-% sample_rate: the sample rate of the signal
-%
-% OUTPUTS:
-% dodTDDR:     dod after correction via TDDR
-%
-% LOG:
-% Script by Frank Fishburn (fishburnf@upmc.edu) 10/03/2018
-%
-
 function [dodTDDR] = pf2_MotionCorrectTDDR(dod,sample_rate)
+% PF2_MOTIONCORRECTTDDR Temporal Derivative Distribution Repair for motion artifacts
+%
+% Corrects motion artifacts by computing the temporal derivative of the
+% signal, applying robust regression (Tukey's biweight) to reduce the
+% magnitude of outlying fluctuations, then integrating to recover the
+% corrected signal. High-frequency components (>0.5 Hz) are separated
+% before correction and merged back afterward.
+%
+% Reference:
+%   Fishburn, F. A. et al. (2019). Temporal Derivative Distribution Repair
+%   (TDDR): A motion correction method for fNIRS. NeuroImage, 184, 171-179.
+%   Script by Frank Fishburn (fishburnf@upmc.edu) 10/03/2018.
+%
+% Syntax:
+%   dodTDDR = pf2_MotionCorrectTDDR(dod, sample_rate)
+%
+% Inputs:
+%   dod         - Optical density signal [T x C double]
+%                 T = time samples, C = channels
+%   sample_rate - Sampling rate in Hz (scalar)
+%
+% Outputs:
+%   dodTDDR - Motion-corrected optical density [T x C double]
+%             Same size as input dod.
+%
+% Algorithm:
+%   1. Separate low-frequency (<0.5 Hz) and high-frequency components
+%   2. Compute temporal derivative of low-frequency signal
+%   3. Iteratively estimate robust weights via Tukey's biweight function
+%   4. Apply weights to centered derivative
+%   5. Integrate corrected derivative and center result
+%   6. Recombine with high-frequency component
+%
+% Example:
+%   data = pf2.import.sampleData.fNIR2000();
+%   od = pf2_Intensity2OD(data.raw);
+%   corrected = pf2_MotionCorrectTDDR(od, data.fs);
+%
+% See also: pf2_SMAR, pf2_MotionCorrectWavelet, pf2_fnirs_MARA
 
 mlAct = ones(size(dod,2),1);
 

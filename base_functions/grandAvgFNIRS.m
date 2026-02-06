@@ -243,9 +243,9 @@ if(~isempty(segmentTimesArr))
     outGA.segmentTimes=unique(segmentTimesArr,'rows');
     outGA.segmentTimes=sort(outGA.segmentTimes,1);
      outGA.segmentTimes=round( outGA.segmentTimes,5);
+    outGA.time=outGA.time(ismember(outGA.time,outGA.segmentTimes(:,1)));
 end
 
-outGA.time=outGA.time(ismember(outGA.time,outGA.segmentTimes(:,1)));
 numSegs=length(outGA.time);
 
 if(showProgress)

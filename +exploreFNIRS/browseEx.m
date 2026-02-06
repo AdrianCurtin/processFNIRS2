@@ -28,20 +28,20 @@ function varargout=browseEx(varargin)
 %
 % Example:
 %   % Launch browser with file dialog
-%   exploreFNIRS.BrowseEx();
+%   exploreFNIRS.browseEx();
 %
 %   % Launch browser starting in specific directory
-%   exploreFNIRS.BrowseEx('/path/to/fnirs/data');
+%   exploreFNIRS.browseEx('/path/to/fnirs/data');
 %
 %   % Load data and capture in variable
-%   myData = exploreFNIRS.BrowseEx();
+%   myData = exploreFNIRS.browseEx();
 %
 % Notes:
 %   - Supports loading multiple file formats (NIR, SNIRF, Hitachi, NIRx)
 %   - Selected files are automatically imported using appropriate readers
 %   - For programmatic loading without GUI, use LoadEx instead
 %
-% See also: exploreFNIRS.LoadEx, exploreFNIRS.SaveEx, exploreFNIRS,
+% See also: exploreFNIRS.loadEx, exploreFNIRS.saveEx, exploreFNIRS,
 %           exploreFNIRS_browse
 
 if(nargout>0)

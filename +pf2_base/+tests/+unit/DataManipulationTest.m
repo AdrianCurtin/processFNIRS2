@@ -41,15 +41,15 @@ classdef DataManipulationTest < matlab.unittest.TestCase
 
             % Create evenly spaced markers
             testCase.dataWithMarkers.markers = [
-                minT + duration*0.05, 49, 0;   % Baseline marker
-                minT + duration*0.10, 50, 0;   % Task start 1
-                minT + duration*0.20, 51, 0;   % Task end 1
-                minT + duration*0.30, 50, 0;   % Task start 2
-                minT + duration*0.40, 51, 0;   % Task end 2
-                minT + duration*0.50, 49, 0;   % Baseline marker
-                minT + duration*0.60, 50, 0;   % Task start 3
-                minT + duration*0.70, 51, 0;   % Task end 3
-                minT + duration*0.80, 52, 0;   % Different marker
+                minT + duration*0.05, 49, 0, 1;   % Baseline marker
+                minT + duration*0.10, 50, 0, 1;   % Task start 1
+                minT + duration*0.20, 51, 0, 1;   % Task end 1
+                minT + duration*0.30, 50, 0, 1;   % Task start 2
+                minT + duration*0.40, 51, 0, 1;   % Task end 2
+                minT + duration*0.50, 49, 0, 1;   % Baseline marker
+                minT + duration*0.60, 50, 0, 1;   % Task start 3
+                minT + duration*0.70, 51, 0, 1;   % Task end 3
+                minT + duration*0.80, 52, 0, 1;   % Different marker
             ];
         end
     end

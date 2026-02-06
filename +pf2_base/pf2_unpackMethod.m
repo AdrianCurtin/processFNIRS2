@@ -91,7 +91,11 @@ function x=pf2_unpackMethod(method)
            for j=1:length(Fidx)
                 F_noarray.args{j}=Fidx(j).args;
                 F_noarray.argvals{j}=Fidx(j).argvals;
-                F_noarray.default_argvals{j}=Fidx(j).default_argvals;
+                if isfield(Fidx, 'default_argvals')
+                    F_noarray.default_argvals{j}=Fidx(j).default_argvals;
+                else
+                    F_noarray.default_argvals{j}=Fidx(j).argvals;
+                end
 				if(isfield(Fidx(j),'output'))
                     F_noarray.output{j}=Fidx(j).output;
                 else

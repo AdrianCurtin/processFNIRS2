@@ -1,4 +1,25 @@
 function processMethods(rawMethodStr,oxyMethodStr)
+% PROCESSMETHODS Process all loaded fNIRS data with specified method pair
+%
+% Runs a raw+oxy method combination on all segments in the exploreFNIRS
+% dataset. Results are cached so re-selecting a previously processed
+% method pair returns instantly. On first load, ROI fields are
+% standardized across devices.
+%
+% Syntax:
+%   exploreFNIRS.processMethods(rawMethodStr, oxyMethodStr)
+%
+% Inputs:
+%   rawMethodStr - Name of the raw processing method, or empty [] to skip
+%                  raw processing and apply oxy-only
+%   oxyMethodStr - Name of the oxy processing method
+%
+% Example:
+%   exploreFNIRS.processMethods('x5_TDDR', 'takizawa_easy');
+%   exploreFNIRS.processMethods([], 'None');  % oxy-only reprocessing
+%
+% See also: processFNIRS2, pf2.methods.raw.list, pf2.methods.oxy.list,
+%           exploreFNIRS.dataset.standardizeROIs
 global ExFNIRS
 %global ProgressHandles
 
@@ -67,7 +88,7 @@ if(~any(curRawMatchIdx&curOxyMatchIdx))
                if(isfield(data{i},'HbO'))
                    data{i}=pf2.process.processOxy(data{i});
                else
-                   warning('Data file for item %i has no Oxy Data, attempting to process with ''None''\n',data{i});
+                   warning('Data file for item %i has no Oxy Data, attempting to process with ''None''\n',i);
                    data{i}=pf2(data{i});
                end
            else

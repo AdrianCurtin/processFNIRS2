@@ -31,7 +31,7 @@ function [fNIR] = importHitachiMES(file,pathname,channelCheck)
 %          .raw       - Raw intensity data [T x C double]
 %          .time      - Time vector in seconds [T x 1 double]
 %          .fs        - Sampling frequency in Hz [double]
-%          .markers   - Event markers [M x 3: time, value, index]
+%          .markers   - Event markers [M x 4: time, value, index, amplitude]
 %          .fchMask   - Channel quality mask [1 x C: 1=good, 0=bad]
 %          .info      - Metadata structure containing:
 %                       .MESheader      - Raw header fields
@@ -263,6 +263,7 @@ end
 
 
 fNIR.markers=[fNIR.time(mrkIdx),hMES(mrkIdx,markCol),mrkIdx];
+fNIR.markers = pf2_base.normalizeMarkers(fNIR.markers);
 
 fNIR.info.MESheader=header;
 fNIR.info.chWavelengths=chWavelengths;

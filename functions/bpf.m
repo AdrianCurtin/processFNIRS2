@@ -1,1 +1,34 @@
-function [ dataf ] = bpf( data,filtOrder,fs,lowF,highF)% inputs ------------------------% data: data to be filtered% filtOrder: filter order% fs: sampling freq.% lowF: highpass cut-off frequency% highF: lowpass cutoff frequency% outputs -----------------------% dataf: filtered data%--------------------------------% bpf function designs bandpass butterworth filter with the specified cut-off frequencies and order.% It filters the data columnwise as its output%--------------------------------[Mini,Nini]=size(data);if Mini==1 %if the data is a row vector converts it to column vector    data=data';end[M,N]=size(data);%-----------------------------------------------------------------% Band-pass Filter design%-----------------------------------------------------------------half_fs = fs/2;    %half of sampling freq. equal to pi[A,B,C,D] = butter(filtOrder,[lowF highF]/half_fs);sos = ss2sos(A,B,C,D);dataf=pf2_base.external.filtfilt_classic(sos,1,data);if Mini==1 %if the data is a row vector converts it to column vector    dataf=dataf';end
+function [ dataf ] = bpf( data,filtOrder,fs,lowF,highF)
+
+% inputs ------------------------
+% data: data to be filtered
+% filtOrder: filter order
+% fs: sampling freq.
+% lowF: highpass cut-off frequency
+% highF: lowpass cutoff frequency
+% outputs -----------------------
+% dataf: filtered data
+%--------------------------------
+% bpf function designs bandpass butterworth filter with the specified cut-off frequencies and order.
+% It filters the data columnwise as its output
+%--------------------------------
+
+[Mini,Nini]=size(data);
+if Mini==1 %if the data is a row vector converts it to column vector
+    data=data';
+end
+
+[M,N]=size(data);
+%-----------------------------------------------------------------
+% Band-pass Filter design
+%-----------------------------------------------------------------
+half_fs = fs/2;    %half of sampling freq. equal to pi
+
+[A,B,C,D] = butter(filtOrder,[lowF highF]/half_fs);
+
+sos = ss2sos(A,B,C,D);
+dataf=pf2_base.external.filtfilt_classic(sos,1,data);
+
+if Mini==1 %if the data is a row vector converts it to column vector
+    dataf=dataf';
+end

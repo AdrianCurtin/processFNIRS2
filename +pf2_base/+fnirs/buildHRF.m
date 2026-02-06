@@ -99,7 +99,12 @@ iEnd=find(hrf<0);
 
 hrf=[time;hrf]';
 
-hrf=hrf(1:iEnd,:);
+if ~isempty(iEnd)
+    hrf=hrf(1:iEnd(1)-1,:);
+else
+    % If HRF never goes negative, keep all values
+    hrf=hrf;
+end
 
 
 end

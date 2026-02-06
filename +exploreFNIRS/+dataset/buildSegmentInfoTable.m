@@ -1,6 +1,31 @@
 function outTable=buildSegmentInfoTable(FNIRS_array)
-
-% standardizes all rows and types for provdied array 
+% BUILDSEGMENTINFOTABLE Build a summary table from an array of fNIRS data structs
+%
+% Iterates over a cell array of processed fNIRS structs and extracts the
+% .info fields from each into a standardized MATLAB table. Handles type
+% mismatches and missing fields across segments by filling with NaN,
+% empty strings, or NaT as appropriate.
+%
+% Syntax:
+%   outTable = exploreFNIRS.dataset.buildSegmentInfoTable(FNIRS_array)
+%
+% Inputs:
+%   FNIRS_array - Cell array of fNIRS data structs, each containing an
+%                 .info sub-struct with metadata fields (e.g., subject ID,
+%                 condition, age). Scalar numeric, string, char, logical,
+%                 categorical, and single-cell table values are extracted.
+%
+% Outputs:
+%   outTable - MATLAB table with one row per segment and columns for each
+%              unique .info field found across all segments. Missing values
+%              are filled with type-appropriate defaults.
+%
+% Example:
+%   data = {seg1, seg2, seg3};  % cell array of fNIRS structs
+%   infoTable = exploreFNIRS.dataset.buildSegmentInfoTable(data);
+%   disp(infoTable);
+%
+% See also: exploreFNIRS.dataset.standardizeROIs, exploreFNIRS
     
 warning off MATLAB:table:RowsAddedExistingVars
 

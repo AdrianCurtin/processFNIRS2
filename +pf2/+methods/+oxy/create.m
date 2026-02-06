@@ -86,6 +86,7 @@ for i = 1:length(functions)
     % Ensure required fields exist
     if ~isfield(func, 'args'), func.args = {}; end
     if ~isfield(func, 'argvals'), func.argvals = {}; end
+    if ~isfield(func, 'default_argvals'), func.default_argvals = func.argvals; end
     if ~isfield(func, 'output'), func.output = 'x'; end
 
     % Store function
@@ -123,6 +124,7 @@ end
 
 function myMethods = unpackMethodsLocal(myMethods)
 % Local copy of unpackMethods to avoid dependency on GUI
+% Handles struct arrays created by INI round-tripping of cell array fields
 
 for i = 1:length(myMethods.cfg.Sections)
     x = myMethods.cfg.(myMethods.cfg.Sections{i});
@@ -139,6 +141,33 @@ for i = 1:length(myMethods.cfg.Sections)
         if isfield(x, fieldName)
             x.F{end+1} = x.(fieldName);
             x = rmfield(x, fieldName);
+        end
+    end
+
+    % Handle struct arrays created by INI cell-array distribution
+    for idx = 1:length(x.F)
+        Fidx = x.F{idx};
+        if isstruct(Fidx) && length(Fidx) > 1
+            F_fixed.f = Fidx(1).f;
+            F_fixed.args = cell(1, length(Fidx));
+            F_fixed.argvals = cell(1, length(Fidx));
+            F_fixed.default_argvals = cell(1, length(Fidx));
+            F_fixed.output = cell(1, length(Fidx));
+            for k = 1:length(Fidx)
+                F_fixed.args{k} = Fidx(k).args;
+                F_fixed.argvals{k} = Fidx(k).argvals;
+                if isfield(Fidx, 'default_argvals')
+                    F_fixed.default_argvals{k} = Fidx(k).default_argvals;
+                else
+                    F_fixed.default_argvals{k} = Fidx(k).argvals;
+                end
+                if isfield(Fidx, 'output')
+                    F_fixed.output{k} = Fidx(k).output;
+                else
+                    F_fixed.output{k} = 'x';
+                end
+            end
+            x.F{idx} = F_fixed;
         end
     end
 

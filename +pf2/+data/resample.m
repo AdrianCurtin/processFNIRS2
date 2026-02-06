@@ -681,14 +681,13 @@ function [outAuxStruct] = recursiveAuxResample(aux_in,flattenAux,segLength,cente
             nAuxChan=size(curField,2);
             
 
-            %create t_ind if missing
-            if(isempty(t_ind)) % if not using fNIR time, we have to figure out where time is logically
-                %calculate index for each sample
-    
-                [t_ind,t_aux_resample]=getTimeIdx(t_aux,segLength,centerOnTime);
+            %create t_ind if missing, always compute t_aux_resample for flattening
+            [t_ind_computed, t_aux_resample] = getTimeIdx(t_aux, segLength, centerOnTime);
+            if(isempty(t_ind))
+                t_ind = t_ind_computed;
             end
-            
-            
+
+
             numSegs_aux=max(t_ind);
 
             auxDat=curField(:);
@@ -776,14 +775,18 @@ function [outAuxStruct] = recursiveAuxResample(aux_in,flattenAux,segLength,cente
 
             
 
-            %create t_ind if missing
-            if(isempty(t_ind)) % if not using fNIR time, we have to figure out where time is logically
-                %calculate index for each sample
-    
-                [t_ind,t_aux_resample]=getTimeIdx(t_aux,segLength,centerOnTime);
-                outAuxStruct.(curFieldName)=table(t_aux_resample,'VariableNames',curTimeNames);
-            elseif(flattenAux)
-                outAuxStruct.(curFieldName)=table(t_aux_resample,'VariableNames',curTimeNames);
+            %create t_ind if missing, always compute t_aux_resample for flattening
+            [t_ind_computed, t_aux_resample] = getTimeIdx(t_aux, segLength, centerOnTime);
+            if(isempty(t_ind))
+                t_ind = t_ind_computed;
+            end
+
+            if(auxFieldHasTime(f)||flattenAux)
+                if(exist('curTimeNames','var')&&~isempty(curTimeNames))
+                    outAuxStruct.(curFieldName)=table(t_aux_resample,'VariableNames',curTimeNames);
+                else
+                    outAuxStruct.(curFieldName)=table(t_aux_resample,'VariableNames',{'time'});
+                end
             else
                 outAuxStruct.(curFieldName)=table();
             end

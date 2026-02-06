@@ -266,8 +266,14 @@ for n = 1:numNIRS
                 % Add dataLabels if more than 3 columns
                 if size(curStruct.markers, 2) > 3
                     stimLabels = {'startTime', 'duration', 'value'};
+                    % Include amplitude data in SNIRF output
+                    stimItem.data = [stimItem.data, curStruct.markers(markerIdx, 4:end)];
                     for col = 4:size(curStruct.markers, 2)
-                        stimLabels{end+1} = sprintf('column%d', col);
+                        if col == 4
+                            stimLabels{end+1} = 'amplitude';
+                        else
+                            stimLabels{end+1} = sprintf('column%d', col);
+                        end
                     end
                     stimItem.dataLabels = stimLabels;
                 end

@@ -55,6 +55,8 @@ function processFNIRS2_configureMethods_OpeningFcn(hObject, eventdata, handles, 
 % Choose default command line output for processFNIRS2_configureMethods
 handles.output = hObject;
 
+pf2_base.applyLightTheme(hObject);
+
 global configureMode
 if(~isempty(varargin))
     if(strcmp(varargin{1},'raw')||strcmp(varargin{1},'oxy'))
@@ -484,15 +486,15 @@ function newName=cleanNameForINI(Name)
 			case Numbers
 			case LowerCases
 			case UpperCases
-			case {'À','�?','Â','Ã','Ä','Å'},     Character = 'A';
+			case {'À','�?','Â','Ã','Ä','Å'},     Character = 'A';
 			case 'Æ',                           Character = 'AE';
 			case 'Ç',                           Character = 'C';
 			case {'È','É','Ê','Ë'},             Character = 'E';
-			case {'Ì','�?','Î','�?'},             Character = 'I';
+			case {'Ì','�?','Î','�?'},             Character = 'I';
 			case 'Ñ',                           Character = 'N';
 			case {'Ò','Ó','Ô','Õ','Ö'},         Character = 'O';
 			case {'Ù','Ú','Û','Ü'},             Character = 'U';
-			case '�?',                           Character = 'Y';
+			case '�?',                           Character = 'Y';
 			case '²',                           Character = '2';
 			case '³',                           Character = '3';
 			case '¼',                           Character = '1_4';
@@ -1378,7 +1380,11 @@ for i=1:length(myMethods.cfg.Sections)
            for j=1:size(Fidx,2)
                 F_noarray.args{j}=Fidx(j).args;
                 F_noarray.argvals{j}=Fidx(j).argvals;
-                F_noarray.default_argvals{j}=Fidx(j).default_argvals;
+                if isfield(Fidx, 'default_argvals')
+                    F_noarray.default_argvals{j}=Fidx(j).default_argvals;
+                else
+                    F_noarray.default_argvals{j}=Fidx(j).argvals;
+                end
                 if(isfield(Fidx(j),'output'))
                     F_noarray.output{1}=Fidx(1).output;
                 else
