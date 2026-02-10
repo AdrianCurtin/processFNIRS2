@@ -446,7 +446,7 @@ end
                     
                     mrkName=sprintf('Mrk%i',showMarkers(i));
                     if(numMarkers(i)<tooManyMarkers||plotTonsOfMarkers)
-                        yLabelHeight=(1:length(showMarkers))*0.05+0.15;
+                        yLabelHeight=min((1:length(showMarkers))*0.05+0.15, 0.95);
                         if(numMarkers(i)<tooManyLabels)
                             pf2_base.external.vline(curMarkers(showMarkersIdx==i),'k',mrkName,yLabelHeight(i));
                         else

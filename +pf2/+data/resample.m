@@ -64,12 +64,13 @@ p=inputParser;
 
 validfNIRInput = @(x) (isnumeric(x)&&length(x)>1) || (isstruct(x) && (isfield(x,'raw')||isfield(x,'time')||isfield(x,'info')));
 validScalarPosNum = @(x) isnumeric(x) && isscalar(x) && (x >= 0);
+validScalarStrictPosNum = @(x) isnumeric(x) && isscalar(x) && (x > 0);
 validTimeOutMode = @(x) ischar(x)&&(ismember(x,{'mid','start','end'}));
 validTimepoints = @(x) isnumeric(x) && isvector(x) && issorted(x);
 
 
 addRequired(p,'fNIR',validfNIRInput);
-addOptional(p,'segmentLength',1,validScalarPosNum);
+addOptional(p,'segmentLength',1,validScalarStrictPosNum);
 addOptional(p,'blLength',[],validScalarPosNum);
 addOptional(p,'blfNIR',[],validfNIRInput);
 addParameter(p,'centerOnT0',false,@islogical);
@@ -88,7 +89,6 @@ fNIR=p.Results.fNIR;
 segLength=p.Results.segmentLength; % How long is each segment, ie: 1 sample
 blLength=p.Results.blLength; % how long is the baseline
 blfNIR=p.Results.blfNIR; % a baseline fNIR struct
-%getPolyAvg=p.Results.getPolyAvg;
 centerOnT0=p.Results.centerOnT0; % should the resample include t=0 as the start point
 centerOnTime=p.Results.centerOnTime;
 specifiedTimepoints = p.Results.specifiedTimepoints;
@@ -132,9 +132,6 @@ end
 
 fNIR.time=round(fNIR.time,5);
 
-%minfTime=min(fNIR.time);
-%maxfTime=max(fNIR.time);
-
 fTime=fNIR.time;
 
 if(~isstruct(blfNIR)&&~isempty(blLength)&&blLength>0)
@@ -175,11 +172,6 @@ else
     numCh=size(fNIR.HbR,2); 
 end
 
-%if(isfield(fNIR,'raw')&&isempty(fNIR.raw))
-    %fNIR.raw=nan(size(fNIR.HbR));
-    %prevent resampling of raw
-%end
-
 if(isnan(centerOnTime))  % foces time blocks to start from t=0 or if undefined, just start from where they started from
     centerOnTime=min(fTime);
 end
@@ -192,9 +184,6 @@ else
     [fTimeInd, timeSeries] = getTimeIdx(fNIR.time, segLength, centerOnTime);
 end
 
-%minSegTime=timeSeries(1);
-%maxSegTime=timeSeries(end);
-
 numSegs=length(timeSeries);
 
 if(pf2_base.isnestedfield(fNIR,'ROI.HbR')&&~isempty(fNIR.ROI.HbR))
@@ -205,20 +194,6 @@ else
     numROI=0;
 end
 
-
-if(getPolyAvg)
-    phbr=nan([numSegs,numCh,polyDegree+1]);
-    phbo=nan([numSegs,numCh,polyDegree+1]);
-    poxy=nan([numSegs,numCh,polyDegree+1]);
-    ptotal=nan([numSegs,numCh,polyDegree+1]);
-    pcbsi=nan([numSegs,numCh,polyDegree+1]);
-    
-    phbrfit=nan(numSegs,numCh,3);
-    phbofit=nan(numSegs,numCh,3);
-    poxyfit=nan(numSegs,numCh,3);
-    ptotalfit=nan(numSegs,numCh,3);
-    pcbsifit=nan(numSegs,numCh,3);
-end
 
 if(isfield(fNIR,'Aux'))
     if(~averageAux)
@@ -231,6 +206,11 @@ else
     averageAux=false;
 end
 
+
+validCh=1:numCh;
+if(calcROI)
+    validCh_roi=1:numROI;
+end
 
 if(blLength>0) % if baseline is present
     bioMlist={'HbO','HbR','HbDiff','HbTotal','CBSI'};
@@ -325,22 +305,9 @@ else
     times_end=timeSeries+segLength-1e-10;
 end
 
-%minSegTime=times_start(1);
-%maxSegTime=times_start(end);
-
-%calculate index for each sample
-%fTimeInd=floor((fTime-minfTime-rem(fTime-minfTime,segLength))/segLength)+1;
-
-
 if(calcROI)
-    %fTimeInd_numROI=repmat(fTimeInd,[numROI,1]);
-    %fTimeInd_numROI=fTimeInd_numROI+numSegs*repelem([0:numROI-1]',nTime,1);
-
     outFNIR.ROI.info=fNIR.ROI.info;
 end
-
-
-ptime=zeros(numSegs,1); %polynomial time
 
 bioMlist={'raw','HbO','HbR','HbDiff','HbTotal','CBSI'};
 
@@ -391,8 +358,6 @@ for b = 1:length(bioMlist)
             pFit.(curB)=pFit.(curB)-repmat(blfNIR.(curB),[numSegs,1]);
         elseif(~isempty(blLength)&&isnan(blLength)&&~isRaw)
             pFit.(curB)=nan([numSegs,numCh]);
-        else
-            %pFit.(curB)=pFit.(curB);
         end
     end
 
@@ -431,8 +396,6 @@ for b = 1:length(bioMlist)
                 pFit.ROI.(curB)=pFit.ROI.(curB)-repmat(blfNIR.ROI.(curB),[numSegs,1]);
             elseif(~isempty(blLength)&&isnan(blLength))
                 pFit.ROI.(curB)=nan([numSegs,numROI]);
-            else
-                %pFit.ROI.(curB)=pFit.ROI.(curB);
             end
         end
     end
@@ -538,20 +501,14 @@ end
 outFNIR.fs=1/segLength; %new "effective sampling frequency
 
 if(getPolyAvg) % returns a time X channel X coefficient array
-    pFit=outFNIR;
-    pFit.HbR_poly=phbr;
-    pFit.HbO_poly=phbo;
-    pFit.HbDiff_poly=poxy;
-    pFit.HbTotal_poly=ptotal;
-    pFit.CBSI_poly=pcbsi;
-    pFit.time=ptime;
-    %pFit.time(end+1)=outFNIR.segmentTimes(end,3);
-    
-    pFit.HbR=phbrfit;
-    pFit.HbO=phbofit;
-    pFit.HbDiff=poxyfit;
-    pFit.HbTotal=ptotalfit;
-    pFit.CBSI=pcbsifit;
+    % Merge metadata from outFNIR into pFit (preserving polynomial data from loop)
+    outFields = fieldnames(outFNIR);
+    for fi = 1:length(outFields)
+        fn = outFields{fi};
+        if ~isfield(pFit, fn)
+            pFit.(fn) = outFNIR.(fn);
+        end
+    end
 else
     pFit=[];
 end
@@ -603,16 +560,21 @@ function [outAuxStruct] = recursiveAuxResample(aux_in,flattenAux,segLength,cente
         outAuxStruct.(validTimeFields{cur_time_ind})=localTime_resample;
     end
 
-    szLocalTime(:)=size(local_time);
-    szParentTime(:)=size(parent_time_in);
-    szNIRTime(:)=size(nir_time);
+    szLocalTime=size(local_time);
+    szParentTime=size(parent_time_in);
+    szNIRTime=size(nir_time);
 
 
     % look through each aux field for timeSeries
     for f=1:length(auxFields)
-        
+
         curFieldName=auxFields{f};
         curField=aux_in.(curFieldName);
+
+        % Skip metadata fields (used for labeling, not time-series data)
+        if ismember(curFieldName, {'varNames', 'unit'})
+            continue;
+        end
 
         if(isempty(curField))
             fprintf('Unable to average signal .Aux.%s, no data present\n',curFieldName);
@@ -665,15 +627,14 @@ function [outAuxStruct] = recursiveAuxResample(aux_in,flattenAux,segLength,cente
                 warning('Non-explicit match for Aux resampling, please use Aux.time variable or ''time'' table column ');
             else % maybe if the first column is constantly incrementing we use that?
 
-                possibleTimeField=all(diff(curField(:,1)>0));
+                possibleTimeField=all(diff(curField(:,1))>0);
                 if(possibleTimeField)
                     t_aux=curField(:,1);
                     auxFieldHasTime(f)=true;
                     warning('Non-explicit match for Aux resampling, please use Aux.time variable or ''time'' table column ');
                 else
-                    %fprintf('Unable to resample this field!');
                     outAuxStruct.(curFieldName)=['Unable to resample this field!'];
-                    
+
                     continue;
                 end
             end
@@ -705,9 +666,15 @@ function [outAuxStruct] = recursiveAuxResample(aux_in,flattenAux,segLength,cente
             end
 
             if(flattenAux)
-                newVarNames={};
-                for nV=1:(nAuxChan-auxFieldHasTime(f))
-                    newVarNames{nV}=sprintf('val%i',nV);
+                nDataCols=nAuxChan-auxFieldHasTime(f);
+                % Use varNames from parent struct if available
+                if isfield(aux_in,'varNames') && iscell(aux_in.varNames) && length(aux_in.varNames)>=nDataCols
+                    newVarNames=aux_in.varNames(1:nDataCols);
+                else
+                    newVarNames={};
+                    for nV=1:nDataCols
+                        newVarNames{nV}=sprintf('val%i',nV);
+                    end
                 end
 
                 if(auxFieldHasTime(f))
@@ -756,24 +723,21 @@ function [outAuxStruct] = recursiveAuxResample(aux_in,flattenAux,segLength,cente
             else % maybe if the first column is constantly incrementing we use that?
 
                 
-                possibleTimeField=isnumeric(curField(:,1))&&all(diff(curField(:,1)>0));
+                possibleTimeField=isnumeric(curField(:,1))&&all(diff(curField(:,1))>0);
                 if(possibleTimeField&&~alreadyFlattened)
                     t_aux=curField(:,1);
                     auxFieldHasTime(f)=true;
                     warning('Non-explicit match for Aux resampling, please use Aux.time variable or ''time'' table column ');
                 else
-                    %fprintf('Unable to resample this field!');
                     if(~alreadyFlattened)
                         outAuxStruct.(curFieldName)=['Unable to resample this field!'];
                     else
                         outAuxStruct.(curFieldName)=curField;
                     end
-                    
+
                     continue;
                 end
             end
-
-            
 
             %create t_ind if missing, always compute t_aux_resample for flattening
             [t_ind_computed, t_aux_resample] = getTimeIdx(t_aux, segLength, centerOnTime);
@@ -940,9 +904,9 @@ function [outAuxStruct] = recursiveAuxFlatten(aux_in,nir_time,parent_time_in)
         outAuxStruct.(validTimeFields{cur_time_ind})=local_time;
     end
 
-    szLocalTime(:)=size(local_time);
-    szParentTime(:)=size(parent_time_in);
-    szNIRTime(:)=size(nir_time);
+    szLocalTime=size(local_time);
+    szParentTime=size(parent_time_in);
+    szNIRTime=size(nir_time);
 
 
     % look through each aux field for timeSeries
@@ -988,13 +952,12 @@ function [outAuxStruct] = recursiveAuxFlatten(aux_in,nir_time,parent_time_in)
                 warning('Non-explicit match for Aux resampling, please use Aux.time variable or ''time'' table column ');
             else % maybe if the first column is constantly incrementing we use that?
 
-                possibleTimeField=all(diff(curField(:,1)>0));
+                possibleTimeField=all(diff(curField(:,1))>0);
                 if(possibleTimeField)
                     t_aux=curField(:,1);
                     auxFieldHasTime(f)=true;
                     warning('Non-explicit match for Aux resampling, please use Aux.time variable or ''time'' table column ');
                 else
-                    %fprintf('Unable to resample this field!');
                     outAuxStruct.(curFieldName)=['Unable to align this field!'];
                     
                     continue;
@@ -1050,13 +1013,12 @@ function [outAuxStruct] = recursiveAuxFlatten(aux_in,nir_time,parent_time_in)
             else % maybe if the first column is constantly incrementing we use that?
 
                 
-                possibleTimeField=isnumeric(curField(:,1))&&all(diff(curField(:,1)>0));
+                possibleTimeField=isnumeric(curField(:,1))&&all(diff(curField(:,1))>0);
                 if(possibleTimeField&&~alreadyFlattened)
                     t_aux=curField(:,1);
                     auxFieldHasTime(f)=true;
                     warning('Non-explicit match for Aux time variable alignment, please use Aux.time variable or ''time'' table column ');
                 else
-                    %fprintf('Unable to resample this field!');
                     if(~alreadyFlattened)
                         outAuxStruct.(curFieldName)=['Unable to resample this field!'];
                     else
@@ -1163,27 +1125,21 @@ function [fTimeInd,timeSeries]=getTimeIdx(times_in,segLength,centerTime)
 
  
     t1=times_in(1);
-    %te=times_in(end);
 
     times_in=times_in(:);
-
-    %tRange_in=te-t1;
 
     if(nargin<3) % just use min time
         centerTime=t1;
     end
 
-   
-
     minSegTime=centerTime+floor((t1-centerTime)/segLength)*segLength;
-    % minimum SegTime is the first value that meets the crieria
-    %       t0_rs = centerTime+segLength*N  (where N is some number of samples
-    %       and t0_sample > t0_rs  but t0_sample < t0_rs +segLength
-    
-    %maxSegTime=centerTime+floor((te-centerTime)/segLength)*segLength;
+    % minimum SegTime is the first value that meets the criteria:
+    %   t0_rs = centerTime+segLength*N  (where N is some integer)
+    %   and t0_sample >= t0_rs  but t0_sample < t0_rs + segLength
 
+    % 1e-10 epsilon prevents floating-point bin-boundary misassignment
+    % where floor returns n-1 instead of n for values at exact boundaries
     fTimeInd=[floor((times_in-minSegTime)/segLength+1+1e-10)];
-    % 1e-10 helps fix conditions where floor returns n-1 instead of n
     % fTimeInd(end) is the highest value here, faster than max()
     
     maxSegTime=minSegTime+(fTimeInd(end)-1)*segLength;

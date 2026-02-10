@@ -7,6 +7,10 @@ function [dodTDDR] = pf2_MotionCorrectTDDR(dod,sample_rate)
 % corrected signal. High-frequency components (>0.5 Hz) are separated
 % before correction and merged back afterward.
 %
+% Channels with partial NaN values are processed piecewise: each contiguous
+% non-NaN segment is corrected independently. Segments shorter than 10
+% samples are left uncorrected (original OD values preserved).
+%
 % Reference:
 %   Fishburn, F. A. et al. (2019). Temporal Derivative Distribution Repair
 %   (TDDR): A motion correction method for fNIRS. NeuroImage, 184, 171-179.
@@ -18,11 +22,12 @@ function [dodTDDR] = pf2_MotionCorrectTDDR(dod,sample_rate)
 % Inputs:
 %   dod         - Optical density signal [T x C double]
 %                 T = time samples, C = channels
+%                 May contain NaN values (handled piecewise).
 %   sample_rate - Sampling rate in Hz (scalar)
 %
 % Outputs:
 %   dodTDDR - Motion-corrected optical density [T x C double]
-%             Same size as input dod.
+%             Same size as input dod. NaN positions are preserved.
 %
 % Algorithm:
 %   1. Separate low-frequency (<0.5 Hz) and high-frequency components
@@ -44,9 +49,46 @@ mlAct = ones(size(dod,2),1);
 lstAct = find(mlAct==1);
 dodTDDR = dod;
 
+minSegment = 10; % Minimum samples for TDDR correction
+
 for ii=1:length(lstAct)
-    
+
     idx_ch = lstAct(ii);
+    chData = dod(:, idx_ch);
+
+    % Skip dead channels (all NaN from zero raw intensity)
+    if all(~isfinite(chData))
+        continue;
+    end
+
+    nanMask = isnan(chData);
+
+    if ~any(nanMask)
+        % No NaN — process whole channel directly
+        dodTDDR(:, idx_ch) = tddr_core(chData, sample_rate);
+        continue;
+    end
+
+    % Piecewise: find contiguous non-NaN segments
+    transitions = diff([true; nanMask; true]);
+    segStarts = find(transitions == -1);
+    segEnds   = find(transitions == 1) - 1;
+
+    for jj = 1:length(segStarts)
+        idx = segStarts(jj):segEnds(jj);
+        if length(idx) >= minSegment
+            dodTDDR(idx, idx_ch) = tddr_core(chData(idx), sample_rate);
+        end
+        % Short segments: left as original OD values (uncorrected but valid)
+    end
+
+end
+
+end
+
+
+function corrected = tddr_core(signal, sample_rate)
+%TDDR_CORE Apply TDDR to a single contiguous (no-NaN) signal segment.
 
     %% Preprocess: Separate high and low frequencies
     filter_cutoff = .5;
@@ -55,18 +97,18 @@ for ii=1:length(lstAct)
     if Fc<1
         [fb,fa] = butter(filter_order,Fc);
         try
-            signal_low = pf2_base.filtfilt_piecewise(fb,fa,dod(:,idx_ch),10);
-        catch 
-            signal_low = pf2_base.external.filtfilt_classic(fb,fa,dod(:,idx_ch));
+            signal_low = filtfilt(fb,fa,signal);
+        catch
+            signal_low = pf2_base.external.filtfilt_classic(fb,fa,signal);
         end
     else
-        signal_low = dod(:,idx_ch);
+        signal_low = signal;
     end
-    signal_high = dod(:,idx_ch) - signal_low;
+    signal_high = signal - signal_low;
 
     %% Initialize
     tune = 4.685;
-    D = sqrt(eps(class(dod)));
+    D = sqrt(eps(class(signal)));
     mu = inf;
     iter = 0;
 
@@ -114,8 +156,6 @@ for ii=1:length(lstAct)
     signal_low_corrected = signal_low_corrected - mean(signal_low_corrected);
 
     %% Postprocess: Merge back with uncorrected high frequency component
-    dodTDDR(:,idx_ch) = signal_low_corrected + signal_high;
-    
-end
+    corrected = signal_low_corrected + signal_high;
 
 end

@@ -48,7 +48,20 @@ end
 %datad = ifft(Dataf);              %time domain filtered data   
 %dataf = (real(datad(Nf/2:M+Nf/2-1,1:N))); %adjustment for time shifting caused by the filter
 
-dataf=filtfilt(b,a,data);
+% Filter each column, handling NaN-padded regions per channel
+minLen = 3 * Nf + 1;
+dataf = NaN(size(data));
+for col = 1:N
+    finIdx = isfinite(data(:, col));
+    if ~any(finIdx), continue; end
+    % Find contiguous finite span (first to last finite sample)
+    first = find(finIdx, 1, 'first');
+    last  = find(finIdx, 1, 'last');
+    seg = data(first:last, col);
+    if all(isfinite(seg)) && numel(seg) > minLen
+        dataf(first:last, col) = filtfilt(b, a, seg);
+    end
+end
 
 if Mini==1 %if the data is a row vector converts it to column vector
     dataf=dataf';

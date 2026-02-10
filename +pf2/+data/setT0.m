@@ -119,6 +119,14 @@ if(pf2_base.isnestedfield(outFNIR,'Aux')) && ~isempty(outFNIR.Aux)
         % Only modify numeric arrays with at least 2D where column 1 might be time
         if isnumeric(curField) && ismatrix(curField) && size(curField,1) > 1 && size(curField,2) >= 1
             outFNIR.Aux.(curFieldName)(:,1) = curField(:,1) - tDiff;
+        elseif istable(curField)
+            % Handle flattened Aux tables — shift the time column
+            tblVars = curField.Properties.VariableNames;
+            timeCol = intersect(timeFieldNames, tblVars);
+            if ~isempty(timeCol) && isnumeric(curField.(timeCol{1}))
+                outFNIR.Aux.(curFieldName).(timeCol{1}) = ...
+                    curField.(timeCol{1}) - tDiff;
+            end
         end
     end
 end

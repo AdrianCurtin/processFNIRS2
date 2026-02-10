@@ -4,8 +4,8 @@ function [X, regressorNames] = buildDesignMatrix(time, fs, events, varargin)
 % Builds a design matrix for general linear model (GLM) analysis of fNIRS
 % data. Each event condition is convolved with a hemodynamic response
 % function (HRF) to produce expected signal regressors. Optionally includes
-% temporal and dispersion derivatives, polynomial drift regressors, and
-% short-channel signals as nuisance regressors.
+% temporal and dispersion derivatives, drift regressors (Legendre polynomial
+% or DCT cosine basis), and short-channel signals as nuisance regressors.
 %
 % Reference:
 %   Huppert, T. J. (2016). Commentary on the statistical properties of
@@ -20,15 +20,26 @@ function [X, regressorNames] = buildDesignMatrix(time, fs, events, varargin)
 %   time   - Time vector [1 x T] or [T x 1] in seconds
 %   fs     - Sampling frequency in Hz [scalar]
 %   events - Struct array with fields:
-%            .name     - Condition label [char]
-%            .onsets   - Stimulus onset times in seconds [1 x N]
-%            .duration - Duration of each stimulus in seconds [scalar or 1 x N]
-%                        Use 0 for impulse (event-related) designs.
+%            .name      - Condition label [char]
+%            .onsets    - Stimulus onset times in seconds [1 x N]
+%            .duration  - Duration of each stimulus in seconds [scalar or 1 x N]
+%                         Use 0 for impulse (event-related) designs.
+%            .amplitude - (Optional) Amplitude scaling per event [scalar or 1 x N]
+%                         Default: 1. Use with parametric modulation designs.
 %
 % Name-Value Parameters:
 %   'HRF'                - Custom HRF vector [N x 1] (default: canonical via buildHRF)
 %   'DriftOrder'         - Order of Legendre polynomial drift regressors (default: 3)
-%                          Set to -1 to disable drift regressors.
+%                          Set to -1 to disable drift regressors. Ignored when
+%                          DriftType is 'dct'.
+%   'DriftType'          - Type of drift regressors: 'legendre' or 'dct'
+%                          (default: 'legendre')
+%                          'legendre' - Legendre polynomial basis (orders 0..DriftOrder)
+%                          'dct'      - Discrete cosine transform basis (SPM-style).
+%                                       Number of components set by DriftCutoff.
+%   'DriftCutoff'        - High-pass cutoff period in seconds for DCT drift
+%                          (default: 128). Frequencies below 1/DriftCutoff Hz are
+%                          modeled by the DCT basis. Only used when DriftType='dct'.
 %   'ShortChannels'      - Short-channel time series [T x S] to add as regressors
 %                          (default: [])
 %   'IncludeDerivative'  - Include temporal derivative of HRF (default: false)
@@ -37,24 +48,25 @@ function [X, regressorNames] = buildDesignMatrix(time, fs, events, varargin)
 %
 % Outputs:
 %   X              - Design matrix [T x P] where P = nConditions*(1 + nDerivatives)
-%                    + (DriftOrder+1) + nShortChannels
+%                    + nDriftRegressors + nShortChannels
 %   regressorNames - Cell array {1 x P} of regressor labels
 %
 % Algorithm:
 %   1. For each condition, create a stimulus boxcar/impulse vector
 %   2. Convolve with HRF (and optionally its temporal/dispersion derivatives)
-%   3. Append Legendre polynomial drift regressors (orders 0 through DriftOrder)
+%   3. Append drift regressors:
+%      a. Legendre: orders 0 through DriftOrder
+%      b. DCT: cosine basis functions up to 1/DriftCutoff Hz (SPM convention)
 %   4. Append short-channel columns if provided
 %   5. Column names encode condition and regressor type
 %
 % Example:
-%   % Build design matrix from block definitions
-%   data = pf2.import.sampleData.fNIR2000();
-%   blocks = pf2.data.defineBlocks(data, [49, 50], 30, ...
-%       'ConditionMap', {49, 'Speech'; 50, 'Noise'});
-%   events = blocksToEvents(blocks);
+%   % Build design matrix with Legendre drift (default)
 %   [X, names] = pf2_base.fnirs.buildDesignMatrix(data.time, data.fs, events);
-%   imagesc(X); set(gca, 'XTickLabel', names);
+%
+%   % Build design matrix with DCT drift (SPM-style, 128s cutoff)
+%   [X, names] = pf2_base.fnirs.buildDesignMatrix(data.time, data.fs, events, ...
+%       'DriftType', 'dct', 'DriftCutoff', 128);
 %
 % See also: pf2_base.fnirs.buildHRF, pf2_base.fnirs.fitGLM, pf2.data.defineBlocks
 
@@ -65,6 +77,8 @@ p.addRequired('fs', @(x) isnumeric(x) && isscalar(x) && x > 0);
 p.addRequired('events', @isstruct);
 p.addParameter('HRF', [], @isnumeric);
 p.addParameter('DriftOrder', 3, @(x) isnumeric(x) && isscalar(x));
+p.addParameter('DriftType', 'legendre', @(x) ismember(lower(char(x)), {'legendre', 'dct'}));
+p.addParameter('DriftCutoff', 128, @(x) isnumeric(x) && isscalar(x) && x > 0);
 p.addParameter('ShortChannels', [], @isnumeric);
 p.addParameter('IncludeDerivative', false, @islogical);
 p.addParameter('IncludeDispersion', false, @islogical);
@@ -73,6 +87,8 @@ p.parse(time, fs, events, varargin{:});
 
 customHRF = p.Results.HRF;
 driftOrder = p.Results.DriftOrder;
+driftType = lower(char(p.Results.DriftType));
+driftCutoff = p.Results.DriftCutoff;
 shortCh = p.Results.ShortChannels;
 includeDerivative = p.Results.IncludeDerivative;
 includeDispersion = p.Results.IncludeDispersion;
@@ -130,17 +146,29 @@ for c = 1:nConditions
         durations = ev.duration(:)';
     end
 
+    % Handle scalar vs vector amplitude (default: 1)
+    if isfield(ev, 'amplitude') && ~isempty(ev.amplitude)
+        if isscalar(ev.amplitude)
+            amplitudes = repmat(ev.amplitude, 1, length(onsets));
+        else
+            amplitudes = ev.amplitude(:)';
+        end
+    else
+        amplitudes = ones(1, length(onsets));
+    end
+
     % Create stimulus vector
     stim = zeros(T, 1);
     for n = 1:length(onsets)
+        amp = amplitudes(min(n, numel(amplitudes)));
         if durations(n) <= 0
             % Impulse: find nearest sample
             [~, idx] = min(abs(time - onsets(n)));
-            stim(idx) = 1;
+            stim(idx) = amp;
         else
-            % Boxcar: set samples within duration to 1
+            % Boxcar: set samples within duration to amplitude
             mask = time >= onsets(n) & time < (onsets(n) + durations(n));
-            stim(mask) = 1;
+            stim(mask) = amp;
         end
     end
 
@@ -168,43 +196,12 @@ end
 driftColumns = {};
 driftNames = {};
 
-if driftOrder >= 0
-    % Normalized time for Legendre polynomials: [-1, 1]
-    tNorm = linspace(-1, 1, T)';
-
-    startOrder = 0;
-    if ~includeConstant
-        startOrder = 1;  % Skip constant term
-    end
-
-    for k = startOrder:driftOrder
-        switch k
-            case 0
-                poly = ones(T, 1);
-                driftNames{end+1} = 'constant'; %#ok<AGROW>
-            case 1
-                poly = tNorm;
-                driftNames{end+1} = 'drift_linear'; %#ok<AGROW>
-            case 2
-                poly = (3*tNorm.^2 - 1) / 2;
-                driftNames{end+1} = 'drift_quad'; %#ok<AGROW>
-            case 3
-                poly = (5*tNorm.^3 - 3*tNorm) / 2;
-                driftNames{end+1} = 'drift_cubic'; %#ok<AGROW>
-            otherwise
-                % General Legendre polynomial via recurrence
-                P_prev2 = ones(T, 1);
-                P_prev1 = tNorm;
-                for j = 2:k
-                    P_curr = ((2*j - 1) * tNorm .* P_prev1 - (j - 1) * P_prev2) / j;
-                    P_prev2 = P_prev1;
-                    P_prev1 = P_curr;
-                end
-                poly = P_curr;
-                driftNames{end+1} = sprintf('drift_order%d', k); %#ok<AGROW>
-        end
-        driftColumns{end+1} = poly; %#ok<AGROW>
-    end
+if strcmp(driftType, 'dct')
+    % DCT cosine basis set (SPM-style high-pass filter)
+    [driftColumns, driftNames] = buildDCTDrift(T, fs, driftCutoff, includeConstant);
+elseif driftOrder >= 0
+    % Legendre polynomial drift regressors
+    [driftColumns, driftNames] = buildLegendreDrift(T, driftOrder, includeConstant);
 end
 
 % --- Short-channel regressors ---
@@ -233,5 +230,96 @@ for j = 1:length(allColumns)
 end
 
 regressorNames = allNames;
+
+end
+
+
+function [columns, names] = buildLegendreDrift(T, driftOrder, includeConstant)
+% BUILDLEGENDREDRIFT Legendre polynomial drift regressors
+
+columns = {};
+names = {};
+
+tNorm = linspace(-1, 1, T)';
+
+startOrder = 0;
+if ~includeConstant
+    startOrder = 1;
+end
+
+for k = startOrder:driftOrder
+    switch k
+        case 0
+            poly = ones(T, 1);
+            names{end+1} = 'constant'; %#ok<AGROW>
+        case 1
+            poly = tNorm;
+            names{end+1} = 'drift_linear'; %#ok<AGROW>
+        case 2
+            poly = (3*tNorm.^2 - 1) / 2;
+            names{end+1} = 'drift_quad'; %#ok<AGROW>
+        case 3
+            poly = (5*tNorm.^3 - 3*tNorm) / 2;
+            names{end+1} = 'drift_cubic'; %#ok<AGROW>
+        otherwise
+            P_prev2 = ones(T, 1);
+            P_prev1 = tNorm;
+            for j = 2:k
+                P_curr = ((2*j - 1) * tNorm .* P_prev1 - (j - 1) * P_prev2) / j;
+                P_prev2 = P_prev1;
+                P_prev1 = P_curr;
+            end
+            poly = P_curr;
+            names{end+1} = sprintf('drift_order%d', k); %#ok<AGROW>
+    end
+    columns{end+1} = poly; %#ok<AGROW>
+end
+
+end
+
+
+function [columns, names] = buildDCTDrift(T, fs, cutoffPeriod, includeConstant)
+% BUILDDCTDRIFT Discrete cosine transform drift regressors (SPM-style)
+%
+% Generates a DCT basis set that models low-frequency drift below
+% 1/cutoffPeriod Hz. Follows the SPM convention (spm_dctmtx).
+%
+% The number of basis functions K is:
+%   K = floor(2 * duration / cutoffPeriod) + 1
+% where duration = T / fs.
+%
+% The k-th basis function (k = 0, 1, ..., K-1) is:
+%   C(n, k) = sqrt(2/T) * cos(pi * (2*n + 1) * k / (2*T))
+% with C(n, 0) = sqrt(1/T) (constant term).
+
+columns = {};
+names = {};
+
+duration = T / fs;
+
+% Number of DCT components: frequencies up to 1/cutoffPeriod Hz
+K = floor(2 * duration / cutoffPeriod) + 1;
+K = max(K, 1);  % At least the constant
+
+% Sample indices 0:T-1
+n = (0:T-1)';
+
+startK = 0;
+if ~includeConstant
+    startK = 1;
+end
+
+for k = startK:K-1
+    if k == 0
+        % DC component (constant)
+        basis = ones(T, 1) * sqrt(1/T);
+        names{end+1} = 'constant'; %#ok<AGROW>
+    else
+        % Cosine basis function
+        basis = sqrt(2/T) * cos(pi * (2*n + 1) * k / (2*T));
+        names{end+1} = sprintf('dct_%d', k); %#ok<AGROW>
+    end
+    columns{end+1} = basis; %#ok<AGROW>
+end
 
 end

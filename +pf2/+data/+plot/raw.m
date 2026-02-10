@@ -199,9 +199,11 @@ else
     RawMin=0;
 end
 
+sty = pf2_base.plot.PlotStyle.getDefault();
+
 if(~isempty(channels))
     if(nargout>0)
-        figHandle=figure(); 
+        figHandle=figure('Color', sty.FigureColor);
     else
         %figure();
     end
@@ -276,11 +278,11 @@ for optIdx = 1:length(channels)
     
 
     rawToPlot=fNIR.raw(:,idx2plot);
-    minH=plot([tmin,tmax],[RawMin,RawMin],'k','HandleVisibility','off');
+    minH=plot([tmin,tmax],[RawMin,RawMin],'-','Color',sty.ForegroundColor,'HandleVisibility','off');
     set(minH,'Tag',sprintf('Min Device Intensity'));
     hold on;
     if(~isempty(RawMax))
-        maxH=plot([tmin,tmax],[RawMax,RawMax],'--k','HandleVisibility','off');
+        maxH=plot([tmin,tmax],[RawMax,RawMax],'--','Color',sty.ForegroundColor,'HandleVisibility','off');
         set(maxH,'Tag',sprintf('Max Device Intensity'));
     end
     
@@ -309,17 +311,17 @@ for optIdx = 1:length(channels)
     
     ylim(ylimit);
     if(~isempty(showMarkers))
-        maxH=plot([tmean],ylimit(2),'color',[1,1,1],'HandleVisibility','off');
-        minH=plot([tmean],ylimit(1),'color',[1,1,1],'HandleVisibility','off');
+        maxH=plot([tmean],ylimit(2),'color',sty.FigureColor,'HandleVisibility','off');
+        minH=plot([tmean],ylimit(1),'color',sty.FigureColor,'HandleVisibility','off');
         for i=1:length(showMarkers)
-            
+
             mrkName=sprintf('Mrk%i',showMarkers(i));
             if(numMarkers(i)<tooManyMarkers||plotTonsOfMarkers)
-                yLabelHeight=(1:length(showMarkers))*0.05+0.15;
+                yLabelHeight=min((1:length(showMarkers))*0.05+0.15, 0.95);
                 if(numMarkers(i)<tooManyLabels)
-                	pf2_base.external.vline(curMarkers(showMarkersIdx==i),'k',mrkName,yLabelHeight(i));
+                	pf2_base.external.vline(curMarkers(showMarkersIdx==i),sty.ForegroundColor,mrkName,yLabelHeight(i));
                 else
-                    pf2_base.external.vline(curMarkers(showMarkersIdx==i),'k','',yLabelHeight(i),'lineTags',mrkName);
+                    pf2_base.external.vline(curMarkers(showMarkersIdx==i),sty.ForegroundColor,'',yLabelHeight(i),'lineTags',mrkName);
                     if(~printOnce)
                         fprintf('Marker %i has too many instances to plot labels\n',showMarkers(i));
                         flagOnce=true;
@@ -366,6 +368,9 @@ end
 % Add figure title from processingInfo if available
 pf2_base.plot.addProcessingInfoTitle(fNIR, gcf());
 
+% Apply theme styling
+sty.applyToFigure(gcf());
+
 % Save figure if requested
 if ~isempty(savePath)
     fig = gcf();
@@ -387,7 +392,8 @@ function txt = myupdatefcn(pointDataTip, event_obj)
      txt={selectedObjectTag};
     elseif(~isempty(selectedObjectTag))
          txt={sprintf('%s\nt=%.2f, y=%.2f',selectedObjectTag,pos(1),pos(2))};
-
+ else
+     txt={''};
  end
  
 for i=1:length(txt)

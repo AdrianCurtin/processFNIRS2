@@ -546,6 +546,13 @@ else
 
 end
 
+% Attach Device object for self-describing data
+try
+    fNIR.device = pf2.Device.load(fNIR);
+catch
+    % Unknown probe — skip device attachment
+end
+
 
 %clear linecount line times count;
 

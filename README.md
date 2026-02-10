@@ -10,11 +10,13 @@ processFNIRS2 is a modular MATLAB toolbox designed for processing functional Nea
   - Hitachi ETG-4000
   - NIRx systems
 - **Customizable processing methods** that can be configured and saved
+- **Motion correction**: TDDR, SMAR, wavelet, spline interpolation (Scholkmann 2010)
+- **Filtering**: FIR bandpass, Butterworth IIR bandpass/lowpass/highpass
 - **Robust visualization tools** including:
   - Time series plots
   - Topographic mapping
   - Interactive data exploration via exploreFNIRS
-- **Channel quality assessment** and artifact rejection capabilities
+- **Channel quality assessment** with Scalp Coupling Index (SCI), power spectrum analysis, and artifact rejection
 - **Region-of-Interest (ROI) analysis** support
 - **Statistical analysis** with LME models integrated in exploreFNIRS
 - **Data export** in various formats including NIR, SNIRF, CSV and MATLAB formats
@@ -48,9 +50,13 @@ myprocesseddata = processFNIRS2(mydata);
 pf2.data.plot.oxy(myprocesseddata);
 pf2.data.plot.roi(myprocesseddata);
 
-% Export data
+% Export single file
 pf2.export.asNIR(myprocesseddata, 'myexport.nir');
 pf2.export.asSNIRF(myprocesseddata, 'myexport.snirf');
+
+% Batch export cell array to directory
+pf2.export.asSNIRF(allData, 'output/');
+pf2.export.asSNIRF(allData, 'output/', 'Dir1', 'Group', 'Prefix', {'SubjectID'});
 
 % Explore and analyze data
 exploreFNIRS(myprocesseddata);
@@ -73,7 +79,10 @@ The toolbox provides various functions for manipulating fNIRS data:
 - `pf2.data.resample`: Resample or average fNIRS data
 - `pf2.data.setT0`: Shift time to align with experiment start
 - `pf2.data.split`: Split fNIRS segments based on time points
+- `pf2.data.defineBlocks`: Convert markers to block struct array
+- `pf2.data.extractBlocks`: Extract fNIRS segments by block definitions
 - `pf2.data.plot`: Visualize fNIRS data (Oxy, Raw, ROI, AuxData)
+- `pf2.qc`: Channel quality assessment (SCI, power spectrum, QC plots)
 - `pf2.export`: Export data to NIR or SNIRF formats
 
 ### Method Configuration
@@ -161,9 +170,14 @@ pf2.data.plot.auxData(myprocesseddata);               % Plot auxiliary data
 % Plots automatically show device, method, and DPF info in title
 % e.g., "fNIR2000C | x5_TDDR | DPF(age=25)"
 
-% Export data to different formats
+% Export single file
 pf2.export.asNIR(myprocesseddata, 'myexport.nir');
 pf2.export.asSNIRF(myprocesseddata, 'myexport.snirf');
+
+% Batch export cell array to a directory
+pf2.export.asSNIRF(allData, 'output/');                          % Flat
+pf2.export.asSNIRF(allData, 'output/', 'Dir1', 'Group');         % Subdirs from .info
+pf2.export.asSNIRF(allData, 'output/', 'Prefix', {'SubjectID'}); % Named files
 ```
 
 ### Processing Metadata
@@ -175,6 +189,103 @@ myprocesseddata.processingInfo.rawMethod      % e.g., 'x5_TDDR'
 myprocesseddata.processingInfo.deviceName     % e.g., 'fNIR2000C'
 myprocesseddata.processingInfo.timestamp      % When processed
 ```
+
+### Quality Control
+Assess signal quality before or after processing:
+```matlab
+% Scalp Coupling Index — measures optode-scalp contact quality
+sciResult = pf2.qc.sci(data);
+pf2.qc.plotQuality(sciResult);
+
+% Power spectrum — detect cardiac/respiratory peaks
+psdResult = pf2.qc.powerSpectrum(data, 'Signal', 'raw');
+pf2.qc.plotQuality(psdResult, 'Layout', 'tiled');
+```
+
+### Block Definition & Extraction
+Define and extract experimental blocks from marker events:
+```matlab
+% Define blocks from marker codes with 30-second duration
+blocks = pf2.data.defineBlocks(data, [49, 50], 30, ...
+    'ConditionMap', {49, 'Easy'; 50, 'Hard'});
+
+% Import per-trial behavioral data from CSV
+blocks = pf2.data.importBlockInfo(blocks, 'trial_data.csv', ...
+    'MarkerCode', [49, 50]);
+
+% Extract fNIRS segments aligned to block onset
+segments = pf2.data.extractBlocks(data, blocks, ...
+    'PreTime', 10, 'SetT0', true, 'CopyInfo', true);
+
+% Feed directly into Experiment
+ex = exploreFNIRS.core.Experiment(segments);
+```
+
+### Metadata Import
+Import subject-level and block-level metadata from CSV/Excel:
+```matlab
+% Subject demographics (one row per subject, matched by SubjectID)
+allData = pf2.data.importInfo(allData, 'demographics.csv', 'SubjectID');
+
+% Block-level behavioral data (positional or key-based matching)
+blocks = pf2.data.importBlockInfo(blocks, 'behavior.csv', ...
+    'MarkerCode', 49);  % only apply to task blocks
+```
+
+See `examples/scripts/example_import_blocks.m` for a complete walkthrough, or `examples/scripts/tutorial_batch_workflow.m` for a realistic multi-subject workflow with directory import, CSV metadata merge, batch processing, and batch export.
+
+### GLM Analysis
+An alternative to the epoch/average approach. The GLM keeps continuous recordings intact and fits HRF-convolved regressors per subject:
+```matlab
+% 1. Define blocks and convert to GLM events
+blocks = pf2.data.defineBlocks(data, [49, 50], 30, ...
+    'ConditionMap', {49, 'Easy'; 50, 'Hard'});
+events = pf2.data.blocksToEvents(blocks);
+
+% 2. Build design matrix (with drift regressors)
+[X, names] = pf2_base.fnirs.buildDesignMatrix(data.time, data.fs, events);
+
+% 3. Fit GLM per biomarker
+hboResults = pf2_base.fnirs.fitGLM(data.HbO, X, names);
+hbrResults = pf2_base.fnirs.fitGLM(data.HbR, X, names);
+
+% 4. Package betas for Experiment
+segments = pf2.data.betasToSegments(hboResults, data, ...
+    'BiomarkerResults', struct('HbO', hboResults, 'HbR', hbrResults), ...
+    'Conditions', {'Easy', 'Hard'});
+
+% 5. Group analysis (no baseline correction or resampling for betas)
+ex = exploreFNIRS.core.Experiment(allSegments);
+ex.settings.useBaseline = false;
+ex.settings.resampleRate = 0;
+ex.groupby({'Condition'});
+ex.aggregate();
+fig = ex.plotBar('Biomarker', 'HbO', 'ShowIndividual', true);
+```
+
+For a streamlined workflow, `GLMExperiment` wraps the entire pipeline into a single class:
+```matlab
+% GLMExperiment: processing + GLM + group analysis in one object
+[subjects, blockDefs] = pf2.import.sampleData.experiment('blocks');
+gx = exploreFNIRS.core.GLMExperiment(subjects, blockDefs);
+gx.glm.conditions = {'Easy', 'Hard'};
+gx.glm.auxFields = {'heartRate'};  % also fit GLM on heart rate
+gx.fit();
+
+% All Experiment methods work on beta data
+gx.groupby({'Condition'});
+gx.aggregate();
+fig = gx.plotBar('Biomarker', 'HbO', 'ShowIndividual', true);
+
+% Topographic LME: F-statistics on 3D brain surface
+[fig, results] = gx.plotTopoLME('Biomarkers', {'HbO'}, 'ShowIntercept', false);
+
+% Per-subject inspection and direct export
+gx.plotDesignMatrix(1);
+T = gx.betaTable('IncludeStats', true);
+```
+
+See `examples/scripts/example_glm_analysis.m` for a complete walkthrough, or `examples/scripts/example_glm_advanced.m` for the manual step-by-step pipeline with first-level contrasts.
 
 ### Advanced Analysis with exploreFNIRS
 For group-level data exploration and statistical analysis, use the exploreFNIRS module:
@@ -189,34 +300,72 @@ exploreFNIRS(allData);
 ex = exploreFNIRS.core.Experiment(allData);
 ex.select('Group', {'Control', 'Treatment'});
 ex.groupby({'Group', 'Condition'});
+
+% Configure preprocessing
+ex.settings.baseline = [-5, 0];
+ex.settings.resampleRate = 1;
+ex.settings.useBaseline = true;
+
+% Visualize time settings before aggregating
+fig = ex.plotExperimentTimeline();
+
 ex.aggregate();
+
+% Branch a new analysis from the same data and settings
+ex2 = exploreFNIRS.core.Experiment(ex);
+ex2.select('Condition', 'Hard');
+ex2.groupby({'Group'});
 
 % Headless plots
 fig = ex.plotTemporal('Biomarkers', {'HbO'}, 'Channels', 1:5);
-fig = ex.plotBar('Biomarker', 'HbO', 'TimeWindow', [5, 25]);
+fig = ex.plotBar('Biomarker', 'HbO', 'ShowIndividual', true);
+[fig, stats] = ex.plotLME('Biomarkers', {'HbO'});
+[fig, stats] = ex.plotScatter('InfoVar', 'Age', 'Biomarkers', {'HbO'});
 
 % ROI-based plotting
 fig = ex.plotTemporal('Biomarkers', {'HbO'}, 'ROIs', 'all');
 
-% Connectivity analysis
+% Advanced visualization
+fig = ex.plotTopo('Biomarker', 'HbO', 'Time', 15);
+fig = ex.plotHeatmap('Biomarker', 'HbO');
+fig = ex.plotComposite(panels, 'Layout', [1, 3]);
+
+% Connectivity analysis (symmetric and directed)
 connResults = ex.connectivity('Method', 'pearson');
+connDirected = ex.connectivity('Method', 'granger');
+intraROI = ex.intraROI('Method', 'pearson');
+interROI = ex.interROI('Method', 'pearson');
+
+% Dynamic functional connectivity with brain states
+dfc = exploreFNIRS.connectivity.computeDynamicFC(data, 'WindowSize', 30);
+states = exploreFNIRS.connectivity.detectStates(dfc, 'K', 3);
 
 % Hyperscanning analysis
 hsResults = ex.hyperscanning('PairBy', 'Dyad', 'Method', 'coherence');
+
+% Standalone statistical analysis (no visualization)
+results = ex.statsFitLME('Biomarkers', {'HbO'}, 'Channels', 1:5);
+T = ex.statsSummarize(results, 'Type', 'anova', 'Format', 'apa');
+cr = ex.statsRunContrasts(results, 'FDRThreshold', 0.05);
 
 % Export
 longTable = ex.exportLong();
 ```
 
 exploreFNIRS features:
-- **Scriptable Experiment class** for complete headless group analysis
+- **Scriptable Experiment class** for complete headless group analysis with copy constructor for branching analyses
+- **Timeline visualization** (`plotExperimentTimeline`) shows baseline, task, and resample settings before processing
 - Group-level analysis with hierarchical averaging
-- **Connectivity analysis** with 5 coupling methods (Pearson, Spearman, xcorr, coherence, wavelet coherence)
-- **Hyperscanning** with subject pairing, dyad/group computation, and permutation testing
+- **Connectivity analysis** with 7 coupling methods (Pearson, Spearman, xcorr, coherence, wavelet coherence, Granger causality, transfer entropy)
+- **Dynamic FC** — sliding-window connectivity with k-means brain state detection
+- **ROI connectivity** — intra-ROI and inter-ROI coupling analysis with chord/radar visualization
+- **Hyperscanning** with subject pairing, dyad/group computation, permutation testing, and inter-brain topographic display
 - **Block-wise analysis** for connectivity and hyperscanning
+- **Statistical analysis module** (`+stats/`) — standalone LME fitting, post-hoc contrasts with FDR, publication-ready summaries (ANOVA, coefficients, fit, APA format)
 - Linear mixed-effects modeling with Satterthwaite degrees of freedom
-- Visualization: temporal plots, bar charts, scatter plots, topographic maps
-- **Headless plotting** with ROI support (plotTemporal, plotBar)
+- **Publication-ready visualization**: temporal plots, bar charts, scatter plots, topographic maps, heatmaps, composite multi-panel figures, directed connectivity diagrams, chord diagrams, dynamic FC plots
+- **Headless plotting** with ROI support (plotTemporal, plotBar, plotTopo, plotHeatmap, plotComposite, plotLME, plotScatter)
+- **Centralized plot styling** via PlotStyle with publication/presentation presets
 - FDR correction: `exploreFNIRS.fx.performFDR()`
 - Data export: `exploreFNIRS.export.mergeGbyTablesWide()` / `mergeGbyTablesLong()`
 
@@ -246,7 +395,7 @@ pf2.settings.selectDevice('fNIR_Devices_fNIR1200_16ch.cfg');
 - `+exploreFNIRS/`: Group analysis (core, connectivity, coupling, hyperscanning, plot, export, fx, dataset)
 - `base_functions/`: Utility functions (legacy)
 - `GUI/`: User interface components (legacy, GUIDE-based)
-- `functions/`: Signal processing algorithms (filters, motion correction, etc.)
+- `functions/`: Signal processing algorithms (TDDR, SMAR, wavelet, spline, Butterworth IIR, FIR, SCI rejection, SSR, Takizawa)
 - `devices/`: Device configuration files (.cfg)
 - `sampledata/`: Example datasets
 
@@ -258,14 +407,19 @@ processFNIRS2 is laid out in the following manner:
   - resample: Resample or average fNIRS data
   - setT0: Shift fNIRS time to match start of experiment
   - split: Split fNIRS segment based on different input times
+  - defineBlocks: Convert markers to block struct array
+  - extractBlocks: Extract fNIRS segments by block definitions
+  - blocksToEvents: Convert blocks to GLM event structs
+  - betasToSegments: Package GLM betas for Experiment
   - **plot**: Functions to visualize fNIRS data
     - auxData: Plot auxiliary data channels
     - oxy: Plot oxygenation data
     - roi: Plot Region of Interest data
     - raw: Plot raw intensity data
-  - **export**: Functions to export fNIRS data
-    - asNIR: Export to NIR file format
-    - asSNIRF: Export to SNIRF file format
+  - **export**: Functions to export fNIRS data (single file or batch)
+    - export: Auto-detect format from extension; batch with `'Format'` param
+    - asNIR: Export to NIR file format (single or batch)
+    - asSNIRF: Export to SNIRF file format (single, multi-run, or batch)
 - **gui**: Shortcut for accessing the GUI
 - **help**: Access to help documentation
 - **import**: Functions to import fNIRS files
@@ -277,6 +431,10 @@ processFNIRS2 is laid out in the following manner:
 - **methods**: Functions to change and modify processing methods
   - oxy: Oxy conversion pipeline methods
   - raw: Raw domain pipeline methods
+- **qc**: Channel quality assessment
+  - sci: Scalp Coupling Index
+  - powerSpectrum: Power spectral density with peak detection
+  - plotQuality: QC visualization
 - **process**: Process fNIR segment data
   - processOxy: Run the Oxy Pipeline only
   - processRaw: Run the Raw Pipeline only

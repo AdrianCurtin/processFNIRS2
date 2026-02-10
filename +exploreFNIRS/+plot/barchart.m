@@ -877,20 +877,14 @@ for sH=1:length(subplotHandles)
             nullMdlstring=sprintf('%s~1+(1|SubjectID)',varName);
             curChartLME_ML=fitlme(mergedTables{sH},lmeString,'FitMethod','ML','CheckHessian',true,'DummyVarCoding',dummyCodeStr);
             nullChartLME=fitlme(mergedTables{sH},nullMdlstring,'FitMethod','ML','CheckHessian',true,'DummyVarCoding',dummyCodeStr);
-            nullCompare{sH}=compare(curChartLME_ML,nullChartLME);
+            nullCompare{sH}=compare(nullChartLME,curChartLME_ML);
             pVal=nullCompare{sH}.pValue(end);
-            if(pVal>0.05)
-                nullCompareStr{sH}='Model is marginally worse than naive model';
+            if(pVal<0.05 && ~isnan(pVal))
+                nullCompareStr{sH}='Model is significantly better than naive model';
             elseif(~isnan(pVal))
-                nullCompareStr{sH}='Model is significantly worse than naive model';
+                nullCompareStr{sH}='Model is not significantly better than naive model';
             else
-                nullCompare{sH}=compare(nullChartLME,curChartLME_ML);
-                pVal=nullCompare{sH}.pValue(end);
-                if(pVal>0.05)
-                    nullCompareStr{sH}='Model is marginally better than naive model';
-                else
-                    nullCompareStr{sH}='Model is significantly better than naive model';
-                end
+                nullCompareStr{sH}='Model comparison inconclusive';
             end
             
             switch (exSettings.ChannelMode)
@@ -946,40 +940,40 @@ for sH=1:length(subplotHandles)
                 
                 
                 
-                ExFNIRS.curChartModelsANOVACoefficents_pval{curRowName,anovaNames}= ExFNIRS.curChartModelsANOVA{sH}.pValue';
-                ExFNIRS.curChartModelsANOVACoefficents_Fstat{curRowName,anovaNames}=ExFNIRS.curChartModelsANOVA{sH}.FStat';
+                ExFNIRS.curChartModelsANOVACoefficents_pval{curRowName,anovaNames}= ExFNIRS.curChartModelsANOVA{sH}.pValue(:)';
+                ExFNIRS.curChartModelsANOVACoefficents_Fstat{curRowName,anovaNames}=ExFNIRS.curChartModelsANOVA{sH}.FStat(:)';
                 if(ismember('DF2',properties(ExFNIRS.curChartModelsANOVA{sH})))
-                    ExFNIRS.curChartModelsANOVACoefficents_df2{curRowName,anovaNames}=ExFNIRS.curChartModelsANOVA{sH}.DF2';
-                    ExFNIRS.curChartModelsANOVACoefficents_df1{curRowName,anovaNames}=ExFNIRS.curChartModelsANOVA{sH}.DF1';
+                    ExFNIRS.curChartModelsANOVACoefficents_df2{curRowName,anovaNames}=ExFNIRS.curChartModelsANOVA{sH}.DF2(:)';
+                    ExFNIRS.curChartModelsANOVACoefficents_df1{curRowName,anovaNames}=ExFNIRS.curChartModelsANOVA{sH}.DF1(:)';
                 else
-                    ExFNIRS.curChartModelsANOVACoefficents_df1{curRowName,anovaNames}=ExFNIRS.curChartModelsANOVA{sH}.DF';
-                    ExFNIRS.curChartModelsANOVACoefficents_df2{curRowName,anovaNames}=zeros(size(ExFNIRS.curChartModelsANOVA{sH}.DF'));
+                    ExFNIRS.curChartModelsANOVACoefficents_df1{curRowName,anovaNames}=ExFNIRS.curChartModelsANOVA{sH}.DF(:)';
+                    ExFNIRS.curChartModelsANOVACoefficents_df2{curRowName,anovaNames}=zeros(size(ExFNIRS.curChartModelsANOVA{sH}.DF(:)'));
                 end
-                
-                
-                
-                
-                
-                ExFNIRS.curChartModelsCoefficents_pval{curRowName,varNames}=ExFNIRS.curChartModelsCoefficents{sH}.pValue';
-                ExFNIRS.curChartModelsCoefficents_tstat{curRowName,varNames}=ExFNIRS.curChartModelsCoefficents{sH}.tStat';
-                ExFNIRS.curChartModelsCoefficents_df{curRowName,varNames}=ExFNIRS.curChartModelsCoefficents{sH}.DF';
+
+
+
+
+
+                ExFNIRS.curChartModelsCoefficents_pval{curRowName,varNames}=ExFNIRS.curChartModelsCoefficents{sH}.pValue(:)';
+                ExFNIRS.curChartModelsCoefficents_tstat{curRowName,varNames}=ExFNIRS.curChartModelsCoefficents{sH}.tStat(:)';
+                ExFNIRS.curChartModelsCoefficents_df{curRowName,varNames}=ExFNIRS.curChartModelsCoefficents{sH}.DF(:)';
                 ExFNIRS.curChartModels_ch(sH)=subplotGby{sH}.curCh;
             else
                 curBioM=subplotGby{sH}.curBioM{1};
                 curRowName=sprintf('%s_%s',chName,curBioM);
-                ExFNIRS.curChartModelsCoefficents_pval{curRowName,varNames}=ExFNIRS.curChartModelsCoefficents{sH}.pValue';
-                ExFNIRS.curChartModelsCoefficents_tstat{curRowName,varNames}=ExFNIRS.curChartModelsCoefficents{sH}.tStat';
-                ExFNIRS.curChartModelsCoefficents_df{curRowName,varNames}=ExFNIRS.curChartModelsCoefficents{sH}.DF';
-                
-                
-                ExFNIRS.curChartModelsANOVACoefficents_pval{curRowName,anovaNames}=ExFNIRS.curChartModelsANOVA{sH}.pValue';
-                ExFNIRS.curChartModelsANOVACoefficents_Fstat{curRowName,anovaNames}=ExFNIRS.curChartModelsANOVA{sH}.FStat';
+                ExFNIRS.curChartModelsCoefficents_pval{curRowName,varNames}=ExFNIRS.curChartModelsCoefficents{sH}.pValue(:)';
+                ExFNIRS.curChartModelsCoefficents_tstat{curRowName,varNames}=ExFNIRS.curChartModelsCoefficents{sH}.tStat(:)';
+                ExFNIRS.curChartModelsCoefficents_df{curRowName,varNames}=ExFNIRS.curChartModelsCoefficents{sH}.DF(:)';
+
+
+                ExFNIRS.curChartModelsANOVACoefficents_pval{curRowName,anovaNames}=ExFNIRS.curChartModelsANOVA{sH}.pValue(:)';
+                ExFNIRS.curChartModelsANOVACoefficents_Fstat{curRowName,anovaNames}=ExFNIRS.curChartModelsANOVA{sH}.FStat(:)';
                 if(ismember('DF2',properties(ExFNIRS.curChartModelsANOVA{sH})))
-                    ExFNIRS.curChartModelsANOVACoefficents_df2{curRowName,anovaNames}=ExFNIRS.curChartModelsANOVA{sH}.DF2';
-                    ExFNIRS.curChartModelsANOVACoefficents_df1{curRowName,anovaNames}=ExFNIRS.curChartModelsANOVA{sH}.DF1';
+                    ExFNIRS.curChartModelsANOVACoefficents_df2{curRowName,anovaNames}=ExFNIRS.curChartModelsANOVA{sH}.DF2(:)';
+                    ExFNIRS.curChartModelsANOVACoefficents_df1{curRowName,anovaNames}=ExFNIRS.curChartModelsANOVA{sH}.DF1(:)';
                 else
-                    ExFNIRS.curChartModelsANOVACoefficents_df1{curRowName,anovaNames}=ExFNIRS.curChartModelsANOVA{sH}.DF';
-                    ExFNIRS.curChartModelsANOVACoefficents_df2{curRowName,anovaNames}=zeros(size(ExFNIRS.curChartModelsANOVA{sH}.DF'));
+                    ExFNIRS.curChartModelsANOVACoefficents_df1{curRowName,anovaNames}=ExFNIRS.curChartModelsANOVA{sH}.DF(:)';
+                    ExFNIRS.curChartModelsANOVACoefficents_df2{curRowName,anovaNames}=zeros(size(ExFNIRS.curChartModelsANOVA{sH}.DF(:)'));
                 end
                 
                 ExFNIRS.curChartModels_ch(sH)=subplotGby{sH}.curCh;

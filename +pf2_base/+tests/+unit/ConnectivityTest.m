@@ -624,6 +624,293 @@ classdef ConnectivityTest < matlab.unittest.TestCase
                 'exploreFNIRS:connectivity:computeMatrix');
         end
 
+        %% normalizeResult Tests
+
+        function testNormalizeResultPassthrough(testCase)
+            % Single-subject result with .matrix should pass through unchanged
+            rng(42);
+            data = createSyntheticSubject(testCase, 'correlated');
+            original = exploreFNIRS.connectivity.computeMatrix(data, ...
+                'Method', 'pearson', 'Biomarker', 'HbO');
+
+            normalized = exploreFNIRS.connectivity.normalizeResult(original);
+
+            testCase.verifyEqual(normalized.matrix, original.matrix);
+            testCase.verifyEqual(normalized.pmatrix, original.pmatrix);
+        end
+
+        function testNormalizeResultConvertsGroupFormat(testCase)
+            % Group result with .Mean but no .matrix should get .matrix from .Mean
+            groupResult = struct( ...
+                'Mean', eye(3), ...
+                'SD', zeros(3), ...
+                'N', 5, ...
+                'label', 'TestGroup', ...
+                'method', 'pearson', ...
+                'biomarker', 'HbO', ...
+                'channels', 1:3, ...
+                'labels', {{'Left','Center','Right'}}, ...
+                'useROI', true);
+
+            normalized = exploreFNIRS.connectivity.normalizeResult(groupResult);
+
+            testCase.verifyTrue(isfield(normalized, 'matrix'));
+            testCase.verifyEqual(normalized.matrix, eye(3));
+            testCase.verifyTrue(isfield(normalized, 'pmatrix'));
+            testCase.verifyTrue(isempty(normalized.pmatrix));
+        end
+
+        function testPlotMatrixAcceptsGroupResult(testCase)
+            % plotMatrix should accept a group result struct without error
+            groupResult = struct( ...
+                'Mean', rand(3) * 0.5, ...
+                'SD', rand(3) * 0.1, ...
+                'N', 5, ...
+                'label', 'TestGroup', ...
+                'method', 'pearson', ...
+                'biomarker', 'HbO', ...
+                'channels', 1:3, ...
+                'labels', {{'Left','Center','Right'}}, ...
+                'useROI', true);
+
+            fig = exploreFNIRS.connectivity.plotMatrix(groupResult, ...
+                'Visible', 'off');
+
+            testCase.verifyTrue(ishandle(fig));
+            close(fig);
+        end
+
+
+        %% alignMatrices Tests
+
+        function testAlignMatricesUnionMode(testCase)
+            % Union mode: master = [1,2,3,4], NaN where channels missing
+            results = cell(3, 1);
+            results{1} = makeConnResult([0.5, 0.3; 0.3, 0.5], [1, 2]);
+            results{2} = makeConnResult([0.6, 0.4; 0.4, 0.6], [2, 3]);
+            results{3} = makeConnResult([0.7, 0.2; 0.2, 0.7], [3, 4]);
+
+            [aligned, masterCh, ~, nValid] = ...
+                exploreFNIRS.connectivity.alignMatrices(results, 'union');
+
+            testCase.verifyEqual(masterCh, [1, 2, 3, 4]);
+            testCase.verifyEqual(size(aligned), [4, 4, 3]);
+
+            % Subject 1 has ch [1,2] -> positions 1,2 filled, 3,4 NaN
+            testCase.verifyEqual(aligned(1, 2, 1), 0.3);
+            testCase.verifyTrue(isnan(aligned(3, 4, 1)));
+
+            % Subject 2 has ch [2,3] -> positions 2,3 filled
+            testCase.verifyEqual(aligned(2, 3, 2), 0.4);
+            testCase.verifyTrue(isnan(aligned(1, 1, 2)));
+
+            % Subject 3 has ch [3,4]
+            testCase.verifyEqual(aligned(3, 4, 3), 0.2);
+
+            % nValid should reflect per-cell counts
+            testCase.verifyEqual(nValid(1, 1), 1);  % only subject 1 has ch1
+            testCase.verifyEqual(nValid(2, 2), 2);  % subjects 1 and 2 have ch2
+            testCase.verifyEqual(nValid(3, 3), 2);  % subjects 2 and 3 have ch3
+            testCase.verifyEqual(nValid(4, 4), 1);  % only subject 3 has ch4
+        end
+
+        function testAlignMatricesIntersectionMode(testCase)
+            % Intersection mode: only channels present in all subjects
+            results = cell(3, 1);
+            results{1} = makeConnResult(rand(3), [1, 2, 3]);
+            results{2} = makeConnResult(rand(3), [2, 3, 4]);
+            results{3} = makeConnResult(rand(3), [1, 3, 4]);
+
+            [~, masterCh, ~, ~] = ...
+                exploreFNIRS.connectivity.alignMatrices(results, 'intersection');
+
+            % Only channel 3 is in all three subjects
+            testCase.verifyEqual(masterCh, 3);
+        end
+
+        function testAlignMatricesThresholdMode(testCase)
+            % Threshold 0.5: channels in >= 50% of subjects
+            results = cell(3, 1);
+            results{1} = makeConnResult(rand(3), [1, 2, 3]);
+            results{2} = makeConnResult(rand(3), [2, 3, 4]);
+            results{3} = makeConnResult(rand(3), [1, 3, 4]);
+
+            [~, masterCh, ~, ~] = ...
+                exploreFNIRS.connectivity.alignMatrices(results, 0.5);
+
+            % Ch1: in 2/3, Ch2: in 2/3, Ch3: in 3/3, Ch4: in 2/3
+            % All >= 0.5*3=1.5, so all pass
+            testCase.verifyEqual(masterCh, [1, 2, 3, 4]);
+
+            % With threshold 1.0, same as intersection
+            [~, masterCh2, ~, ~] = ...
+                exploreFNIRS.connectivity.alignMatrices(results, 1.0);
+            testCase.verifyEqual(masterCh2, 3);
+
+            % With threshold 0.8: need >= 2.4, so only ch3 (3/3) passes
+            [~, masterCh3, ~, ~] = ...
+                exploreFNIRS.connectivity.alignMatrices(results, 0.8);
+            testCase.verifyEqual(masterCh3, 3);
+        end
+
+        function testAlignMatricesIdenticalChannels(testCase)
+            % All subjects have same channels -> same as direct stacking
+            rng(42);
+            m1 = rand(3); m1 = (m1 + m1') / 2;
+            m2 = rand(3); m2 = (m2 + m2') / 2;
+            results = cell(2, 1);
+            results{1} = makeConnResult(m1, [1, 2, 3]);
+            results{2} = makeConnResult(m2, [1, 2, 3]);
+
+            [aligned, masterCh, ~, nValid] = ...
+                exploreFNIRS.connectivity.alignMatrices(results, 'union');
+
+            testCase.verifyEqual(masterCh, [1, 2, 3]);
+            testCase.verifyEqual(size(aligned), [3, 3, 2]);
+            testCase.verifyEqual(aligned(:, :, 1), m1, 'AbsTol', 1e-10);
+            testCase.verifyEqual(aligned(:, :, 2), m2, 'AbsTol', 1e-10);
+            testCase.verifyEqual(nValid, 2 * ones(3, 3));
+        end
+
+        function testAlignHyperscanningVectors(testCase)
+            % Hyperscanning 'same' pairing with different channel sets
+            results = cell(3, 1);
+            results{1} = makeHyperResult([0.5; 0.3; 0.7], [1, 2, 3]);
+            results{2} = makeHyperResult([0.4; 0.6], [2, 4]);
+            results{3} = makeHyperResult([0.8; 0.1; 0.9], [1, 3, 4]);
+
+            [aligned, masterCh, ~, nValid] = ...
+                exploreFNIRS.connectivity.alignMatrices(results, 'union');
+
+            testCase.verifyEqual(masterCh, [1, 2, 3, 4]);
+            testCase.verifyEqual(size(aligned), [4, 1, 3]);
+
+            % Subject 1 has ch [1,2,3]
+            testCase.verifyEqual(aligned(1, 1, 1), 0.5);
+            testCase.verifyEqual(aligned(2, 1, 1), 0.3);
+            testCase.verifyEqual(aligned(3, 1, 1), 0.7);
+            testCase.verifyTrue(isnan(aligned(4, 1, 1)));
+
+            % Subject 2 has ch [2,4]
+            testCase.verifyTrue(isnan(aligned(1, 1, 2)));
+            testCase.verifyEqual(aligned(2, 1, 2), 0.4);
+            testCase.verifyEqual(aligned(4, 1, 2), 0.6);
+
+            % nValid counts
+            testCase.verifyEqual(nValid(1, 1), 2);  % ch1: subjects 1,3
+            testCase.verifyEqual(nValid(2, 1), 2);  % ch2: subjects 1,2
+            testCase.verifyEqual(nValid(4, 1), 2);  % ch4: subjects 2,3
+        end
+
+        function testConnectivityGroupsUnbalanced(testCase)
+            % End-to-end: subjects with different fchMask -> correct alignment
+            rng(42);
+            T = testCase.T;
+            fs = testCase.fs;
+
+            % Create 3 subjects with different good channels
+            s1 = createSyntheticSubject(testCase, 'correlated');
+            s1.fchMask = [1, 1, 1, 0, 0, 0, 0, 0];  % ch 1-3
+
+            s2 = createSyntheticSubject(testCase, 'correlated');
+            s2.fchMask = [0, 1, 1, 1, 0, 0, 0, 0];  % ch 2-4
+
+            s3 = createSyntheticSubject(testCase, 'correlated');
+            s3.fchMask = [1, 0, 1, 1, 0, 0, 0, 0];  % ch 1,3,4
+
+            % Build groups struct matching Experiment internal format
+            groups.label = 'TestGroup';
+            groups.gbyFNIRS = {s1, s2, s3};
+
+            % computeConnectivityGroups is a local function in Experiment.m,
+            % so test via computeMatrix + alignMatrices directly
+            subResults = cell(3, 1);
+            subResults{1} = exploreFNIRS.connectivity.computeMatrix(s1, ...
+                'Method', 'pearson', 'Biomarker', 'HbO');
+            subResults{2} = exploreFNIRS.connectivity.computeMatrix(s2, ...
+                'Method', 'pearson', 'Biomarker', 'HbO');
+            subResults{3} = exploreFNIRS.connectivity.computeMatrix(s3, ...
+                'Method', 'pearson', 'Biomarker', 'HbO');
+
+            % Verify different channel sets
+            testCase.verifyEqual(subResults{1}.channels, [1, 2, 3]);
+            testCase.verifyEqual(subResults{2}.channels, [2, 3, 4]);
+            testCase.verifyEqual(subResults{3}.channels, [1, 3, 4]);
+
+            % Union alignment
+            [aligned, masterCh, ~, nValid] = ...
+                exploreFNIRS.connectivity.alignMatrices(subResults, 'union');
+
+            testCase.verifyEqual(masterCh, [1, 2, 3, 4]);
+            testCase.verifyEqual(size(aligned, 1), 4);
+            testCase.verifyEqual(size(aligned, 2), 4);
+            testCase.verifyEqual(size(aligned, 3), 3);
+
+            % Ch2-Ch3 pair: present in subjects 1 and 2
+            testCase.verifyEqual(nValid(2, 3), 2);
+            % Ch1-Ch4 pair: present in subject 3 only
+            testCase.verifyEqual(nValid(1, 4), 1);
+
+            % Mean should be computable without error
+            meanMat = mean(aligned, 3, 'omitnan');
+            testCase.verifyEqual(size(meanMat), [4, 4]);
+
+            % Intersection alignment
+            [~, masterChInt, ~, ~] = ...
+                exploreFNIRS.connectivity.alignMatrices(subResults, 'intersection');
+            % Only ch3 is in all three subjects
+            testCase.verifyEqual(masterChInt, 3);
+        end
+
+        function testHyperscanningGroupUnbalanced(testCase)
+            % End-to-end: dyads with different channel counts
+            rng(42);
+            nDyads = 3;
+            T = testCase.T;
+            nCh = testCase.nChannels;
+
+            data = cell(nDyads * 2, 1);
+            for d = 1:nDyads
+                shared = randn(T, nCh) * 0.5;
+                for role = 1:2
+                    idx = (d-1)*2 + role;
+                    s = createSyntheticSubject(testCase, 'random');
+                    s.HbO = shared + randn(T, nCh) * 0.5;
+                    s.info.SubjectID = sprintf('S%d%d', d, role);
+                    s.info.DyadID = sprintf('D%02d', d);
+                    if role == 1
+                        s.info.Role = 'Speaker';
+                    else
+                        s.info.Role = 'Listener';
+                    end
+                    % Give each dyad slightly different channel masks
+                    mask = ones(1, nCh);
+                    mask(mod(d + role, nCh) + 1) = 0;  % reject one channel
+                    s.fchMask = mask;
+                    data{idx} = s;
+                end
+            end
+
+            pairs = exploreFNIRS.hyperscanning.pairSubjects(data);
+            testCase.verifyEqual(length(pairs), nDyads);
+
+            % Run with union alignment
+            result = exploreFNIRS.hyperscanning.computeGroup(data, pairs, ...
+                'Method', 'pearson', 'Biomarker', 'HbO', 'Align', 'union');
+
+            testCase.verifyTrue(isfield(result, 'Mean'));
+            testCase.verifyTrue(isfield(result, 'nValid'));
+            testCase.verifyEqual(length(result.dyads), nDyads);
+
+            % Run with intersection alignment
+            resultInt = exploreFNIRS.hyperscanning.computeGroup(data, pairs, ...
+                'Method', 'pearson', 'Biomarker', 'HbO', 'Align', 'intersection');
+
+            % Intersection should have fewer or equal channels
+            testCase.verifyLessThanOrEqual(length(resultInt.channels), ...
+                length(result.channels));
+        end
+
     end
 
 end
@@ -716,4 +1003,29 @@ function data = addROIData(data, T, roiNames)
     data.ROI.info = table(repmat({[1,2,3]}, nROIs, 1), ...
         'VariableNames', {'Channels'}, ...
         'RowNames', roiNames);
+end
+
+
+function result = makeConnResult(matrix, channels)
+    % Create a minimal connectivity result struct for alignment tests
+    result.matrix = matrix;
+    result.channels = channels;
+    result.labels = arrayfun(@(c) sprintf('Ch%d', c), channels, 'UniformOutput', false);
+    result.method = 'pearson';
+    result.biomarker = 'HbO';
+    result.useROI = false;
+end
+
+
+function result = makeHyperResult(values, channels)
+    % Create a minimal hyperscanning 'same' result struct for alignment tests
+    result.values = values(:);
+    result.channelsA = channels;
+    result.channelsB = channels;
+    result.labelsA = arrayfun(@(c) sprintf('Ch%d', c), channels, 'UniformOutput', false);
+    result.labelsB = arrayfun(@(c) sprintf('Ch%d', c), channels, 'UniformOutput', false);
+    result.method = 'pearson';
+    result.biomarker = 'HbO';
+    result.pairing = 'same';
+    result.useROI = false;
 end

@@ -132,9 +132,7 @@ for roiIdx=1:numROI
     curCh=fNIR.ROI.info.Optodes{roiIdx};
 
     for(optIdx=1:length(curCh))
-        optNum=probeInfo.ChannelList(curCh(optIdx));
-
-        optPos=probeInfo.OptLayout2D{optNum};
+        optPos=probeInfo.OptPos.subplot_layout{curCh(optIdx)};
 
         optPos([2])=1-optPos([2])-optPos([4]); %flips y vertical axis
 

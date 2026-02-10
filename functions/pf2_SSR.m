@@ -30,7 +30,7 @@ function [fNIR] = pf2_SSR(fNIR, method, numPCs)
 %
 % Example:
 %   data = pf2.import.importSNIRF('subject01.snirf', false);
-%   processed = processFNIRS2(data, 'ShowGUI', false);
+%   processed = processFNIRS2(data);
 %   corrected = pf2_SSR(processed, 'nearest');
 %
 % Notes:

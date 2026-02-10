@@ -68,6 +68,9 @@ if isempty(PF2) || ~isfield(PF2, 'myRawMethods')
     pf2_base.pf2_initialize();
 end
 
+% Sanitize method name for INI lookup
+methodName = pf2_base.cleanNameForINI(methodName);
+
 % Check method exists
 if ~ismember(methodName, PF2.myRawMethods.cfg.Sections)
     error('pf2:MethodNotFound', ...

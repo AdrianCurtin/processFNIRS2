@@ -118,17 +118,6 @@ if isfield(data.nirs, 'stim') && ~isempty(data.nirs.stim)
                 curMarkerData = [curMarkerData, curStim.data(:, 4:end)];
             end
             
-            % Add stimulus name as a column if needed
-            if isfield(curStim, 'name') && ~isempty(curStim.name)
-                stimName = repmat({curStim.name}, size(curMarkerData, 1), 1);
-                if ~iscell(stimName{1})
-                    % Add a column for the name if more than 3 columns
-                    if size(curMarkerData, 2) > 3
-                        curMarkerData = [curMarkerData, cell2mat(stimName)];
-                    end
-                end
-            end
-            
             markerArray = [markerArray; curMarkerData];
         end
     end
@@ -686,11 +675,14 @@ if isfield(fNIR, 'probeinfo')
     for i = 1:length(device.Probe)
         device.cfg.add(sprintf('Probe%i', i), device.Probe{i});
     end
-    
+
     setF.device = device;
 else
     fNIR.probeinfo = device;
 end
+
+% Attach Device object for self-describing data
+fNIR.device = pf2.Device.fromProbeInfo(device);
 
 
 % Load existing channel mask if available and not checking

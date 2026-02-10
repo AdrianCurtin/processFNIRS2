@@ -1,15 +1,27 @@
-function colors = getGroupColors(n)
+function colors = getGroupColors(n, colorSpec)
 % GETGROUPCOLORS Return distinguishable colors for group plotting
 %
 % Returns an [n x 3] matrix of RGB colors for use in grouped plots.
-% Uses a perceptually distinct 8-color palette for n <= 8, and falls
-% back to MATLAB's lines() colormap for larger n.
+% Uses a perceptually distinct 8-color palette by default for n <= 8,
+% and falls back to MATLAB's lines() colormap for larger n.
+%
+% Optionally accepts a color specification to override the default palette:
+% an [N x 3] RGB matrix, a colormap name string (resolved via
+% exploreFNIRS.helper.getColormap), or a function handle @(N) -> [N x 3].
 %
 % Syntax:
 %   colors = exploreFNIRS.core.getGroupColors(n)
+%   colors = exploreFNIRS.core.getGroupColors(n, [1 0 0; 0 0 1])
+%   colors = exploreFNIRS.core.getGroupColors(n, 'Set1')
+%   colors = exploreFNIRS.core.getGroupColors(n, @parula)
 %
 % Inputs:
-%   n - Number of groups (positive integer)
+%   n         - Number of groups (positive integer)
+%   colorSpec - (optional) Color specification:
+%               [] or omitted  — use default palette
+%               [M x 3] matrix — use directly (rows cycled if M < n)
+%               char/string    — colormap name (e.g. 'Set1', 'tab10')
+%               function_handle — @(N) returning [N x 3]
 %
 % Outputs:
 %   colors - [n x 3] matrix of RGB values in [0,1]
@@ -18,7 +30,16 @@ function colors = getGroupColors(n)
 %   colors = exploreFNIRS.core.getGroupColors(4);
 %   % colors is [4 x 3] with blue, red-orange, green, purple
 %
-% See also: exploreFNIRS.core.plotBar, exploreFNIRS.core.plotTemporal
+%   colors = exploreFNIRS.core.getGroupColors(4, 'Dark2');
+%   % colors is [4 x 3] from the Brewer Dark2 palette
+%
+% See also: exploreFNIRS.core.plotBar, exploreFNIRS.core.plotTemporal,
+%           exploreFNIRS.helper.getColormap
+
+    if nargin >= 2 && ~isempty(colorSpec)
+        colors = resolveColorSpec(colorSpec, n);
+        return;
+    end
 
     baseColors = [
         0.0000, 0.4470, 0.7410;  % blue
@@ -34,5 +55,29 @@ function colors = getGroupColors(n)
         colors = baseColors(1:n, :);
     else
         colors = lines(n);
+    end
+end
+
+
+function colors = resolveColorSpec(colorSpec, n)
+% Resolve a color specification to an [n x 3] RGB matrix
+    if isnumeric(colorSpec) && size(colorSpec, 2) == 3
+        % Direct RGB matrix — cycle if fewer rows than n
+        m = size(colorSpec, 1);
+        if m >= n
+            colors = colorSpec(1:n, :);
+        else
+            idx = mod((0:n-1)', m) + 1;
+            colors = colorSpec(idx, :);
+        end
+    elseif ischar(colorSpec) || isstring(colorSpec)
+        % Colormap name — resolve via getColormap
+        cmapFn = exploreFNIRS.helper.getColormap(char(colorSpec));
+        colors = cmapFn(n);
+    elseif isa(colorSpec, 'function_handle')
+        colors = colorSpec(n);
+    else
+        error('exploreFNIRS:core:getGroupColors', ...
+            'colorSpec must be an [N x 3] RGB matrix, colormap name, or function handle');
     end
 end

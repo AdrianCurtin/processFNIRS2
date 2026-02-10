@@ -1,22 +1,30 @@
-function export(data, filepath)
+function export(data, filepath, varargin)
 % EXPORT Auto-detect format and export fNIRS data to file
 %
 % Automatically detects the output format from the file extension and calls
 % the appropriate exporter. If no filepath is provided, opens a save dialog
 % for interactive selection.
 %
+% For batch export of a cell array to a directory, pass a directory path
+% and a 'Format' name-value pair to select the output format.
+%
 % Syntax:
 %   pf2.export.export(data, filepath)
 %   pf2.export.export(data)
-%   pf2.export(data, filepath)       % Package-level call
-%   pf2.export(data)                 % Interactive save dialog
+%   pf2.export.export(allData, 'output/', 'Format', 'snirf')  % Batch export
 %
 % Inputs:
-%   data     - fNIRS data structure (processed or raw)
-%   filepath - (optional) Output file path. Supported formats:
+%   data     - fNIRS data structure (processed or raw), or cell array for
+%              batch export
+%   filepath - (optional) Output file path or directory. Supported formats:
 %              .nir     - fNIR Devices/Biopac format
 %              .snirf   - SNIRF standardized format (recommended)
 %              If omitted, opens save dialog for selection.
+%
+% Name-Value Parameters (batch mode):
+%   'Format'  - Output format: 'snirf' or 'nir' (required for batch)
+%   All other name-value pairs are passed through to the format exporter
+%   (Dir1-Dir4, Prefix, Verbose, NormalizeRaw, StripExtraRawChannels).
 %
 % Example:
 %   % Process and export with auto-detected format
@@ -26,6 +34,9 @@ function export(data, filepath)
 %
 %   % Interactive save dialog
 %   pf2.export(processed);
+%
+%   % Batch export cell array to directory
+%   pf2.export(allData, 'output/', 'Format', 'snirf', 'Dir1', 'Group');
 %
 %   % Explicit format (bypasses auto-detect)
 %   pf2.export.asSNIRF(processed, 'output.snirf');
@@ -53,17 +64,53 @@ if nargin < 2 || isempty(filepath)
     filepath = fullfile(path, file);
 end
 
-% Get file extension
+% --- Batch mode: cell array + directory path ---
 [~, ~, ext] = fileparts(filepath);
+if iscell(data) && (isempty(ext) || ~ismember(lower(ext), {'.snirf', '.nir'}))
+    % Extract Format from varargin
+    fmt = '';
+    passArgs = {};
+    i = 1;
+    while i <= numel(varargin)
+        if (ischar(varargin{i}) || isstring(varargin{i})) ...
+                && strcmpi(varargin{i}, 'Format')
+            if i < numel(varargin)
+                fmt = lower(char(varargin{i+1}));
+                i = i + 2;
+                continue;
+            end
+        end
+        passArgs{end+1} = varargin{i}; %#ok<AGROW>
+        i = i + 1;
+    end
+
+    if isempty(fmt)
+        error('pf2:export:NoFormat', ...
+            'Batch export requires a ''Format'' parameter (''snirf'' or ''nir'').');
+    end
+
+    switch fmt
+        case 'snirf'
+            pf2.export.asSNIRF(data, filepath, passArgs{:});
+        case 'nir'
+            pf2.export.asNIR(data, filepath, passArgs{:});
+        otherwise
+            error('pf2:export:UnknownFormat', ...
+                'Unknown format: ''%s''. Supported: ''snirf'', ''nir''.', fmt);
+    end
+    return;
+end
+
+% --- Single-file mode ---
 ext = lower(ext);
 
 % Route to appropriate exporter based on extension
 switch ext
     case '.snirf'
-        pf2.export.asSNIRF(data, filepath);
+        pf2.export.asSNIRF(data, filepath, varargin{:});
 
     case '.nir'
-        pf2.export.asNIR(data, filepath);
+        pf2.export.asNIR(data, filepath, varargin{:});
 
     otherwise
         error('pf2:export:UnknownFormat', ...

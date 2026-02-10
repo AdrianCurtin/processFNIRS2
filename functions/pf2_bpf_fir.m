@@ -11,8 +11,12 @@ function [ dataf ] = pf2_bpf_fir( data,fs,lowF,highF,Nf,restoreMean,NaN_mode)
 % outputs -----------------------
 % dataf: filtered data
 %--------------------------------
-% bpf function designs lowpass FIR filter with the specified cut-off frequencies and length.
-% It filters the data columnwise as its output
+% Designs a bandpass FIR filter with the specified cut-off frequencies and
+% length. Filters the data columnwise.
+%
+% References:
+%   Oppenheim, A. V. & Schafer, R. W. (2010). Discrete-Time Signal
+%   Processing, 3rd ed. Prentice Hall. ISBN: 978-0131988422
 %--------------------------------
 
 if(nargin<7)

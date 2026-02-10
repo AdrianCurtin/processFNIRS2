@@ -235,9 +235,9 @@ else
     end
 
     if isempty(char(opts.Title))
-        sgtitle(sprintf('Power Spectrum (%s)', result.signal));
+        pf2_base.external.suptitle(sprintf('Power Spectrum (%s)', result.signal));
     else
-        sgtitle(char(opts.Title));
+        pf2_base.external.suptitle(char(opts.Title));
     end
 end
 

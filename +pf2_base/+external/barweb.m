@@ -41,6 +41,7 @@ addParameter(p, 'PlotViolin', false, @islogical);
 addParameter(p, 'ErrorIsY', false, @islogical);
 addParameter(p, 'HideBar', false, @islogical);
 addParameter(p, 'NegativeToInfinity', false, @islogical);
+addParameter(p, 'Axes', [], @(x) isempty(x) || isgraphics(x));
 
 parse(p, barvalues, errors, varargin{:});
 
@@ -97,6 +98,22 @@ negativeToInfinity = p.Results.NegativeToInfinity;
 % Created: October 18, 2005 (ver 1.0)
 % Updated: Dec 07, 2006 (ver 2.1)
 % Updated: July 21, 2008 (ver 2.3)
+
+% Resolve target axes
+if isempty(p.Results.Axes)
+    ax = gca;
+else
+    ax = p.Results.Axes;
+    axes(ax); %#ok<LAXES>
+end
+
+% Detect dark mode: use white borders/errorbars when background is dark
+axColor = get(ax, 'Color');
+if isnumeric(axColor) && mean(axColor) < 0.5
+    edgeClr = [1 1 1];
+else
+    edgeClr = [0 0 0];
+end
 
 % Get function arguments
 BottomError=true;
@@ -256,9 +273,9 @@ else
 	% Plot bars
     % (even if invisible, we use for the xpoints)
     if(~negativeToInfinity)
-        handles.bars = bar(barvalues, width,'edgecolor','k', 'linewidth', 2);
+        handles.bars = bar(barvalues, width,'edgecolor',edgeClr, 'linewidth', 2);
     else
-        handles.bars = bar(barvalues, width,'BaseValue', -10,'edgecolor','k', 'linewidth', 2);
+        handles.bars = bar(barvalues, width,'BaseValue', -10,'edgecolor',edgeClr, 'linewidth', 2);
     end
 	hold on
 	if ~isempty(bw_colormap)
@@ -267,7 +284,7 @@ else
 		colormap(jet);
 	end
 	if ~isempty(bw_legend) && ~strcmp(legend_type, 'axis')&&strcmp(legend_type,'plot')
-		handles.legend = legend(bw_legend, 'location', 'best', 'FontSize',12,'TextColor',[0,0,0]);
+		handles.legend = legend(bw_legend, 'location', 'best', 'FontSize',12,'TextColor',edgeClr);
 		legend boxoff;
 	else
 		handles.legend = [];
@@ -316,13 +333,13 @@ else
             end
             curColor=bw_colormap(newI,:);
         else
-            curColor=[0,0,0];
+            curColor=edgeClr;
         end
-        
+
         if(hideBar&&~reDrawAsReactangles&&~hideError)
-            handles.errors(i) = errorbar(x', barvalues(:,i), errorsLower(:,i), 'Color',curColor, 'linestyle', 'none', 'linewidth', 3); 
+            handles.errors(i) = errorbar(x', barvalues(:,i), errorsLower(:,i), 'Color',curColor, 'linestyle', 'none', 'linewidth', 3);
         elseif(~hideError)
-            handles.errors(i) = errorbar(x', barvalues(:,i), errorsLower(:,i),errorsUpper(:,i), 'k', 'linestyle', 'none', 'linewidth', 1); 
+            handles.errors(i) = errorbar(x', barvalues(:,i), errorsLower(:,i),errorsUpper(:,i), 'Color', edgeClr, 'linestyle', 'none', 'linewidth', 1); 
        
         end
 
@@ -336,7 +353,9 @@ else
             end
         end
         if(hideBar)
-            set(handles.bars(i),'Tag',bw_legend{i});
+            if(length(bw_legend)>=i&&~isempty(bw_legend{i}))
+                set(handles.bars(i),'Tag',bw_legend{i});
+            end
             set(handles.bars(i),'Visible',false);
 
             %Replot for non-zero based bars
@@ -381,7 +400,7 @@ else
                 if(plotViolin)
                     % Draw Violin plot with rectangles
                     if(useKSD)
-                        handles.Violin{ii,i}=fill([f{ii,i}*barW/2+x(ii);flipud(x(ii)-f{ii,i}*barW/2)],[u{ii,i};flipud(u{ii,i})],curColor,'EdgeColor',[0,0,0]);
+                        handles.Violin{ii,i}=fill([f{ii,i}*barW/2+x(ii);flipud(x(ii)-f{ii,i}*barW/2)],[u{ii,i};flipud(u{ii,i})],curColor,'EdgeColor',edgeClr);
                         set(handles.Violin{ii,i},'HandleVisibility','off');
                     else
 
@@ -444,9 +463,9 @@ else
                     curBarDataPoints=[xVals,curBarDataPoints];
 
                     if(noBarSummaryVal)
-                        scatter(curBarDataPoints(:,1),curBarDataPoints(:,2),2,'o','MarkerEdgeColor',curColor);
+                        scatter(curBarDataPoints(:,1),curBarDataPoints(:,2),2,'o','MarkerEdgeColor',curColor,'HandleVisibility','off');
                     else
-                        scatter(curBarDataPoints(:,1),curBarDataPoints(:,2),2,'o','MarkerEdgeColor',[0,0,0]);
+                        scatter(curBarDataPoints(:,1),curBarDataPoints(:,2),2,'o','MarkerEdgeColor',edgeClr,'HandleVisibility','off');
                     end
                 end
             end
@@ -456,7 +475,7 @@ else
         if(hideBar)
              if((~hideError&&~reDrawAsReactangles)||plotFeatureAsPoint)
 
-                 handles.statpoints(i)=scatter(x,barvalues(:,i),16,'d','filled','MarkerFaceColor',[0,0,0]);
+                 handles.statpoints(i)=scatter(x,barvalues(:,i),16,'d','filled','MarkerFaceColor',edgeClr);
                 if ~isempty(bw_colormap)                 
                      
                     if(noBarSummaryVal)
@@ -488,7 +507,7 @@ else
 	end
 	
 	if error_sides == 1
-		set(gca,'children', flipud(get(gca,'children')));
+		set(ax,'children', flipud(get(ax,'children')));
     end
 	
     if ymin>0||isnan(ymin)
@@ -526,7 +545,7 @@ else
 				text(xdata(j),  -0.03*ymax*1.1, bw_legend(i), 'Rotation', 60, 'fontsize', 12, 'HorizontalAlignment', 'right');
 			end
 		end
-		set(gca,'xaxislocation','top');
+		set(ax,'xaxislocation','top');
 	end
 	
 	if ~isempty(bw_title)
@@ -539,15 +558,18 @@ else
 		ylabel(bw_ylabel, 'fontsize',14);
 	end
 	
-	set(gca, 'xticklabel', groupnames, 'box', 'off', 'ticklength', [0 0], 'fontsize', 12, 'xtick',1:numgroups, 'linewidth', 2,'xgrid','off','ygrid','off');
+	set(ax, 'xticklabel', groupnames, 'box', 'off', 'ticklength', [0 0], 'fontsize', 12, 'xtick',1:numgroups, 'linewidth', 2,'xgrid','off','ygrid','off');
 	if ~isempty(gridstatus) && any(gridstatus == 'x')
-		set(gca,'xgrid','on');
+		set(ax,'xgrid','on');
 	end
 	if ~isempty(gridstatus) && any(gridstatus ==  'y')
-		set(gca,'ygrid','on');
+		set(ax,'ygrid','on');
 	end
-	
-	handles.ax = gca;
-	
-	hold off
+
+	handles.ax = ax;
+
+	% Only hold off if axes was not explicitly provided
+	if isempty(p.Results.Axes)
+		hold off
+	end
 end

@@ -73,9 +73,10 @@ function fig = plotWcoherence(result, varargin)
         dispRange = [min(freqs), max(freqs)];
     end
 
-    fig = figure('Visible', opts.Visible, ...
-        'Position', [100, 100, opts.SaveWidth, opts.SaveHeight], ...
-        'Color', 'w');
+    fig = pf2_base.plot.createFigure('Visible', opts.Visible, ...
+        'Width', opts.SaveWidth, 'Height', opts.SaveHeight, ...
+        'SavePath', opts.SavePath);
+    sty = pf2_base.plot.PlotStyle.getDefault();
     ax = axes('Parent', fig);
 
     % Plot coherence
@@ -161,16 +162,8 @@ function fig = plotWcoherence(result, varargin)
         title(ax, sprintf('Wavelet Coherence (mean = %.3f)', result.value));
     end
 
-    % Save
-    if ~isempty(opts.SavePath)
-        if ~isempty(which('pf2_base.plot.saveFigure'))
-            pf2_base.plot.saveFigure(fig, opts.SavePath, ...
-                opts.SaveWidth, opts.SaveHeight, opts.SaveDPI);
-        else
-            set(fig, 'PaperPositionMode', 'auto');
-            print(fig, opts.SavePath, '-dpng', sprintf('-r%d', opts.SaveDPI));
-        end
-        fprintf('Saved: %s\n', opts.SavePath);
-    end
+    sty.applyToAxes(ax);
+
+    pf2_base.plot.handleSave(fig, opts);
 
 end

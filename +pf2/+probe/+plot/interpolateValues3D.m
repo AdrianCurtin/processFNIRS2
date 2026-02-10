@@ -48,8 +48,10 @@ function [ h, imgOut ] = interpolateValues3D(varargin)
 %   'brainAlpha'        - Brain surface transparency (default: 1)
 %   'showColorbar'      - Display colorbar (default: true)
 %   'initCamPosition'   - Initial camera position (default: 'auto')
-%                         Options: 'auto', 'front', 'back', 'top', 'left', 'right', 'face'
-%                         Or numeric [x, y, z] position.
+%                         Options: 'auto', 'front', 'back', 'top', 'bottom',
+%                         'left', 'right', 'face', 'top-left', 'top-right',
+%                         'top-front', 'top-back', 'front-left', 'front-right',
+%                         'back-left', 'back-right', or numeric [x, y, z].
 %   'logScale'          - Use logarithmic color scale (default: false)
 %   'interpolateType'   - Interpolation method (default: 'nearest')
 %                         Options: 'nearest', 'linear', 'quadratic', 'cubic'
@@ -61,6 +63,8 @@ function [ h, imgOut ] = interpolateValues3D(varargin)
 %   'showScattering'    - Show light scattering paths (default: false)
 %   'optodeLines'       - Show optode direction lines (default: false)
 %   'animated'          - Optimize for animation (default: false)
+%   'voxelLighting'     - Lighting style for voxel brain (default: 'none')
+%                         Options: 'none', 'realistic', 'dramatic', 'clinical'
 %
 % Outputs:
 %   h      - Handle to the axes containing the visualization
@@ -89,7 +93,6 @@ function [ h, imgOut ] = interpolateValues3D(varargin)
 %
 % See also: pf2.probe.plot.showProbe3D, pf2.probe.plot.interpolateValues,
 %           pf2.probe.plot.imageValues, exploreFNIRS
-tic
 isStructOrEmpty=@(x) isstruct(x)||isempty(x);
 isStringOrChar=@(x)isstring(x)||ischar(x);
 
@@ -97,10 +100,10 @@ validAxesHandle= @(x) isa(x,'matlab.graphics.axis.Axes')&&isvalid(x);
 validScalarPosNumOr0 = @(x) isnumeric(x) && x>=0;
 validScalarPosNum = @(x) isnumeric(x) && x>0;
 validScalarPosNumOrNan = @(x) isnumeric(x) && (x>0||isnan(x));
-validI1020Label = @(x) islogical(x) || isStringOrChar(x);
+validI1020Label = @(x) islogical(x) || isStringOrChar(x) || iscell(x);
 validBrodmann = @(x) islogical(x) || isnumeric(x)&&all(x<=55)&&all(x>0);
 validColor = @(x) (ischar(x) && length(x) == 1) || (isnumeric(x) && length(x) == 3) || isempty(x);
-validFnirs = @(x) isStructOrEmpty(x);
+validFnirs = @(x) isStructOrEmpty(x) || iscell(x);
 %validColorList = @(x) validColor(x) || all(arrayfun(validColor, x));
 
 defaultInterpolateType = 'nearest';
@@ -108,7 +111,9 @@ validInterpolateTypes = {'nearest', 'linear', 'quadratic', 'cubic'};
 validInterpolateType = @(x) any(validatestring(x, validInterpolateTypes));
 
 defaultCamPosition = 'auto';
-validCamPositions = {'auto','front', 'back', 'top' 'left', 'right','face'};
+validCamPositions = {'auto','front', 'back', 'top', 'bottom', 'left', 'right', 'face', ...
+    'top-left', 'top-right', 'top-front', 'top-back', ...
+    'front-left', 'front-right', 'back-left', 'back-right'};
 validCamPosition = @(x) ((isstring(x)||ischar(x))&&any(validatestring(x, validCamPositions))) || (isnumeric(x) && length(x) == 3);
 
 defaultColormap = 'hotCropped';
@@ -183,6 +188,7 @@ addParameter(p, 'BrodmannAreas', false, validBrodmann); % Colors in Brodmann are
 addParameter(p, 'BA_cmp', @lines, validColormap); % Colors in Brodmann areas
 addParameter(p, 'useVoxelBrodmannAreas', false, @islogical); % Colors in Brodmann areas
 addParameter(p, 'showVoxelBrain', false, @islogical); % Colors in Brodmann areas
+addParameter(p, 'voxelLighting', 'none', @(x) ischar(x) || isstring(x));
 centerCamPos=[0,-20,0];
 addParameter(p, 'camTarget', centerCamPos, validCamPosition); % Target Camera location
 addParameter(p, 'camUp', [0,0,1] , validCamPosition); % Target Camera location
@@ -209,8 +215,6 @@ saveHeight = p.Results.saveHeight;
 saveDPI = p.Results.saveDPI;
 
 
-bufferDistance=nan;
-
 multiprobe = iscell(data2plot);
 
 
@@ -235,14 +239,27 @@ else
     data2plot_concat=data2plot{1}(:);
 end
 
-if(isempty(p.Results.fNIR) && ~p.Results.useEEG)
-    global setF;
-    fNIR = {};
-    if(multiprobe)
+fNIR = p.Results.fNIR;
+
+% Unwrap single-element cell of config name string for single-probe mode
+if iscell(fNIR) && numel(fNIR) == 1 && (isstring(fNIR{1}) || ischar(fNIR{1}))
+    fNIR = fNIR{1};
+end
+
+% Store config name for downstream loading (don't load yet)
+fNIR_cfgOverride = '';
+if (isstring(fNIR) || ischar(fNIR)) && ~isempty(fNIR)
+    fNIR_cfgOverride = char(fNIR);
+    if ~endsWith(fNIR_cfgOverride, '.cfg')
+        fNIR_cfgOverride = [fNIR_cfgOverride '.cfg'];
+    end
+    fNIR = {};  % clear so downstream treats as empty struct
+end
+
+if isempty(fNIR) && ~p.Results.useEEG
+    if multiprobe
         error("Must specify FNIRS devices when using Multi-probe plotting")
     end
-else
-    fNIR = p.Results.fNIR;
 end
 
 if(iscell(fNIR)&&all(dataEmpty))
@@ -331,6 +348,14 @@ elseif(length(maxVal)==1 && length(minVal)==1)
     cbarUpper_minmax=sort([minVal, maxVal]);
 end
 
+% Default hasUpperData/hasLowerData when maxVal was explicitly provided
+if twosided && ~exist('hasUpperData', 'var')
+    hasUpperData = true;
+end
+if twosided && ~exist('hasLowerData', 'var')
+    hasLowerData = true;
+end
+
 if(p.Results.logScale)
     if(any(data2plot_concat<=0))
         error("Cannot use logscale when data contains negative values")
@@ -343,7 +368,7 @@ end
 
 
 cmap_high = p.Results.cmap;
-if(~ishandle(cmap_high))
+if(~isa(cmap_high,'function_handle'))
     if(strcmp(cmap_high,'hotCropped'))
         cmap_high=hotCropped;
     else
@@ -352,7 +377,7 @@ if(~ishandle(cmap_high))
 end
 
 cmap_low_t = p.Results.cmap_lower;
-if(~ishandle(cmap_low_t))
+if(~isa(cmap_low_t,'function_handle'))
     cmap_low_t = str2func(cmap_low_t);
 end
 cmap_low = @(n) flip(cmap_low_t(n));
@@ -430,7 +455,7 @@ grootHandle.ShowHiddenHandles=true;
 itemsToSkipPlot=cell(0);
 j=1;
 for i=1:length(itemsToDelete)
-    item = findobj(gca, "Tag", itemsToDelete{i});
+    item = findobj(ax, "Tag", itemsToDelete{i});
     if(~isempty(item)&&~animationOptimized)
         delete(item);
     elseif(~isempty(item)&&animationOptimized)
@@ -528,14 +553,8 @@ else
     if(p.Results.useEEG && isempty(fNIR))
         probeDraw = {};
         cfgFilePath = '';
-    elseif(isempty(fNIR)&&isfield(setF,'device'))
-        cfgFilePath=setF.device.cfg.File;
-        if(~isfield(setF.device.Probe{1},'OptLayout2D'))
-            probeInfo=pf2_base.loadDeviceCfg(cfgFilePath,false);
-            setF.device=probeInfo;
-        else
-            probeInfo=setF.device;
-        end
+    elseif ~isempty(fNIR_cfgOverride)
+        cfgFilePath = fNIR_cfgOverride;
     elseif(isfield(fNIR,'probeinfo'))
         probeInfo=fNIR.probeinfo;
     elseif(pf2_base.isnestedfield(fNIR,'info.probename')&&isfield(fNIR.info,'probename')&&~contains(fNIR.info.probename,'Unknown'))
@@ -684,7 +703,7 @@ if(p.Results.useEEG)
     includeChannels = ~isnan(probeInfo.OptPos3DX);
 end
 
-if(~include_ss)
+if(~include_ss && isfield(probeInfo, 'TableOpt'))
     includeChannels=includeChannels&~probeInfo.TableOpt.IsShortSeparation;
 
     if(length(data2plot_concat)>sum(includeChannels))
@@ -793,6 +812,19 @@ ka=0.825;
 kd=0.4;
 ks=0.2;
 
+% Voxel brain lighting presets
+switch lower(p.Results.voxelLighting)
+    case 'realistic'
+        voxKa = 0.7;   voxKd = 0.5;  voxKs = 0.25;  voxSE = 12;
+    case 'dramatic'
+        voxKa = 0.5;   voxKd = 0.65; voxKs = 0.4;   voxSE = 25;
+    case 'clinical'
+        voxKa = 0.65;  voxKd = 0.55; voxKs = 0.1;   voxSE = 8;
+    otherwise % 'none'
+        voxKa = ka;    voxKd = kd;   voxKs = ks;     voxSE = 10;
+end
+useVoxelLighting = ~strcmpi(p.Results.voxelLighting, 'none');
+
 hold on;
 
 lht=findobj(gca,'Type','Light','Tag','Front');
@@ -828,122 +860,241 @@ end
 if(p.Results.showVoxelBrain&&(isempty(itemsToSkipPlot)||~contains(itemsToSkipPlot,'BrainVoxel')))
     h=ax;
     mni_t1=pf2_base.getAsset('mni_t1', 'cache', h);
-    
+
     center=[91,127,73];
-    szM=size(mni_t1);
-    
-    
+
     voxelRes=1;
-    
-    
-    x2mni=@(x) x-center(1);
-    y2mni=@(y) y-center(2);
-    z2mni=@(z) z-center(3);
-    
-    xyz2mni=@(x,y,z) [x2mni(x),y2mni(y),z2mni(z)];
-    
-    mni2x=@(mx) mx+center(1);
-    mni2y=@(my) my+center(2);
-    mni2z=@(mz) mz+center(3);
-    
-    mni_t1_x=x2mni(1:voxelRes:szM(1));
-    mni_t1_y=y2mni(1:voxelRes:szM(2));
-    mni_t1_z=z2mni(1:voxelRes:szM(3));
-    %mni_t1=mni_t1(1:voxelRes:end,1:voxelRes:end,end:voxelRes*-1:1);
-    
-    
-    
-    
-    lighting('none');
-    
-    if(p.Results.useVoxelBrodmannAreas)
-        h=ax;
-        brdm=pf2_base.getAsset('brodmann', 'cache', h);
-        
-        
-        brdm=brdm(1:voxelRes:end,1:voxelRes:end,1:voxelRes:end);
-        
-        %center=[90,126,72];
-        szB=size(brdm);
-        
-        
-        brodmannRes=voxelRes;
-        
-        %BA_areas=[9,10,46];
-        
-        if(showBrodmann)
-            brainColmap=p.Results.BA_cmp(length(BA_areas));
-            
-            
-            for i=1:length(BA_areas)
-                bdI=find(brdm==BA_areas(i)); %&mni_t1>0); % Might look better with these for whatever reason
-                
-                if(~any(bdI))
-                    continue;
-                end
-                
-                [bdx,bdy,bdz] = ind2sub(size(brdm),bdI);
-                
-                bd_mni_intensity=mni_t1(bdI);
-                
-                mni_t1(bdI)=0;
-                
-                
-                bdxyz=xyz2mni(bdx,bdy,bdz);
-                
-                
-                scattercols=brainColmap(i,:).*(double(bd_mni_intensity)/255/3+0.66);
-                h=plotCube(bdxyz(:,1),bdxyz(:,2),bdxyz(:,3),brodmannRes,scattercols);
-                %h=scatter3(bdxyz(:,1),bdxyz(:,3),bdxyz(:,2),50*brodmannRes,scattercols,'filled');
-                h.DisplayName=sprintf('BA%i',BA_areas(i));
-                h.Tag='BA_area_mrk';
+
+    % Check for cached isosurface mesh
+    cacheKey = 'voxelISOmesh';
+    cached = getappdata(ax, cacheKey);
+
+    if ~isempty(cached)
+        % Reuse cached mesh
+        if isfield(cached, 'brodmann') && ~isempty(cached.brodmann)
+            for ci = 1:length(cached.brodmann)
+                cb = cached.brodmann(ci);
+                h = patch('Faces', cb.faces, 'Vertices', cb.verts, ...
+                    'FaceVertexCData', cb.colors, 'FaceColor', 'interp', ...
+                    'EdgeColor', 'none');
+                h.DisplayName = cb.displayName;
+                h.Tag = 'BA_area_mrk';
                 hold on
-                legend();
             end
+            legend();
         end
-        
-        lighting('none');
-        bdI=brdm>0.&~ismember(brdm,BA_areas);%&mni_t1>0;
-        [bdx,bdy,bdz] = ind2sub(size(brdm),find(bdI));
-        
-        bd_mni_intensity=mni_t1(bdI);
-        
-        mni_t1(bdI)=0;
-        bdxyz=xyz2mni(bdx,bdy,bdz);
-        
-        
-        
-        scattercols=p.Results.voxelColor.*(double(bd_mni_intensity)/255);
-        h=plotCube(bdxyz(:,1),bdxyz(:,2),bdxyz(:,3),brodmannRes,scattercols);
-        %h=scatter3(bdxyz(:,1),bdxyz(:,3),bdxyz(:,2),50*brodmannRes,scattercols,'filled');
-        %h.DisplayName=sprintf('BA%i',BA_areas(i));
-        h.Tag='BrainVoxel';
-        h.HandleVisibility='off';
-        
-        hold on
-        legend();
-        
-        
-        %nnzMNIvals=nnzMNIvals(b);
-        
-        
+        if isfield(cached, 'background') && ~isempty(cached.background)
+            bg = cached.background;
+            h = patch('Faces', bg.faces, 'Vertices', bg.verts, ...
+                'FaceVertexCData', bg.colors, 'FaceColor', 'interp', ...
+                'EdgeColor', 'none', ...
+                'AmbientStrength', voxKa, 'DiffuseStrength', voxKd, ...
+                'SpecularStrength', voxKs, 'SpecularExponent', voxSE, ...
+                'FaceAlpha', 1);
+            h.Tag = 'BrainVoxel';
+            h.HandleVisibility = 'off';
+            hold on
+        end
+        if isfield(cached, 'brain') && ~isempty(cached.brain)
+            br = cached.brain;
+            h = patch('Faces', br.faces, 'Vertices', br.verts, ...
+                'FaceVertexCData', br.colors, 'FaceColor', 'interp', ...
+                'EdgeColor', 'none', 'VertexNormals', br.normals, ...
+                'AmbientStrength', voxKa, 'DiffuseStrength', voxKd, ...
+                'SpecularStrength', voxKs, 'SpecularExponent', voxSE, ...
+                'FaceAlpha', 1);
+            h.Tag = 'BrainVoxel';
+            h.HandleVisibility = 'off';
+            hold on
+        end
+        if useVoxelLighting
+            lighting('gouraud');
+        else
+            lighting('none');
+        end
     else
-        
-        
-        nnzMNI=mni_t1>0;%.&~ismember(brdm,BA_areas);
-        nnzMNIvals=(mni_t1(nnzMNI));
-        
-        [mnx,mny,mnz] = ind2sub(size(mni_t1),find(nnzMNI));
-        
-        mnxyz=xyz2mni(mnx,mny,mnz);
-        
-        cubeCols=p.Results.voxelColor.*double(nnzMNIvals)/255;
-        
-        h=plotCube(mnxyz(:,1),mnxyz(:,2),mnxyz(:,3),voxelRes,cubeCols);
-        h.Tag='BrainVoxel';
-        h.HandleVisibility='off';
-        lighting('none');
-        hold on
+        % Compute isosurface meshes from scratch
+        isoCache = struct('brodmann', [], 'background', [], 'brain', []);
+
+        if useVoxelLighting
+            lighting('gouraud');
+        else
+            lighting('none');
+        end
+
+        if(p.Results.useVoxelBrodmannAreas)
+            brdm=pf2_base.getAsset('brodmann', 'cache', ax);
+            brdm=brdm(1:voxelRes:end,1:voxelRes:end,1:voxelRes:end);
+
+            origMni = mni_t1; % preserve intensity before zeroing BA voxels
+
+            if(showBrodmann)
+                brainColmap=p.Results.BA_cmp(length(BA_areas));
+                brodmannCache = [];
+
+                for i=1:length(BA_areas)
+                    mask = (brdm == BA_areas(i));
+                    if ~any(mask(:)), continue; end
+
+                    % Zero out these voxels from T1 so background doesn't overlap
+                    mni_t1(mask) = 0;
+
+                    % Pad to avoid edge artifacts, smooth for clean surface
+                    maskPad = padarray(double(mask), [1 1 1], 0);
+                    maskSmooth = smooth3(maskPad, 'gaussian', [3 3 3]);
+                    [f, v] = isosurface(maskSmooth, 0.3);
+
+                    if isempty(f), continue; end
+
+                    v = v - 1; % undo padarray offset
+
+                    % MNI transform: isosurface returns (col, row, slice)
+                    v_mni = [v(:,2) - center(1), v(:,1) - center(2), v(:,3) - center(3)];
+
+                    % Intensity-modulated color from original T1
+                    vInt = interp3(double(origMni), v(:,1), v(:,2), v(:,3), 'linear', 0);
+                    vColors = brainColmap(i,:) .* (vInt/255/3 + 0.66);
+
+                    h = patch('Faces', f, 'Vertices', v_mni, ...
+                        'FaceVertexCData', vColors, 'FaceColor', 'interp', ...
+                        'EdgeColor', 'none');
+                    h.DisplayName = sprintf('BA%i', BA_areas(i));
+                    h.Tag = 'BA_area_mrk';
+                    hold on
+
+                    % Store for cache
+                    entry = struct('faces', f, 'verts', v_mni, 'colors', vColors, ...
+                        'displayName', sprintf('BA%i', BA_areas(i)));
+                    if isempty(brodmannCache)
+                        brodmannCache = entry;
+                    else
+                        brodmannCache(end+1) = entry; %#ok<AGROW>
+                    end
+                end
+                legend();
+                isoCache.brodmann = brodmannCache;
+            end
+
+            % Remaining Brodmann voxels (background)
+            if useVoxelLighting
+                lighting('gouraud');
+            else
+                lighting('none');
+            end
+            remainMask = brdm > 0 & ~ismember(brdm, BA_areas);
+            mni_bg = double(mni_t1) .* double(remainMask);
+
+            if any(mni_bg(:) > 0)
+                mni_t1(remainMask) = 0;
+
+                bgPad = padarray(mni_bg, [1 1 1], 0);
+                bgSmooth = smooth3(bgPad, 'gaussian', [3 3 3]);
+                [bgF, bgV] = isosurface(bgSmooth, 10);
+
+                if ~isempty(bgF)
+                    bgV = bgV - 1; % undo padarray offset
+                    bgV_mni = [bgV(:,2) - center(1), bgV(:,1) - center(2), bgV(:,3) - center(3)];
+
+                    % Sample at multiple depths inward, take max to avoid dark sulci
+                    bgN = isonormals(bgSmooth, bgV + 1); % +1 to match padded coords
+                    bgN_mag = max(sqrt(sum(bgN.^2, 2)), eps);
+                    bgN_unit = bgN ./ bgN_mag;
+                    origMni_dbl = double(origMni);
+                    bgInt = zeros(size(bgV, 1), 1);
+                    for sd = [3, 6, 10, 15]
+                        bgSPts = bgV - sd * bgN_unit;
+                        bgSPts = max(bgSPts, 1);
+                        bgSPts(:,1) = min(bgSPts(:,1), size(origMni,2));
+                        bgSPts(:,2) = min(bgSPts(:,2), size(origMni,1));
+                        bgSPts(:,3) = min(bgSPts(:,3), size(origMni,3));
+                        bgInt = max(bgInt, interp3(origMni_dbl, bgSPts(:,1), bgSPts(:,2), bgSPts(:,3), 'linear', 0));
+                    end
+                    bgInt = max(bgInt, 100); % brightness floor
+                    bgColors = p.Results.voxelColor .* (bgInt / 255);
+
+                    h = patch('Faces', bgF, 'Vertices', bgV_mni, ...
+                        'FaceVertexCData', bgColors, 'FaceColor', 'interp', ...
+                        'EdgeColor', 'none', ...
+                        'AmbientStrength', voxKa, 'DiffuseStrength', voxKd, ...
+                        'SpecularStrength', voxKs, 'SpecularExponent', voxSE, ...
+                        'FaceAlpha', 1);
+                    h.Tag = 'BrainVoxel';
+                    h.HandleVisibility = 'off';
+                    hold on
+
+                    isoCache.background = struct('faces', bgF, 'verts', bgV_mni, 'colors', bgColors);
+                end
+            end
+            legend();
+
+        else
+            % Non-Brodmann voxel brain path
+            vol = smooth3(double(mni_t1), 'gaussian', [3 3 3]);
+            isoVal = 20;
+            [isoF, isoV] = isosurface(vol, isoVal);
+            isoN = isonormals(vol, isoV);
+
+            % MNI transform: isosurface returns (col, row, slice)
+            isoV_mni = [isoV(:,2) - center(1), isoV(:,1) - center(2), isoV(:,3) - center(3)];
+
+            % Per-vertex intensity coloring — sample at multiple depths inward
+            % and take the max to avoid dark patches from sulci/ventricles.
+            % isonormals returns outward-pointing normals (toward smaller values).
+            isoN_mag = max(sqrt(sum(isoN.^2, 2)), eps);
+            isoN_unit = isoN ./ isoN_mag;
+            mni_dbl = double(mni_t1);
+            sampleDepths = [3, 6, 10, 15]; % multiple depths in voxels
+            vInt = zeros(size(isoV, 1), 1);
+            for sd = sampleDepths
+                sPts = isoV - sd * isoN_unit;
+                sPts = max(sPts, 1);
+                sPts(:,1) = min(sPts(:,1), size(mni_t1,2));
+                sPts(:,2) = min(sPts(:,2), size(mni_t1,1));
+                sPts(:,3) = min(sPts(:,3), size(mni_t1,3));
+                vInt = max(vInt, interp3(mni_dbl, sPts(:,1), sPts(:,2), sPts(:,3), 'linear', 0));
+            end
+            vInt = max(vInt, 100); % brightness floor for any remaining dark vertices
+            vColors = p.Results.voxelColor .* (vInt / 255);
+
+            h = patch('Faces', isoF, 'Vertices', isoV_mni, ...
+                'FaceVertexCData', vColors, 'FaceColor', 'interp', ...
+                'EdgeColor', 'none', 'VertexNormals', -isoN, ...
+                'AmbientStrength', voxKa, 'DiffuseStrength', voxKd, ...
+                'SpecularStrength', voxKs, 'SpecularExponent', voxSE, ...
+                'FaceAlpha', 1);
+            h.Tag = 'BrainVoxel';
+            h.HandleVisibility = 'off';
+            if useVoxelLighting
+                lighting('gouraud');
+            else
+                lighting('none');
+            end
+            hold on
+
+            isoCache.brain = struct('faces', isoF, 'verts', isoV_mni, ...
+                'colors', vColors, 'normals', -isoN);
+        end
+
+        % Store computed mesh in cache
+        setappdata(ax, cacheKey, isoCache);
+    end
+
+    % Add camera lights when voxel lighting is active
+    if useVoxelLighting
+        lht = findobj(ax, 'Type', 'Light', 'Tag', 'Front');
+        if isempty(lht)
+            lht = camlight('right');
+            lht.Tag = 'Front';
+            lht.Color = camColor;
+            lht.Position = [0, 100, 0];
+        end
+        lht2 = findobj(ax, 'Type', 'Light', 'Tag', 'Rear');
+        if isempty(lht2)
+            lht2 = camlight('left');
+            lht2.Tag = 'Rear';
+            lht2.Position = [0, -100, 90];
+            lht2.Color = camColor;
+        end
     end
 end
 
@@ -986,15 +1137,33 @@ if(~all(dataEmpty))
     %     cerebro_mdl.b_dist=d;
     %     cerebro_mdl.b_area=bigbdidx(ind);
     
-    dist_array = zeros(num_vertices, num_control);
-    for i=1:num_control
-        q = repmat(controlPoints(i,:), num_vertices, 1);
-        dist_array(:,i) = sum((mdl.v - q).^2, 2);
+    if animationOptimized
+        cache = getappdata(ax, 'iv3d_distCache');
+        if ~isempty(cache) && size(cache.dist_array, 2) == num_control
+            dist_array = cache.dist_array;
+            ind = cache.ind;
+        else
+            dist_array = sum(mdl.v.^2, 2) + sum(controlPoints.^2, 2)' - 2 * (mdl.v * controlPoints');
+            [d, ind] = min(dist_array, [], 2);
+            ind(d > max_distance_2) = 0;
+            setappdata(ax, 'iv3d_distCache', struct('dist_array', dist_array, 'ind', ind));
+        end
+    else
+        dist_array = sum(mdl.v.^2, 2) + sum(controlPoints.^2, 2)' - 2 * (mdl.v * controlPoints');
+        [d, ind] = min(dist_array, [], 2);
+        ind(d > max_distance_2) = 0;
     end
-    
-    [d, ind] = min(dist_array, [], 2);
-    ind(d > max_distance_2) = 0;
-    
+
+    % Exclude NaN channels from interpolation (e.g. masked-out channels)
+    nanChannels = isnan(C);
+    if any(nanChannels)
+        dist_array(:, nanChannels) = Inf;
+        [d, ind] = min(dist_array, [], 2);
+        ind(d > max_distance_2) = 0;
+        ind(isinf(d)) = 0;
+        C(nanChannels) = 0;
+    end
+
     c_min = nanmin(C, [], 'all');
     c_max = nanmax(C, [], 'all');
     
@@ -1065,11 +1234,7 @@ if(~all(dataEmpty))
             C_temp([-1; c_ind] < 0, :) = repmat(brainColor, sum(c_ind < 0) + 1, 1);
             C_temp(mask, :) = repmat(brainColor, sum(mask), 1);
             
-            counts = histcounts(ind, 0:num_control+1);
-            Cs = zeros(num_vertices, 3);
-            for i = 1:num_control+1
-                Cs(ind == i-1, :) = repmat(C_temp(i, :), counts(i), 1);
-            end
+            Cs = C_temp(ind + 1, :);
             
         case {'linear', 'quadratic', 'cubic'}
             switch projectmode
@@ -1086,10 +1251,28 @@ if(~all(dataEmpty))
             
             C_temp = repmat(c_ind', num_vertices, 1);
             v_ind = my_interp_fx(dist_array, C_temp, beta, 2);
-            
-            Cs = ind2rgb(round(v_ind * (size(cmap, 1) - 1)) + 1, cmap);
-            Cs(v_ind < 0 | mask, :) = repmat(brainColor, sum(v_ind < 0 | mask), 1);
+
+            Cs = reshape(ind2rgb(round(v_ind * (size(cmap, 1) - 1)) + 1, cmap), [], 3);
+
+            % Build per-vertex mask: vertices near only masked channels
+            if any(mask)
+                mask_weights = double(mask(:))';
+                v_mask = my_interp_fx(dist_array, repmat(mask_weights, num_vertices, 1), beta, 2) > 0.5;
+            else
+                v_mask = false(size(v_ind));
+            end
+            Cs(v_ind < 0 | v_mask, :) = repmat(brainColor, sum(v_ind < 0 | v_mask), 1);
             Cs(ind == 0, :) = repmat(brainColor, sum(ind == 0), 1);
+    end
+
+    % Distance-based edge fading: smooth transition to brain color at buffer boundary
+    validVerts = ind > 0;
+    if any(validVerts)
+        vIdx = find(validVerts);
+        d_nearest = dist_array(sub2ind(size(dist_array), vIdx, ind(validVerts)));
+        d_ratio = sqrt(d_nearest / max_distance_2);  % 0 at channel, 1 at boundary
+        fadeAlpha = max(0, min(1, (1 - d_ratio) / 0.4));  % fade over outer 40%
+        Cs(vIdx,:) = Cs(vIdx,:) .* fadeAlpha + brainColor .* (1 - fadeAlpha);
     end
 
 else % No data to plot, everything is brain and anatomy
@@ -1204,9 +1387,79 @@ if(~p.Results.showVoxelBrain)
         end
         
     end
-    
+
 end
 
+% Project channel data onto voxel brain isosurface when both are active
+if p.Results.showVoxelBrain && ~all(dataEmpty)
+    voxelPatches = findall(ax, 'Type', 'Patch', 'Tag', 'BrainVoxel');
+    for vi = 1:length(voxelPatches)
+        vp = voxelPatches(vi);
+        vpVerts = get(vp, 'Vertices');
+        vpBaseColors = get(vp, 'FaceVertexCData');
+        nv = size(vpVerts, 1);
+
+        % Distance from each isosurface vertex to each channel control point
+        vp_dist = sum(vpVerts.^2, 2) + sum(controlPoints.^2, 2)' - 2 * (vpVerts * controlPoints');
+        [vp_d, vp_ind] = min(vp_dist, [], 2);
+        vp_ind(vp_d > max_distance_2) = 0;
+
+        % Handle NaN channels
+        if exist('nanChannels', 'var') && any(nanChannels)
+            vp_dist(:, nanChannels) = Inf;
+            [vp_d, vp_ind] = min(vp_dist, [], 2);
+            vp_ind(vp_d > max_distance_2) = 0;
+            vp_ind(isinf(vp_d)) = 0;
+        end
+
+        vpCs = vpBaseColors;
+        hasData = vp_ind > 0;
+
+        if any(hasData)
+            switch projectmode
+                case 'nearest'
+                    C_temp = [brainColor; reshape(ind2rgb(round(c_ind * (size(cmap, 1) - 1)) + 1, cmap), [], 3)];
+                    C_temp([-1; c_ind] < 0, :) = repmat(brainColor, sum(c_ind < 0) + 1, 1);
+                    if exist('mask', 'var') && any(mask)
+                        C_temp(mask, :) = repmat(brainColor, sum(mask), 1);
+                    end
+                    projColors = C_temp(vp_ind(hasData) + 1, :);
+
+                case {'linear', 'quadratic', 'cubic'}
+                    switch projectmode
+                        case 'linear',    beta_vp = 0.5;
+                        case 'quadratic', beta_vp = 1;
+                        case 'cubic',     beta_vp = 1.5;
+                    end
+                    vp_dist(vp_dist >= max_distance_2) = Inf;
+                    vp_C_temp = repmat(c_ind', nv, 1);
+                    vp_interp = @(dist, val, pow, dim) sum(val .* (1./(dist.^pow + 1e-8)) ./ sum(1./(dist.^pow + 1e-8), dim), dim);
+                    vp_v_ind = vp_interp(vp_dist, vp_C_temp, beta_vp, 2);
+                    projColors = reshape(ind2rgb(round(vp_v_ind(hasData) * (size(cmap, 1) - 1)) + 1, cmap), [], 3);
+
+                    if exist('mask', 'var') && any(mask)
+                        mask_weights = double(mask(:))';
+                        vp_v_mask = vp_interp(vp_dist, repmat(mask_weights, nv, 1), beta_vp, 2) > 0.5;
+                        projColors(vp_v_mask(hasData) | vp_v_ind(hasData) < 0, :) = ...
+                            repmat(brainColor, sum(vp_v_mask(hasData) | vp_v_ind(hasData) < 0), 1);
+                    else
+                        projColors(vp_v_ind(hasData) < 0, :) = ...
+                            repmat(brainColor, sum(vp_v_ind(hasData) < 0), 1);
+                    end
+            end
+
+            % Edge fading
+            d_nearest = vp_dist(sub2ind(size(vp_dist), find(hasData), vp_ind(hasData)));
+            d_ratio = sqrt(d_nearest / max_distance_2);
+            fadeAlpha = max(0, min(1, (1 - d_ratio) / 0.4));
+
+            % Blend projected color with base voxel color
+            vpCs(hasData, :) = projColors .* fadeAlpha + vpBaseColors(hasData, :) .* (1 - fadeAlpha);
+        end
+
+        set(vp, 'FaceVertexCData', vpCs);
+    end
+end
 
 if(multiprobe)
     probe_colors=lines(num_devices);
@@ -1214,43 +1467,50 @@ end
 
 mrkScaleFactor=22;
 
+% Nudge scatter markers slightly inward so text always wins depth test.
+% 0.5mm is imperceptible but resolves z-fighting between co-located objects.
+markerInsetMM = 0.001;
+insetPos = @(pos) pos - markerInsetMM * pos ./ max(vecnorm(pos, 2, 2), 1e-6);
+
 if(showChannels&&isfield(probeInfo, 'TableOpt')&&~contains('ProbeOpt',itemsToSkipPlot))
     optPos = [probeInfo.TableOpt.Pos3D_x probeInfo.TableOpt.Pos3D_y probeInfo.TableOpt.Pos3D_z];
-    
+
     if(~include_ss)
         optPos=optPos(~probeInfo.TableOpt.IsShortSeparation,:);
     end
-    
+
     if(p.Results.useTalairach)
         optPos=pf2_base.external.icbm_fsl2tal(optPos);
     end
-    
-    if(~isempty(optColor) && (isnumeric(optColor) && ~any(isnan(optColor)) || ~ismissing(optColor)))
+
+    optPosInset = insetPos(optPos);
+
+    if(~isempty(optColor) && (isnumeric(optColor) && ~any(isnan(optColor(:))) || (isstring(optColor) && ~any(ismissing(optColor)))))
         if(multiprobe)
             uDevices=unique(probeInfo.TableOpt.ProbeNum);
-            
+
             probe_string=cell(0);
             for i=1:num_devices
-                
+
                 selOpt=probeInfo.TableOpt.ProbeNum(:,1)==uDevices(i);
                 if(~include_ss)
                     selOpt(probeInfo.TableOpt.IsShortSeparation)=[];
                 end
-                h(i) = scatter3(optPos(selOpt,1), optPos(selOpt,2), optPos(selOpt,3),20*p.Results.labelfontsize,'filled',optColor,'MarkerEdgeColor' ,probe_colors(i,:),'LineWidth',1.5);
-                
+                h(i) = scatter3(optPosInset(selOpt,1), optPosInset(selOpt,2), optPosInset(selOpt,3),20*p.Results.labelfontsize,'filled',optColor,'MarkerEdgeColor' ,probe_colors(i,:),'LineWidth',1.5);
+
                 probe_string{i}=sprintf('Probe %i',uDevices(i));
-                
+
                 h(i).Tag='ProbeOpt';
                 h(i).DisplayName=probe_string{i};
             end
             legend(h,probe_string);
         else
-            h = scatter3(optPos(:,1), optPos(:,2), optPos(:,3),20*p.Results.labelfontsize,'filled',optColor,'MarkerEdgeColor' ,'k');
+            h = scatter3(optPosInset(:,1), optPosInset(:,2), optPosInset(:,3),20*p.Results.labelfontsize,'filled',optColor,'MarkerEdgeColor' ,'k');
             h.Tag='ProbeOpt';
             h.DisplayName='Optode';
         end
     end
-    
+
     if(include_ss)
         h=text(optPos(:,1), optPos(:,2), optPos(:,3), string(probeInfo.TableOpt.OptodeNum), 'HorizontalAlignment', 'center','VerticalAlignment', 'middle', "FontSize", p.Results.labelfontsize, 'color', p.Results.labelfontcolor);
     else
@@ -1272,8 +1532,9 @@ if(plotFNIRS_SD&&isfield(probeInfo,'TableSD'))
     %    srcPos=pf2_base.external.icbm_fsl2tal(srcPos);
     %end
     
+    srcPosInset = insetPos(srcPos);
     if(~isempty(srcColor) && (isnumeric(srcColor) && ~any(isnan(srcColor)) || ~ismissing(srcColor)))
-        h = scatter3(srcPos(:,1),srcPos(:,2),srcPos(:,3),mrkScaleFactor*p.Results.labelfontsize,'filled',srcColor);
+        h = scatter3(srcPosInset(:,1),srcPosInset(:,2),srcPosInset(:,3),mrkScaleFactor*p.Results.labelfontsize,'filled',srcColor);
         h.Tag=sprintf('ProbeSrc');
         h.DisplayName='Source';
     end
@@ -1282,15 +1543,10 @@ if(plotFNIRS_SD&&isfield(probeInfo,'TableSD'))
         h(i).Tag='ProbeSrcLabel';
     end
     hold on
-    
-    %detPos = [probeInfo.TableSD.Pos3D_x(detIdx), probeInfo.TableSD.Pos3D_y(detIdx), probeInfo.TableSD.Pos3D_z(detIdx)];
-    
-    %if(p.Results.useTalairach)
-    %    detPos=pf2_base.external.icbm_fsl2tal(detPos);
-    %end
-    
+
+    detPosInset = insetPos(detPos);
     if(~isempty(detColor) && (isnumeric(detColor) && ~any(isnan(detColor)) || ~ismissing(detColor)))
-        h = scatter3(detPos(:,1), detPos(:,2), detPos(:,3), mrkScaleFactor*p.Results.labelfontsize, 'filled', detColor);
+        h = scatter3(detPosInset(:,1), detPosInset(:,2), detPosInset(:,3), mrkScaleFactor*p.Results.labelfontsize, 'filled', detColor);
         h.Tag=sprintf('ProbeDet');
         h.DisplayName='Detector';
     end
@@ -1305,18 +1561,20 @@ if(plot1020&&~contains('Scatter1020',itemsToSkipPlot))
     for i=1:size(c1020,1)
         %text(cerebro1020(i,1),cerebro1020(i,2),cerebro1020(i,3),cerebro1020_labels{i})
         if(~isnan(c1020.BA(i)))
+            ePos = [c1020.x(i), c1020.y(i), c1020.z(i)];
+            ePosInset = insetPos(ePos);
             if(numColors == 4 || numColors == 1)
-                h = scatter3(c1020.x(i),c1020.y(i),c1020.z(i),mrkScaleFactor*1.5*p.Results.labelfontsize, 'filled', color1020);
-                
+                h = scatter3(ePosInset(1),ePosInset(2),ePosInset(3),mrkScaleFactor*1.5*p.Results.labelfontsize, 'filled', color1020);
+
             else
-                h = scatter3(c1020.x(i),c1020.y(i),c1020.z(i),mrkScaleFactor*1.5*p.Results.labelfontsize, 'filled');
+                h = scatter3(ePosInset(1),ePosInset(2),ePosInset(3),mrkScaleFactor*1.5*p.Results.labelfontsize, 'filled');
             end
             h.Tag=sprintf('Scatter1020');
             hold on
-            
-            h=text(c1020.x(i),c1020.y(i),c1020.z(i),c1020.Electrode(i),'HorizontalAlignment', 'center','VerticalAlignment', 'middle', "FontSize", p.Results.labelfontsize, 'color', p.Results.labelfontcolor);
-            for i=1:length(h)
-                h(i).Tag='Label1020';
+
+            h=text(ePos(1),ePos(2),ePos(3),c1020.Electrode(i),'HorizontalAlignment', 'center','VerticalAlignment', 'middle', "FontSize", p.Results.labelfontsize, 'color', p.Results.labelfontcolor);
+            for k=1:length(h)
+                h(k).Tag='Label1020';
             end
             %text(x2tx(c1020.x(i)),y2ty(c1020.y(i)),z2tz(c1020.z(i)),c1020.Electrode(i),'HorizontalAlignment','center')
             
@@ -1343,19 +1601,42 @@ if(isempty(itemsToSkipPlot))
     else
         switch(p.Results.initCamPosition)
             case 'auto'
-                campos(nanmean(optPos,1)/norm(nanmean(optPos,1))*1500);   %Front facing
+                autoPos = nanmean(optPos,1);
+                if any(isnan(autoPos)) || norm(autoPos) == 0
+                    campos([0,1200,0]);  % Fall back to front view
+                else
+                    campos(autoPos/norm(autoPos)*1500);
+                end
             case 'front'
                 campos([0,1200,0]);
             case 'back'
                 campos([0,-1200,0]);
             case 'top'
                 campos([0,0,1500]);
+            case 'bottom'
+                campos([0,0,-1500]);
             case 'left'
                 campos([-1200,0,0]);
             case 'right'
                 campos([1200,0,0]);
             case 'face'
                 campos([0,1200,-300]);
+            case 'top-left'
+                campos([-900,0,1100]);
+            case 'top-right'
+                campos([900,0,1100]);
+            case 'top-front'
+                campos([0,900,1100]);
+            case 'top-back'
+                campos([0,-900,1100]);
+            case 'front-left'
+                campos([-850,850,0]);
+            case 'front-right'
+                campos([850,850,0]);
+            case 'back-left'
+                campos([-850,-850,0]);
+            case 'back-right'
+                campos([850,-850,0]);
             otherwise
                 warning('Invalid camera position');
                 campos(OptPos3D_mean/norm(OptPos3D_mean)*1500);  %Front facing
@@ -1418,11 +1699,19 @@ if(p.Results.showScattering||p.Results.optodeLines)&&~contains('OptLines',itemsT
 end
 
 
-title(ax, titleString);
+% Determine text color from figure background (handles dark mode)
+figBg = get(ancestor(ax, 'figure'), 'Color');
+if isnumeric(figBg) && mean(figBg) > 0.5
+    textClr = [0 0 0];
+else
+    textClr = [1 1 1];
+end
+
+title(ax, titleString, 'Color', textClr);
 if p.Results.showColorbar && ~all(dataEmpty) && isempty(itemsToSkipPlot)
     % Remove existing colorbars
     delete(findobj(ax, 'Type', 'ColorBar'));
-    
+
     ax1 = ax;
     curAxPosition = ax1.Position;
     
@@ -1435,14 +1724,15 @@ if p.Results.showColorbar && ~all(dataEmpty) && isempty(itemsToSkipPlot)
             if hasUpperData
                 chPos = colorbar(ax1, 'Location', 'eastoutside');
                 chPos.Tag = 'Main';
-                title(chPos, clrBarTitle);
-                
+                chPos.Color = textClr;
+                title(chPos, clrBarTitle, 'Color', textClr);
+
                 % Set colormap for upper colorbar
                 colormap(ax1, cmap_high(nColorsMaxBar));
                 caxis(ax1, cbarUpper_minmax);
-                
+
                 % Adjust position of upper colorbar
-                
+
                 chPos.Position = [curAxPosition(1)+curAxPosition(3), curAxPosition(2)+cbHeight, cbWidth, cbHeight];
             end
             
@@ -1451,9 +1741,10 @@ if p.Results.showColorbar && ~all(dataEmpty) && isempty(itemsToSkipPlot)
                 ax2 = axes('Position', ax1.Position, 'Visible', 'off');
                 chNeg = colorbar(ax2, 'Location', 'eastoutside');
                 chNeg.Tag = 'Lower';
+                chNeg.Color = textClr;
 
                 if(~hasUpperData)
-                    title(chNeg, clrBarTitle);
+                    title(chNeg, clrBarTitle, 'Color', textClr);
                 end
                 
                 % Set colormap for lower colorbar
@@ -1469,21 +1760,23 @@ if p.Results.showColorbar && ~all(dataEmpty) && isempty(itemsToSkipPlot)
     else
         % Single-sided colorbar
         chPos = colorbar(ax1, 'Location', 'eastoutside');
-        title(chPos, clrBarTitle);
-        
+        chPos.Color = textClr;
+        title(chPos, clrBarTitle, 'Color', textClr);
+
         % Set colormap for single colorbar
         if isnumeric(cmap_high)
             colormap(ax1, cmap_high);
         else
             colormap(ax1, cmap_high(nColorsMaxBar));
         end
-        
+
         if p.Results.logScale
             set(ax1, 'ColorScale', 'log');
             caxis(ax1, exp(cbarUpper_minmax));
         else
             caxis(ax1, cbarUpper_minmax);
         end
+
     end
 end
 
@@ -1688,5 +1981,3 @@ if ~isempty(savePath)
     fig = gcf();
     pf2_base.plot.saveFigure(fig, savePath, saveWidth, saveHeight, saveDPI);
 end
-
-toc

@@ -16,7 +16,7 @@ function result = computeDyad(dataA, dataB, varargin)
 %
 % Name-Value Parameters:
 %   Method          - Coupling method: 'pearson' (default), 'spearman', 'xcorr',
-%                     'coherence', 'wcoherence'
+%                     'coherence', 'wcoherence', 'granger', 'transferentropy'
 %   Biomarker       - 'HbO' (default), 'HbR', 'HbTotal', 'HbDiff', 'CBSI'
 %   ChannelPairing  - How to pair channels/ROIs across subjects:
 %                     'same' (default) - same index (Ca=Cb)
@@ -25,6 +25,8 @@ function result = computeDyad(dataA, dataB, varargin)
 %   TimeWindow      - [start, end] in seconds (default: full overlap)
 %   CouplingArgs    - Extra args passed to coupling function (default: {})
 %   UseROI          - Use ROI-level data instead of channels (default: false)
+%   Accelerate      - Acceleration mode: 'auto' (default), 'gpu', 'parfor', 'none'
+%                     For 'all' pairing with parfor available, parallelizes pairwise loop.
 %
 % Outputs:
 %   result - Struct with fields:
@@ -51,6 +53,7 @@ function result = computeDyad(dataA, dataB, varargin)
     addParameter(p, 'TimeWindow', [], @(v) isnumeric(v) && (isempty(v) || length(v) == 2));
     addParameter(p, 'CouplingArgs', {}, @iscell);
     addParameter(p, 'UseROI', false, @islogical);
+    addParameter(p, 'Accelerate', 'auto', @(x) ischar(x) && ismember(lower(x), {'auto','gpu','parfor','none'}));
     parse(p, dataA, dataB, varargin{:});
     opts = p.Results;
 
@@ -120,8 +123,8 @@ function result = computeDyad(dataA, dataB, varargin)
     fsB = dataB.fs;
 
     if abs(fsA - fsB) > 0.01
-        warning('exploreFNIRS:hyperscanning:computeDyad', ...
-            'Sampling rates differ (%.2f vs %.2f Hz). Results may be unreliable.', fsA, fsB);
+        error('exploreFNIRS:hyperscanning:computeDyad', ...
+            'Sampling rates differ (%.2f vs %.2f Hz). Resample data to matching rates before computing dyad coupling.', fsA, fsB);
     end
     fs = fsA;
 
@@ -153,6 +156,20 @@ function result = computeDyad(dataA, dataB, varargin)
     % Get coupling function
     couplingFn = getCouplingFn(opts.Method);
 
+    % Determine parfor usage
+    accelMode = lower(opts.Accelerate);
+    useParfor = false;
+    switch accelMode
+        case 'auto'
+            [canPf, poolOn] = pf2_base.accel.canParfor();
+            useParfor = canPf && poolOn;
+        case 'parfor'
+            [canPf, ~] = pf2_base.accel.canParfor();
+            useParfor = canPf;
+        case {'gpu', 'none'}
+            % no parfor
+    end
+
     % Compute coupling based on pairing mode
     switch lower(opts.ChannelPairing)
         case 'same'
@@ -160,49 +177,100 @@ function result = computeDyad(dataA, dataB, varargin)
             values = nan(nCh, 1);
             pvalues = nan(nCh, 1);
 
-            for c = 1:nCh
-                xa = sigA(:, channelsA(c));
-                xb = sigB(:, channelsB(c));
+            sA = sigA(:, channelsA);
+            sB = sigB(:, channelsB);
 
-                if all(isnan(xa)) || all(isnan(xb))
-                    continue;
-                end
-
-                res = couplingFn(xa, xb, fs, opts.CouplingArgs{:});
-                val = res.value;
-                pval = res.pvalue;
-                if res.windowed
-                    val = mean(val, 'omitnan');
-                    pval = mean(pval, 'omitnan');
-                end
-                values(c) = val;
-                pvalues(c) = pval;
-            end
-
-        case 'all'
-            nA = length(channelsA);
-            nB = length(channelsB);
-            values = nan(nA, nB);
-            pvalues = nan(nA, nB);
-
-            for a = 1:nA
-                for b = 1:nB
-                    xa = sigA(:, channelsA(a));
-                    xb = sigB(:, channelsB(b));
-
+            if useParfor && nCh > 20
+                parfor c = 1:nCh
+                    xa = sA(:, c);
+                    xb = sB(:, c);
                     if all(isnan(xa)) || all(isnan(xb))
                         continue;
                     end
-
                     res = couplingFn(xa, xb, fs, opts.CouplingArgs{:});
                     val = res.value;
                     pval = res.pvalue;
                     if res.windowed
                         val = mean(val, 'omitnan');
-                        pval = mean(pval, 'omitnan');
+                        pval = combinePvalues(pval);
                     end
-                    values(a, b) = val;
-                    pvalues(a, b) = pval;
+                    values(c) = val;
+                    pvalues(c) = pval;
+                end
+            else
+                for c = 1:nCh
+                    xa = sA(:, c);
+                    xb = sB(:, c);
+                    if all(isnan(xa)) || all(isnan(xb))
+                        continue;
+                    end
+                    res = couplingFn(xa, xb, fs, opts.CouplingArgs{:});
+                    val = res.value;
+                    pval = res.pvalue;
+                    if res.windowed
+                        val = mean(val, 'omitnan');
+                        pval = combinePvalues(pval);
+                    end
+                    values(c) = val;
+                    pvalues(c) = pval;
+                end
+            end
+
+        case 'all'
+            nA = length(channelsA);
+            nB = length(channelsB);
+            nPairs = nA * nB;
+
+            sA = sigA(:, channelsA);
+            sB = sigB(:, channelsB);
+
+            if useParfor && nPairs > 20
+                % Flatten to linear index for parfor
+                vals = nan(nPairs, 1);
+                pvals = nan(nPairs, 1);
+
+                parfor k = 1:nPairs
+                    a = ceil(k / nB);
+                    b = k - (a - 1) * nB;
+                    xa = sA(:, a);
+                    xb = sB(:, b);
+                    if all(isnan(xa)) || all(isnan(xb))
+                        continue;
+                    end
+                    res = couplingFn(xa, xb, fs, opts.CouplingArgs{:});
+                    val = res.value;
+                    pval = res.pvalue;
+                    if res.windowed
+                        val = mean(val, 'omitnan');
+                        pval = combinePvalues(pval);
+                    end
+                    vals(k) = val;
+                    pvals(k) = pval;
+                end
+
+                values = reshape(vals, nB, nA)';
+                pvalues = reshape(pvals, nB, nA)';
+            else
+                values = nan(nA, nB);
+                pvalues = nan(nA, nB);
+
+                for a = 1:nA
+                    for b = 1:nB
+                        xa = sA(:, a);
+                        xb = sB(:, b);
+                        if all(isnan(xa)) || all(isnan(xb))
+                            continue;
+                        end
+                        res = couplingFn(xa, xb, fs, opts.CouplingArgs{:});
+                        val = res.value;
+                        pval = res.pvalue;
+                        if res.windowed
+                            val = mean(val, 'omitnan');
+                            pval = combinePvalues(pval);
+                        end
+                        values(a, b) = val;
+                        pvalues(a, b) = pval;
+                    end
                 end
             end
 
@@ -260,8 +328,27 @@ function fn = getCouplingFn(method)
             fn = @exploreFNIRS.coupling.coherence;
         case 'wcoherence'
             fn = @exploreFNIRS.coupling.wcoherence;
+        case 'granger'
+            fn = @exploreFNIRS.coupling.granger;
+        case 'transferentropy'
+            fn = @exploreFNIRS.coupling.transferEntropy;
         otherwise
             error('exploreFNIRS:hyperscanning:computeDyad', ...
                 'Unknown coupling method "%s".', method);
     end
+end
+
+
+function p = combinePvalues(pvals)
+% Combine p-values using Fisher's method (chi-squared test)
+    pvals = pvals(~isnan(pvals));
+    if isempty(pvals)
+        p = NaN;
+        return;
+    end
+    % Clamp to eps to avoid log(0) = -Inf
+    pvals = max(pvals, eps);
+    chi2stat = -2 * sum(log(pvals));
+    df = 2 * length(pvals);
+    p = 1 - chi2cdf(chi2stat, df);
 end

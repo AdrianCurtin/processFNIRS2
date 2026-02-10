@@ -506,6 +506,11 @@ function [outAuxStruct] = recursiveAuxFlatten(aux_in,nir_time,parent_time_in)
         curFieldName=auxFields{f};
         curField=aux_in.(curFieldName);
 
+        % Skip metadata fields (used for labeling, not time-series data)
+        if ismember(curFieldName, {'varNames', 'unit'})
+            continue;
+        end
+
         if(isempty(curField))
             auxFieldIsEmpty(f)=true;
             outAuxStruct.(curFieldName)=curField;
@@ -557,11 +562,16 @@ function [outAuxStruct] = recursiveAuxFlatten(aux_in,nir_time,parent_time_in)
             end
 
             nAuxChan=size(curField,2);
-          
+            nDataCols=nAuxChan-auxFieldHasTime(f);
 
-            newVarNames={};
-            for nV=1:(nAuxChan-auxFieldHasTime(f))
-                newVarNames{nV}=sprintf('val%i',nV);
+            % Use varNames from parent struct if available
+            if isfield(aux_in,'varNames') && iscell(aux_in.varNames) && length(aux_in.varNames)>=nDataCols
+                newVarNames=aux_in.varNames(1:nDataCols);
+            else
+                newVarNames={};
+                for nV=1:nDataCols
+                    newVarNames{nV}=sprintf('val%i',nV);
+                end
             end
 
             if(auxFieldHasTime(f))

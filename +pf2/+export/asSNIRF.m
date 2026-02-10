@@ -1,4 +1,4 @@
-function [snirfData] = asSNIRF(fNIRcells, filepath, normalizeRaw, stripExtraRawChannels)
+function [snirfData] = asSNIRF(fNIRcells, filepath, varargin)
 % ASSNIRF Export fNIRS data to SNIRF format
 %
 % Converts pf2 fNIRS data structures to the standardized SNIRF format for
@@ -14,18 +14,28 @@ function [snirfData] = asSNIRF(fNIRcells, filepath, normalizeRaw, stripExtraRawC
 %   snirfData = pf2.export.asSNIRF(fNIR, filepath)          % Save to path
 %   snirfData = pf2.export.asSNIRF(fNIRcells, filepath)     % Multiple runs
 %   snirfData = pf2.export.asSNIRF(..., normalizeRaw, stripExtraRawChannels)
+%   pf2.export.asSNIRF(allData, 'output/')                  % Batch to directory
+%   pf2.export.asSNIRF(allData, 'output/', 'Dir1', 'Group') % With subdirs
 %
 % Inputs:
 %   fNIRcells            - fNIRS data structure or cell array of structures
 %                          Each structure should contain .raw, .time, .fs, etc.
 %                          Multiple structures create multiple /nirs groups.
-%   filepath             - Output file path (optional)
+%   filepath             - Output file path or directory (optional)
 %                          If not provided, opens save dialog.
-%                          Extension .snirf is added if missing.
+%                          Cell array + directory path (no .snirf ext) = batch mode.
+%                          Extension .snirf is added if missing in single-file mode.
 %   normalizeRaw         - Normalize raw data before export (default: false)
 %                          If true, scales data for improved compatibility.
 %   stripExtraRawChannels - Remove dark/ambient channels from export (default: false)
 %                          Time and marker columns are always removed.
+%
+% Batch Mode Name-Value Parameters:
+%   'Dir1'..'Dir4'           - Info field names mapped to subdirectories
+%   'Prefix'                 - Cell array of info field names for filename
+%   'NormalizeRaw'           - Normalize raw data (default: false)
+%   'StripExtraRawChannels'  - Strip dark/ambient channels (default: false)
+%   'Verbose'                - Print progress messages (default: true)
 %
 % Outputs:
 %   snirfData            - Generated SNIRF data structure
@@ -55,6 +65,10 @@ function [snirfData] = asSNIRF(fNIRcells, filepath, normalizeRaw, stripExtraRawC
 %   % Export multiple runs in one file
 %   pf2.export.asSNIRF({run1, run2, run3}, 'session.snirf');
 %
+%   % Batch export to directory
+%   pf2.export.asSNIRF(allData, 'output/');
+%   pf2.export.asSNIRF(allData, 'output/', 'Dir1', 'Group', 'Prefix', {'SubjectID'});
+%
 %   % Export with GUI file selection
 %   snirfStruct = pf2.export.asSNIRF(data);
 %
@@ -65,16 +79,44 @@ if(nargin < 1)
 end
 
 if nargin < 2
-   [filename, path] = uiputfile(['*.snirf']); 
+   [filename, path] = uiputfile(['*.snirf']);
    filepath = [path filename];
 end
 
-if(nargin < 3)
-    normalizeRaw = false;
+% --- Detect batch mode: cell array + directory path (no .snirf extension) ---
+[~, ~, extCheck] = fileparts(filepath);
+isBatchMode = iscell(fNIRcells) && ~strcmpi(extCheck, '.snirf');
+
+if isBatchMode
+    % Parse batch name-value parameters
+    batchOpts = parseBatchOpts(varargin{:});
+    paths = pf2_base.buildExportPaths(fNIRcells, filepath, '.snirf', batchOpts);
+    n = numel(fNIRcells);
+    for i = 1:n
+        if batchOpts.Verbose
+            fprintf('  Exporting %d/%d: %s\n', i, n, paths{i});
+        end
+        pf2.export.asSNIRF(fNIRcells{i}, paths{i}, ...
+            batchOpts.NormalizeRaw, batchOpts.StripExtraRawChannels);
+    end
+    if batchOpts.Verbose
+        fprintf('Batch export complete: %d files written to %s\n', n, filepath);
+    end
+    snirfData = [];
+    return;
 end
 
-if(nargin < 4)
-    stripExtraRawChannels = false;
+% --- Single/multi-run mode: parse legacy positional or name-value args ---
+normalizeRaw = false;
+stripExtraRawChannels = false;
+if ~isempty(varargin)
+    % Legacy positional: asSNIRF(data, path, true, false)
+    if islogical(varargin{1}) || isnumeric(varargin{1})
+        normalizeRaw = varargin{1};
+        if numel(varargin) >= 2
+            stripExtraRawChannels = varargin{2};
+        end
+    end
 end
 
 [ filepathdir, filename, ext ] = fileparts(filepath);
@@ -445,6 +487,25 @@ function metaData = info2meta(nirStruct)
         end
     end
 
+    % Fallback: if MeasurementDate not set yet, try info fields or UnixTime
+    if ~isfield(metaData, 'MeasurementDate')
+        if isfield(info, 'MeasurementDate') && ~isempty(info.MeasurementDate)
+            metaData.MeasurementDate = c2v(info.MeasurementDate);
+        elseif isfield(info, 'date') && ~isempty(info.date)
+            metaData.MeasurementDate = c2v(info.date);
+        elseif isfield(info, 'Date') && ~isempty(info.Date)
+            metaData.MeasurementDate = c2v(info.Date);
+        elseif isfield(info, 'recordingDate') && ~isempty(info.recordingDate)
+            metaData.MeasurementDate = c2v(info.recordingDate);
+        elseif isfield(info, 'UnixTime') && ~isempty(info.UnixTime)
+            ut = info.UnixTime;
+            if ischar(ut) || isstring(ut), ut = str2double(ut); end
+            dt = datetime(ut, 'ConvertFrom', 'posixtime');
+            metaData.MeasurementDate = c2v(datestr(dt, 'yyyy-mm-dd'));
+            metaData.MeasurementTime = c2v(datestr(dt, 'HH:MM:SS'));
+        end
+    end
+
     % Ensure required SubjectID is present
     if isfield(info, 'SubjectID') && ~isempty(info.SubjectID)
         metaData.SubjectID = c2v(info.SubjectID);
@@ -482,6 +543,11 @@ function metaData = info2meta(nirStruct)
     fieldMappings('instancenumber') = 'InstanceNumber';
     fieldMappings('calibrationfile') = 'CalibrationFileName';
     fieldMappings('calibration') = 'CalibrationFileName';
+    fieldMappings('measurementdate') = 'MeasurementDate';
+    fieldMappings('date') = 'MeasurementDate';
+    fieldMappings('recordingdate') = 'MeasurementDate';
+    fieldMappings('measurementtime') = 'MeasurementTime';
+    fieldMappings('recordingtime') = 'MeasurementTime';
     fieldMappings('unixtime') = 'UnixTime';
     fieldMappings('unixtimestamp') = 'UnixTime';
     fieldMappings('lastname') = 'lastName';
@@ -747,4 +813,20 @@ function [probe, measurementList, deviceMetaDataTags, rawMax, strippedChannelsMa
      
     % Add wavelengths
     probe.wavelengths = wvList(~isnan(wvList));
+end
+
+
+function opts = parseBatchOpts(varargin)
+% Parse batch export name-value parameters
+    p = inputParser;
+    p.addParameter('Dir1', '', @(x) ischar(x) || isstring(x));
+    p.addParameter('Dir2', '', @(x) ischar(x) || isstring(x));
+    p.addParameter('Dir3', '', @(x) ischar(x) || isstring(x));
+    p.addParameter('Dir4', '', @(x) ischar(x) || isstring(x));
+    p.addParameter('Prefix', {}, @iscell);
+    p.addParameter('NormalizeRaw', false, @(x) islogical(x) || isnumeric(x));
+    p.addParameter('StripExtraRawChannels', false, @islogical);
+    p.addParameter('Verbose', true, @islogical);
+    p.parse(varargin{:});
+    opts = p.Results;
 end

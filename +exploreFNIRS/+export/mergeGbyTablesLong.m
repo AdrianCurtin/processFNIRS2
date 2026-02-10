@@ -117,6 +117,7 @@ for g=1:length(gbyTables)
     if(emptyChannelFlag&&exportFNIR)
         numCh=size(curBarGA.HbO.data,2);
         channelIndexes=1:numCh;
+        channelLabels=cellstr(num2str(channelIndexes(:)));
     elseif(exportFNIR)
        numCh=length(channelIndexes); 
     else

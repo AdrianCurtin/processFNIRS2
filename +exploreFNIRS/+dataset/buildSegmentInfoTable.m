@@ -38,7 +38,9 @@ else
     
     outTable=table();
     for i=1:numF
-        fprintf('Row %i of %i\n',i,numF);
+        if mod(i, 100) == 0 || i == numF
+            fprintf('Row %i of %i\n',i,numF);
+        end
 
        curFNIRseg=FNIRS_array{i};
        

@@ -17,7 +17,7 @@ classdef BlockDefinitionTest < matlab.unittest.TestCase
     methods (TestClassSetup)
         function loadSampleData(testCase)
             raw = pf2.import.sampleData.fNIR2000();
-            testCase.processedData = processFNIRS2(raw, 'ShowGUI', false);
+            testCase.processedData = processFNIRS2(raw);
         end
     end
 
@@ -535,6 +535,99 @@ classdef BlockDefinitionTest < matlab.unittest.TestCase
                 'endTime should be 50 + 3 PostPad = 53');
             testCase.verifyEqual(blocks(1).duration, 28, ...
                 'duration = 20 + 5 + 3 = 28');
+        end
+    end
+
+    %% defineBlocks - MarkerCode + EndMarker
+    methods (Test)
+        function testMarkerCodeWithEndMarker(testCase)
+            % Single start code + single end code via MarkerCode + EndMarker
+            data = pf2_base.tests.unit.BlockDefinitionTest.makeSyntheticData();
+            data.markers = [10 49 0 1; 25 51 0 1; 40 49 0 1; 55 51 0 1];
+
+            blocks = pf2.data.defineBlocks(data, 'MarkerCode', 49, 'EndMarker', 51);
+
+            testCase.verifyLength(blocks, 2, 'Should find 2 blocks');
+            testCase.verifyEqual(blocks(1).startTime, 10);
+            testCase.verifyEqual(blocks(1).endTime, 25);
+            testCase.verifyEqual(blocks(1).duration, 15);
+            testCase.verifyEqual(blocks(2).startTime, 40);
+            testCase.verifyEqual(blocks(2).endTime, 55);
+            testCase.verifyEqual(blocks(2).duration, 15);
+        end
+
+        function testMarkerCodeWithEndMarkerPairs(testCase)
+            % Per-code end markers: 49->59, 48->58
+            data = pf2_base.tests.unit.BlockDefinitionTest.makeSyntheticData();
+            data.markers = [10 49 0 1; 20 59 0 1; 30 48 0 1; 45 58 0 1];
+
+            blocks = pf2.data.defineBlocks(data, 'MarkerCode', [49 48], ...
+                'EndMarker', [59 58]);
+
+            testCase.verifyLength(blocks, 2, 'Should find 2 blocks');
+            % Sorted by time
+            testCase.verifyEqual(blocks(1).startTime, 10);
+            testCase.verifyEqual(blocks(1).endTime, 20);
+            testCase.verifyEqual(blocks(1).markerCode, 49);
+            testCase.verifyEqual(blocks(2).startTime, 30);
+            testCase.verifyEqual(blocks(2).endTime, 45);
+            testCase.verifyEqual(blocks(2).markerCode, 48);
+        end
+
+        function testPositionalCodesWithEndMarker(testCase)
+            % Positional API: defineBlocks(data, 49, 'EndMarker', 51)
+            data = pf2_base.tests.unit.BlockDefinitionTest.makeSyntheticData();
+            data.markers = [10 49 0 1; 30 51 0 1];
+
+            blocks = pf2.data.defineBlocks(data, 49, 'EndMarker', 51);
+
+            testCase.verifyLength(blocks, 1);
+            testCase.verifyEqual(blocks(1).startTime, 10);
+            testCase.verifyEqual(blocks(1).endTime, 30);
+            testCase.verifyEqual(blocks(1).duration, 20);
+        end
+
+        function testMarkerCodeEndMarkerSharedEnd(testCase)
+            % Multiple start codes with one shared EndMarker (scalar broadcast)
+            data = pf2_base.tests.unit.BlockDefinitionTest.makeSyntheticData();
+            data.markers = [10 49 0 1; 25 51 0 1; 40 50 0 1; 55 51 0 1];
+
+            blocks = pf2.data.defineBlocks(data, [49 50], 'EndMarker', 51);
+
+            testCase.verifyLength(blocks, 2, 'Should find 2 blocks');
+            testCase.verifyEqual(blocks(1).startTime, 10);
+            testCase.verifyEqual(blocks(1).endTime, 25);
+            testCase.verifyEqual(blocks(1).markerCode, 49);
+            testCase.verifyEqual(blocks(2).startTime, 40);
+            testCase.verifyEqual(blocks(2).endTime, 55);
+            testCase.verifyEqual(blocks(2).markerCode, 50);
+        end
+
+        function testMarkerCodeEndMarkerWithConditionMap(testCase)
+            % ConditionMap works in MarkerCode+EndMarker mode
+            data = pf2_base.tests.unit.BlockDefinitionTest.makeSyntheticData();
+            data.markers = [10 49 0 1; 25 51 0 1; 40 50 0 1; 55 51 0 1];
+
+            blocks = pf2.data.defineBlocks(data, [49 50], 'EndMarker', 51, ...
+                'ConditionMap', {49, 'CondA'; 50, 'CondB'});
+
+            testCase.verifyLength(blocks, 2);
+            testCase.verifyEqual(blocks(1).info.Condition, 'CondA');
+            testCase.verifyEqual(blocks(2).info.Condition, 'CondB');
+        end
+
+        function testMarkerCodeEndMarkerMissingEnd(testCase)
+            % Start marker with no subsequent end marker is skipped
+            data = pf2_base.tests.unit.BlockDefinitionTest.makeSyntheticData();
+            % Second start (40) has no end marker after it
+            data.markers = [10 49 0 1; 25 51 0 1; 40 49 0 1];
+
+            blocks = pf2.data.defineBlocks(data, 49, 'EndMarker', 51);
+
+            testCase.verifyLength(blocks, 1, ...
+                'Second start with no end should be skipped');
+            testCase.verifyEqual(blocks(1).startTime, 10);
+            testCase.verifyEqual(blocks(1).endTime, 25);
         end
     end
 

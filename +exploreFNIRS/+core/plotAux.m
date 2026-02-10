@@ -29,6 +29,7 @@ function fig = plotAux(groups, auxField, varargin)
 %   SaveWidth   - Width in pixels (default: 800)
 %   SaveHeight  - Height in pixels (default: 500)
 %   SaveDPI     - Resolution (default: 150)
+%   Colors      - Group color palette override (default: [] = auto)
 %
 % Outputs:
 %   fig - Figure handle
@@ -61,6 +62,7 @@ function fig = plotAux(groups, auxField, varargin)
     addParameter(p, 'SaveWidth', 800, @isnumeric);
     addParameter(p, 'SaveHeight', 500, @isnumeric);
     addParameter(p, 'SaveDPI', 150, @isnumeric);
+    addParameter(p, 'Colors', [], @(x) isempty(x) || isnumeric(x) || ischar(x) || isstring(x) || isa(x, 'function_handle') || isa(x, 'exploreFNIRS.core.ColorScheme'));
     parse(p, groups, auxField, varargin{:});
     opts = p.Results;
 
@@ -134,7 +136,11 @@ function fig = plotAux(groups, auxField, varargin)
         'Position', [100, 100, figW, figH], ...
         'Color', 'w');
 
-    groupColors = exploreFNIRS.core.getGroupColors(nGroups);
+    if isa(opts.Colors, 'exploreFNIRS.core.ColorScheme')
+        groupColors = opts.Colors.resolve(groups);
+    else
+        groupColors = exploreFNIRS.core.getGroupColors(nGroups, opts.Colors);
+    end
 
     if strcmpi(opts.Layout, 'grid') && nCh > 1
         % Grid: one subplot per Aux channel
@@ -161,7 +167,7 @@ function fig = plotAux(groups, auxField, varargin)
             end
 
             plot(ax, xlim(ax), [0 0], 'k-', 'LineWidth', 0.5, 'HandleVisibility', 'off');
-            title(ax, chLabels{cIdx});
+            title(ax, pf2_base.plot.escapeTeX(chLabels{cIdx}));
             xlabel(ax, 'Time (s)');
             if cIdx == 1 || mod(cIdx-1, nCols) == 0
                 ylabel(ax, getAuxUnit(refAux));
@@ -207,9 +213,9 @@ function fig = plotAux(groups, auxField, varargin)
                 legendHandles(end+1) = h; %#ok<AGROW>
 
                 if nCh > 1
-                    legendEntries{end+1} = sprintf('%s: %s', groups(g).label, chLabels{cIdx}); %#ok<AGROW>
+                    legendEntries{end+1} = pf2_base.plot.escapeTeX(sprintf('%s: %s', groups(g).label, chLabels{cIdx})); %#ok<AGROW>
                 else
-                    legendEntries{end+1} = groups(g).label; %#ok<AGROW>
+                    legendEntries{end+1} = pf2_base.plot.escapeTeX(groups(g).label); %#ok<AGROW>
                 end
             end
         end
@@ -229,9 +235,9 @@ function fig = plotAux(groups, auxField, varargin)
 
     % Figure title
     if ~isempty(opts.Title)
-        sgtitle(fig, opts.Title);
+        pf2_base.external.suptitle(fig, opts.Title);
     else
-        sgtitle(fig, auxField);
+        pf2_base.external.suptitle(fig, pf2_base.plot.escapeTeX(auxField));
     end
 
     % Save
@@ -375,7 +381,7 @@ function addSharedLegend(fig, groups, groupColors)
     entries = cell(nGroups, 1);
     for g = 1:nGroups
         handles(g) = plot(axLeg, NaN, NaN, '-', 'Color', groupColors(g,:), 'LineWidth', 1.2);
-        entries{g} = groups(g).label;
+        entries{g} = pf2_base.plot.escapeTeX(groups(g).label);
     end
 
     legend(handles, entries, 'Location', 'southoutside', ...

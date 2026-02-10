@@ -46,6 +46,7 @@ function fig = plotMatrix(result, varargin)
     addParameter(p, 'SaveDPI', 150, @isnumeric);
     parse(p, result, varargin{:});
     opts = p.Results;
+    result = exploreFNIRS.connectivity.normalizeResult(result);
 
     if ~isempty(opts.SavePath)
         opts.Visible = 'off';
@@ -61,9 +62,10 @@ function fig = plotMatrix(result, varargin)
         mat(nonsig) = 0;
     end
 
-    fig = figure('Visible', opts.Visible, ...
-        'Position', [100, 100, opts.SaveWidth, opts.SaveHeight], ...
-        'Color', 'w');
+    fig = pf2_base.plot.createFigure('Visible', opts.Visible, ...
+        'Width', opts.SaveWidth, 'Height', opts.SaveHeight, ...
+        'SavePath', opts.SavePath);
+    sty = pf2_base.plot.PlotStyle.getDefault();
     ax = axes('Parent', fig);
 
     imagesc(ax, mat, opts.CLim);
@@ -75,6 +77,7 @@ function fig = plotMatrix(result, varargin)
     else
         chLabels = arrayfun(@(c) sprintf('Ch%d', c), channels, 'UniformOutput', false);
     end
+    chLabels = pf2_base.plot.escapeTeX(chLabels);
     set(ax, 'XTick', 1:nCh, 'XTickLabel', chLabels, 'XTickLabelRotation', 45);
     set(ax, 'YTick', 1:nCh, 'YTickLabel', chLabels);
 
@@ -109,7 +112,7 @@ function fig = plotMatrix(result, varargin)
                         textColor = 'w';
                     end
                     text(ax, j, i, txt, 'HorizontalAlignment', 'center', ...
-                        'FontSize', 7, 'Color', textColor);
+                        'FontSize', sty.LegendFontSize - 2, 'Color', textColor);
                 end
             end
         end
@@ -134,17 +137,9 @@ function fig = plotMatrix(result, varargin)
         ylabel(ax, 'Channel');
     end
 
-    % Save
-    if ~isempty(opts.SavePath)
-        if ~isempty(which('pf2_base.plot.saveFigure'))
-            pf2_base.plot.saveFigure(fig, opts.SavePath, ...
-                opts.SaveWidth, opts.SaveHeight, opts.SaveDPI);
-        else
-            set(fig, 'PaperPositionMode', 'auto');
-            print(fig, opts.SavePath, '-dpng', sprintf('-r%d', opts.SaveDPI));
-        end
-        fprintf('Saved: %s\n', opts.SavePath);
-    end
+    sty.applyToAxes(ax);
+
+    pf2_base.plot.handleSave(fig, opts);
 end
 
 

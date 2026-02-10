@@ -306,6 +306,12 @@ switch(numRawChannels)
         fNIR.info.probename='Unkown *MES.CSV file';
 end
 
+% Attach Device object for self-describing data
+try
+    fNIR.device = pf2.Device.load(fNIR);
+catch
+    % Unknown probe — skip device attachment
+end
 
 
 if(~channelCheck)

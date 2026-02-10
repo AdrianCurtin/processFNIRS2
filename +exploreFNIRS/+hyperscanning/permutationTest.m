@@ -19,6 +19,7 @@ function result = permutationTest(data, pairs, varargin)
 % Name-Value Parameters:
 %   Permutations - Number of permutations (default: 500)
 %   PThreshold   - Significance threshold for FDR correction (default: 0.05)
+%   Align        - Channel alignment mode for group aggregation (default: 'union')
 %   All computeDyad parameters are also supported (Method, Biomarker,
 %   ChannelPairing, Channels, TimeWindow, CouplingArgs).
 %
@@ -41,6 +42,16 @@ function result = permutationTest(data, pairs, varargin)
 %     3. Store in null distribution
 %   P-value = (# null >= observed + 1) / (nPerms + 1)
 %
+% References:
+%   Phipson, B. & Smyth, G. K. (2010). Permutation P-values should never
+%   be zero: calculating exact P-values when permutations are randomly
+%   drawn. Statistical Applications in Genetics and Molecular Biology,
+%   9(1), Article 39. DOI: 10.2202/1544-6115.1585
+%
+%   Benjamini, Y. & Hochberg, Y. (1995). Controlling the false discovery
+%   rate: a practical and powerful approach to multiple testing. Journal of
+%   the Royal Statistical Society, Series B, 57(1), 289-300.
+%
 % See also: exploreFNIRS.hyperscanning.computeGroup, exploreFNIRS.fx.performFDR
 
     ip = inputParser;
@@ -55,6 +66,9 @@ function result = permutationTest(data, pairs, varargin)
     addParameter(ip, 'Channels', [], @isnumeric);
     addParameter(ip, 'TimeWindow', [], @(v) isnumeric(v) && (isempty(v) || length(v) == 2));
     addParameter(ip, 'CouplingArgs', {}, @iscell);
+    addParameter(ip, 'UseROI', false, @islogical);
+    addParameter(ip, 'Accelerate', 'auto', @(x) ischar(x) && ismember(lower(x), {'auto','gpu','parfor','none'}));
+    addParameter(ip, 'Align', 'union', @(x) (ischar(x) || isstring(x)) || (isnumeric(x) && isscalar(x)));
     parse(ip, data, pairs, varargin{:});
     opts = ip.Results;
 
@@ -78,9 +92,19 @@ function result = permutationTest(data, pairs, varargin)
     if ~isempty(opts.CouplingArgs)
         dyadArgs = [dyadArgs, 'CouplingArgs', {opts.CouplingArgs}];
     end
+    if opts.UseROI
+        dyadArgs = [dyadArgs, 'UseROI', true];
+    end
+    if ~strcmpi(opts.Accelerate, 'auto')
+        dyadArgs = [dyadArgs, 'Accelerate', opts.Accelerate];
+    end
+
+    % Build align args for computeGroup
+    alignArgs = {'Align', opts.Align};
 
     % Compute observed coupling
-    observedGroup = exploreFNIRS.hyperscanning.computeGroup(data, pairs, dyadArgs{:});
+    observedGroup = exploreFNIRS.hyperscanning.computeGroup(data, pairs, ...
+        alignArgs{:}, dyadArgs{:});
     observed = observedGroup.Mean(:);
     nElements = length(observed);
 
@@ -109,7 +133,7 @@ function result = permutationTest(data, pairs, varargin)
         % Compute group coupling with shuffled pairs
         try
             shuffResult = exploreFNIRS.hyperscanning.computeGroup( ...
-                data, shuffledPairs, dyadArgs{:});
+                data, shuffledPairs, alignArgs{:}, dyadArgs{:});
             nullDist(perm, :) = shuffResult.Mean(:);
         catch
             % Skip failed permutations

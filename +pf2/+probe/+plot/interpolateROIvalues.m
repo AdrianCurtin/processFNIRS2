@@ -103,7 +103,11 @@ if(isempty(ROIinfo))
         ROIinfo=[];
     end
 else
-    deviceCfg = ROIinfo.DeviceCfg{1};
+    if ismember('DeviceCfg', ROIinfo.Properties.VariableNames)
+        deviceCfg = ROIinfo.DeviceCfg{1};
+    else
+        deviceCfg = '';
+    end
 end
 
 if(isempty(ROIinfo)&&~isempty(fNIR)&&~pf2_base.isnestedfield(fNIR,'ROI.info')&&~isempty(fNIR.info))
@@ -166,7 +170,7 @@ end
 
 
 allCh=[];
-chData2plot=nan(height(probeInfo.TableOpt));
+chData2plot=nan(height(probeInfo.TableOpt), 1);
 
 mrkLbl=cell(size(chData2plot));
 mrkLbl(:)={''};
@@ -175,17 +179,24 @@ ROInames=ROIinfo.Properties.RowNames;
 
 for roiIdx=1:numROI
 
-    if(~strcmp(deviceCfg,ROIinfo.DeviceCfg(roiIdx)))
+    if ismember('DeviceCfg', ROIinfo.Properties.VariableNames) && ...
+            ~strcmp(deviceCfg, ROIinfo.DeviceCfg(roiIdx))
         continue;
     end
 
     curCh=ROIinfo.Optodes{roiIdx};
     
+    if ismember('index', ROIinfo.Properties.VariableNames)
+        dataIdx = ROIinfo.index(roiIdx);
+    else
+        dataIdx = roiIdx;
+    end
+
     for(optIdx=1:length(curCh))
         optNum=probeInfo.TableOpt.OptodeNum(curCh(optIdx));
 
-        chData2plot(optNum)=data2plot(ROIinfo.index(roiIdx));
-        mrkLbl{optNum}=ROInames{ROIinfo.index(roiIdx)};
+        chData2plot(optNum)=data2plot(dataIdx);
+        mrkLbl{optNum}=ROInames{dataIdx};
     end
     
     allCh=[allCh,curCh];
@@ -273,6 +284,8 @@ intArrAlpha(intArrLinear<0)=0;
 
 x2keep=round([inpX(1,min(optXidx)-bufferMult)+1,inpX(1,min(max(optXidx)+bufferMult,length(optXidx)))]);
 y2keep=round([inpY(min(optYidx)-bufferMult,1)+1,inpY(max(optYidx)+bufferMult,1)]);
+x2keep = max(1, min(imgSize, x2keep));
+y2keep = max(1, min(imgSize, y2keep));
 
 optPos2Plot=round([inpX(1,optXidx);inpX(1,optYidx)]);
 
@@ -290,9 +303,11 @@ imgFinal.AlphaDataMapping='scaled';
 
 hold on
 
-plot(optPos2Plot(1,:)/1.01+1,optPos2Plot(2,:)/1.01+1,'O','MarkerSize',25,'LineWidth',3,'color','black', 'MarkerFaceColor', 'k');
+mrkX = optPos2Plot(1,:) - x2keep(1) + 1;
+mrkY = optPos2Plot(2,:) - y2keep(1) + 1;
+plot(mrkX, mrkY, 'O', 'MarkerSize', 25, 'LineWidth', 3, 'color', 'black', 'MarkerFaceColor', 'k');
 for optIdx=1:length(chData2plot)
-    text(optPos2Plot(1,optIdx)/1.01+1,optPos2Plot(2,optIdx)/1.01+1,mrkLbl{optIdx},'FontSize',10,'HorizontalAlignment', 'center','color','white');
+    text(mrkX(optIdx), mrkY(optIdx), mrkLbl{optIdx}, 'FontSize', 10, 'HorizontalAlignment', 'center', 'color', 'white');
 end
 
 ch=colorbar();

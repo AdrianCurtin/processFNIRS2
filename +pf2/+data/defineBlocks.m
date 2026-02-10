@@ -9,7 +9,9 @@ function blocks = defineBlocks(data, varargin)
 % Syntax:
 %   blocks = pf2.data.defineBlocks(data, markerCodes)
 %   blocks = pf2.data.defineBlocks(data, markerCodes, duration)
+%   blocks = pf2.data.defineBlocks(data, markerCodes, 'EndMarker', endCode)
 %   blocks = pf2.data.defineBlocks(data, 'MarkerCode', code, 'Duration', dur)
+%   blocks = pf2.data.defineBlocks(data, 'MarkerCode', code, 'EndMarker', endCode)
 %   blocks = pf2.data.defineBlocks(data, 'StartMarker', s, 'EndMarker', e)
 %   blocks = pf2.data.defineBlocks(data, ..., 'Name', Value)
 %
@@ -30,9 +32,15 @@ function blocks = defineBlocks(data, varargin)
 %   'UseDuration'  - Force use of duration from markers column 3 (default: false)
 %   'StartMarker'  - Start marker code(s) for paired extraction [scalar or column vector]
 %   'EndMarker'    - End marker code(s) for paired extraction [scalar or column vector]
-%                    Must match StartMarker dimensions or be scalar.
-%   'ConditionMap' - Cell array {code1, 'Label1'; code2, 'Label2'} mapping
-%                    marker codes to condition label strings (default: {})
+%                    Can be used with StartMarker or MarkerCode.
+%                    Must match StartMarker/MarkerCode length or be scalar.
+%   'ConditionMap' - Cell array mapping marker codes to labels (default: {})
+%                    Two-column: {code1, 'Label1'; code2, 'Label2'}
+%                    Multi-column: {code1, 'Easy', 'Stroop'; code2, 'Hard', 'Stroop'}
+%                    Extra columns map to extra fields via ConditionField.
+%   'ConditionField' - Field name(s) for ConditionMap labels (default: 'Condition')
+%                      Char for single field, cell array for multiple:
+%                      {'Condition', 'Task'} maps columns 2, 3 of ConditionMap.
 %   'InfoTable'    - Table with one row per block (default: [])
 %                    Column names become .info fields for each block.
 %   'InfoFields'   - Struct of constant fields applied to all blocks (default: struct())
@@ -54,13 +62,16 @@ function blocks = defineBlocks(data, varargin)
 %            .amplitude   - Marker amplitude from column 4 (default 1)
 %            .info        - Struct with block-level metadata:
 %                           .BlockNumber - Sequential 1, 2, 3...
-%                           .Condition   - From ConditionMap (if provided)
+%                           .(ConditionField) - From ConditionMap (default 'Condition')
 %                           ... any user fields from InfoTable/InfoFields
 %
 % Algorithm:
 %   1. Normalize markers to 4-column format
-%   2. Find matching markers by code (MarkerCode or StartMarker/EndMarker)
-%   3. Determine duration: fixed > marker column 3 > zero
+%   2. Select mode: MarkerCode (fixed duration), MarkerCode+EndMarker
+%      (pair start codes with terminating marker), or StartMarker+EndMarker
+%   3. For MarkerCode: duration from fixed > marker column 3 > zero
+%      For MarkerCode+EndMarker or StartMarker+EndMarker: pair each start
+%      with the next available end marker to determine duration
 %   4. Build struct array with startTime, endTime, duration, markerCode, markerIndex
 %   5. Apply PrePad/PostPad to extend block boundaries
 %   6. Apply ConditionMap, InfoTable, InfoFields to .info
@@ -72,6 +83,12 @@ function blocks = defineBlocks(data, varargin)
 %
 %   % Auto-detect duration from marker column 3
 %   blocks = pf2.data.defineBlocks(data, 49);
+%
+%   % Marker code + end marker (duration from terminating marker)
+%   blocks = pf2.data.defineBlocks(data, [49, 50], 'EndMarker', 51);
+%
+%   % Per-code end markers: 49->59, 48->58
+%   blocks = pf2.data.defineBlocks(data, [49, 48], 'EndMarker', [59, 58]);
 %
 %   % Start/end pairs with condition mapping
 %   blocks = pf2.data.defineBlocks(data, ...
@@ -108,6 +125,7 @@ p.addParameter('UseDuration', false, @islogical);
 p.addParameter('StartMarker', [], @(x) isnumeric(x));
 p.addParameter('EndMarker', [], @(x) isnumeric(x));
 p.addParameter('ConditionMap', {}, @iscell);
+p.addParameter('ConditionField', 'Condition', @(x) ischar(x) || isstring(x) || iscellstr(x));
 p.addParameter('InfoTable', [], @(x) isempty(x) || istable(x));
 p.addParameter('InfoFields', struct(), @isstruct);
 p.addParameter('MinDuration', 0, @(x) isnumeric(x) && isscalar(x));
@@ -134,6 +152,10 @@ useDuration = p.Results.UseDuration;
 startMarker = p.Results.StartMarker;
 endMarker = p.Results.EndMarker;
 conditionMap = p.Results.ConditionMap;
+conditionField = p.Results.ConditionField;
+if ischar(conditionField) || isstring(conditionField)
+    conditionField = {char(conditionField)};
+end
 infoTable = p.Results.InfoTable;
 infoFields = p.Results.InfoFields;
 minDur = p.Results.MinDuration;
@@ -147,18 +169,24 @@ if ~isstruct(data) || ~isfield(data, 'markers')
     error('pf2:defineBlocks:badInput', 'First argument must be an fNIRS struct with .markers field.');
 end
 
-% Validate: must specify either MarkerCode or StartMarker+EndMarker
+% Validate mode: MarkerCode, MarkerCode+EndMarker, or StartMarker+EndMarker
 hasMarkerCode = ~isempty(markerCode);
-hasStartEnd = ~isempty(startMarker) && ~isempty(endMarker);
+hasStartMarker = ~isempty(startMarker);
+hasEndMarker = ~isempty(endMarker);
 
-if ~hasMarkerCode && ~hasStartEnd
+if ~hasMarkerCode && ~hasStartMarker
     error('pf2:defineBlocks:noMode', ...
-        'Must specify either marker codes or both ''StartMarker'' and ''EndMarker''.');
+        'Must specify marker codes or ''StartMarker''.');
 end
 
-if hasMarkerCode && hasStartEnd
+if hasMarkerCode && hasStartMarker
     error('pf2:defineBlocks:ambiguousMode', ...
-        'Cannot specify both marker codes and ''StartMarker''/''EndMarker''.');
+        'Cannot specify both marker codes and ''StartMarker''.');
+end
+
+if hasStartMarker && ~hasEndMarker
+    error('pf2:defineBlocks:missingEndMarker', ...
+        '''StartMarker'' requires ''EndMarker''.');
 end
 
 % Normalize markers to 4 columns [time, value, duration, amplitude]
@@ -174,7 +202,10 @@ if isempty(mrk) || size(mrk, 1) == 0
 end
 
 % Build blocks based on mode
-if hasMarkerCode
+if hasMarkerCode && hasEndMarker
+    % MarkerCode + EndMarker: use start/end pairing with MarkerCode as start
+    blocks = buildFromStartEnd(mrk, markerCode, endMarker);
+elseif hasMarkerCode
     blocks = buildFromMarkerCode(mrk, markerCode, fixedDuration, useDuration);
 else
     blocks = buildFromStartEnd(mrk, startMarker, endMarker);
@@ -207,11 +238,13 @@ end
 % Apply ConditionMap
 if ~isempty(conditionMap) && size(conditionMap, 2) >= 2
     mapCodes = cell2mat(conditionMap(:, 1));
-    mapLabels = conditionMap(:, 2);
+    nFields = min(length(conditionField), size(conditionMap, 2) - 1);
     for k = 1:length(blocks)
         idx = find(mapCodes == blocks(k).markerCode, 1);
         if ~isempty(idx)
-            blocks(k).info.Condition = mapLabels{idx};
+            for f = 1:nFields
+                blocks(k).info.(conditionField{f}) = conditionMap{idx, f + 1};
+            end
         end
     end
 end

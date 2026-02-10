@@ -31,10 +31,10 @@ classdef GoldenFileTest < matlab.unittest.TestCase
             % Determine test type based on path
             [~, fileName] = fileparts(goldenFile);
 
-            if contains(goldenFile, fullfile('golden', 'processFNIRS2'))
+            if contains(goldenFile, fullfile('tests', 'golden', 'processFNIRS2'))
                 % Pipeline golden test
                 testCase.runPipelineGolden(golden, fileName);
-            elseif contains(goldenFile, fullfile('golden', 'functions'))
+            elseif contains(goldenFile, fullfile('tests', 'golden', 'functions'))
                 % Function golden test
                 testCase.runFunctionGolden(golden, fileName);
             else
@@ -70,7 +70,7 @@ classdef GoldenFileTest < matlab.unittest.TestCase
             end
 
             % Process
-            processed = processFNIRS2(data, 'ShowGUI', false);
+            processed = processFNIRS2(data);
 
             % Compare output
             result = compareOutputs(golden.output, extractOutput(processed), 1e-10);
@@ -119,8 +119,8 @@ classdef GoldenFileTest < matlab.unittest.TestCase
             projectRoot = fileparts(fileparts(fileparts(fileparts(thisFile))));
 
             files = {};
-            dirs = {fullfile(projectRoot, 'golden', 'processFNIRS2'), ...
-                    fullfile(projectRoot, 'golden', 'functions')};
+            dirs = {fullfile(projectRoot, 'tests', 'golden', 'processFNIRS2'), ...
+                    fullfile(projectRoot, 'tests', 'golden', 'functions')};
 
             for d = 1:length(dirs)
                 if isfolder(dirs{d})

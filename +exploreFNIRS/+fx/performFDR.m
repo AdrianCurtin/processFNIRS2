@@ -17,28 +17,27 @@ function [qvalues,k,passed]=performFDR(pvalues,pThreshold)
 % Inputs:
 %   pvalues    - Matrix or vector of uncorrected p-values
 %                Can be a numeric array or table (tables are converted)
-%                NaN values are ignored in calculations
+%                NaN values are excluded from the test count
 %   pThreshold - FDR threshold for significance (default: 0.05)
 %                Typical values: 0.01, 0.05, 0.10
 %
 % Outputs:
 %   qvalues    - FDR-corrected q-values, same size as pvalues
-%                q = p * m / k, where m = total tests, k = rank
+%                q = p * m / k, where m = number of valid tests, k = critical rank
 %                Values > 1 are capped at 1
-%   k          - Critical rank: largest i where p(i) <= q * i / m
-%                Used for adjusting q-values
+%   k          - Critical rank: largest i where p(i) <= pThreshold * i / m
+%                Minimum value of 1
 %   passed     - Logical matrix indicating significant results
-%                true where qvalues <= pThreshold AND pvalues < 0.05
+%                true where qvalues <= pThreshold
 %
 % Algorithm (Benjamini-Hochberg procedure):
-%   1. Sort p-values in ascending order
+%   1. Sort valid (non-NaN) p-values in ascending order
 %   2. For each p-value at rank i, calculate threshold: q * i / m
 %   3. Find largest k where p(k) <= threshold
-%   4. Reject all hypotheses with rank <= k
-%   5. Calculate adjusted q-values: q(i) = p(i) * m / k
+%   4. Calculate adjusted q-values: q(i) = p(i) * m / k
 %
 % Notes:
-%   - Results are further constrained to raw p < 0.05
+%   - NaN p-values are excluded from the test count and remain NaN in output
 %   - This is the standard (non-adaptive) BH procedure
 %   - For two-step adaptive FDR, see performFDR_twostep
 %   - Assumes tests are independent or positively dependent
@@ -53,46 +52,37 @@ function [qvalues,k,passed]=performFDR(pvalues,pThreshold)
 %
 % See also: performFDR_twostep, exploreFNIRS.fx.autoContrast
 
-if(istable(pvalues))
+if istable(pvalues)
     pvalues=table2array(pvalues);
 end
 
-if(nargin<2)
+if nargin<2
     pThreshold=0.05;
 end
 
-qvalues=nan(size(pvalues));
-kVals=nan(size(pvalues(:)));
-[pSorted,pIdx]=sort(pvalues(:));
+% Count valid (non-NaN) tests
+m=sum(~isnan(pvalues(:)));
 
-numP=length(pSorted);
-kPass=zeros(1,numP);
-m=numP;
-
-for i=1:numP
-    qThreshold=pThreshold/m*i;
-    k=numP-i+1;
-    qvalues(pIdx(i))=pvalues(pIdx(i))*m/i;
-
-    if(qvalues(pIdx(i))<=pThreshold&&pvalues(pIdx(i))<=0.05)
-        kPass(pIdx(i))=1;
-    end
-    kVals(pIdx(i))=i;
-end
-
-k_ind=find(kPass==1);
-if(isempty(k_ind))
+if m==0
+    qvalues=nan(size(pvalues));
     k=1;
-else
-   k=max(k_ind);
+    passed=false(size(pvalues));
+    return;
 end
 
+% Sort valid p-values to find critical rank
+pSorted=sort(pvalues(~isnan(pvalues(:))));
+
+% Find critical k: largest rank i where p(i) <= pThreshold * i / m
+k=0;
+for i=1:m
+    if pSorted(i)<=pThreshold*i/m
+        k=i;
+    end
+end
+k=max(k,1);
+
+% Compute q-values and determine significance
 qvalues=pvalues*m/k;
 qvalues(qvalues>1)=1;
 passed=qvalues<=pThreshold;
-
-if(any(kPass(:)))
-   k=max(kVals(kPass(:)==1));
-   qvalues=pvalues*m/k;
-   passed=qvalues<=pThreshold&pvalues<0.05;
-end

@@ -48,7 +48,7 @@ function fNIR = shortChannelRegression(fNIR, varargin)
 %
 % Example:
 %   data = pf2.import.importSNIRF('subject01.snirf', false);
-%   processed = processFNIRS2(data, 'ShowGUI', false);
+%   processed = processFNIRS2(data);
 %   corrected = pf2_base.fnirs.shortChannelRegression(processed);
 %
 % Notes:

@@ -2,200 +2,107 @@ function InstallMEX
 
 global WAVELABPATH
 
-%pause;
-
-
-
 MEX_OK = 1;
 
-% Check if all the MEX files are installed
-for file={'CPAnalysis' 'WPAnalysis' 'FWT_PO' 'FWT2_PO' 'IWT_PO' ...
-      'IWT2_PO' 'UpDyadHi' 'UpDyadLo' 'DownDyadHi' 'DownDyadLo' 'dct_iv' ...
-      'FCPSynthesis' 'FWPSynthesis' ...
-      'dct_ii' 'dst_ii' 'dct_iii' 'dst_iii' ...
-      'FWT_PBS' 'IWT_PBS' ...
-      'FWT_TI' 'IWT_TI' ...
-      'FMIPT' 'IMIPT' ...
-      'FAIPT' 'IAIPT' 'LMIRefineSeq' 'MedRefineSeq'}
-  m_or_mex_filepath=which(file{1});
-  funcExist=exist(file{1},'file')==3;
+% MEX file names and their destination directories (relative to WAVELABPATH)
+mexFiles = {
+    'CPAnalysis',     'Packets/One-D';
+    'WPAnalysis',     'Packets/One-D';
+    'FWT_PO',         'Orthogonal';
+    'FWT2_PO',        'Orthogonal';
+    'IWT_PO',         'Orthogonal';
+    'IWT2_PO',        'Orthogonal';
+    'UpDyadHi',       'Orthogonal';
+    'UpDyadLo',       'Orthogonal';
+    'DownDyadHi',     'Orthogonal';
+    'DownDyadLo',     'Orthogonal';
+    'dct_iv',         'Packets/One-D';
+    'FCPSynthesis',   'Pursuit';
+    'FWPSynthesis',   'Pursuit';
+    'dct_ii',         'Meyer';
+    'dst_ii',         'Meyer';
+    'dct_iii',        'Meyer';
+    'dst_iii',        'Meyer';
+    'FWT_PBS',        'Biorthogonal';
+    'IWT_PBS',        'Biorthogonal';
+    'FWT_TI',         'Invariant';
+    'IWT_TI',         'Invariant';
+    'FMIPT',          'Median';
+    'IMIPT',          'Median';
+    'FAIPT',          'Papers/MIPT';
+    'IAIPT',          'Papers/MIPT';
+    'LMIRefineSeq',   'Papers/MIPT';
+    'MedRefineSeq',   'Papers/MIPT';
+};
 
-  if ~any(funcExist)
-    fprintf('Could not find MEX file for %s!\n',file{1});
-    MEX_OK = 0;
-    break;
-  end
+% Check if all MEX files are available for the current architecture
+for k = 1:size(mexFiles, 1)
+    if exist(mexFiles{k, 1}, 'file') ~= 3
+        fprintf('Could not find MEX file for %s\n', mexFiles{k, 1});
+        MEX_OK = 0;
+        break;
+    end
 end
 
-% If not, install...
-if ~MEX_OK,
-  disp('WaveLab detects that some or all of your MEX files are not installed,')
-  % Skip interactive prompt in batch/headless mode
-  if batchStartupOptionUsed
-    warning('WaveLab:MEXMissing', 'Some MEX files missing. Run InstallMEX interactively to compile.');
+if MEX_OK
     return;
-  end
-  R=input('do you want to install them now? [[Yes]/No] \n','s');
-if strcmp(R,'') + strcmp(R,'Yes') | strcmp(R,'yes') | strcmp(R,'y') | strcmp(R,'Y') | strcmp(R,'YES'), 
-  disp('INSTALLING MEX FILES, MAY TAKE A WHILE ...')
-  disp(' ')
-  disp('WaveLab assumes that your mex compiler is properly installed.')
-  disp('In particular, you should be able to call mex.m within matlab')
-  disp('to compile a mex file.')
-  disp('Consult your system administrator if not.')
-  disp(' ')      
-  FIRST_COMPILE = 0;
-  
-  eval(sprintf('cd ''%sMEXSource''', WAVELABPATH));
-  
-  mexFiles={'CPAnalysis' 'WPAnalysis' 'FWT_PO' 'FWT2_PO' 'IWT_PO' ...
-	'IWT2_PO' 'UpDyadHi' 'UpDyadLo' 'DownDyadHi' 'DownDyadLo' 'dct_iv' ...
-	'FCPSynthesis' 'FWPSynthesis' ...
-	'dct_ii' 'dst_ii' 'dct_iii' 'dst_iii' ...
-	'FWT_PBS' 'IWT_PBS' ...
-	'FWT_TI' 'IWT_TI' ...
-	'FMIPT' 'IMIPT' ...
-	'FAIPT' 'IAIPT' 'LMIRefineSeq' 'MedRefineSeq'};
-  
-  for f=1:length(mexFiles)
-  
-    file = mexFiles{f};
-    disp(sprintf('%s.c',file));
-    eval(sprintf('mex %s.c',file));
-  end
-
-  Friend = computer;
-  isPC = 0; isMAC = 0;
-  if strcmp(Friend(1:2),'PC')
-    isPC = 1;
-  elseif strcmp(Friend,'MAC2')
-    isMAC = 1;
-  end
-  
-  if isunix
-    !mv CPAnalysis.mex* ../Packets/One-D
-    !mv WPAnalysis.mex* ../Packets/One-D
-    !mv FWT_PO.mex* ../Orthogonal
-    !mv FWT2_PO.mex* ../Orthogonal
-    !mv IWT_PO.mex* ../Orthogonal
-    !mv IWT2_PO.mex* ../Orthogonal
-    !mv UpDyadHi.mex* ../Orthogonal
-    !mv UpDyadLo.mex* ../Orthogonal
-    !mv DownDyadHi.mex* ../Orthogonal
-    !mv DownDyadLo.mex* ../Orthogonal
-    !mv dct_iv.mex* ../Packets/One-D
-    !mv FCPSynthesis.mex* ../Pursuit
-    !mv FWPSynthesis.mex* ../Pursuit
-    !mv dct_ii.mex* ../Meyer
-    !mv dst_ii.mex* ../Meyer
-    !mv dct_iii.mex* ../Meyer
-    !mv dst_iii.mex* ../Meyer
-    !mv FWT_PBS.mex* ../Biorthogonal
-    !mv IWT_PBS.mex* ../Biorthogonal
-    !mv FWT_TI.mex* ../Invariant
-    !mv IWT_TI.mex* ../Invariant
-    !mv FMIPT.mex* ../Median 
-    !mv IMIPT.mex* ../Median
-    !mv FAIPT.mex* ../Papers/MIPT
-    !mv IAIPT.mex* ../Papers/MIPT
-    !mv LMIRefineSeq.mex* ../Papers/MIPT
-    !mv MedRefineSeq.mex* ../Papers/MIPT
-  elseif isPC
-    dos('move CPAnalysis.mexw ..\\Packets\\One-D');
-    dos('move WPAnalysis.mexw ..\\Packets\\One-D');
-    dos('move FWT_PO.mexw ..\\Orthogonal');
-    dos('move FWT2_PO.mexw ..\\Orthogonal');
-    dos('move IWT_PO.mexw ..\\Orthogonal');
-    dos('move IWT2_PO.mexw ..\\Orthogonal');
-    dos('move UpDyadHi.mexw ..\\Orthogonal');
-    dos('move UpDyadLo.mexw ..\\Orthogonal');
-    dos('move DownDyadHi.mexw ..\\Orthogonal');
-    dos('move DownDyadLo.mexw ..\\Orthogonal');
-    dos('move dct_iv.mexw ..\\Packets\\One-D');
-    dos('move FCPSynthesis.mexw ..\\Pursuit');
-    dos('move FWPSynthesis.mexw ..\\Pursuit');
-    dos('move dct_ii.mexw ..\\Meyer');
-    dos('move dst_ii.mexw ..\\Meyer');
-    dos('move dct_iii.mexw ..\\Meyer');
-    dos('move dst_iii.mexw ..\\Meyer');
-    dos('move FWT_PBS.mexw ..\\Biorthogonal');
-    dos('move IWT_PBS.mexw ..\\Biorthogonal');
-    dos('move FWT_TI.mexw ..\\Invariant');
-    dos('move IWT_TI.mexw ..\\Invariant');
-    dos('move FMIPT.mexw ..\\Median ');
-    dos('move IMIPT.mexw ..\\Median');
-    dos('move FAIPT.mexw ..\\Papers\\MIPT');
-    dos('move IAIPT.mexw ..\\Papers\\MIPT');
-    dos('move LMIRefineSeq.mexw ..\\Papers\\MIPT');
-    dos('move MedRefineSeq.mexw ..\\Papers\\MIPT');
-    dos('move CPAnalysis.mexw64 ..\\Packets\\One-D');
-    dos('move WPAnalysis.mexw64 ..\\Packets\\One-D');
-    dos('move FWT_PO.mexw64 ..\\Orthogonal');
-    dos('move FWT2_PO.mexw64 ..\\Orthogonal');
-    dos('move IWT_PO.mexw64 ..\\Orthogonal');
-    dos('move IWT2_PO.mexw64 ..\\Orthogonal');
-    dos('move UpDyadHi.mexw64 ..\\Orthogonal');
-    dos('move UpDyadLo.mexw64 ..\\Orthogonal');
-    dos('move DownDyadHi.mexw64 ..\\Orthogonal');
-    dos('move DownDyadLo.mexw64 ..\\Orthogonal');
-    dos('move dct_iv.mexw64 ..\\Packets\\One-D');
-    dos('move FCPSynthesis.mexw64 ..\\Pursuit');
-    dos('move FWPSynthesis.mexw64 ..\\Pursuit');
-    dos('move dct_ii.mexw64 ..\\Meyer');
-    dos('move dst_ii.mexw64 ..\\Meyer');
-    dos('move dct_iii.mexw64 ..\\Meyer');
-    dos('move dst_iii.mexw64 ..\\Meyer');
-    dos('move FWT_PBS.mexw64 ..\\Biorthogonal');
-    dos('move IWT_PBS.mexw64 ..\\Biorthogonal');
-    dos('move FWT_TI.mexw64 ..\\Invariant');
-    dos('move IWT_TI.mexw64 ..\\Invariant');
-    dos('move FMIPT.mexw64 ..\\Median ');
-    dos('move IMIPT.mexw64 ..\\Median');
-    dos('move FAIPT.mexw64 ..\\Papers\\MIPT');
-    dos('move IAIPT.mexw64 ..\\Papers\\MIPT');
-    dos('move LMIRefineSeq.mexw64 ..\\Papers\\MIPT');
-    dos('move MedRefineSeq.mexw64 ..\\Papers\\MIPT');
-  elseif isMAC
-    acopy('CPAnalysis.mex', '::Packets:One-D')
-    acopy('WPAnalysis.mex' ,'::Packets:One-D')
-    acopy('FWT_PO.mex' ,'::Orthogonal')
-    acopy('FWT2_PO.mex' ,'::Orthogonal')
-    acopy('IWT_PO.mex' ,'::Orthogonal')
-    acopy('IWT2_PO.mex' ,'::Orthogonal')
-    acopy('UpDyadHi.mex' ,'::Orthogonal')
-    acopy('UpDyadLo.mex' ,'::Orthogonal')
-    acopy('DownDyadHi.mex' ,'::Orthogonal')
-    acopy('DownDyadLo.mex' ,'::Orthogonal')
-    acopy('dct_iv.mex' ,'::Packets:One-D')
-    acopy('FCPSynthesis.mex' ,'::Pursuit')
-    acopy('FWPSynthesis.mex' ,'::Pursuit')
-    acopy('FastAllSeg.mex' ,'::Papers:MinEntSeg')
-    acopy('dct_ii.mex' ,'::Meyer')
-    acopy('dst_ii.mex' ,'::Meyer')
-    acopy('dct_iii.mex' ,'::Meyer')
-    acopy('dst_iii.mex' ,'::Meyer')
-    acopy('FWT_PBS.mex' ,'::Biorthogonal')
-    acopy('IWT_PBS.mex' ,'::Biorthogonal')
-    acopy('FWT_TI.mex' ,'::Invariant')
-    acopy('IWT_TI.mex' ,'::Invariant')
-    acopy('FMIPT.mex' ,'::Median')
-    acopy('IMIPT.mex' ,'::Median')
-    acopy('FAIPT.mex' ,'::Papers:MIPT')
-    acopy('IAIPT.mex' ,'::Papers:MIPT')
-    acopy('LMIRefineSeq.mex' ,'::Papers:MIPT')
-    acopy('MedRefineSeq.mex' ,'::Papers:MIPT')
-  end
-end
 end
 
-eval(sprintf('cd ''%s''', WAVELABPATH));
+% Determine whether to compile
+if batchStartupOptionUsed
+    doInstall = true;
+else
+    disp('WaveLab detects that some MEX files are not installed for this architecture.');
+    R = input('Install them now? [[Yes]/No] ', 's');
+    doInstall = isempty(R) || any(strcmpi(R, {'yes', 'y'}));
+end
 
-clear MEX_OK isPC R
- 
- 
+if ~doInstall
+    return;
+end
+
+fprintf('Compiling WaveLab MEX files for %s ...\n', computer('arch'));
+
+origDir = pwd;
+srcDir = fullfile(WAVELABPATH, 'MEXSource');
+cd(srcDir);
+
+nCompiled = 0;
+nFailed = 0;
+for k = 1:size(mexFiles, 1)
+    name = mexFiles{k, 1};
+    destRel = mexFiles{k, 2};
+    srcFile = fullfile(srcDir, [name '.c']);
+    destDir = fullfile(WAVELABPATH, destRel);
+
+    % Skip if already compiled for this architecture
+    if exist(name, 'file') == 3
+        continue;
+    end
+
+    if ~isfile(srcFile)
+        fprintf('  [skip] %s.c not found\n', name);
+        continue;
+    end
+
+    try
+        fprintf('  Compiling %s.c ...', name);
+        mex(srcFile, '-outdir', destDir);
+        fprintf(' OK\n');
+        nCompiled = nCompiled + 1;
+    catch ME
+        fprintf(' FAILED: %s\n', ME.message);
+        nFailed = nFailed + 1;
+    end
+end
+
+cd(origDir);
+fprintf('WaveLab MEX compilation: %d compiled, %d failed, %d already present\n', ...
+    nCompiled, nFailed, size(mexFiles, 1) - nCompiled - nFailed);
+
 %
 %  Part of Wavelab Version 850
 %  Built Tue Jan  3 13:20:38 EST 2006
 %  This is Copyrighted Material
 %  For Copying permissions see COPYING.m
-%  Comments? e-mail wavelab@stat.stanford.edu 
+%  Comments? e-mail wavelab@stat.stanford.edu

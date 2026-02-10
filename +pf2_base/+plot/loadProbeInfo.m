@@ -39,8 +39,11 @@ end
 probeInfo = [];
 deviceInfo = [];
 
+% Check for pf2.Device object first
+if isstruct(fNIR) && isfield(fNIR, 'device') && isa(fNIR.device, 'pf2.Device')
+    probeInfo = fNIR.device.probeInfo;
 % Check if probeinfo is already in the data struct
-if isstruct(fNIR) && isfield(fNIR, 'probeinfo')
+elseif isstruct(fNIR) && isfield(fNIR, 'probeinfo')
     probeInfo = fNIR.probeinfo;
 else
     % Try to get config file path from fNIR.info.probename

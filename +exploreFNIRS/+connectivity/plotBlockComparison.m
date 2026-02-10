@@ -98,33 +98,57 @@ function fig = plotBlockComparison(blockResults, varargin)
 
             switch lower(opts.Metric)
                 case 'mean'
-                    utVals = getUpperTriangle(mat);
-                    blockMeans(b) = mean(utVals, 'omitnan');
+                    offVals = getOffDiagonal(mat);
+                    blockMeans(b) = mean(offVals, 'omitnan');
                     % SEM from individual subjects
                     nSubj = length(grp.matrices);
                     subjMeans = zeros(nSubj, 1);
                     for s = 1:nSubj
-                        subjMeans(s) = mean(getUpperTriangle(grp.matrices{s}), 'omitnan');
+                        subjMeans(s) = mean(getOffDiagonal(grp.matrices{s}), 'omitnan');
                     end
                     blockSEMs(b) = std(subjMeans, 'omitnan') / sqrt(nSubj);
                     subjectValues{b} = subjMeans;
 
                 case 'median'
-                    utVals = getUpperTriangle(mat);
-                    blockMeans(b) = median(utVals, 'omitnan');
+                    offVals = getOffDiagonal(mat);
+                    blockMeans(b) = median(offVals, 'omitnan');
                     nSubj = length(grp.matrices);
                     subjMeds = zeros(nSubj, 1);
                     for s = 1:nSubj
-                        subjMeds(s) = median(getUpperTriangle(grp.matrices{s}), 'omitnan');
+                        subjMeds(s) = median(getOffDiagonal(grp.matrices{s}), 'omitnan');
                     end
                     blockSEMs(b) = std(subjMeds, 'omitnan') / sqrt(nSubj);
                     subjectValues{b} = subjMeds;
 
                 case 'density'
-                    % Fraction of significant connections
-                    blockMeans(b) = NaN;
-                    blockSEMs(b) = 0;
-                    subjectValues{b} = [];
+                    % Fraction of significant connections (one-sample t-test)
+                    nSubj = length(grp.matrices);
+                    if nSubj < 3
+                        warning('exploreFNIRS:connectivity:plotBlockComparison', ...
+                            'Density metric requires >= 3 subjects, got %d', nSubj);
+                        blockMeans(b) = NaN;
+                        blockSEMs(b) = 0;
+                        subjectValues{b} = [];
+                    else
+                        % Detect directed methods: check matrix asymmetry
+                        testMat = grp.Mean;
+                        isAsymmetric = any(abs(testMat - testMat') > 1e-10, 'all');
+                        if isAsymmetric
+                            mask = ~eye(nCh, 'logical');
+                        else
+                            mask = triu(true(nCh), 1);
+                        end
+                        [ri, ci] = find(mask);
+                        nPairs = length(ri);
+                        pVals = ones(nPairs, 1);
+                        for pi = 1:nPairs
+                            vals = cellfun(@(m) m(ri(pi), ci(pi)), grp.matrices);
+                            [~, pVals(pi)] = ttest(vals);
+                        end
+                        blockMeans(b) = mean(pVals < opts.PThreshold);
+                        blockSEMs(b) = 0;
+                        subjectValues{b} = [];
+                    end
 
                 otherwise
                     error('exploreFNIRS:connectivity:plotBlockComparison', ...
@@ -141,9 +165,10 @@ function fig = plotBlockComparison(blockResults, varargin)
     end
 
     % Create figure
-    fig = figure('Visible', opts.Visible, ...
-        'Position', [100, 100, opts.SaveWidth, opts.SaveHeight], ...
-        'Color', 'w');
+    fig = pf2_base.plot.createFigure('Visible', opts.Visible, ...
+        'Width', opts.SaveWidth, 'Height', opts.SaveHeight, ...
+        'SavePath', opts.SavePath);
+    sty = pf2_base.plot.PlotStyle.getDefault();
     ax = axes('Parent', fig);
 
     if isempty(opts.Colors)
@@ -162,7 +187,7 @@ function fig = plotBlockComparison(blockResults, varargin)
 
     % Error bars
     errorbar(ax, 1:nBlocks, blockMeans, blockSEMs, 'k.', ...
-        'LineWidth', 1.2, 'CapSize', 6);
+        'LineWidth', sty.AxisLineWidth, 'CapSize', 6);
 
     % Individual subject dots
     if opts.ShowIndividual
@@ -179,11 +204,11 @@ function fig = plotBlockComparison(blockResults, varargin)
 
     % Zero line
     plot(ax, [0.5, nBlocks + 0.5], [0, 0], '-', ...
-        'Color', [0.7, 0.7, 0.7], 'LineWidth', 0.5);
+        'Color', sty.ZeroLineColor, 'LineWidth', 0.5);
 
     hold(ax, 'off');
 
-    set(ax, 'XTick', 1:nBlocks, 'XTickLabel', blockLabels);
+    set(ax, 'XTick', 1:nBlocks, 'XTickLabel', pf2_base.plot.escapeTeX(blockLabels));
     xlabel(ax, 'Block');
 
     if ~isempty(opts.ChannelPair)
@@ -202,24 +227,20 @@ function fig = plotBlockComparison(blockResults, varargin)
     end
 
     box(ax, 'on');
+    sty.applyToAxes(ax);
 
-    % Save
-    if ~isempty(opts.SavePath)
-        if ~isempty(which('pf2_base.plot.saveFigure'))
-            pf2_base.plot.saveFigure(fig, opts.SavePath, ...
-                opts.SaveWidth, opts.SaveHeight, opts.SaveDPI);
-        else
-            set(fig, 'PaperPositionMode', 'auto');
-            print(fig, opts.SavePath, '-dpng', sprintf('-r%d', opts.SaveDPI));
-        end
-        fprintf('Saved: %s\n', opts.SavePath);
-    end
+    pf2_base.plot.handleSave(fig, opts);
 
 end
 
 
-function vals = getUpperTriangle(mat)
-% Extract upper triangle values (excluding diagonal)
-    mask = triu(true(size(mat)), 1);
+function vals = getOffDiagonal(mat)
+% Extract off-diagonal values (upper triangle for symmetric, all for directed)
+    isAsymmetric = any(abs(mat - mat') > 1e-10, 'all');
+    if isAsymmetric
+        mask = ~eye(size(mat), 'logical');
+    else
+        mask = triu(true(size(mat)), 1);
+    end
     vals = mat(mask);
 end

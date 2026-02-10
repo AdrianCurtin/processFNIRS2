@@ -51,7 +51,7 @@ int xstart,n;
 
 void scopydouble(x,xstart,xskip,y,ystart,yskip,n)
 DOUBLE *x,*y;
-int xstart,n;
+int xstart,xskip,ystart,yskip,n;
 {
   x += xstart;
   y += ystart;
@@ -181,8 +181,7 @@ int l, d, n,J;
   free(interp); */
 }
 
-int nlhs, nrhs;
-mxArray *plhs[], *prhs[];
+/* removed stale global mxArray declarations for C23 compatibility */
 
 void mexFunction(int nlhs,mxArray *plhs[],int nrhs,const mxArray *prhs[])
 {
