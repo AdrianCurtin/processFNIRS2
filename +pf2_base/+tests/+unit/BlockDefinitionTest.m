@@ -17,7 +17,7 @@ classdef BlockDefinitionTest < matlab.unittest.TestCase
     methods (TestClassSetup)
         function loadSampleData(testCase)
             raw = pf2.import.sampleData.fNIR2000();
-            testCase.processedData = processFNIRS2(raw, 'ShowGUI', false);
+            testCase.processedData = processFNIRS2(raw);
         end
     end
 
@@ -86,7 +86,7 @@ classdef BlockDefinitionTest < matlab.unittest.TestCase
         function testMarkerFixedDuration(testCase)
             % Marker code + fixed duration creates correct blocks
             data = pf2_base.tests.unit.BlockDefinitionTest.makeSyntheticData();
-            blocks = pf2.data.defineBlocks(data, 'MarkerCode', 49, 'Duration', 15);
+            blocks = pf2.data.defineBlocks(data, 'MarkerCode', 49, 'Duration', 15, 'Embed', false);
 
             testCase.verifyLength(blocks, 3, 'Should find 3 blocks');
             testCase.verifyEqual(blocks(1).startTime, 30, 'First block starts at marker time');
@@ -98,7 +98,7 @@ classdef BlockDefinitionTest < matlab.unittest.TestCase
         function testMarkerFixedDurationBlockNumbers(testCase)
             % BlockNumber auto-assigned sequentially
             data = pf2_base.tests.unit.BlockDefinitionTest.makeSyntheticData();
-            blocks = pf2.data.defineBlocks(data, 'MarkerCode', 49, 'Duration', 15);
+            blocks = pf2.data.defineBlocks(data, 'MarkerCode', 49, 'Duration', 15, 'Embed', false);
 
             for k = 1:length(blocks)
                 testCase.verifyEqual(blocks(k).info.BlockNumber, k, ...
@@ -112,7 +112,7 @@ classdef BlockDefinitionTest < matlab.unittest.TestCase
         function testMarkerUseDuration(testCase)
             % UseDuration flag reads duration from markers column 3
             data = pf2_base.tests.unit.BlockDefinitionTest.makeSyntheticData();
-            blocks = pf2.data.defineBlocks(data, 'MarkerCode', 49, 'UseDuration', true);
+            blocks = pf2.data.defineBlocks(data, 'MarkerCode', 49, 'UseDuration', true, 'Embed', false);
 
             testCase.verifyLength(blocks, 3);
             testCase.verifyEqual(blocks(1).duration, 20, 'Block 1 duration from col 3');
@@ -128,7 +128,7 @@ classdef BlockDefinitionTest < matlab.unittest.TestCase
             % Paired start/end markers produce correct windows
             data = pf2_base.tests.unit.BlockDefinitionTest.makePairedMarkerData();
             blocks = pf2.data.defineBlocks(data, ...
-                'StartMarker', [50; 51], 'EndMarker', [52; 53]);
+                'StartMarker', [50; 51], 'EndMarker', [52; 53], 'Embed', false);
 
             testCase.verifyLength(blocks, 4, 'Should find 4 blocks (2 per condition)');
 
@@ -148,7 +148,7 @@ classdef BlockDefinitionTest < matlab.unittest.TestCase
             data = pf2_base.tests.unit.BlockDefinitionTest.makePairedMarkerData();
             blocks = pf2.data.defineBlocks(data, ...
                 'StartMarker', [50; 51], 'EndMarker', [52; 53], ...
-                'ConditionMap', {50, 'Natural'; 51, 'Synthetic'});
+                'ConditionMap', {50, 'Natural'; 51, 'Synthetic'}, 'Embed', false);
 
             % Sorted by time: A1(50), B1(51), A2(50), B2(51)
             testCase.verifyEqual(blocks(1).info.Condition, 'Natural');
@@ -164,7 +164,7 @@ classdef BlockDefinitionTest < matlab.unittest.TestCase
             % Use column vector for OR: find markers 50 or 51
             blocks = pf2.data.defineBlocks(data, ...
                 'MarkerCode', [50; 51], 'Duration', 10, ...
-                'ConditionMap', {50, 'CondA'; 51, 'CondB'});
+                'ConditionMap', {50, 'CondA'; 51, 'CondB'}, 'Embed', false);
 
             testCase.verifyLength(blocks, 4, 'Should find 4 markers (2x50 + 2x51)');
             testCase.verifyEqual(blocks(1).info.Condition, 'CondA');
@@ -181,7 +181,7 @@ classdef BlockDefinitionTest < matlab.unittest.TestCase
                 'VariableNames', {'Score','Difficulty'});
 
             blocks = pf2.data.defineBlocks(data, 'MarkerCode', 49, ...
-                'Duration', 15, 'InfoTable', scores);
+                'Duration', 15, 'InfoTable', scores, 'Embed', false);
 
             testCase.verifyEqual(blocks(1).info.Score, 85);
             testCase.verifyEqual(blocks(2).info.Difficulty, 'Hard');
@@ -195,7 +195,7 @@ classdef BlockDefinitionTest < matlab.unittest.TestCase
             % Constant InfoFields applied to all blocks
             data = pf2_base.tests.unit.BlockDefinitionTest.makeSyntheticData();
             blocks = pf2.data.defineBlocks(data, 'MarkerCode', 49, ...
-                'Duration', 15, 'InfoFields', struct('Task', 'Stroop', 'Group', 'Control'));
+                'Duration', 15, 'InfoFields', struct('Task', 'Stroop', 'Group', 'Control'), 'Embed', false);
 
             for k = 1:length(blocks)
                 testCase.verifyEqual(blocks(k).info.Task, 'Stroop');
@@ -211,7 +211,7 @@ classdef BlockDefinitionTest < matlab.unittest.TestCase
             data = pf2_base.tests.unit.BlockDefinitionTest.makeSyntheticData();
             % Durations are 20, 25, 30 from column 3
             blocks = pf2.data.defineBlocks(data, 'MarkerCode', 49, ...
-                'UseDuration', true, 'MinDuration', 22);
+                'UseDuration', true, 'MinDuration', 22, 'Embed', false);
 
             testCase.verifyLength(blocks, 2, ...
                 'Should reject block with duration=20 (< MinDuration=22)');
@@ -226,7 +226,7 @@ classdef BlockDefinitionTest < matlab.unittest.TestCase
             % Blocks longer than MaxDuration are rejected
             data = pf2_base.tests.unit.BlockDefinitionTest.makeSyntheticData();
             blocks = pf2.data.defineBlocks(data, 'MarkerCode', 49, ...
-                'UseDuration', true, 'MaxDuration', 27);
+                'UseDuration', true, 'MaxDuration', 27, 'Embed', false);
 
             testCase.verifyLength(blocks, 2, ...
                 'Should reject block with duration=30 (> MaxDuration=27)');
@@ -238,7 +238,7 @@ classdef BlockDefinitionTest < matlab.unittest.TestCase
         function testEmptyMarkers(testCase)
             % No matching markers returns empty struct array
             data = pf2_base.tests.unit.BlockDefinitionTest.makeSyntheticData();
-            blocks = pf2.data.defineBlocks(data, 'MarkerCode', 999, 'Duration', 10);
+            blocks = pf2.data.defineBlocks(data, 'MarkerCode', 999, 'Duration', 10, 'Embed', false);
 
             testCase.verifyEmpty(blocks, 'Should return empty for no matching markers');
             testCase.verifyTrue(isstruct(blocks), 'Empty result should still be struct');
@@ -248,7 +248,7 @@ classdef BlockDefinitionTest < matlab.unittest.TestCase
             % Data with empty markers returns empty
             data = pf2_base.tests.unit.BlockDefinitionTest.makeSyntheticData();
             data.markers = zeros(0, 4);
-            blocks = pf2.data.defineBlocks(data, 'MarkerCode', 49, 'Duration', 10);
+            blocks = pf2.data.defineBlocks(data, 'MarkerCode', 49, 'Duration', 10, 'Embed', false);
 
             testCase.verifyEmpty(blocks);
         end
@@ -259,8 +259,9 @@ classdef BlockDefinitionTest < matlab.unittest.TestCase
         function testBasicExtraction(testCase)
             % Extract blocks produces correct number of segments
             data = pf2_base.tests.unit.BlockDefinitionTest.makeSyntheticData();
-            blocks = pf2.data.defineBlocks(data, 'MarkerCode', 49, 'Duration', 20);
-            segments = pf2.data.extractBlocks(data, blocks, 'SetT0', false);
+            blocks = pf2.data.defineBlocks(data, 'MarkerCode', 49, 'Duration', 20, 'Embed', false);
+            segments = pf2.data.extractBlocks(data, blocks, ...
+                'PreTime', 0, 'PostTime', 0, 'SetT0', false);
 
             testCase.verifyLength(segments, 3, 'Should extract 3 segments');
 
@@ -282,7 +283,7 @@ classdef BlockDefinitionTest < matlab.unittest.TestCase
         function testPreTimePostTime(testCase)
             % PreTime and PostTime extend extraction window
             data = pf2_base.tests.unit.BlockDefinitionTest.makeSyntheticData();
-            blocks = pf2.data.defineBlocks(data, 'MarkerCode', 49, 'Duration', 20);
+            blocks = pf2.data.defineBlocks(data, 'MarkerCode', 49, 'Duration', 20, 'Embed', false);
 
             % Extract with 5s pre and 3s post, no T0 shift for easier verification
             segments = pf2.data.extractBlocks(data, blocks, ...
@@ -307,10 +308,11 @@ classdef BlockDefinitionTest < matlab.unittest.TestCase
             % Add a known offset to HbO so baseline subtraction is visible
             data.HbO = data.HbO + 5;
 
-            blocks = pf2.data.defineBlocks(data, 'MarkerCode', 49, 'Duration', 20);
+            blocks = pf2.data.defineBlocks(data, 'MarkerCode', 49, 'Duration', 20, 'Embed', false);
 
             % Extract without baseline
-            segsNoBL = pf2.data.extractBlocks(data, blocks, 'SetT0', false);
+            segsNoBL = pf2.data.extractBlocks(data, blocks, ...
+                'PreTime', 0, 'PostTime', 0, 'SetT0', false);
 
             % Extract with baseline: [-5, 0] relative to block start
             % Need PreTime >= 5 to include baseline period in extraction
@@ -330,9 +332,10 @@ classdef BlockDefinitionTest < matlab.unittest.TestCase
         function testSetT0(testCase)
             % SetT0 shifts time so block start = 0
             data = pf2_base.tests.unit.BlockDefinitionTest.makeSyntheticData();
-            blocks = pf2.data.defineBlocks(data, 'MarkerCode', 49, 'Duration', 20);
+            blocks = pf2.data.defineBlocks(data, 'MarkerCode', 49, 'Duration', 20, 'Embed', false);
 
-            segments = pf2.data.extractBlocks(data, blocks, 'SetT0', true);
+            segments = pf2.data.extractBlocks(data, blocks, ...
+                'PreTime', 0, 'PostTime', 0, 'SetT0', true);
 
             for k = 1:length(segments)
                 seg = segments{k};
@@ -344,7 +347,7 @@ classdef BlockDefinitionTest < matlab.unittest.TestCase
         function testSetT0WithPreTime(testCase)
             % With PreTime, time starts at negative value
             data = pf2_base.tests.unit.BlockDefinitionTest.makeSyntheticData();
-            blocks = pf2.data.defineBlocks(data, 'MarkerCode', 49, 'Duration', 20);
+            blocks = pf2.data.defineBlocks(data, 'MarkerCode', 49, 'Duration', 20, 'Embed', false);
 
             segments = pf2.data.extractBlocks(data, blocks, ...
                 'PreTime', 5, 'SetT0', true);
@@ -363,7 +366,7 @@ classdef BlockDefinitionTest < matlab.unittest.TestCase
             % Parent data.info merged with block.info
             data = pf2_base.tests.unit.BlockDefinitionTest.makeSyntheticData();
             blocks = pf2.data.defineBlocks(data, 'MarkerCode', 49, ...
-                'Duration', 20, 'ConditionMap', {49, 'StroopTask'});
+                'Duration', 20, 'ConditionMap', {49, 'StroopTask'}, 'Embed', false);
 
             segments = pf2.data.extractBlocks(data, blocks);
 
@@ -380,18 +383,36 @@ classdef BlockDefinitionTest < matlab.unittest.TestCase
                 'Condition from ConditionMap should be present');
         end
 
-        function testCopyInfoFalse(testCase)
-            % CopyInfo=false skips parent data.info
+        function testOverwriteInfoFalse(testCase)
+            % OverwriteInfo=false prevents block.info from overwriting parent fields
             data = pf2_base.tests.unit.BlockDefinitionTest.makeSyntheticData();
-            blocks = pf2.data.defineBlocks(data, 'MarkerCode', 49, 'Duration', 20);
+            data.info.Condition = 'ParentCondition';  % set on parent
+            blocks = pf2.data.defineBlocks(data, 'MarkerCode', 49, 'Duration', 20, ...
+                'ConditionMap', {49, 'BlockCondition'}, 'Embed', false);
 
-            segments = pf2.data.extractBlocks(data, blocks, 'CopyInfo', false);
+            segments = pf2.data.extractBlocks(data, blocks, 'OverwriteInfo', false);
 
             seg = segments{1};
-            testCase.verifyFalse(isfield(seg.info, 'SubjectID'), ...
-                'Parent SubjectID should not be present when CopyInfo=false');
+            testCase.verifyEqual(seg.info.Condition, 'ParentCondition', ...
+                'Parent Condition should be preserved when OverwriteInfo=false');
+            testCase.verifyEqual(seg.info.SubjectID, 'S01', ...
+                'Parent info always copied');
             testCase.verifyTrue(isfield(seg.info, 'BlockNumber'), ...
-                'Block-level fields should still be present');
+                'Block-only fields should still be added');
+        end
+
+        function testOverwriteInfoTrue(testCase)
+            % OverwriteInfo=true (default) lets block.info overwrite parent fields
+            data = pf2_base.tests.unit.BlockDefinitionTest.makeSyntheticData();
+            data.info.Condition = 'ParentCondition';
+            blocks = pf2.data.defineBlocks(data, 'MarkerCode', 49, 'Duration', 20, ...
+                'ConditionMap', {49, 'BlockCondition'}, 'Embed', false);
+
+            segments = pf2.data.extractBlocks(data, blocks);
+
+            seg = segments{1};
+            testCase.verifyEqual(seg.info.Condition, 'BlockCondition', ...
+                'Block Condition should overwrite parent when OverwriteInfo=true');
         end
     end
 
@@ -432,7 +453,7 @@ classdef BlockDefinitionTest < matlab.unittest.TestCase
             blocks = pf2.data.defineBlocks(data, 'MarkerCode', 49, ...
                 'UseDuration', true, ...
                 'ConditionMap', {49, 'StroopTask'}, ...
-                'InfoFields', struct('Group', 'Control'));
+                'InfoFields', struct('Group', 'Control'), 'Embed', false);
 
             segments = pf2.data.extractBlocks(data, blocks, ...
                 'PreTime', 5, 'PostTime', 2, 'SetT0', true);
@@ -467,7 +488,7 @@ classdef BlockDefinitionTest < matlab.unittest.TestCase
                 minT + 80, 10, 20, 1;
             ];
 
-            blocks = pf2.data.defineBlocks(data, 'MarkerCode', 10, 'Duration', 20);
+            blocks = pf2.data.defineBlocks(data, 'MarkerCode', 10, 'Duration', 20, 'Embed', false);
             segments = pf2.data.extractBlocks(data, blocks, 'SetT0', true);
 
             testCase.verifyLength(segments, 2);
@@ -482,7 +503,7 @@ classdef BlockDefinitionTest < matlab.unittest.TestCase
         function testPositionalCodesAndDuration(testCase)
             % Simple positional syntax: defineBlocks(data, codes, duration)
             data = pf2_base.tests.unit.BlockDefinitionTest.makeSyntheticData();
-            blocks = pf2.data.defineBlocks(data, [49], 15);
+            blocks = pf2.data.defineBlocks(data, [49], 15, 'Embed', false);
 
             testCase.verifyLength(blocks, 3, 'Should find 3 blocks');
             testCase.verifyEqual(blocks(1).duration, 15);
@@ -492,7 +513,7 @@ classdef BlockDefinitionTest < matlab.unittest.TestCase
         function testPositionalMultipleCodes(testCase)
             % Multiple codes as row vector: defineBlocks(data, [49, 50], 30)
             data = pf2_base.tests.unit.BlockDefinitionTest.makePairedMarkerData();
-            blocks = pf2.data.defineBlocks(data, [50, 51], 10);
+            blocks = pf2.data.defineBlocks(data, [50, 51], 10, 'Embed', false);
 
             testCase.verifyLength(blocks, 4, 'Should find 4 blocks (2x50 + 2x51)');
         end
@@ -500,7 +521,7 @@ classdef BlockDefinitionTest < matlab.unittest.TestCase
         function testPositionalAutoDuration(testCase)
             % No duration given: auto-detect from marker column 3
             data = pf2_base.tests.unit.BlockDefinitionTest.makeSyntheticData();
-            blocks = pf2.data.defineBlocks(data, 49);
+            blocks = pf2.data.defineBlocks(data, 49, 'Embed', false);
 
             testCase.verifyLength(blocks, 3);
             testCase.verifyEqual(blocks(1).duration, 20, ...
@@ -513,7 +534,7 @@ classdef BlockDefinitionTest < matlab.unittest.TestCase
             % Positional codes + name-value params mixed
             data = pf2_base.tests.unit.BlockDefinitionTest.makeSyntheticData();
             blocks = pf2.data.defineBlocks(data, 49, 15, ...
-                'ConditionMap', {49, 'Stroop'});
+                'ConditionMap', {49, 'Stroop'}, 'Embed', false);
 
             testCase.verifyLength(blocks, 3);
             testCase.verifyEqual(blocks(1).info.Condition, 'Stroop');
@@ -527,7 +548,7 @@ classdef BlockDefinitionTest < matlab.unittest.TestCase
             % PrePad and PostPad extend block boundaries
             data = pf2_base.tests.unit.BlockDefinitionTest.makeSyntheticData();
             blocks = pf2.data.defineBlocks(data, 49, 20, ...
-                'PrePad', 5, 'PostPad', 3);
+                'PrePad', 5, 'PostPad', 3, 'Embed', false);
 
             testCase.verifyEqual(blocks(1).startTime, 25, ...
                 'startTime should be 30 - 5 PrePad = 25');
@@ -535,6 +556,285 @@ classdef BlockDefinitionTest < matlab.unittest.TestCase
                 'endTime should be 50 + 3 PostPad = 53');
             testCase.verifyEqual(blocks(1).duration, 28, ...
                 'duration = 20 + 5 + 3 = 28');
+        end
+    end
+
+    %% defineBlocks - MarkerCode + EndMarker
+    methods (Test)
+        function testMarkerCodeWithEndMarker(testCase)
+            % Single start code + single end code via MarkerCode + EndMarker
+            data = pf2_base.tests.unit.BlockDefinitionTest.makeSyntheticData();
+            data.markers = [10 49 0 1; 25 51 0 1; 40 49 0 1; 55 51 0 1];
+
+            blocks = pf2.data.defineBlocks(data, 'MarkerCode', 49, 'EndMarker', 51, 'Embed', false);
+
+            testCase.verifyLength(blocks, 2, 'Should find 2 blocks');
+            testCase.verifyEqual(blocks(1).startTime, 10);
+            testCase.verifyEqual(blocks(1).endTime, 25);
+            testCase.verifyEqual(blocks(1).duration, 15);
+            testCase.verifyEqual(blocks(2).startTime, 40);
+            testCase.verifyEqual(blocks(2).endTime, 55);
+            testCase.verifyEqual(blocks(2).duration, 15);
+        end
+
+        function testMarkerCodeWithEndMarkerPairs(testCase)
+            % Per-code end markers: 49->59, 48->58
+            data = pf2_base.tests.unit.BlockDefinitionTest.makeSyntheticData();
+            data.markers = [10 49 0 1; 20 59 0 1; 30 48 0 1; 45 58 0 1];
+
+            blocks = pf2.data.defineBlocks(data, 'MarkerCode', [49 48], ...
+                'EndMarker', [59 58], 'Embed', false);
+
+            testCase.verifyLength(blocks, 2, 'Should find 2 blocks');
+            % Sorted by time
+            testCase.verifyEqual(blocks(1).startTime, 10);
+            testCase.verifyEqual(blocks(1).endTime, 20);
+            testCase.verifyEqual(blocks(1).markerCode, 49);
+            testCase.verifyEqual(blocks(2).startTime, 30);
+            testCase.verifyEqual(blocks(2).endTime, 45);
+            testCase.verifyEqual(blocks(2).markerCode, 48);
+        end
+
+        function testPositionalCodesWithEndMarker(testCase)
+            % Positional API: defineBlocks(data, 49, 'EndMarker', 51)
+            data = pf2_base.tests.unit.BlockDefinitionTest.makeSyntheticData();
+            data.markers = [10 49 0 1; 30 51 0 1];
+
+            blocks = pf2.data.defineBlocks(data, 49, 'EndMarker', 51, 'Embed', false);
+
+            testCase.verifyLength(blocks, 1);
+            testCase.verifyEqual(blocks(1).startTime, 10);
+            testCase.verifyEqual(blocks(1).endTime, 30);
+            testCase.verifyEqual(blocks(1).duration, 20);
+        end
+
+        function testMarkerCodeEndMarkerSharedEnd(testCase)
+            % Multiple start codes with one shared EndMarker (scalar broadcast)
+            data = pf2_base.tests.unit.BlockDefinitionTest.makeSyntheticData();
+            data.markers = [10 49 0 1; 25 51 0 1; 40 50 0 1; 55 51 0 1];
+
+            blocks = pf2.data.defineBlocks(data, [49 50], 'EndMarker', 51, 'Embed', false);
+
+            testCase.verifyLength(blocks, 2, 'Should find 2 blocks');
+            testCase.verifyEqual(blocks(1).startTime, 10);
+            testCase.verifyEqual(blocks(1).endTime, 25);
+            testCase.verifyEqual(blocks(1).markerCode, 49);
+            testCase.verifyEqual(blocks(2).startTime, 40);
+            testCase.verifyEqual(blocks(2).endTime, 55);
+            testCase.verifyEqual(blocks(2).markerCode, 50);
+        end
+
+        function testMarkerCodeEndMarkerWithConditionMap(testCase)
+            % ConditionMap works in MarkerCode+EndMarker mode
+            data = pf2_base.tests.unit.BlockDefinitionTest.makeSyntheticData();
+            data.markers = [10 49 0 1; 25 51 0 1; 40 50 0 1; 55 51 0 1];
+
+            blocks = pf2.data.defineBlocks(data, [49 50], 'EndMarker', 51, ...
+                'ConditionMap', {49, 'CondA'; 50, 'CondB'}, 'Embed', false);
+
+            testCase.verifyLength(blocks, 2);
+            testCase.verifyEqual(blocks(1).info.Condition, 'CondA');
+            testCase.verifyEqual(blocks(2).info.Condition, 'CondB');
+        end
+
+        function testMarkerCodeEndMarkerMissingEnd(testCase)
+            % Start marker with no subsequent end marker is skipped
+            data = pf2_base.tests.unit.BlockDefinitionTest.makeSyntheticData();
+            % Second start (40) has no end marker after it
+            data.markers = [10 49 0 1; 25 51 0 1; 40 49 0 1];
+
+            blocks = pf2.data.defineBlocks(data, 49, 'EndMarker', 51, 'Embed', false);
+
+            testCase.verifyLength(blocks, 1, ...
+                'Second start with no end should be skipped');
+            testCase.verifyEqual(blocks(1).startTime, 10);
+            testCase.verifyEqual(blocks(1).endTime, 25);
+        end
+    end
+
+    %% defineBlocks - Embed
+    methods (Test)
+        function testEmbedDefaultTrue(testCase)
+            % Default behavior (Embed=true) returns data struct with .blocks
+            data = pf2_base.tests.unit.BlockDefinitionTest.makeSyntheticData();
+            result = pf2.data.defineBlocks(data, 49, 20);
+
+            testCase.verifyTrue(isfield(result, 'blocks'), ...
+                'Default should embed blocks');
+            testCase.verifyTrue(isfield(result, 'HbO'), ...
+                'Should still be an fNIRS struct');
+            testCase.verifyLength(result.blocks, 3);
+        end
+
+        function testEmbedBlocks(testCase)
+            % Explicit Embed=true returns data struct with .blocks field
+            data = pf2_base.tests.unit.BlockDefinitionTest.makeSyntheticData();
+            result = pf2.data.defineBlocks(data, 49, 20, 'Embed', true);
+
+            testCase.verifyTrue(isstruct(result), 'Should return a struct');
+            testCase.verifyTrue(isfield(result, 'blocks'), 'Should have .blocks field');
+            testCase.verifyTrue(isfield(result, 'HbO'), 'Should still be an fNIRS struct');
+            testCase.verifyLength(result.blocks, 3, 'Should have 3 blocks');
+            testCase.verifyEqual(result.blocks(1).startTime, 30);
+            testCase.verifyEqual(result.blocks(1).duration, 20);
+        end
+
+        function testEmbedFalseReturnBlocks(testCase)
+            % Embed=false returns blocks array
+            data = pf2_base.tests.unit.BlockDefinitionTest.makeSyntheticData();
+            blocks = pf2.data.defineBlocks(data, 49, 20, 'Embed', false);
+
+            testCase.verifyFalse(isfield(blocks, 'HbO'), ...
+                'Embed=false should return blocks, not data struct');
+            testCase.verifyLength(blocks, 3);
+        end
+
+        function testEmbedWithConditionMap(testCase)
+            % Embed works with ConditionMap and other options
+            data = pf2_base.tests.unit.BlockDefinitionTest.makePairedMarkerData();
+            result = pf2.data.defineBlocks(data, [50, 51], 10, ...
+                'ConditionMap', {50, 'A'; 51, 'B'}, 'Embed', true);
+
+            testCase.verifyTrue(isfield(result, 'blocks'));
+            testCase.verifyLength(result.blocks, 4);
+            testCase.verifyEqual(result.blocks(1).info.Condition, 'A');
+        end
+
+        function testDefineBlocksCellArray(testCase)
+            % defineBlocks on cell array embeds blocks on each element
+            data1 = pf2_base.tests.unit.BlockDefinitionTest.makeSyntheticData();
+            data1.info.SubjectID = 'S01';
+            data2 = pf2_base.tests.unit.BlockDefinitionTest.makeSyntheticData();
+            data2.info.SubjectID = 'S02';
+
+            allData = pf2.data.defineBlocks({data1, data2}, 49, 20);
+
+            testCase.verifyTrue(iscell(allData), 'Should return cell array');
+            testCase.verifyLength(allData, 2);
+            testCase.verifyTrue(isfield(allData{1}, 'blocks'));
+            testCase.verifyTrue(isfield(allData{2}, 'blocks'));
+            testCase.verifyLength(allData{1}.blocks, 3);
+            testCase.verifyEqual(allData{1}.info.SubjectID, 'S01');
+        end
+    end
+
+    %% extractBlocks - Embedded Blocks
+    methods (Test)
+        function testExtractBlocksFromEmbed(testCase)
+            % extractBlocks(data) finds data.blocks automatically
+            data = pf2_base.tests.unit.BlockDefinitionTest.makeSyntheticData();
+            data = pf2.data.defineBlocks(data, 49, 20, 'Embed', true);
+
+            segments = pf2.data.extractBlocks(data, 'SetT0', false);
+
+            testCase.verifyLength(segments, 3, 'Should extract 3 segments');
+            testCase.verifyTrue(isfield(segments{1}, 'HbO'));
+        end
+
+        function testExtractBlocksExplicitStillWorks(testCase)
+            % extractBlocks(data, blocks) still works as before
+            data = pf2_base.tests.unit.BlockDefinitionTest.makeSyntheticData();
+            blocks = pf2.data.defineBlocks(data, 49, 20, 'Embed', false);
+
+            segments = pf2.data.extractBlocks(data, blocks, 'SetT0', false);
+
+            testCase.verifyLength(segments, 3);
+            testCase.verifyTrue(isfield(segments{1}, 'HbO'));
+        end
+
+        function testExtractBlocksNoBlocksError(testCase)
+            % Error when no blocks provided and data.blocks missing
+            data = pf2_base.tests.unit.BlockDefinitionTest.makeSyntheticData();
+            testCase.verifyError(...
+                @() pf2.data.extractBlocks(data), ...
+                'pf2:extractBlocks:noBlocks');
+        end
+
+        function testExtractBlocksCellArray(testCase)
+            % Cell array of data structs with embedded blocks
+            data1 = pf2_base.tests.unit.BlockDefinitionTest.makeSyntheticData();
+            data1.info.SubjectID = 'S01';
+            data1 = pf2.data.defineBlocks(data1, 49, 20, 'Embed', true);
+
+            data2 = pf2_base.tests.unit.BlockDefinitionTest.makeSyntheticData();
+            data2.info.SubjectID = 'S02';
+            data2 = pf2.data.defineBlocks(data2, 49, 20, 'Embed', true);
+
+            segments = pf2.data.extractBlocks({data1, data2}, 'SetT0', false);
+
+            testCase.verifyLength(segments, 6, 'Should have 3+3=6 segments');
+            testCase.verifyEqual(segments{1}.info.SubjectID, 'S01');
+            testCase.verifyEqual(segments{4}.info.SubjectID, 'S02');
+        end
+
+        function testExtractBlocksCellArrayWithNameValue(testCase)
+            % Cell array with name-value params forwarded
+            data1 = pf2_base.tests.unit.BlockDefinitionTest.makeSyntheticData();
+            data1 = pf2.data.defineBlocks(data1, 49, 20, 'Embed', true);
+
+            segments = pf2.data.extractBlocks({data1}, ...
+                'PreTime', 5, 'SetT0', true);
+
+            testCase.verifyLength(segments, 3);
+            testCase.verifyEqual(min(segments{1}.time), -5, 'AbsTol', 0.2);
+        end
+
+        function testSegmentsDontInheritBlocks(testCase)
+            % Extracted segments should not carry parent .blocks
+            data = pf2_base.tests.unit.BlockDefinitionTest.makeSyntheticData();
+            data = pf2.data.defineBlocks(data, 49, 20, 'Embed', true);
+
+            segments = pf2.data.extractBlocks(data);
+
+            testCase.verifyFalse(isfield(segments{1}, 'blocks'), ...
+                'Individual segments should not have .blocks');
+        end
+    end
+
+    %% Blocks propagation through data functions
+    methods (Test)
+        function testSetT0ShiftsBlockTimes(testCase)
+            % setT0 should shift block start/end times
+            data = pf2_base.tests.unit.BlockDefinitionTest.makeSyntheticData();
+            data = pf2.data.defineBlocks(data, 49, 20, 'Embed', true);
+
+            shifted = pf2.data.setT0(data, 10);
+
+            testCase.verifyEqual(shifted.blocks(1).startTime, 20, ...
+                'Block startTime should shift by -10');
+            testCase.verifyEqual(shifted.blocks(1).endTime, 40, ...
+                'Block endTime should shift by -10');
+        end
+
+        function testSplitFiltersBlocks(testCase)
+            % split should keep only blocks within the time window
+            data = pf2_base.tests.unit.BlockDefinitionTest.makeSyntheticData();
+            data = pf2.data.defineBlocks(data, 49, 20, 'Embed', true);
+
+            % Block times: [30-50, 90-115, 180-210]
+            % Split to include only second block
+            segment = pf2.data.split(data, 85, 120);
+
+            testCase.verifyTrue(isfield(segment, 'blocks'), ...
+                'split should preserve .blocks');
+            testCase.verifyLength(segment.blocks, 1, ...
+                'Only the block overlapping [85,120] should remain');
+            testCase.verifyEqual(segment.blocks(1).startTime, 90);
+        end
+
+        function testBlocksPreservedThroughProcess(testCase)
+            % processFNIRS2 should preserve .blocks on the output
+            raw = pf2.import.sampleData.fNIR2000();
+
+            % Add markers and define blocks before processing
+            raw.markers = [30, 49, 20, 1; 90, 49, 20, 1];
+            raw = pf2.data.defineBlocks(raw, 49, 20, 'Embed', true);
+
+            processed = processFNIRS2(raw);
+
+            testCase.verifyTrue(isfield(processed, 'blocks'), ...
+                'processFNIRS2 should preserve .blocks');
+            testCase.verifyLength(processed.blocks, 2);
         end
     end
 

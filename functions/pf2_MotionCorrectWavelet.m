@@ -1,10 +1,9 @@
-function [dodWavelet] = pf2_MotionCorrectWavelet(dod,iqr,turnon)
+function [dodWavelet] = pf2_MotionCorrectWavelet(dod,iqr,turnon,wavelet,accelerate)
 % PF2_MOTIONCORRECTWAVELET Wavelet-based motion artifact correction
 %
 % Performs a wavelet decomposition of the signal and removes coefficients
 % that exceed iqr times the interquartile range, as these are likely due
-% to motion artifacts. Uses a shift-invariant discrete wavelet transform
-% with the db2 wavelet.
+% to motion artifacts. Uses a shift-invariant discrete wavelet transform.
 %
 % Reference:
 %   Molavi, B. & Dumont, G. A. (2012). Wavelet-based motion artifact
@@ -14,14 +13,23 @@ function [dodWavelet] = pf2_MotionCorrectWavelet(dod,iqr,turnon)
 % Syntax:
 %   dodWavelet = pf2_MotionCorrectWavelet(dod, iqr)
 %   dodWavelet = pf2_MotionCorrectWavelet(dod, iqr, turnon)
+%   dodWavelet = pf2_MotionCorrectWavelet(dod, iqr, turnon, wavelet)
+%   dodWavelet = pf2_MotionCorrectWavelet(dod, iqr, turnon, wavelet, accelerate)
 %
 % Inputs:
-%   dod    - Optical density signal [T x C double]
-%            T = time samples, C = channels
-%   iqr    - IQR multiplier for outlier detection (scalar, typical: 1.5)
-%            Higher values = fewer coefficients removed.
-%            Set iqr < 0 to skip correction (returns input unchanged).
-%   turnon - Enable flag (optional, scalar). If 0, skips correction.
+%   dod        - Optical density signal [T x C double]
+%                T = time samples, C = channels
+%   iqr        - IQR multiplier for outlier detection (scalar, typical: 1.5)
+%                Higher values = fewer coefficients removed.
+%                Set iqr < 0 to skip correction (returns input unchanged).
+%   turnon     - Enable flag (optional, scalar). If 0, skips correction.
+%   wavelet    - Wavelet family (optional, string, default: 'db2')
+%                Supported: 'haar','db2'-'db10','sym4'-'sym10','coif1'-'coif5',
+%                'beylkin','vaidyanathan','battle1','battle3','battle5'
+%   accelerate - Parallel acceleration mode (optional, string, default: 'auto')
+%                'auto'   - use parfor if pool running and nChannels > 8
+%                'parfor' - use parfor if available
+%                'none'   - serial processing
 %
 % Outputs:
 %   dodWavelet - Motion-corrected optical density [T x C double]
@@ -31,8 +39,9 @@ function [dodWavelet] = pf2_MotionCorrectWavelet(dod,iqr,turnon)
 %   data = pf2.import.sampleData.fNIR2000();
 %   od = pf2_Intensity2OD(data.raw);
 %   corrected = pf2_MotionCorrectWavelet(od, 1.5);
+%   corrected = pf2_MotionCorrectWavelet(od, 1.5, 1, 'db4');
 %
-% See also: pf2_MotionCorrectTDDR, pf2_SMAR, pf2_fnirs_MARA
+% See also: pf2_MotionCorrectTDDR, pf2_SMAR, pf2_fnirs_MARA, pf2_base.wavelet.resolveWavelet
 
 if exist('turnon')
    if turnon==0
@@ -41,7 +50,12 @@ if exist('turnon')
    end
 end
 
-
+if ~exist('wavelet','var') || isempty(wavelet)
+    wavelet = 'db2';
+end
+if ~exist('accelerate','var') || isempty(accelerate)
+    accelerate = 'auto';
+end
 
 if iqr<0
     dodWavelet = dod;
@@ -53,56 +67,68 @@ if(isempty(WAVELABPATH))
     pf2_base.toolboxes.setup_wavelab();
 end
 
+% Resolve wavelet family
+[qmfilter, wavename, ~] = pf2_base.wavelet.resolveWavelet(wavelet);
+if isempty(wavename)
+    error('pf2:MotionCorrectWavelet:unsupportedWavelet', ...
+        'Wavelet ''%s'' has no MATLAB Wavelet Toolbox equivalent needed for dwt/idwt.', wavelet);
+end
+
 dod(isinf(dod))=nan;
 dodWavelet = dod;
 
 SignalLength = size(dod,1); % #time points of original signal
 N = ceil(log2(SignalLength)); % #of levels for the wavelet decomposition
-DataPadded = zeros (2^N,1); % data length should be power of 2  
+nChannels = size(dod,2);
 
-%p = ffpath2('db2.mat');
-%fprintf('Loading %s\n', [p, '/db2.mat']);
-%load([p, '/db2.mat']);  % Load a wavelet (db2 in this case)
-sF = dbwavf('db2');
-db2 = sqrt(2)*sF;
-
-qmfilter = qmf(db2,4); % Quadrature mirror filter used for analysis
 L = 4;  % Lowest wavelet scale used in the analysis
 
-for ii = 1:size(dod,2)
-    
-    idx_ch = ii;
-    
-    dod(isinf(dod))=nan;
-
-    DataPadded(1:SignalLength) = dod(:,idx_ch);  % zeros pad data to have length of power of 2   
-    DataPadded(SignalLength+1:end) = 0;  
-    
-    DCVal = mean(DataPadded);         
-    DataPadded = DataPadded-DCVal;    % removing mean value
-    DataLength = size(DataPadded,1);  
-   
-    [yn NormCoef]=NormalizationNoise(DataPadded',qmfilter);
-    
-    try
-        StatWT = WT_inv(yn,L,N,'db2'); % discrete wavelet transform shift invariant
-        [ARSignal wcTI] = WaveletAnalysis(StatWT,L,'db2',iqr,SignalLength);  % Apply artifact removal
-       
-        ARSignal = ARSignal/NormCoef+DCVal;           
-
-        dodWavelet(:,idx_ch) = ARSignal(1:length(dod));
-    catch
-        warning('Channel %i is invalid\n',ii);
-        dodWavelet(:,idx_ch) = nan;
+% Determine whether to use parfor
+useParfor = false;
+if ~strcmp(accelerate, 'none')
+    [canUse, poolRunning] = pf2_base.accel.canParfor();
+    if strcmp(accelerate, 'parfor')
+        useParfor = canUse;
+    elseif strcmp(accelerate, 'auto')
+        useParfor = canUse && poolRunning && nChannels > 8;
     end
-    
+end
 
+if useParfor
+    parfor ii = 1:nChannels
+        dodWavelet(:,ii) = processChannel(dod(:,ii), SignalLength, N, L, qmfilter, wavename, iqr, ii);
+    end
+else
+    for ii = 1:nChannels
+        dodWavelet(:,ii) = processChannel(dod(:,ii), SignalLength, N, L, qmfilter, wavename, iqr, ii);
+    end
 end
 
 
 
 
 % ---------------------------------------------------------------------
+
+function col = processChannel(channelData, SignalLength, N, L, qmfilter, wavename, iqr, chIdx)
+% Process a single channel - extracted for parfor compatibility
+    channelData(isinf(channelData)) = nan;
+    DataPadded = zeros(2^N, 1);
+    DataPadded(1:SignalLength) = channelData;
+
+    DCVal = mean(DataPadded);
+    DataPadded = DataPadded - DCVal;
+
+    [yn, NormCoef] = NormalizationNoise(DataPadded', qmfilter);
+
+    try
+        StatWT = WT_inv(yn, L, N, wavename);
+        [ARSignal, ~] = WaveletAnalysis(StatWT, L, wavename, iqr, SignalLength);
+        ARSignal = ARSignal / NormCoef + DCVal;
+        col = ARSignal(1:SignalLength)';
+    catch
+        warning('Channel %i is invalid\n', chIdx);
+        col = nan(SignalLength, 1);
+    end
 
 % function pth = ffpath2(fname)
 % %   FFPATH    Find file path
@@ -189,7 +215,7 @@ function wp = WT_inv(x,L,N,wavename)
 D = N-L;
 n = length(x);
 wp = zeros(n,D+1);
-dwtmode('per');  % set the wavelet mode to periodization
+dwtmode('per', 'nodisp');
 
 wp(:,1) = x';
 for d=0:(D-1)
@@ -338,7 +364,7 @@ function x = IWT_inv(StatWT,wavename)
 D = D-1;
 
 wp = StatWT;
-dwtmode('per');
+dwtmode('per', 'nodisp');
 
 approx = wp(:,1)'; % approximation coefficients in the first column
 for d = D-1:-1:0

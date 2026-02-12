@@ -31,11 +31,11 @@ thisFile = mfilename('fullpath');
 projectRoot = fileparts(fileparts(fileparts(thisFile)));
 
 if promote
-    pipelineDir = fullfile(projectRoot, 'golden', 'processFNIRS2');
-    functionDir = fullfile(projectRoot, 'golden', 'functions');
+    pipelineDir = fullfile(projectRoot, 'tests', 'golden', 'processFNIRS2');
+    functionDir = fullfile(projectRoot, 'tests', 'golden', 'functions');
 else
-    pipelineDir = fullfile(projectRoot, 'golden', 'candidates');
-    functionDir = fullfile(projectRoot, 'golden', 'candidates');
+    pipelineDir = fullfile(projectRoot, 'tests', 'golden', 'candidates');
+    functionDir = fullfile(projectRoot, 'tests', 'golden', 'candidates');
 end
 
 % Ensure directories exist
@@ -54,7 +54,7 @@ verStr = sprintf('%.1f', pf2ver);
 fprintf('Generating: fNIR2000_default...\n');
 pf2.methods.raw.setMethod('None');
 pf2.methods.oxy.setMethod('None');
-processed = processFNIRS2(data, 'ShowGUI', false);
+processed = processFNIRS2(data);
 
 golden = struct();
 golden.output = extractOutput(processed);
@@ -87,7 +87,7 @@ else
     rawMethodName = 'golden_TDDR';
 end
 pf2.methods.oxy.setMethod('None');
-processed = processFNIRS2(data, 'ShowGUI', false);
+processed = processFNIRS2(data);
 
 golden = struct();
 golden.output = extractOutput(processed);
@@ -129,8 +129,8 @@ pf2.methods.oxy.setMethod('None');
 
 fprintf('Golden file generation complete.\n');
 if ~promote
-    fprintf('Files saved to golden/candidates/. Review and promote with:\n');
-    fprintf('  movefile(''golden/candidates/file.mat'', ''golden/processFNIRS2/file.mat'')\n');
+    fprintf('Files saved to tests/golden/candidates/. Review and promote with:\n');
+    fprintf('  movefile(''tests/golden/candidates/file.mat'', ''tests/golden/processFNIRS2/file.mat'')\n');
 end
 
 end

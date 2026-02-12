@@ -539,6 +539,9 @@ fNIR.fchMask=ones(1,numCh);
 
 fNIR.probeinfo=device;
 
+% Attach Device object for self-describing data
+fNIR.device = pf2.Device.fromProbeInfo(device);
+
 if(~channelCheck)
     ch_mask_file=sprintf('%s_CH.mat',fileroot);
 

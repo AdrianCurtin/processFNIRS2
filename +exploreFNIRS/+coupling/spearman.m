@@ -47,6 +47,13 @@ function result = spearman(x, y, fs, varargin)
     if winSamples <= 0 || winSamples >= length(x)
         % Full-signal mode
         valid = ~isnan(x) & ~isnan(y);
+        if sum(valid) < 3
+            result.value = NaN;
+            result.pvalue = NaN;
+            result.method = 'spearman';
+            result.windowed = false;
+            return;
+        end
         [r, pval] = corr(x(valid), y(valid), 'Type', 'Spearman');
 
         result.value = r;

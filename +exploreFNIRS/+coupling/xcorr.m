@@ -113,10 +113,17 @@ function res = computeXcorr(x, y, fs, maxLagSamp, normMode)
     % Preserve sign at peak
     peakVal = c(peakIdx);
 
-    % Approximate p-value using Fisher z-transform
-    n = length(x);
-    z = atanh(peakVal) * sqrt(n - 3);
-    pval = 2 * (1 - normcdf(abs(z)));
+    % Approximate p-value using Fisher z-transform (only valid for 'coeff' normalization)
+    if strcmp(normMode, 'coeff')
+        n = length(x);
+        peakVal = max(min(peakVal, 0.9999), -0.9999);
+        z = atanh(peakVal) * sqrt(n - 3);
+        pval = 2 * (1 - normcdf(abs(z)));
+        nLags = 2 * maxLagSamp + 1;
+        pval = min(pval * nLags, 1);
+    else
+        pval = NaN;
+    end
 
     res.value = peakVal;
     res.pvalue = pval;

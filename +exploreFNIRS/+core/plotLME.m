@@ -1,22 +1,31 @@
 function [fig, results] = plotLME(groups, groupByVars, varargin)
 % PLOTLME Linear Mixed Effects analysis for grouped fNIRS data
 %
-% Fits LME models per channel using groupby variables as fixed effects.
-% Returns fitted models, ANOVA tables, auto-generated contrasts, and
-% optionally renders bar charts and topographic F-statistic maps.
+% Fits LME models per channel and biomarker using groupby variables as
+% fixed effects. Returns fitted models, ANOVA tables, auto-generated
+% contrasts, and renders bar charts of F-statistics per channel. Each
+% biomarker gets its own row of subplots — biomarkers are never combined.
+%
+% Delegates model fitting to exploreFNIRS.stats.fitLME and adds
+% visualization on top. Supports fNIRS, ROI, and Aux data types.
 %
 % Syntax:
 %   [fig, results] = plotLME(groups, groupByVars)
 %   [fig, results] = plotLME(groups, groupByVars, 'Biomarkers', {'HbO'})
 %   [fig, results] = plotLME(groups, groupByVars, 'ShowTopo', true)
+%   [fig, results] = plotLME(groups, groupByVars, 'DataType', 'Aux', ...
+%       'AuxField', 'heartRate')
 %
 % Inputs:
 %   groups      - Struct array from Experiment.groups (after aggregate())
 %   groupByVars - Cell array of grouping variable names used in groupby()
 %
 % Name-Value Parameters:
-%   Biomarkers     - Cell array (default: {'HbO'})
+%   Biomarkers     - Cell array (default: {'HbO','HbR','HbTotal','CBSI'})
+%                    Biomarkers not found in data are silently skipped.
+%                    Ignored when DataType='Aux'.
 %   Channels       - Vector of channel indices (default: all)
+%   AuxField       - Aux field name (required when DataType='Aux')
 %   RandomEffects  - Random effects formula (default: '1|SubjectID')
 %   UseIntercept   - Include intercept (default: true)
 %   AllInteractions - Use full interaction model (default: false)
@@ -24,6 +33,7 @@ function [fig, results] = plotLME(groups, groupByVars, varargin)
 %   CustomFormula  - Override auto-built formula (default: '')
 %   ShowBar        - Show bar chart visualization (default: true)
 %   ShowTopo       - Show ANOVA F-stat topo map (default: false)
+%                    Not available for Aux data type.
 %   SigThreshold   - Significance threshold (default: 0.05)
 %   SigType        - 'p' (default), 'q', 'q-twostep'
 %   ErrorType      - 'SEM' (default), 'SD', 'none'
@@ -33,17 +43,25 @@ function [fig, results] = plotLME(groups, groupByVars, varargin)
 %   SaveWidth      - Width in pixels (default: 800)
 %   SaveHeight     - Height in pixels (default: 500)
 %   SaveDPI        - Resolution (default: 150)
+%   Colors         - Bar color palette override (default: [] = biomarker palette)
+%                    [N x 3] RGB matrix, colormap name (e.g. 'Set1'),
+%                    or function handle @(N) returning [N x 3].
+%
+% Layout:
+%   rows = biomarkers (or 1 row for Aux), columns = ANOVA terms
+%   Each subplot shows F-statistics across channels as a bar chart.
+%   Significant channels (p < SigThreshold) are marked with *.
 %
 % Outputs:
 %   fig     - Figure handle (empty if no visualization)
 %   results - Struct with:
-%     .models       - Cell array of LinearMixedModel objects per channel
-%     .anova        - Cell array of ANOVA tables per channel
+%     .models       - Cell array of LinearMixedModel objects [nBio x nCh]
+%     .anova        - Cell array of ANOVA tables [nBio x nCh]
 %     .anova_pval   - Table of ANOVA p-values [channels x terms]
 %     .anova_Fstat  - Table of ANOVA F-statistics [channels x terms]
 %     .coefficients - Cell array of random effects per channel
 %     .contrasts    - Cell array of auto-generated contrast tables
-%     .AIC          - Vector of AIC values per channel
+%     .AIC          - Matrix of AIC values [nBio x nCh]
 %     .formula      - The formula string used
 %     .mergedTable  - Long-format merged data table
 %
@@ -52,22 +70,25 @@ function [fig, results] = plotLME(groups, groupByVars, varargin)
 %   ex.groupby({'Group', 'Condition'});
 %   ex.aggregate();
 %
-%   % Basic LME analysis
-%   [fig, results] = ex.plotLME('Biomarkers', {'HbO'}, 'Channels', 1:5);
+%   % Default: all 4 biomarkers
+%   [fig, results] = ex.plotLME();
 %   disp(results.anova_pval);
 %
-%   % With custom formula
-%   [fig, results] = ex.plotLME('CustomFormula', ...
-%       'Opt1_HbO ~ Group*Condition + (1|SubjectID)');
+%   % Specific biomarkers and channels
+%   [fig, results] = ex.plotLME('Biomarkers', {'HbO','HbR'}, 'Channels', 1:5);
 %
-% See also: exploreFNIRS.core.Experiment, exploreFNIRS.fx.autoContrast,
-%           fitlme, anova
+%   % Auxiliary data
+%   [fig, results] = ex.plotAuxLME('heartRate');
+%
+% See also: exploreFNIRS.stats.fitLME, exploreFNIRS.core.Experiment,
+%           exploreFNIRS.fx.autoContrast, fitlme, anova
 
     p = inputParser;
     addRequired(p, 'groups', @isstruct);
     addRequired(p, 'groupByVars', @iscell);
-    addParameter(p, 'Biomarkers', {'HbO'}, @iscell);
+    addParameter(p, 'Biomarkers', {'HbO','HbR','HbTotal','CBSI'}, @iscell);
     addParameter(p, 'Channels', [], @isnumeric);
+    addParameter(p, 'AuxField', '', @ischar);
     addParameter(p, 'RandomEffects', '1|SubjectID', @ischar);
     addParameter(p, 'UseIntercept', true, @islogical);
     addParameter(p, 'AllInteractions', false, @islogical);
@@ -84,6 +105,10 @@ function [fig, results] = plotLME(groups, groupByVars, varargin)
     addParameter(p, 'SaveWidth', 800, @isnumeric);
     addParameter(p, 'SaveHeight', 500, @isnumeric);
     addParameter(p, 'SaveDPI', 150, @isnumeric);
+    addParameter(p, 'ExcludeShortSeparation', true, @islogical);
+    addParameter(p, 'DataType', 'fNIRS', @ischar);
+    addParameter(p, 'SkipTimeFactor', false, @islogical);
+    addParameter(p, 'Colors', [], @(x) isempty(x) || isnumeric(x) || ischar(x) || isstring(x) || isa(x, 'function_handle') || isa(x, 'exploreFNIRS.core.ColorScheme'));
     parse(p, groups, groupByVars, varargin{:});
     opts = p.Results;
 
@@ -91,325 +116,229 @@ function [fig, results] = plotLME(groups, groupByVars, varargin)
         opts.Visible = 'off';
     end
 
-    nGroups = length(groups);
-    nBioM = length(opts.Biomarkers);
+    isROIMode = strcmpi(opts.DataType, 'ROI');
+    isAuxMode = strcmpi(opts.DataType, 'Aux');
 
-    % Validate groups have bar-flat data
-    for g = 1:nGroups
-        if isempty(groups(g).gbyGrandBarFlat)
+    % Aux mode: topo not available (no probe geometry)
+    if isAuxMode && opts.ShowTopo
+        warning('exploreFNIRS:core:plotLME', ...
+            'ShowTopo not available for Aux data. Using ShowBar instead.');
+        opts.ShowTopo = false;
+        opts.ShowBar = true;
+    end
+
+    ga = groups(1).gbyGrandBarFlat;
+
+    if isAuxMode
+        % Aux mode: validate aux field exists
+        if isempty(opts.AuxField)
             error('exploreFNIRS:core:plotLME', ...
-                'Group %d has no bar-flat grand average. Call aggregate() first.', g);
+                'AuxField is required when DataType is ''Aux''');
         end
-    end
-
-    % Determine channels
-    if isempty(opts.Channels)
-        nCh = size(groups(1).gbyGrandBarFlat.(opts.Biomarkers{1}).data, 2);
-        channels = 1:nCh;
+        if ~isfield(ga, 'Aux') || ~isstruct(ga.Aux)
+            error('exploreFNIRS:core:plotLME', ...
+                'No Aux data in grand average.');
+        end
+        % Check field exists (with _data suffix fallback)
+        af = opts.AuxField;
+        if ~isfield(ga.Aux, af) && ~isfield(ga.Aux, [af '_data'])
+            error('exploreFNIRS:core:plotLME', ...
+                'Aux field "%s" not found in grand average data.', af);
+        end
+        % For Aux, biomarkers list is just the aux field name (1 row)
+        opts.Biomarkers = {opts.AuxField};
     else
-        channels = opts.Channels;
-        nCh = length(channels);
+        % Filter biomarkers to those that exist in the data
+        validBio = {};
+        for i = 1:length(opts.Biomarkers)
+            if isROIMode
+                if pf2_base.isnestedfield(ga, ['ROI.' opts.Biomarkers{i}])
+                    validBio{end+1} = opts.Biomarkers{i}; %#ok<AGROW>
+                end
+            else
+                if isfield(ga, opts.Biomarkers{i}) && ~isempty(ga.(opts.Biomarkers{i}))
+                    validBio{end+1} = opts.Biomarkers{i}; %#ok<AGROW>
+                end
+            end
+        end
+        if isempty(validBio)
+            error('exploreFNIRS:core:plotLME', ...
+                'None of the requested biomarkers found in data.');
+        end
+        opts.Biomarkers = validBio;
     end
 
-    % Get time bins
-    barTimes = groups(1).gbyGrandBarFlat.time;
+    % Delegate model fitting to stats module
+    statsArgs = { ...
+        'Biomarkers', opts.Biomarkers, ...
+        'Channels', opts.Channels, ...
+        'RandomEffects', opts.RandomEffects, ...
+        'UseIntercept', opts.UseIntercept, ...
+        'AllInteractions', opts.AllInteractions, ...
+        'InfoCovariate', opts.InfoCovariate, ...
+        'CustomFormula', opts.CustomFormula, ...
+        'ExcludeShortSeparation', opts.ExcludeShortSeparation, ...
+        'SkipTimeFactor', opts.SkipTimeFactor, ...
+        'DataType', opts.DataType};
+    if isAuxMode
+        statsArgs = [statsArgs, {'AuxField', opts.AuxField}];
+    end
+    results = exploreFNIRS.stats.fitLME(groups, groupByVars, statsArgs{:});
 
-    % Build channel labels
-    chLabels = arrayfun(@(x) num2str(x), channels, 'UniformOutput', false);
-
-    % Initialize results
-    results = struct();
-    results.models = cell(nBioM, nCh);
-    results.anova = cell(nBioM, nCh);
-    results.contrasts = cell(nBioM, nCh);
-    results.AIC = nan(nBioM, nCh);
-    results.formula = '';
-    results.mergedTable = [];
-    results.anova_pval = table();
-    results.anova_Fstat = table();
+    channels = results.channels;
+    nCh = length(channels);
+    nBioM = length(opts.Biomarkers);
 
     fig = [];
 
-    % Process each biomarker x channel combination
-    for bIdx = 1:nBioM
-        bioM = opts.Biomarkers{bIdx};
-
-        for chI = 1:nCh
-            ch = channels(chI);
-
-            % Build merged long-format table
-            mergedTable = exploreFNIRS.export.mergeGbyTablesLong( ...
-                groups, {bioM}, ch, barTimes, false, false, chLabels(chI));
-
-            if isempty(mergedTable) || height(mergedTable) == 0
-                warning('No data for %s channel %d, skipping', bioM, ch);
-                continue;
-            end
-
-            % Convert Time to numeric if multiple time bins
-            if ismember('Time', mergedTable.Properties.VariableNames)
-                if iscell(mergedTable.Time) || isstring(mergedTable.Time)
-                    mergedTable.Time = str2double(mergedTable.Time);
-                end
-            end
-
-            % Build variable name (response)
-            varName = sprintf('Opt%s_%s', chLabels{chI}, bioM);
-
-            if ~ismember(varName, mergedTable.Properties.VariableNames)
-                warning('Variable %s not found in merged table, skipping', varName);
-                continue;
-            end
-
-            % Build LME formula
-            if ~isempty(opts.CustomFormula)
-                lmeString = opts.CustomFormula;
-                dummyCodeStr = 'reference';
-                if contains(lmeString, '-1+') || contains(lmeString, '~-1')
-                    dummyCodeStr = 'full';
-                    lmeString = strrep(lmeString, '*', ':');
-                end
-            else
-                [lmeString, dummyCodeStr] = buildFormula(varName, ...
-                    groupByVars, opts);
-            end
-
-            results.formula = lmeString;
-            if bIdx == 1 && chI == 1
-                results.mergedTable = mergedTable;
-            end
-
-            % Fit LME
-            try
-                rng(2019);
-                mdl = fitlme(mergedTable, lmeString, ...
-                    'FitMethod', 'REML', 'CheckHessian', true, ...
-                    'DummyVarCoding', dummyCodeStr);
-
-                results.models{bIdx, chI} = mdl;
-                results.AIC(bIdx, chI) = mdl.ModelCriterion.AIC;
-
-                % ANOVA
-                anv = anova(mdl, 'DFMethod', 'satterthwaite');
-                results.anova{bIdx, chI} = anv;
-
-                % Store ANOVA results in summary tables
-                chRowName = sprintf('Opt%s_%s', chLabels{chI}, bioM);
-                anovaNames = sanitizeNames(anv.Term);
-
-                results.anova_pval{chRowName, anovaNames} = anv.pValue';
-                results.anova_Fstat{chRowName, anovaNames} = anv.FStat';
-
-                % Auto contrasts
-                try
-                    cTable = exploreFNIRS.fx.autoContrast(mdl);
-                    results.contrasts{bIdx, chI} = cTable;
-                catch
-                    results.contrasts{bIdx, chI} = table();
-                end
-
-                % Random effects coefficients
-                try
-                    [~, ~, results.coefficients{bIdx, chI}] = ...
-                        randomEffects(mdl, 'DFMethod', 'satterthwaite');
-                catch
-                    results.coefficients{bIdx, chI} = [];
-                end
-
-                % Null model comparison
-                try
-                    nullStr = sprintf('%s~1+(1|SubjectID)', varName);
-                    mdlML = fitlme(mergedTable, lmeString, ...
-                        'FitMethod', 'ML', 'CheckHessian', true, ...
-                        'DummyVarCoding', dummyCodeStr);
-                    nullMdl = fitlme(mergedTable, nullStr, ...
-                        'FitMethod', 'ML', 'CheckHessian', true, ...
-                        'DummyVarCoding', dummyCodeStr);
-                    nullComp = compare(mdlML, nullMdl);
-                    results.nullComparison{bIdx, chI} = nullComp;
-                catch
-                    results.nullComparison{bIdx, chI} = [];
-                end
-
-                % Print summary
-                fprintf('LME [%s Ch %d]: AIC=%.1f\n', bioM, ch, ...
-                    results.AIC(bIdx, chI));
-
-            catch ME
-                fprintf(2, 'LME failed for %s Ch %d: %s\n', bioM, ch, ME.message);
-            end
-        end
-    end
-
-    % Print ANOVA summary
-    if ~isempty(results.anova_pval) && height(results.anova_pval) > 0
-        fprintf('\n--- ANOVA p-values ---\n');
-        disp(results.anova_pval);
-    end
-
     % Visualization
-    if opts.ShowBar || opts.ShowTopo
-        fig = figure('Visible', opts.Visible, ...
-            'Position', [100, 100, opts.SaveWidth, opts.SaveHeight], 'Color', 'w');
-
-        if opts.ShowBar && ~opts.ShowTopo
-            plotBarSummary(fig, groups, results, opts, channels, chLabels);
-        elseif opts.ShowTopo && ~opts.ShowBar
-            plotTopoFstat(fig, results, opts);
-        else
-            % Both: bar on left, topo on right
-            plotBarSummary(fig, groups, results, opts, channels, chLabels);
-        end
-
-        % Title
-        if ~isempty(opts.Title)
-            sgtitle(fig, opts.Title);
-        else
-            sgtitle(fig, sprintf('LME: %s', results.formula));
-        end
+    if ~(opts.ShowBar || opts.ShowTopo)
+        return;
     end
 
-    % Save
-    if ~isempty(opts.SavePath) && ~isempty(fig)
-        if ~isempty(which('pf2_base.plot.saveFigure'))
-            pf2_base.plot.saveFigure(fig, opts.SavePath, ...
-                opts.SaveWidth, opts.SaveHeight, opts.SaveDPI);
+    sty = pf2_base.plot.PlotStyle.getDefault();
+
+    if opts.ShowBar
+        fig = plotBarSummary(results, opts, channels, nBioM, nCh, sty);
+    elseif opts.ShowTopo
+        fig = plotTopoFstat(results, opts, channels, nBioM, nCh, sty);
+    end
+
+    % Title: show full model formula (matching plotTopoLME)
+    if ~isempty(fig)
+        if ~isempty(opts.Title)
+            pf2_base.external.suptitle(fig, opts.Title);
         else
-            set(fig, 'PaperPositionMode', 'auto');
-            print(fig, opts.SavePath, '-dpng', sprintf('-r%d', opts.SaveDPI));
+            formulaStr = regexprep(results.formula, '^[^~]+~', 'biom ~ ');
+            formulaStr = strrep(formulaStr, '+', ' + ');
+            formulaStr = regexprep(formulaStr, '\s+', ' ');
+            pf2_base.external.suptitle(fig, pf2_base.plot.escapeTeX(formulaStr));
         end
-        fprintf('Saved: %s\n', opts.SavePath);
+
+        sty.applyToFigure(fig);
+        pf2_base.plot.handleSave(fig, opts);
     end
 end
 
 
 %% Local helpers
 
-function [lmeString, dummyCodeStr] = buildFormula(varName, groupByVars, opts)
-% Build LME formula string from groupby variables and options
 
-    dummyCodeStr = 'reference';
+function fig = plotBarSummary(results, opts, channels, nBioM, nCh, sty)
+% Render bar chart: rows = biomarkers, columns = ANOVA terms
+% Each subplot shows F-statistics across channels
 
-    % Build fixed effects part
-    basicParts = {};
-    if ~isempty(opts.InfoCovariate)
-        basicParts{end+1} = opts.InfoCovariate;
-    end
-
-    mdlPrtString = strjoin(basicParts, '*');
-    if isempty(mdlPrtString)
-        mdlPrtString = '1';
-    end
-
-    % Add groupby variables
-    if opts.AllInteractions
-        curLMEGbyString = mdlPrtString;
-        for i = 1:length(groupByVars)
-            curLMEGbyString = sprintf('%s*%s', curLMEGbyString, groupByVars{i});
-        end
-    else
-        parts = {};
-        for i = 1:length(groupByVars)
-            if strcmp(mdlPrtString, '1')
-                parts{end+1} = groupByVars{i}; %#ok<AGROW>
-            else
-                parts{end+1} = sprintf('%s*%s', mdlPrtString, groupByVars{i}); %#ok<AGROW>
-            end
-        end
-        curLMEGbyString = strjoin(parts, '+');
-    end
-
-    % Build full formula
-    if opts.UseIntercept
-        if isempty(curLMEGbyString) || strcmp(curLMEGbyString, '1')
-            lmeString = sprintf('%s~1+(%s)', varName, opts.RandomEffects);
-        else
-            lmeString = sprintf('%s~%s+(%s)', varName, curLMEGbyString, ...
-                opts.RandomEffects);
-        end
-    else
-        dummyCodeStr = 'full';
-        lmeString = sprintf('%s~-1+%s+(%s)', varName, ...
-            strrep(curLMEGbyString, '*', ':'), opts.RandomEffects);
-    end
-end
-
-
-function plotBarSummary(fig, groups, results, opts, channels, chLabels)
-% Render bar chart summarizing significant ANOVA terms
-
-    nBioM = length(opts.Biomarkers);
-    nCh = length(channels);
-    colors = exploreFNIRS.core.getGroupColors(length(groups));
-
-    if height(results.anova_pval) == 0
-        text(0.5, 0.5, 'No models fitted', ...
-            'HorizontalAlignment', 'center', 'Units', 'normalized', ...
-            'Parent', axes('Parent', fig));
+    % Extract ANOVA terms from the first fitted model (exclude Intercept)
+    termNames = getTermNames(results, nBioM, nCh);
+    if isempty(termNames)
+        fig = [];
         return;
     end
 
-    termNames = results.anova_pval.Properties.VariableNames;
     nTerms = length(termNames);
 
-    % One subplot per ANOVA term
-    nCols = min(nTerms, 4);
-    nRows = ceil(nTerms / nCols);
-
-    for t = 1:nTerms
-        ax = subplot(nRows, nCols, t, 'Parent', fig);
-        hold(ax, 'on');
-
-        fVals = results.anova_Fstat{:, t};
-        pVals = results.anova_pval{:, t};
-
-        % Bar chart of F-values
-        bar(ax, 1:height(results.anova_Fstat), fVals, 0.6, ...
-            'FaceColor', [0.5, 0.5, 0.8], 'EdgeColor', 'k');
-
-        % Mark significant channels
-        for i = 1:length(pVals)
-            if pVals(i) < opts.SigThreshold
-                text(ax, i, fVals(i), '*', ...
-                    'HorizontalAlignment', 'center', ...
-                    'VerticalAlignment', 'bottom', ...
-                    'FontSize', 14, 'FontWeight', 'bold', 'Color', 'r');
-            end
-        end
-
-        title(ax, strrep(termNames{t}, '_', ' '));
-        xlabel(ax, 'Channel');
-        ylabel(ax, 'F-statistic');
-        grid(ax, 'on');
-        box(ax, 'on');
-    end
-end
-
-
-function plotTopoFstat(fig, results, opts)
-% Render topographic F-statistic maps
-
-    if height(results.anova_Fstat) == 0
-        return;
-    end
-
-    termNames = results.anova_Fstat.Properties.VariableNames;
-    nTerms = length(termNames);
-    nBioM = length(opts.Biomarkers);
-
-    nCols = nTerms;
+    % Layout: rows = biomarkers, cols = ANOVA terms
     nRows = nBioM;
+    nCols = nTerms;
 
-    for t = 1:nTerms
-        for bIdx = 1:nBioM
+    figW = opts.SaveWidth * min(nCols, 4);
+    figH = opts.SaveHeight * max(nRows * 0.6, 1);
+
+    fig = pf2_base.plot.createFigure('Visible', opts.Visible, ...
+        'Width', figW, 'Height', figH, 'SavePath', opts.SavePath);
+
+    if ~isempty(opts.Colors) && ~isa(opts.Colors, 'exploreFNIRS.core.ColorScheme')
+        bioColors = exploreFNIRS.core.getGroupColors(nBioM, opts.Colors);
+    else
+        bioColors = getBarColors(nBioM);
+    end
+
+    for bIdx = 1:nBioM
+        bioM = opts.Biomarkers{bIdx};
+
+        % Extract F-stats and p-values for this biomarker across channels
+        [fMatrix, pMatrix] = extractBiomarkerAnova(results, bIdx, nCh, termNames);
+
+        for t = 1:nTerms
+            spIdx = (bIdx - 1) * nCols + t;
+            ax = subplot(nRows, nCols, spIdx, 'Parent', fig);
+            hold(ax, 'on');
+
+            fVals = fMatrix(:, t);
+            pVals = pMatrix(:, t);
+
+            % Bar chart of F-values using actual channel numbers as x
+            bar(ax, channels, fVals, 0.6, ...
+                'FaceColor', bioColors(bIdx,:), 'EdgeColor', 'k', ...
+                'FaceAlpha', 0.7);
+
+            % Mark significant channels
+            for i = 1:nCh
+                if ~isnan(pVals(i)) && pVals(i) < opts.SigThreshold
+                    text(ax, channels(i), fVals(i), '*', ...
+                        'HorizontalAlignment', 'center', ...
+                        'VerticalAlignment', 'bottom', ...
+                        'FontSize', 14, 'FontWeight', 'bold', 'Color', 'r');
+                end
+            end
+
+            % Labels
+            if bIdx == 1
+                title(ax, pf2_base.plot.escapeTeX(termNames{t}));
+            end
+            if bIdx == nBioM
+                if strcmpi(opts.DataType, 'ROI')
+                    xlabel(ax, 'ROI');
+                elseif strcmpi(opts.DataType, 'Aux')
+                    xlabel(ax, 'Aux Channel');
+                else
+                    xlabel(ax, 'Channel');
+                end
+            end
+            if t == 1
+                ylabel(ax, sprintf('%s F-stat', bioM));
+            end
+
+            set(ax, 'XTick', channels);
+            grid(ax, 'on');
+            box(ax, 'on');
+        end
+    end
+end
+
+
+function fig = plotTopoFstat(results, opts, channels, nBioM, nCh, sty)
+% Render topographic F-statistic maps: rows = biomarkers, cols = terms
+
+    termNames = getTermNames(results, nBioM, nCh);
+    if isempty(termNames)
+        fig = [];
+        return;
+    end
+
+    nTerms = length(termNames);
+    nRows = nBioM;
+    nCols = nTerms;
+
+    figW = opts.SaveWidth * min(nCols, 4);
+    figH = opts.SaveHeight * max(nRows * 0.6, 1);
+
+    fig = pf2_base.plot.createFigure('Visible', opts.Visible, ...
+        'Width', figW, 'Height', figH, 'SavePath', opts.SavePath);
+
+    for bIdx = 1:nBioM
+        bioM = opts.Biomarkers{bIdx};
+        [fMatrix, pMatrix] = extractBiomarkerAnova(results, bIdx, nCh, termNames);
+
+        for t = 1:nTerms
             spIdx = (bIdx - 1) * nCols + t;
             ax = subplot(nRows, nCols, spIdx, 'Parent', fig);
 
-            fVals = results.anova_Fstat{:, t}';
-            pVals = results.anova_pval{:, t}';
+            fVals = fMatrix(:, t)';
+            pVals = pMatrix(:, t)';
 
             % FDR correction
-            [curQ, curK] = exploreFNIRS.fx.performFDR(pVals, opts.SigThreshold);
+            [curQ, ~] = exploreFNIRS.fx.performFDR(pVals, opts.SigThreshold);
 
             switch opts.SigType
                 case 'q'
@@ -427,14 +356,16 @@ function plotTopoFstat(fig, results, opts)
                 if ~isempty(which('pf2.probe.plot.interpolateValues3D'))
                     axes(ax); %#ok<LAXES>
                     pf2.probe.plot.interpolateValues3D(fVals, [], minF, [], ...
-                        termNames{t}, 'F-val', 'bufferDistance', 1);
+                        sprintf('%s: %s', bioM, termNames{t}), 'F-val', ...
+                        'bufferDistance', 1);
                 else
-                    bar(ax, fVals, 'FaceColor', 'flat');
+                    bar(ax, channels, fVals, 'FaceColor', 'flat');
+                    set(ax, 'XTick', channels);
                     ylabel(ax, 'F-stat');
-                    title(ax, termNames{t});
+                    title(ax, sprintf('%s: %s', bioM, termNames{t}));
                 end
             else
-                text(ax, 0.5, 0.5, sprintf('%s\nn.s.', termNames{t}), ...
+                text(ax, 0.5, 0.5, sprintf('%s: %s\nn.s.', bioM, termNames{t}), ...
                     'HorizontalAlignment', 'center', 'Units', 'normalized');
                 axis(ax, 'off');
             end
@@ -443,18 +374,66 @@ function plotTopoFstat(fig, results, opts)
 
     sigStr = sprintf('Thresholded at %s=%.2f', opts.SigType, opts.SigThreshold);
     annotation(fig, 'textbox', [0, 0.97, 0.3, 0.03], 'String', sigStr, ...
-        'FitBoxToText', 'on', 'EdgeColor', 'none', 'FontSize', 7);
+        'FitBoxToText', 'on', 'EdgeColor', 'none', 'FontSize', 7, ...
+        'Color', sty.DimColor);
 end
 
 
-function cleanNames = sanitizeNames(names)
-% Clean ANOVA term names for use as table variable names
-    cleanNames = cell(size(names));
-    for i = 1:length(names)
-        str = names{i};
-        str(str == '(' | str == ')') = '';
-        str(str == ':' | str == '_') = '';
-        str(str == ' ' | str == '-') = '';
-        cleanNames{i} = str;
+function termNames = getTermNames(results, nBioM, nCh)
+% Extract ANOVA term names from the first fitted model (including Intercept)
+
+    termNames = {};
+
+    for bIdx = 1:nBioM
+        for chI = 1:nCh
+            anv = results.anova{bIdx, chI};
+            if ~isempty(anv)
+                termNames = anv.Term;
+                return;
+            end
+        end
+    end
+end
+
+
+function [fMatrix, pMatrix] = extractBiomarkerAnova(results, bIdx, nCh, termNames)
+% Extract F-stats and p-values for one biomarker across all channels
+% Returns [nCh x nTerms] matrices
+
+    nTerms = length(termNames);
+    fMatrix = nan(nCh, nTerms);
+    pMatrix = nan(nCh, nTerms);
+
+    for chI = 1:nCh
+        anv = results.anova{bIdx, chI};
+        if isempty(anv)
+            continue;
+        end
+
+        for t = 1:nTerms
+            tIdx = find(strcmpi(anv.Term, termNames{t}), 1);
+            if ~isempty(tIdx)
+                fMatrix(chI, t) = anv.FStat(tIdx);
+                pMatrix(chI, t) = anv.pValue(tIdx);
+            end
+        end
+    end
+end
+
+
+function colors = getBarColors(nBioM)
+% Distinct colors for each biomarker row
+
+    palette = [
+        0.2  0.6  0.9   % HbO  - blue
+        0.9  0.3  0.3   % HbR  - red
+        0.5  0.7  0.4   % HbTotal - green
+        0.7  0.5  0.8   % CBSI - purple
+    ];
+
+    if nBioM <= size(palette, 1)
+        colors = palette(1:nBioM, :);
+    else
+        colors = exploreFNIRS.core.getGroupColors(nBioM);
     end
 end

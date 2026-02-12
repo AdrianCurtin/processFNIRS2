@@ -21,8 +21,8 @@ function result = verifyGolden(goldenPath, actualOutput, tolerance)
 %
 % Example:
 %   data = pf2.import.sampleData.fNIR2000();
-%   processed = processFNIRS2(data, 'ShowGUI', false);
-%   result = pf2_base.tests.golden.verifyGolden('golden/processFNIRS2/fNIR2000_default.mat', processed);
+%   processed = processFNIRS2(data);
+%   result = pf2_base.tests.golden.verifyGolden('tests/golden/processFNIRS2/fNIR2000_default.mat', processed);
 %
 % See also: pf2_base.tests.golden.computeHash
 

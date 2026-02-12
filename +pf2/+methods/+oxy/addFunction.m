@@ -65,6 +65,9 @@ if isempty(PF2) || ~isfield(PF2, 'myOxyMethods')
     pf2_base.pf2_initialize();
 end
 
+% Sanitize method name for INI lookup
+methodName = pf2_base.cleanNameForINI(methodName);
+
 % Check method exists
 if ~ismember(methodName, PF2.myOxyMethods.cfg.Sections)
     error('pf2:MethodNotFound', ...

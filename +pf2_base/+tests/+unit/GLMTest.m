@@ -165,6 +165,122 @@ classdef GLMTest < matlab.unittest.TestCase
             testCase.verifyGreaterThan(max(X(:, 1)), 0);
         end
 
+        function testDCTDriftType(testCase)
+            % DCT drift type produces valid design matrix
+            events(1).name = 'TaskA';
+            events(1).onsets = [20 60 100];
+            events(1).duration = 20;
+
+            [X, names] = pf2_base.fnirs.buildDesignMatrix(testCase.time, testCase.fs, events, ...
+                'DriftType', 'dct', 'DriftCutoff', 128);
+
+            testCase.verifyEqual(size(X, 1), testCase.T);
+            testCase.verifyTrue(any(contains(names, 'dct_')));
+            testCase.verifyTrue(any(strcmp(names, 'constant')));
+        end
+
+        function testDCTColumnCount(testCase)
+            % DCT column count depends on duration and cutoff
+            % Duration = 300s, cutoff = 128s
+            % K = floor(2 * 300 / 128) + 1 = floor(4.69) + 1 = 5
+            events(1).name = 'TaskA';
+            events(1).onsets = [20];
+            events(1).duration = 20;
+
+            [X, names] = pf2_base.fnirs.buildDesignMatrix(testCase.time, testCase.fs, events, ...
+                'DriftType', 'dct', 'DriftCutoff', 128);
+
+            % 1 stim + 5 DCT (constant + dct_1..dct_4) = 6
+            testCase.verifyEqual(size(X, 2), 6);
+            nDCT = sum(contains(names, 'dct_') | strcmp(names, 'constant'));
+            testCase.verifyEqual(nDCT, 5);
+        end
+
+        function testDCTOrthogonality(testCase)
+            % DCT basis functions should be approximately orthogonal
+            events(1).name = 'TaskA';
+            events(1).onsets = [20];
+            events(1).duration = 20;
+
+            [X, names] = pf2_base.fnirs.buildDesignMatrix(testCase.time, testCase.fs, events, ...
+                'DriftType', 'dct', 'DriftCutoff', 60);
+
+            % Extract just DCT columns
+            dctIdx = contains(names, 'dct_') | strcmp(names, 'constant');
+            D = X(:, dctIdx);
+
+            % Gram matrix should be close to identity
+            G = D' * D;
+            offDiag = G - diag(diag(G));
+            testCase.verifyLessThan(max(abs(offDiag(:))), 0.01, ...
+                'DCT columns should be nearly orthogonal');
+        end
+
+        function testDCTNoConstant(testCase)
+            % DCT without constant should skip k=0 component
+            events(1).name = 'TaskA';
+            events(1).onsets = [20];
+            events(1).duration = 20;
+
+            [~, names] = pf2_base.fnirs.buildDesignMatrix(testCase.time, testCase.fs, events, ...
+                'DriftType', 'dct', 'DriftCutoff', 128, 'IncludeConstant', false);
+
+            testCase.verifyFalse(any(strcmp(names, 'constant')));
+        end
+
+        function testDCTShortCutoff(testCase)
+            % Very short cutoff produces more DCT components
+            events(1).name = 'TaskA';
+            events(1).onsets = [20];
+            events(1).duration = 20;
+
+            [~, namesFew] = pf2_base.fnirs.buildDesignMatrix(testCase.time, testCase.fs, events, ...
+                'DriftType', 'dct', 'DriftCutoff', 300);
+            [~, namesMany] = pf2_base.fnirs.buildDesignMatrix(testCase.time, testCase.fs, events, ...
+                'DriftType', 'dct', 'DriftCutoff', 30);
+
+            nFew = sum(contains(namesFew, 'dct_') | strcmp(namesFew, 'constant'));
+            nMany = sum(contains(namesMany, 'dct_') | strcmp(namesMany, 'constant'));
+
+            testCase.verifyGreaterThan(nMany, nFew, ...
+                'Shorter cutoff should produce more DCT components');
+        end
+
+        function testDCTWithGLM(testCase)
+            % DCT drift should work with fitGLM and recover betas
+            rng(42);
+
+            events(1).name = 'TaskA';
+            events(1).onsets = [20 60 100 140 180 220];
+            events(1).duration = 20;
+
+            [X, names] = pf2_base.fnirs.buildDesignMatrix(testCase.time, testCase.fs, events, ...
+                'DriftType', 'dct', 'DriftCutoff', 128);
+
+            trueBeta = zeros(size(X, 2), 1);
+            trueBeta(1) = 3.0;
+
+            Y = X * trueBeta + 0.1 * randn(testCase.T, 1);
+            results = pf2_base.fnirs.fitGLM(Y, X, names);
+
+            testCase.verifyEqual(results.beta(1), 3.0, 'AbsTol', 0.3, ...
+                'GLM with DCT drift should recover task beta');
+        end
+
+        function testLegendreBackwardCompatible(testCase)
+            % Default behavior (no DriftType) should produce same result as 'legendre'
+            events(1).name = 'TaskA';
+            events(1).onsets = [20 60];
+            events(1).duration = 20;
+
+            [X1, names1] = pf2_base.fnirs.buildDesignMatrix(testCase.time, testCase.fs, events);
+            [X2, names2] = pf2_base.fnirs.buildDesignMatrix(testCase.time, testCase.fs, events, ...
+                'DriftType', 'legendre');
+
+            testCase.verifyEqual(X1, X2, 'Default should match explicit legendre');
+            testCase.verifyEqual(names1, names2);
+        end
+
     end
 
     %% fitGLM Tests

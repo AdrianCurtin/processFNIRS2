@@ -34,7 +34,7 @@ function hhh=vline(varargin)
 validX= @(x) isempty(x)||isnumeric(x)||isdatetime(x)||isduration(x);
 validAxesHandle= @(x) isa(x,'matlab.graphics.axis.Axes')&&isvalid(x);
 validStrCell = @(x) ischar(x) || (iscell(x));
-validHeight= @(x) isnumeric(x)&&~isempty(x)&&~any(x>1)&&~any(x<0);
+validHeight= @(x) isnumeric(x)&&~isempty(x);
 
 if(isa(varargin{1},'matlab.graphics.axis.Axes')) %If first argument is axes then move to front
    ax=varargin{1};
@@ -136,6 +136,7 @@ for lineNum=1:numLines
     else
         yLabelHeight=0.1;
     end
+    yLabelHeight=max(0,min(1,yLabelHeight));
     
     
     g=ishold(ax);

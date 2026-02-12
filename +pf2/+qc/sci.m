@@ -90,14 +90,44 @@ assert(isfield(data, 'fs'), 'pf2:qc:sci:noFs', ...
 
 fs = data.fs;
 
-% Check Nyquist constraint
-nyquist = fs / 2;
-assert(opts.CardiacBand(2) < nyquist, 'pf2:qc:sci:nyquist', ...
-    'Upper cardiac band (%.1f Hz) must be below Nyquist (%.1f Hz).', ...
-    opts.CardiacBand(2), nyquist);
-
-%% Resolve wavelength layout
+%% Resolve wavelength layout (needed to determine nChannels for early return)
 [channelMap, nChannels] = resolveWavelengthLayout(data, opts);
+
+%% Check Nyquist constraint — graceful degradation for low sampling rates
+nyquist = fs / 2;
+cardiacBand = opts.CardiacBand;
+
+if cardiacBand(2) >= nyquist
+    % Auto-clamp upper band to 80% of Nyquist (filter rolloff margin)
+    clampedHigh = nyquist * 0.8;
+    bandwidth = clampedHigh - cardiacBand(1);
+
+    if bandwidth < 0.5 || clampedHigh < 1.0
+        % Band too narrow or can't reach typical cardiac frequency (~1 Hz)
+        warning('pf2:qc:sci:lowFs', ...
+            ['Sampling rate (%.1f Hz) is too low for SCI computation. ' ...
+             'Cardiac band [%.1f, %.1f] Hz requires Nyquist > %.1f Hz. ' ...
+             'Returning NaN (channels not penalized).'], ...
+            fs, cardiacBand(1), cardiacBand(2), cardiacBand(2));
+
+        result.sci = nan(1, nChannels);
+        result.isGood = true(1, nChannels);
+        result.channels = 1:nChannels;
+        result.threshold = opts.Threshold;
+        result.cardiacBand = opts.CardiacBand;
+        result.fs = fs;
+        result.skipped = true;
+        result.skipReason = sprintf(...
+            'Sampling rate (%.1f Hz) too low for cardiac band [%.1f, %.1f] Hz', ...
+            fs, cardiacBand(1), cardiacBand(2));
+        return;
+    end
+
+    warning('pf2:qc:sci:bandClamped', ...
+        'Cardiac band clamped from [%.1f, %.1f] to [%.1f, %.1f] Hz (Nyquist=%.1f Hz).', ...
+        cardiacBand(1), cardiacBand(2), cardiacBand(1), clampedHigh, nyquist);
+    cardiacBand(2) = clampedHigh;
+end
 
 %% Compute SCI for each channel
 sciValues = zeros(1, nChannels);
@@ -115,18 +145,25 @@ for ch = 1:nChannels
     wl1 = data.raw(:, col1);
     wl2 = data.raw(:, col2);
 
-    % Skip if either signal is constant (dead channel)
-    if std(wl1) == 0 || std(wl2) == 0
+    % Skip if either signal is constant (dead channel) or contains all NaN
+    if std(wl1, 'omitnan') == 0 || std(wl2, 'omitnan') == 0
         sciValues(ch) = 0;
         continue;
     end
 
     % Bandpass filter to cardiac band
-    wl1_filt = bpf(wl1, opts.FilterOrder, fs, opts.CardiacBand(1), opts.CardiacBand(2));
-    wl2_filt = bpf(wl2, opts.FilterOrder, fs, opts.CardiacBand(1), opts.CardiacBand(2));
+    wl1_filt = bpf(wl1, opts.FilterOrder, fs, cardiacBand(1), cardiacBand(2));
+    wl2_filt = bpf(wl2, opts.FilterOrder, fs, cardiacBand(1), cardiacBand(2));
+
+    % Remove NaN positions (bpf returns NaN for non-finite input spans)
+    validMask = ~isnan(wl1_filt) & ~isnan(wl2_filt);
+    if sum(validMask) < 10
+        sciValues(ch) = 0;
+        continue;
+    end
 
     % Compute zero-lag normalized cross-correlation
-    xc = xcorr(wl1_filt, wl2_filt, 0, 'normalized');
+    xc = xcorr(wl1_filt(validMask), wl2_filt(validMask), 0, 'normalized');
     sciValues(ch) = abs(xc);
 end
 
@@ -135,8 +172,9 @@ result.sci = sciValues;
 result.isGood = sciValues >= opts.Threshold;
 result.channels = 1:nChannels;
 result.threshold = opts.Threshold;
-result.cardiacBand = opts.CardiacBand;
+result.cardiacBand = cardiacBand;
 result.fs = fs;
+result.skipped = false;
 
 end
 
@@ -148,6 +186,24 @@ function [channelMap, nChannels] = resolveWavelengthLayout(data, opts)
 %
 % Returns channelMap [nChannels x 2] where each row gives the two column
 % indices in data.raw for that channel's two wavelengths.
+
+% Method 0: data.device (pf2.Device object)
+if isfield(data, 'device') && isa(data.device, 'pf2.Device')
+    wl = data.device.wavelengths();
+    chNums = data.device.channelNumbers();
+
+    uniqueCh = unique(chNums(chNums > 0 & ~isnan(chNums)));
+    nChannels = numel(uniqueCh);
+    channelMap = zeros(nChannels, 2);
+
+    for i = 1:nChannels
+        cols = find(chNums == uniqueCh(i) & wl > 0 & ~isnan(wl));
+        if numel(cols) >= 2
+            channelMap(i, :) = cols(1:2);
+        end
+    end
+    return;
+end
 
 % Method 1: Explicit parameters
 if ~isempty(opts.Wavelengths) && ~isempty(opts.ChannelNumbers)
@@ -174,11 +230,42 @@ if isfield(data, 'probeinfo') && isfield(data.probeinfo, 'Probe') ...
         && iscell(data.probeinfo.Probe) && ~isempty(data.probeinfo.Probe) ...
         && isfield(data.probeinfo.Probe{1}, 'TableCh')
     tableCh = data.probeinfo.Probe{1}.TableCh;
-    % TableCh typically has columns: [optodeNumber, wavelengthIndex, ...]
-    % Extract channel numbers and wavelength indices
-    if size(tableCh, 2) >= 2
-        chNums = tableCh(:, 1)';
-        wlIdx = tableCh(:, 2)';
+    % SNIRF TableCh is a table with named columns:
+    %   ColNumber, OptodeNumber, isTime, isMarker, isCh, Wavelength, isDark, ...
+    % Each row = one raw column. OptodeNumber groups two wavelengths per channel.
+    if istable(tableCh) && ismember('OptodeNumber', tableCh.Properties.VariableNames) ...
+            && ismember('ColNumber', tableCh.Properties.VariableNames)
+        colNums = tableCh.ColNumber(:)';
+        optNums = tableCh.OptodeNumber(:)';
+
+        % Filter to valid channels only (exclude time, marker, dark)
+        if ismember('isCh', tableCh.Properties.VariableNames)
+            validMask = tableCh.isCh(:)';
+        else
+            validMask = optNums > 0 & ~isnan(optNums);
+        end
+
+        uniqueCh = unique(optNums(validMask & optNums > 0 & ~isnan(optNums)));
+        nChannels = numel(uniqueCh);
+        channelMap = zeros(nChannels, 2);
+
+        for i = 1:nChannels
+            cols = colNums(optNums == uniqueCh(i) & validMask);
+            if numel(cols) >= 2
+                channelMap(i, :) = cols(1:2);
+            end
+        end
+        return;
+
+    % Fallback: non-SNIRF table or numeric array with [chNum, wlIdx, ...]
+    elseif size(tableCh, 2) >= 2
+        if istable(tableCh)
+            chNums = tableCh{:, 1}';
+            wlIdx = tableCh{:, 2}';
+        else
+            chNums = tableCh(:, 1)';
+            wlIdx = tableCh(:, 2)';
+        end
 
         uniqueCh = unique(chNums(chNums > 0));
         nChannels = numel(uniqueCh);

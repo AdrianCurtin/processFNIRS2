@@ -47,6 +47,13 @@ function result = pearson(x, y, fs, varargin)
     if winSamples <= 0 || winSamples >= length(x)
         % Full-signal mode
         valid = ~isnan(x) & ~isnan(y);
+        if sum(valid) < 3
+            result.value = NaN;
+            result.pvalue = NaN;
+            result.method = 'pearson';
+            result.windowed = false;
+            return;
+        end
         [r, pval] = corr(x(valid), y(valid), 'Type', 'Pearson');
 
         result.value = r;

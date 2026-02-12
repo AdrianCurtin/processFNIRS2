@@ -253,16 +253,17 @@ classdef TDDRTest < matlab.unittest.TestCase
         end
 
         function testTDDRHandlesNaN(testCase)
-            % Test that TDDR handles NaN values in input
+            % Test that TDDR handles NaN values in input via piecewise processing
             %
-            % NaN values may be present from channel masking. TDDR uses
-            % filtfilt internally which propagates NaN through the signal.
-            % The key test is that TDDR does not error on NaN input and
-            % returns output of the same size.
+            % NaN values may be present from channel masking or device timing
+            % mismatch. TDDR processes each contiguous non-NaN segment
+            % independently and preserves NaN at original positions.
 
-            % Generate signal with NaN segment
+            % Generate signal with NaN gap in the middle
             signal = testCase.generateCleanSinusoid(0.1, 1);
-            signal(200:210) = NaN;
+            signal = testCase.addStepArtifact(signal, 300, 5);
+            nanIdx = 200:210;
+            signal(nanIdx) = NaN;
 
             % Apply TDDR - should not error
             corrected = pf2_MotionCorrectTDDR(signal, testCase.fs);
@@ -271,9 +272,57 @@ classdef TDDRTest < matlab.unittest.TestCase
             testCase.verifySize(corrected, size(signal), ...
                 'TDDR did not preserve signal size with NaN input');
 
-            % Note: filtfilt propagates NaN, so we just verify no error occurred
-            % and output exists with correct size. The NaN propagation behavior
-            % is expected from the underlying filter implementation.
+            % NaN positions must be preserved
+            testCase.verifyTrue(all(isnan(corrected(nanIdx))), ...
+                'TDDR did not preserve NaN at original positions');
+
+            % Valid segments must not become NaN
+            validBefore = 1:199;
+            validAfter  = 211:length(signal);
+            testCase.verifyFalse(any(isnan(corrected(validBefore))), ...
+                'TDDR introduced NaN in valid segment before gap');
+            testCase.verifyFalse(any(isnan(corrected(validAfter))), ...
+                'TDDR introduced NaN in valid segment after gap');
+        end
+
+        function testTDDRHandlesLeadingTrailingNaN(testCase)
+            % Test piecewise TDDR with leading/trailing NaN (device merge scenario)
+            %
+            % When merging two fNIRS devices with different recording lengths,
+            % channels from the shorter device have leading or trailing NaN.
+            % TDDR must process the valid interior without destroying it.
+
+            nSamples = testCase.duration * testCase.fs;
+            signal = testCase.generateCleanSinusoid(0.1, 1);
+            signal = testCase.addStepArtifact(signal, 300, 4);
+
+            % Simulate 50-sample leading + 30-sample trailing NaN
+            leadN = 50;
+            trailN = 30;
+            signal(1:leadN) = NaN;
+            signal(end-trailN+1:end) = NaN;
+
+            corrected = pf2_MotionCorrectTDDR(signal, testCase.fs);
+
+            % Size preserved
+            testCase.verifySize(corrected, size(signal));
+
+            % Leading/trailing NaN preserved
+            testCase.verifyTrue(all(isnan(corrected(1:leadN))), ...
+                'Leading NaN not preserved');
+            testCase.verifyTrue(all(isnan(corrected(end-trailN+1:end))), ...
+                'Trailing NaN not preserved');
+
+            % Valid interior must not be NaN
+            validIdx = (leadN+1):(nSamples-trailN);
+            testCase.verifyFalse(any(isnan(corrected(validIdx))), ...
+                'TDDR introduced NaN in valid interior with leading/trailing NaN');
+
+            % Step artifact should still be corrected in valid region
+            origRange = max(signal(validIdx)) - min(signal(validIdx));
+            corrRange = max(corrected(validIdx)) - min(corrected(validIdx));
+            testCase.verifyLessThan(corrRange, origRange, ...
+                'TDDR did not correct step artifact in valid region');
         end
 
         function testTDDRReducesSpikeArtifacts(testCase)

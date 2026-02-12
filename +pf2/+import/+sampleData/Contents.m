@@ -6,6 +6,7 @@
 %   fNIR1200              - fNIR Devices fNIR 1200 sample data
 %   Hitachi_ETG4000_3x5   - Hitachi ETG-4000 (3x5 probe) sample data
 %   Hitachi_ETG4000_3x11  - Hitachi ETG-4000 (3x11 probe) sample data
+%   experiment            - Synthetic multi-subject experiment (4 subjects, 6 blocks)
 %
 % Example:
 %   % Load fNIR 2000 sample

@@ -7,10 +7,15 @@ function results = fitGLM(Y, X, regressorNames, varargin)
 % AR-IRLS accounts for temporal autocorrelation in fNIRS residuals by
 % prewhitening with estimated AR coefficients.
 %
-% Reference:
+% References:
 %   Barker, J. W., Aarabi, A., & Huppert, T. J. (2013). Autoregressive
 %   model based algorithm for correcting motion and serially correlated
 %   errors in fNIRS. Biomedical Optics Express, 4(8), 1366-1379.
+%
+%   Huppert, T. J. (2016). Commentary on the statistical properties of
+%   noise and its implication on general linear models in functional
+%   near-infrared spectroscopy. Neurophotonics, 3(1), 010401.
+%   DOI: 10.1117/1.NPh.3.1.010401
 %
 % Syntax:
 %   results = pf2_base.fnirs.fitGLM(Y, X, regressorNames)
@@ -29,6 +34,8 @@ function results = fitGLM(Y, X, regressorNames, varargin)
 %   'AROrder'       - AR model order for AR-IRLS (default: 4)
 %   'MaxIter'       - Maximum iterations for AR-IRLS (default: 20)
 %   'Tolerance'     - Convergence tolerance for AR-IRLS (default: 1e-4)
+%   'Accelerate'    - Acceleration mode: 'auto' (default), 'gpu', 'none'
+%                     'auto' uses GPU for OLS when T*C > 50000 elements.
 %
 % Outputs:
 %   results - Struct with fields:
@@ -78,6 +85,7 @@ p.addParameter('ContrastNames', {}, @iscell);
 p.addParameter('AROrder', 4, @(x) isnumeric(x) && isscalar(x) && x > 0);
 p.addParameter('MaxIter', 20, @(x) isnumeric(x) && isscalar(x) && x > 0);
 p.addParameter('Tolerance', 1e-4, @(x) isnumeric(x) && isscalar(x) && x > 0);
+p.addParameter('Accelerate', 'auto', @(x) ischar(x) && ismember(lower(x), {'auto','gpu','none'}));
 p.parse(Y, X, regressorNames, varargin{:});
 
 method = upper(p.Results.Method);
@@ -86,6 +94,7 @@ contrastNames = p.Results.ContrastNames;
 arOrder = p.Results.AROrder;
 maxIter = p.Results.MaxIter;
 tol = p.Results.Tolerance;
+accelMode = lower(p.Results.Accelerate);
 
 [T, nCh] = size(Y);
 P = size(X, 2);
@@ -101,13 +110,25 @@ if length(regressorNames) ~= P
         length(regressorNames), P);
 end
 
+% Determine GPU usage for OLS
+useGPU = false;
+switch accelMode
+    case 'auto'
+        gpuInfo = pf2_base.accel.isGPUAvailable();
+        useGPU = gpuInfo.available && (T * nCh > 50000);
+    case 'gpu'
+        useGPU = true;
+    case 'none'
+        % serial CPU
+end
+
 % --- Fit model ---
 switch method
     case 'OLS'
-        [beta, residuals, se, dof] = fitOLS(Y, X);
+        [beta, residuals, se, dof] = fitOLS(Y, X, useGPU);
 
     case 'AR-IRLS'
-        [beta, residuals, se, dof] = fitARIRLS(Y, X, arOrder, maxIter, tol);
+        [beta, residuals, se, dof] = fitARIRLS(Y, X, arOrder, maxIter, tol, useGPU);
 end
 
 % --- Compute statistics ---
@@ -139,12 +160,13 @@ end
 
 %%_Subfunctions_________________________________________________________
 
-function [beta, residuals, se, dof] = fitOLS(Y, X)
+function [beta, residuals, se, dof] = fitOLS(Y, X, useGPU)
 % FITOLS Ordinary least squares estimation
 %
 % Inputs:
-%   Y - Data matrix [T x C]
-%   X - Design matrix [T x P]
+%   Y      - Data matrix [T x C]
+%   X      - Design matrix [T x P]
+%   useGPU - Whether to use GPU for matrix operations
 %
 % Outputs:
 %   beta      - Coefficients [P x C]
@@ -155,10 +177,28 @@ function [beta, residuals, se, dof] = fitOLS(Y, X)
 [T, ~] = size(Y);
 P = size(X, 2);
 
+% Optionally transfer to GPU
+if useGPU
+    [Yg, onGPU] = pf2_base.accel.toGPU(Y, 'Force', true);
+    if onGPU
+        Xg = gpuArray(X);
+    else
+        Xg = X;
+        Yg = Y;
+    end
+else
+    Yg = Y;
+    Xg = X;
+end
+
 % Solve via pseudoinverse
-Xpinv = pinv(X);
-beta = Xpinv * Y;
-residuals = Y - X * beta;
+Xpinv = pinv(Xg);
+beta = Xpinv * Yg;
+residuals = Yg - Xg * beta;
+
+% Gather from GPU
+beta = pf2_base.accel.gather(beta);
+residuals = pf2_base.accel.gather(residuals);
 
 % Degrees of freedom
 dof = T - P;
@@ -175,7 +215,7 @@ se = sqrt(varBeta * MSE);  % [P x C]
 
 end
 
-function [beta, residuals, se, dof] = fitARIRLS(Y, X, arOrder, maxIter, tol)
+function [beta, residuals, se, dof] = fitARIRLS(Y, X, arOrder, maxIter, tol, useGPU)
 % FITARIRLS Autoregressive iteratively reweighted least squares
 %
 % Inputs:
@@ -184,6 +224,7 @@ function [beta, residuals, se, dof] = fitARIRLS(Y, X, arOrder, maxIter, tol)
 %   arOrder - AR model order [scalar]
 %   maxIter - Maximum iterations [scalar]
 %   tol     - Convergence tolerance [scalar]
+%   useGPU  - Whether to use GPU for OLS
 %
 % Outputs:
 %   beta      - Coefficients [P x C]
@@ -195,29 +236,22 @@ function [beta, residuals, se, dof] = fitARIRLS(Y, X, arOrder, maxIter, tol)
 P = size(X, 2);
 
 % Initial OLS
-[beta, residuals, ~, ~] = fitOLS(Y, X);
+[beta, residuals, ~, ~] = fitOLS(Y, X, useGPU);
 
 prevBeta = beta;
 
 for iter = 1:maxIter
-    % Estimate AR coefficients from residuals (per channel, then average)
-    arCoeffs = zeros(arOrder, nCh);
-    for ch = 1:nCh
-        r = residuals(:, ch);
-        r = r(~isnan(r));
-        if length(r) > arOrder + 1
-            arCoeffs(:, ch) = yulewalk(r, arOrder);
-        end
-    end
+    % Estimate AR coefficients from residuals (vectorized across channels)
+    arCoeffs = yulewalkMulti(residuals, arOrder);
     % Use mean AR coefficients across channels for consistent prewhitening
     meanAR = mean(arCoeffs, 2);
 
-    % Build prewhitening filter matrix
+    % Build prewhitening filter matrix (vectorized)
     Yw = applyARFilter(Y, meanAR);
     Xw = applyARFilter(X, meanAR);
 
     % Re-fit OLS on prewhitened data
-    [beta, residuals_w, se, dof] = fitOLS(Yw, Xw);
+    [beta, residuals_w, se, dof] = fitOLS(Yw, Xw, useGPU);
 
     % Compute residuals in original space
     residuals = Y - X * beta;
@@ -235,40 +269,49 @@ dof = max(T - P - arOrder, 1);
 
 end
 
-function a = yulewalk(r, order)
-% YULEWALK Estimate AR coefficients via Yule-Walker equations
+function arCoeffs = yulewalkMulti(residuals, order)
+% YULEWALKMULTI Vectorized Yule-Walker AR estimation across channels
+%
+% Computes autocorrelation for all channels simultaneously, then solves
+% per-channel Toeplitz systems (small order x order, not worth vectorizing).
 %
 % Inputs:
-%   r     - Residual signal [T x 1]
-%   order - AR model order [scalar]
+%   residuals - [T x C] residual matrix
+%   order     - AR model order [scalar]
 %
 % Outputs:
-%   a - AR coefficients [order x 1]
+%   arCoeffs  - [order x C] AR coefficients
 
-r = r(:);
-N = length(r);
+[T, nCh] = size(residuals);
+arCoeffs = zeros(order, nCh);
 
-% Compute autocorrelation
-R = zeros(order + 1, 1);
+% Vectorized autocorrelation across all channels
+R_all = zeros(order + 1, nCh);
 for k = 0:order
-    R(k+1) = sum(r(1:N-k) .* r(k+1:N)) / N;
+    R_all(k+1, :) = sum(residuals(1:T-k, :) .* residuals(k+1:T, :), 1) / T;
 end
 
-% Build Toeplitz system
-Rmat = toeplitz(R(1:order));
-rvec = R(2:order+1);
-
-% Solve Yule-Walker equations
-if rcond(Rmat) > eps
-    a = Rmat \ rvec;
-else
-    a = zeros(order, 1);
+% Per-channel Toeplitz solve (small system: order x order)
+for ch = 1:nCh
+    R = R_all(:, ch);
+    if any(isnan(R))
+        continue;
+    end
+    Rmat = toeplitz(R(1:order));
+    rvec = R(2:order+1);
+    if rcond(Rmat) > eps
+        arCoeffs(:, ch) = Rmat \ rvec;
+    end
 end
 
 end
 
 function Yw = applyARFilter(Y, arCoeffs)
-% APPLYARFILTER Prewhiten data using AR coefficients
+% APPLYARFILTER Vectorized prewhitening using AR coefficients
+%
+% Applies the AR filter across all columns simultaneously. The inner
+% loop iterates only over the AR order (typically 4), not over time
+% samples, making this much faster than the naive triple-nested loop.
 %
 % Inputs:
 %   Y        - Data [T x C]
@@ -277,14 +320,13 @@ function Yw = applyARFilter(Y, arCoeffs)
 % Outputs:
 %   Yw - Prewhitened data [T x C]
 
-[T, C] = size(Y);
+[T, ~] = size(Y);
 order = length(arCoeffs);
 Yw = Y;
 
-for t = (order+1):T
-    for k = 1:order
-        Yw(t, :) = Yw(t, :) - arCoeffs(k) * Y(t-k, :);
-    end
+% Vectorized: loop over AR order only (typically 4 iterations)
+for k = 1:order
+    Yw((order+1):T, :) = Yw((order+1):T, :) - arCoeffs(k) * Y((order+1-k):(T-k), :);
 end
 
 % Zero out the first 'order' rows (not reliably filtered)

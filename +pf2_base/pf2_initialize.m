@@ -80,7 +80,7 @@ if(~isfield(PF2,'defaultRootPath'))
     PF2.defaultRootPath=pf2_base.pf2_defaultRootPath();
     curdir=cd;
     cd(PF2.defaultRootPath);
-    addpath('base_functions','functions','GUI');
+    addpath(PF2.defaultRootPath,'base_functions','functions','GUI');
     cd(curdir);
 end
 

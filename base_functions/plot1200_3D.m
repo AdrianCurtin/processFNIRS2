@@ -20,7 +20,7 @@ end
 
 
 
-% TAL EEG locations from Automated cortical projection of EEG sensors: Anatomical correlation via the international 10–10 system
+% TAL EEG locations from Automated cortical projection of EEG sensors: Anatomical correlation via the international 10ï¿½10 system
 if(useHighRes)
     cerebro_mdl=load('cerebro_mdl.mat');    %high res model
     cerebro_mdl=cerebro_mdl.cerebro_mdl;
@@ -177,7 +177,7 @@ switch(projectmode)
 end
 toc
 
-h=patch('vertices', mdl.v, 'faces', mdl.f,'FaceVertexCData',Cs,'FaceColor','interp','AmbientStrength',0.6, 'LineStyle', 'None');
+h=patch('vertices', mdl.v, 'faces', mdl.f,'FaceVertexCData',Cs,'FaceColor','interp','AmbientStrength',0.75, 'LineStyle', 'None');
 
 if(plotHit52_frontal)
     for i=1:size(hit_fp_52,1)

@@ -18,6 +18,14 @@
 %   concatenate           - Join fNIRS segments vertically (time)
 %   concatenateHorizontal - Join fNIRS segments horizontally (channels)
 %
+% Block Operations:
+%   defineBlocks          - Create block definitions from event markers
+%   extractBlocks         - Extract blocks as separate fNIRS structs
+%
+% Metadata Import:
+%   importInfo            - Import subject-level metadata from CSV/Excel
+%   importBlockInfo       - Import block-level metadata from CSV/Excel
+%
 % GUI Tools:
 %   editChannelMaskGUI    - Interactive channel mask editor
 %

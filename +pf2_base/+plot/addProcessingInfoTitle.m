@@ -45,14 +45,7 @@ if isfield(pInfo, 'dpfMode')
 end
 
 if ~isempty(titleParts)
-    % Use sgtitle for figure-level title (R2018b+)
-    try
-        sgtitle(fig, strjoin(titleParts, ' | '), 'FontSize', 10, 'FontWeight', 'normal');
-    catch
-        % Fallback for older MATLAB versions
-        annotation(fig, 'textbox', [0 0.95 1 0.05], 'String', strjoin(titleParts, ' | '), ...
-            'EdgeColor', 'none', 'HorizontalAlignment', 'center', 'FontSize', 10);
-    end
+    pf2_base.external.suptitle(fig, strjoin(titleParts, ' | '));
 end
 
 end

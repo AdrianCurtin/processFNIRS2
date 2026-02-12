@@ -1,9 +1,9 @@
 function fig = plotBar(groups, varargin)
 % PLOTBAR Headless bar chart from grouped/aggregated experiment data
 %
-% Creates bar charts showing mean biomarker values per group for selected
-% channels and time windows, with error bars. Works without the
-% exploreFNIRS GUI.
+% Creates bar charts showing mean biomarker values per group for each
+% channel, with error bars. Each channel gets its own subplot — channels
+% are never averaged. Groups are shown as separate bars within each subplot.
 %
 % Syntax:
 %   fig = plotBar(groups)
@@ -17,19 +17,31 @@ function fig = plotBar(groups, varargin)
 %
 % Name-Value Parameters:
 %   Biomarker   - Single biomarker name (default: 'HbO')
-%   Channels    - Vector of channel indices (default: all)
+%   Channels    - Vector of channel indices (default: all channels)
 %   ROIs        - ROI indices, names, or 'all' (default: [])
 %                 When provided, data is read from gbyGrand.ROI instead of
 %                 gbyGrand. Mutually exclusive with Channels.
 %   TimeWindow  - [start, end] in seconds to average over (default: full range)
 %   ErrorType   - 'SEM' (default), 'SD', or 'none'
 %   ShowIndividual - Show individual data points (default: false)
+%   ShowN       - Show subject count (n=X) above bars (default: true)
+%   Legend      - 'last' (default), 'first', 'all', or 'none'
+%                 Controls which subplot(s) show the legend.
+%   YLim        - [min max] y-axis limits (default: auto, shared across subplots)
+%   XLim        - [min max] x-axis limits (default: auto, shared across subplots)
+%   PlotBy      - Groupby variable to use as series in clustered bars
+%                 (e.g., 'Condition'). Creates grouped bar chart instead
+%                 of flat bars. The PlotBy factor becomes the legend,
+%                 remaining factors become X-axis categories.
 %   Title       - Figure title (default: auto)
 %   Visible     - 'on' (default) or 'off'
 %   SavePath    - File path to save figure
 %   SaveWidth   - Width in pixels (default: 600)
 %   SaveHeight  - Height in pixels (default: 400)
 %   SaveDPI     - Resolution (default: 150)
+%   Colors      - Group color palette override (default: [] = auto)
+%                 [N x 3] RGB matrix, colormap name (e.g. 'Set1', 'tab10'),
+%                 or function handle @(N) returning [N x 3].
 %
 % Outputs:
 %   fig - Figure handle
@@ -39,9 +51,9 @@ function fig = plotBar(groups, varargin)
 %   ex.groupby({'Group','Condition'});
 %   ex.aggregate();
 %
-%   % Bar chart for HbO, channels 1-10, averaged over 5-20s
+%   % Bar chart for HbO, channels 1-5, averaged over 5-20s
 %   fig = exploreFNIRS.core.plotBar(ex.groups, ...
-%       'Biomarker', 'HbO', 'Channels', 1:10, ...
+%       'Biomarker', 'HbO', 'Channels', 1:5, ...
 %       'TimeWindow', [5, 20], 'SavePath', 'bar.png');
 %
 % See also: exploreFNIRS.core.Experiment, exploreFNIRS.core.plotTemporal
@@ -54,12 +66,19 @@ function fig = plotBar(groups, varargin)
     addParameter(p, 'TimeWindow', [], @isnumeric);
     addParameter(p, 'ErrorType', 'SEM', @ischar);
     addParameter(p, 'ShowIndividual', false, @islogical);
+    addParameter(p, 'ShowN', true, @islogical);
+    addParameter(p, 'Legend', 'last', @ischar);
+    addParameter(p, 'YLim', [], @isnumeric);
+    addParameter(p, 'XLim', [], @isnumeric);
+    addParameter(p, 'PlotBy', '', @ischar);
+    addParameter(p, 'GroupByVars', {}, @iscell);
     addParameter(p, 'Title', '', @ischar);
     addParameter(p, 'Visible', 'on', @ischar);
     addParameter(p, 'SavePath', '', @ischar);
     addParameter(p, 'SaveWidth', 600, @isnumeric);
     addParameter(p, 'SaveHeight', 400, @isnumeric);
     addParameter(p, 'SaveDPI', 150, @isnumeric);
+    addParameter(p, 'Colors', [], @(x) isempty(x) || isnumeric(x) || ischar(x) || isstring(x) || isa(x, 'function_handle') || isa(x, 'exploreFNIRS.core.ColorScheme'));
     parse(p, groups, varargin{:});
     opts = p.Results;
 
@@ -78,9 +97,16 @@ function fig = plotBar(groups, varargin)
         end
     end
 
-    % Resolve ROI mode
+    % Auto-expand groups by time bins when multiple bars exist
+    if ~isempty(groups(1).gbyGrandBarFlat) && ...
+            length(groups(1).gbyGrandBarFlat.time) > 1
+        groups = exploreFNIRS.core.expandGroupsByTime(groups);
+        nGroups = length(groups);
+    end
+
+    % Resolve channels/ROIs (default = all)
     if ~isempty(opts.ROIs)
-        if ~any(strcmp(p.UsingDefaults, 'Channels'))
+        if ~isempty(opts.Channels)
             error('exploreFNIRS:core:plotBar', ...
                 'ROIs and Channels are mutually exclusive.');
         end
@@ -89,23 +115,244 @@ function fig = plotBar(groups, varargin)
                 'No ROI data in grand average. Define ROIs before aggregating.');
         end
         [roiIdx, roiNames] = resolveROIs(groups, opts.ROIs);
+        plotItems = roiIdx;
+        itemNames = roiNames;
         useROI = true;
     else
         useROI = false;
+        if isempty(opts.Channels)
+            nTotalCh = size(groups(1).gbyGrand.(bioM).Mean, 2);
+            plotItems = 1:nTotalCh;
+        else
+            plotItems = opts.Channels;
+        end
+        itemNames = arrayfun(@(c) sprintf('Ch %d', c), plotItems, ...
+            'UniformOutput', false);
+    end
+    nItems = length(plotItems);
+
+    % PlotBy setup
+    hasPB = ~isempty(opts.PlotBy);
+    if hasPB
+        [plotByValues, ~, withinLabels, plotByIdx] = ...
+            exploreFNIRS.core.splitGroupsByFactor(groups, opts.PlotBy);
     end
 
-    % Determine channels/ROIs
-    if useROI
-        channels = roiIdx;
-    elseif isempty(opts.Channels)
-        nCh = size(groups(1).gbyGrand.(bioM).Mean, 2);
-        channels = 1:nCh;
+    % Layout: prefer columns (bar subplots are taller than wide)
+    nCols = ceil(sqrt(nItems));
+    nRows = ceil(nItems / nCols);
+
+    figW = opts.SaveWidth * min(nCols, 5);
+    figH = opts.SaveHeight * max(nRows, 1);
+
+    fig = pf2_base.plot.createFigure('Visible', opts.Visible, ...
+        'Width', figW, 'Height', figH, 'SavePath', opts.SavePath);
+    sty = pf2_base.plot.PlotStyle.getDefault();
+
+    allAxes = gobjects(nItems, 1);
+
+    for chI = 1:nItems
+        ax = subplot(nRows, nCols, chI, 'Parent', fig);
+        hold(ax, 'on');
+        allAxes(chI) = ax;
+
+        ch = plotItems(chI);
+
+        % Compute per-group means/errors for this channel
+        [groupMeans, groupErrors, groupN, groupLabels, individualData] = ...
+            computeChannelStats(groups, bioM, ch, opts, useROI);
+
+        if hasPB
+            % --- Clustered bar chart (barweb) ---
+            nSeries = length(plotByValues);
+            uniqueWithin = unique(withinLabels, 'stable');
+            nX = length(uniqueWithin);
+
+            meanMatrix = nan(nX, nSeries);
+            errorMatrix = nan(nX, nSeries);
+            indivData = cell(nX, nSeries);
+
+            for g = 1:nGroups
+                si = plotByIdx(g);
+                xi = find(strcmp(uniqueWithin, withinLabels{g}), 1);
+                meanMatrix(xi, si) = groupMeans(g);
+                errorMatrix(xi, si) = groupErrors(g);
+                indivData{xi, si} = individualData{g};
+            end
+
+            if isa(opts.Colors, 'exploreFNIRS.core.ColorScheme')
+                seriesColors = opts.Colors.resolve(groups);
+                % Remap to series-level: take one color per unique series value
+                seriesColors = seriesColors(1:nSeries, :);
+            else
+                seriesColors = exploreFNIRS.core.getGroupColors(nSeries, opts.Colors);
+            end
+
+            if strcmpi(opts.ErrorType, 'none')
+                errInput = [];
+            else
+                errInput = errorMatrix;
+            end
+
+            barwebArgs = {'Axes', ax, ...
+                'ColorMap', seriesColors, ...
+                'YLabel', sprintf('%s (%s)', bioM, getUnitsLabel(groups(1)))};
+
+            if showLegend(opts.Legend, chI, nItems) && ~strcmpi(opts.Legend, 'none')
+                barwebArgs = [barwebArgs, {'Legend', pf2_base.plot.escapeTeX(plotByValues)}];
+            end
+
+            if opts.ShowIndividual
+                barwebArgs = [barwebArgs, {'DataPoints', indivData}];
+            end
+
+            bwHandles = pf2_base.external.barweb(meanMatrix, errInput, 1, pf2_base.plot.escapeTeX(uniqueWithin), ...
+                barwebArgs{:});
+            hold(ax, 'on');
+
+            % Style legend if barweb created one
+            if ~isempty(bwHandles.legend) && isvalid(bwHandles.legend)
+                bwHandles.legend.TextColor = sty.LegendTextColor;
+                bwHandles.legend.Color = sty.LegendBgColor;
+                bwHandles.legend.EdgeColor = sty.LegendEdgeColor;
+                bwHandles.legend.Box = 'on';
+            end
+
+            % X-axis label: within factor name(s) — bottom row only
+            isBottomRow = ceil(chI / nCols) == nRows;
+            if isBottomRow && ~isempty(opts.GroupByVars)
+                withinVars = setdiff(opts.GroupByVars, {opts.PlotBy}, 'stable');
+                if ~isempty(withinVars)
+                    xlabel(ax, pf2_base.plot.escapeTeX(strjoin(withinVars, ' x ')));
+                end
+            end
+
+        else
+            % --- Standard flat bar chart (via barweb) ---
+            if isa(opts.Colors, 'exploreFNIRS.core.ColorScheme')
+                colors = opts.Colors.resolve(groups);
+            else
+                colors = exploreFNIRS.core.getGroupColors(nGroups, opts.Colors);
+            end
+
+            meanMatrix = groupMeans(:);   % [nGroups x 1] — each group is X category
+            if strcmpi(opts.ErrorType, 'none')
+                errInput = [];
+            else
+                errInput = groupErrors(:);
+            end
+
+            indivData = cell(nGroups, 1);
+            for g = 1:nGroups
+                indivData{g, 1} = individualData{g};
+            end
+
+            barwebArgs = {'Axes', ax, ...
+                'ColorMap', colors(1,:), ...
+                'YLabel', sprintf('%s (%s)', bioM, getUnitsLabel(groups(1)))};
+
+            if opts.ShowIndividual
+                barwebArgs = [barwebArgs, {'DataPoints', indivData}];
+            end
+
+            bwHandles = pf2_base.external.barweb(meanMatrix, errInput, 1, pf2_base.plot.escapeTeX(groupLabels), ...
+                barwebArgs{:});
+            hold(ax, 'on');
+
+            % Color each bar individually (single series = single color by default)
+            if ~isempty(bwHandles.bars)
+                bwHandles.bars(1).FaceColor = 'flat';
+                bwHandles.bars(1).CData = colors(1:nGroups, :);
+            end
+
+            % Add x-axis margin so bars don't touch the edges
+            xlim(ax, [0.25, nGroups + 0.75]);
+
+            % Legend identifies bars, so replace tick labels with xlabel
+            % Only show xlabel on bottom row to avoid overlapping with row below
+            isBottomRow = ceil(chI / nCols) == nRows;
+            if ~isempty(opts.GroupByVars)
+                set(ax, 'XTickLabel', {});
+                if isBottomRow
+                    xlabel(ax, pf2_base.plot.escapeTeX(strjoin(opts.GroupByVars, ' x ')));
+                end
+            end
+
+            % Legend with colored patches (always show on designated subplot)
+            if showLegend(opts.Legend, chI, nItems)
+                lh = gobjects(nGroups, 1);
+                for g = 1:nGroups
+                    lh(g) = patch(ax, NaN, NaN, colors(g,:), ...
+                        'EdgeColor', sty.ForegroundColor, 'LineWidth', 2);
+                end
+                lg = legend(ax, lh, pf2_base.plot.escapeTeX(groupLabels), 'Location', 'best');
+                lg.TextColor = sty.LegendTextColor;
+                lg.Color = sty.LegendBgColor;
+                lg.EdgeColor = sty.LegendEdgeColor;
+            end
+        end
+
+        % N-labels above bars
+        if opts.ShowN && ~all(isnan(groupN))
+            yl = ylim(ax);
+            yRange = yl(2) - yl(1);
+            for g = 1:nGroups
+                if ~isnan(groupN(g))
+                    if hasPB
+                        % barweb positions categories at integer x values
+                        si = plotByIdx(g);
+                        xi = find(strcmp(uniqueWithin, withinLabels{g}), 1);
+                        xPos = xi;  % approximate center of group
+                    else
+                        xPos = g;
+                    end
+                    yPos = groupMeans(g) + groupErrors(g) + yRange * 0.02;
+                    text(ax, xPos, yPos, sprintf('n=%d', groupN(g)), ...
+                        'HorizontalAlignment', 'center', ...
+                        'VerticalAlignment', 'bottom', ...
+                        'FontSize', 7, 'Color', sty.DimColor, ...
+                        'HandleVisibility', 'off');
+                end
+            end
+        end
+
+        % Zero line
+        plot(ax, xlim(ax), [0 0], '-', 'Color', sty.ZeroLineColor, ...
+            'LineWidth', 0.5, 'HandleVisibility', 'off');
+
+        title(ax, pf2_base.plot.escapeTeX(itemNames{chI}));
+        box(ax, 'on');
+        grid(ax, 'on');
+    end
+
+    % Shared axes
+    linkaxes(allAxes, 'y');
+    if ~isempty(opts.YLim), arrayfun(@(a) ylim(a, opts.YLim), allAxes); end
+    if ~isempty(opts.XLim), arrayfun(@(a) xlim(a, opts.XLim), allAxes); end
+
+    % Figure title (suptitle auto-rescales subplots to avoid overlap)
+    if ~isempty(opts.Title)
+        pf2_base.external.suptitle(fig, opts.Title);
     else
-        channels = opts.Channels;
+        tStr = bioM;
+        if ~isempty(opts.TimeWindow)
+            tStr = sprintf('%s (%g-%gs)', tStr, opts.TimeWindow(1), opts.TimeWindow(2));
+        end
+        pf2_base.external.suptitle(fig, tStr);
     end
-    nCh = length(channels);
 
-    % For each group: compute mean and error across time window and channels
+    sty.applyToFigure(fig);
+    pf2_base.plot.handleSave(fig, opts);
+end
+
+
+%% Local helpers
+
+
+function [groupMeans, groupErrors, groupN, groupLabels, individualData] = ...
+        computeChannelStats(groups, bioM, ch, opts, useROI)
+% Compute per-group mean, error, N for a single channel
+    nGroups = length(groups);
     groupMeans = nan(1, nGroups);
     groupErrors = nan(1, nGroups);
     groupN = nan(1, nGroups);
@@ -118,11 +365,15 @@ function fig = plotBar(groups, varargin)
             if ~isfield(ga.ROI, bioM) || isempty(ga.ROI.(bioM))
                 continue;
             end
+            src = ga.ROI.(bioM);
         else
             if ~isfield(ga, bioM) || isempty(ga.(bioM))
                 continue;
             end
+            src = ga.(bioM);
         end
+
+        if ch > size(src.Mean, 2), continue; end
 
         timeVec = ga.time;
 
@@ -132,29 +383,16 @@ function fig = plotBar(groups, varargin)
         else
             tMask = true(size(timeVec));
         end
-
         if ~any(tMask), continue; end
 
-        % Select data source
-        if useROI
-            src = ga.ROI.(bioM);
-        else
-            src = ga.(bioM);
-        end
+        % Mean: average over time window for this single channel
+        groupMeans(g) = mean(src.Mean(tMask, ch), 'omitnan');
 
-        chIdx = channels(channels <= size(src.Mean, 2));
-        if isempty(chIdx), continue; end
-
-        % Grand mean: average over time window and channels/ROIs
-        meanSlice = src.Mean(tMask, chIdx);
-        groupMeans(g) = mean(meanSlice, 'all', 'omitnan');
-
-        % Error: use the per-subject data for proper SEM
+        % Error: use per-subject data when available
         if isfield(src, 'data') && ~isempty(src.data)
             % data is [T x C x N]
-            subjectData = src.data(tMask, chIdx, :);
-            % Average over time and channels per subject
-            perSubject = squeeze(mean(mean(subjectData, 1, 'omitnan'), 2, 'omitnan'));
+            subjectData = src.data(tMask, ch, :);
+            perSubject = squeeze(mean(subjectData, 1, 'omitnan'));
             perSubject = perSubject(:);
             perSubject(isnan(perSubject)) = [];
 
@@ -170,112 +408,13 @@ function fig = plotBar(groups, varargin)
                     groupErrors(g) = 0;
             end
         else
-            % Fallback to pre-computed stats
-            semSlice = src.SEM(tMask, chIdx);
-            groupErrors(g) = mean(semSlice, 'all', 'omitnan');
-            nSlice = src.N(tMask, chIdx);
-            groupN(g) = round(mean(nSlice, 'all', 'omitnan'));
+            groupErrors(g) = mean(src.SEM(tMask, ch), 'omitnan');
+            groupN(g) = round(mean(src.N(tMask, ch), 'omitnan'));
         end
 
         groupLabels{g} = groups(g).label;
     end
-
-    % Create figure
-    fig = figure('Visible', opts.Visible, ...
-        'Position', [100, 100, opts.SaveWidth, opts.SaveHeight], ...
-        'Color', 'w');
-    ax = axes('Parent', fig);
-    hold(ax, 'on');
-
-    % Colors
-    colors = exploreFNIRS.core.getGroupColors(nGroups);
-
-    % Bar plot
-    barX = 1:nGroups;
-    for g = 1:nGroups
-        bar(ax, barX(g), groupMeans(g), 0.6, ...
-            'FaceColor', colors(g,:), 'EdgeColor', 'k', 'FaceAlpha', 0.7);
-    end
-
-    % Error bars
-    if ~strcmpi(opts.ErrorType, 'none')
-        errorbar(ax, barX, groupMeans, groupErrors, 'k.', ...
-            'LineWidth', 1.2, 'CapSize', 8);
-    end
-
-    % Individual data points
-    if opts.ShowIndividual
-        for g = 1:nGroups
-            if ~isempty(individualData{g})
-                jitter = (rand(size(individualData{g})) - 0.5) * 0.25;
-                scatter(ax, barX(g) + jitter, individualData{g}, 20, ...
-                    colors(g,:), 'filled', 'MarkerFaceAlpha', 0.5, ...
-                    'HandleVisibility', 'off');
-            end
-        end
-    end
-
-    % Labels
-    set(ax, 'XTick', barX, 'XTickLabel', groupLabels, 'XTickLabelRotation', 30);
-    ylabel(ax, sprintf('%s (%s)', bioM, getUnitsLabel(groups(1))));
-
-    % N labels above bars
-    for g = 1:nGroups
-        if ~isnan(groupN(g))
-            yPos = groupMeans(g) + groupErrors(g);
-            if isnan(yPos), yPos = groupMeans(g); end
-            text(ax, barX(g), yPos, sprintf('n=%d', groupN(g)), ...
-                'HorizontalAlignment', 'center', 'VerticalAlignment', 'bottom', ...
-                'FontSize', 8);
-        end
-    end
-
-    % Zero line
-    plot(ax, xlim(ax), [0 0], 'k-', 'LineWidth', 0.5, 'HandleVisibility', 'off');
-
-    % Title
-    if ~isempty(opts.Title)
-        title(ax, opts.Title);
-    else
-        if useROI
-            if nCh == 1
-                itemStr = roiNames{1};
-            else
-                itemStr = sprintf('ROIs: %s', strjoin(roiNames, ', '));
-            end
-        else
-            if nCh == 1
-                itemStr = sprintf('Ch %d', channels(1));
-            else
-                itemStr = sprintf('Ch %d-%d', channels(1), channels(end));
-            end
-        end
-        if ~isempty(opts.TimeWindow)
-            tStr = sprintf(', %g-%gs', opts.TimeWindow(1), opts.TimeWindow(2));
-        else
-            tStr = '';
-        end
-        title(ax, sprintf('%s: %s%s', bioM, itemStr, tStr));
-    end
-
-    box(ax, 'on');
-    grid(ax, 'on');
-
-    % Save
-    if ~isempty(opts.SavePath)
-        if ~isempty(which('pf2_base.plot.saveFigure'))
-            pf2_base.plot.saveFigure(fig, opts.SavePath, ...
-                opts.SaveWidth, opts.SaveHeight, opts.SaveDPI);
-        else
-            set(fig, 'PaperPositionMode', 'auto');
-            print(fig, opts.SavePath, '-dpng', sprintf('-r%d', opts.SaveDPI));
-        end
-        fprintf('Saved: %s\n', opts.SavePath);
-    end
 end
-
-
-%% Local helpers
 
 
 function lbl = getUnitsLabel(group)
@@ -283,6 +422,18 @@ function lbl = getUnitsLabel(group)
         lbl = group.gbyGrand.units;
     else
         lbl = '\DeltaHb';
+    end
+end
+
+
+function tf = showLegend(mode, idx, total)
+% Determine whether to show legend on this subplot
+    switch lower(mode)
+        case 'last',  tf = (idx == total);
+        case 'first', tf = (idx == 1);
+        case 'all',   tf = true;
+        case 'none',  tf = false;
+        otherwise,    tf = (idx == total);
     end
 end
 

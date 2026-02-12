@@ -27,7 +27,20 @@ half_fs = fs/2;    %half of sampling freq. equal to pi
 [A,B,C,D] = butter(filtOrder,[lowF highF]/half_fs);
 
 sos = ss2sos(A,B,C,D);
-dataf=pf2_base.external.filtfilt_classic(sos,1,data);
+
+% Filter each column, handling NaN-padded regions per channel
+dataf = NaN(size(data));
+for col = 1:size(data, 2)
+    finIdx = isfinite(data(:, col));
+    if ~any(finIdx), continue; end
+    % Find contiguous finite span (first to last finite sample)
+    first = find(finIdx, 1, 'first');
+    last  = find(finIdx, 1, 'last');
+    seg = data(first:last, col);
+    if all(isfinite(seg)) && numel(seg) > 3*filtOrder
+        dataf(first:last, col) = pf2_base.external.filtfilt_classic(sos, 1, seg);
+    end
+end
 
 if Mini==1 %if the data is a row vector converts it to column vector
     dataf=dataf';

@@ -5,16 +5,25 @@ function result = computeGroup(data, pairs, varargin)
 % coupling for each pair, and aggregates into group-level statistics
 % (Mean, SD, SEM, N) with one-sample t-tests against zero.
 %
+% Uses alignMatrices to handle dyads with different valid channels,
+% ensuring channel identity is preserved during group aggregation.
+%
 % Syntax:
 %   result = exploreFNIRS.hyperscanning.computeGroup(data, pairs)
 %   result = exploreFNIRS.hyperscanning.computeGroup(data, pairs, ...
 %       'Method', 'pearson', 'Biomarker', 'HbO')
+%   result = exploreFNIRS.hyperscanning.computeGroup(data, pairs, ...
+%       'Align', 'intersection')
 %
 % Inputs:
 %   data  - Cell array of processed fNIRS structs
 %   pairs - Struct array from pairSubjects (with .indices, .dyadID, etc.)
 %
 % Name-Value Parameters:
+%   Align - Channel alignment mode for group aggregation:
+%           'union' (default) - all channels, NaN where missing
+%           'intersection' - only channels in all dyads
+%           numeric 0-1 - channels in >= threshold fraction of dyads
 %   All parameters from computeDyad are supported (Method, Biomarker,
 %   ChannelPairing, Channels, TimeWindow, CouplingArgs).
 %
@@ -24,6 +33,7 @@ function result = computeGroup(data, pairs, varargin)
 %     .SD       - Standard deviation
 %     .SEM      - Standard error of the mean
 %     .N        - Number of valid dyads per element
+%     .nValid   - Per-cell count of non-NaN values
 %     .tstat    - One-sample t-statistic (vs 0)
 %     .pvalue   - P-value from one-sample t-test
 %     .dyads    - Cell array of individual dyad results
@@ -31,7 +41,7 @@ function result = computeGroup(data, pairs, varargin)
 %     .method   - Coupling method used
 %     .biomarker - Biomarker used
 %     .pairing  - Channel pairing mode
-%     .channels - Channels used
+%     .channels - Channels used (master channel set)
 %
 % Example:
 %   pairs = exploreFNIRS.hyperscanning.pairSubjects(data);
@@ -40,10 +50,23 @@ function result = computeGroup(data, pairs, varargin)
 %   fprintf('Mean coupling: %.3f (p = %.4f)\n', ...
 %       mean(result.Mean, 'omitnan'), mean(result.pvalue, 'omitnan'));
 %
-% See also: exploreFNIRS.hyperscanning.pairSubjects, exploreFNIRS.hyperscanning.computeDyad
+% See also: exploreFNIRS.hyperscanning.pairSubjects,
+%   exploreFNIRS.hyperscanning.computeDyad,
+%   exploreFNIRS.connectivity.alignMatrices
 
-    % Pass through all name-value params to computeDyad
-    dyadArgs = varargin;
+    % Extract Align parameter before forwarding rest to computeDyad
+    align = 'union';
+    dyadArgs = {};
+    k = 1;
+    while k <= length(varargin)
+        if ischar(varargin{k}) && strcmpi(varargin{k}, 'Align')
+            align = varargin{k+1};
+            k = k + 2;
+        else
+            dyadArgs = [dyadArgs, varargin(k)]; %#ok<AGROW>
+            k = k + 1;
+        end
+    end
 
     nPairs = length(pairs);
     if nPairs == 0
@@ -80,40 +103,59 @@ function result = computeGroup(data, pairs, varargin)
         error('exploreFNIRS:hyperscanning:computeGroup', 'All dyads failed');
     end
 
-    % Stack dyad values into 3D array for aggregation
-    refSize = size(dyadResults{1}.values);
-    allValues = nan([refSize, nValid]);
-
-    for d = 1:nValid
-        dVals = dyadResults{d}.values;
-        % Handle size mismatch by trimming to common size
-        sz = min(size(dVals), refSize);
-        if length(sz) == 1
-            allValues(1:sz(1), d) = dVals(1:sz(1));
-        else
-            allValues(1:sz(1), 1:sz(2), d) = dVals(1:sz(1), 1:sz(2));
-        end
-    end
+    % Align dyad values using channel-identity-aware stacking
+    [allValues, masterCh, ~, nValidMat] = ...
+        exploreFNIRS.connectivity.alignMatrices(dyadResults, align);
 
     % Aggregate
-    dim = length(refSize) + 1;  % last dimension = dyads
-    meanVals = mean(allValues, dim, 'omitnan');
-    sdVals = std(allValues, 0, dim, 'omitnan');
-    nVals = sum(~isnan(allValues), dim);
-    semVals = sdVals ./ sqrt(max(nVals, 1));
+    dim = ndims(allValues);  % last dimension = dyads
 
-    % One-sample t-test against zero
-    tstat = meanVals ./ semVals;
+    % Fisher z-transform for correlation-based methods before averaging
+    methodName = lower(dyadResults{1}.method);
+    useFisherZ = ismember(methodName, {'pearson', 'spearman', 'xcorr'});
+
+    nVals = sum(~isnan(allValues), dim);
+
+    if useFisherZ
+        zValues = atanh(max(min(allValues, 0.9999), -0.9999));
+        zMean = mean(zValues, dim, 'omitnan');
+        zSD = std(zValues, 0, dim, 'omitnan');
+        zSEM = zSD ./ sqrt(max(nVals, 1));
+        meanVals = tanh(zMean);
+        % Back-transform SD/SEM to original scale (delta method approximation)
+        sdVals = zSD .* (1 - meanVals.^2);
+        semVals = zSEM .* (1 - meanVals.^2);
+        % T-test in z-space (where distribution is approximately normal)
+        tstat = zMean ./ zSEM;
+    else
+        meanVals = mean(allValues, dim, 'omitnan');
+        sdVals = std(allValues, 0, dim, 'omitnan');
+        semVals = sdVals ./ sqrt(max(nVals, 1));
+        tstat = meanVals ./ semVals;
+    end
+
     df = max(nVals - 1, 1);
     % Two-tailed p-value from t-distribution
     pvalue = 2 * (1 - tcdf(abs(tstat), df));
     % Handle edge cases
     pvalue(nVals < 2) = NaN;
 
+    % Suppress cells with too few valid dyads (need at least 3 for
+    % meaningful group statistics; with fewer the Fisher z-mean is
+    % dominated by individual extreme values)
+    minDyads = min(3, max(nVals(:)));
+    tooFew = nVals < minDyads;
+    meanVals(tooFew) = NaN;
+    sdVals(tooFew)   = NaN;
+    semVals(tooFew)  = NaN;
+    tstat(tooFew)    = NaN;
+    pvalue(tooFew)   = NaN;
+
     result.Mean = squeeze(meanVals);
     result.SD = squeeze(sdVals);
     result.SEM = squeeze(semVals);
     result.N = squeeze(nVals);
+    result.nValid = squeeze(nValidMat);
     result.tstat = squeeze(tstat);
     result.pvalue = squeeze(pvalue);
     result.dyads = dyadResults;
@@ -121,8 +163,24 @@ function result = computeGroup(data, pairs, varargin)
     result.method = dyadResults{1}.method;
     result.biomarker = dyadResults{1}.biomarker;
     result.pairing = dyadResults{1}.pairing;
-    result.channels = dyadResults{1}.channelsA;
 
-    fprintf('Group result: %d valid dyads, mean coupling = %.3f\n', ...
-        nValid, mean(result.Mean(:), 'omitnan'));
+    % Dyad-level summary: mean coupling per dyad, then average across dyads
+    % (more robust than averaging the Fisher z group matrix)
+    dyadMeans = nan(nValid, 1);
+    for d = 1:nValid
+        dyadMeans(d) = mean(dyadResults{d}.values(:), 'omitnan');
+    end
+    result.dyadMeans = dyadMeans;
+
+    % Use master channels from alignment
+    if iscell(masterCh)
+        result.channels = masterCh{1};
+        result.channelsB = masterCh{2};
+    else
+        result.channels = masterCh;
+    end
+
+    % Report dyad-level summary (robust to sparse channel coverage)
+    fprintf('Group result: %d valid dyads, mean coupling = %.3f (dyad-level), median = %.3f\n', ...
+        nValid, mean(dyadMeans, 'omitnan'), median(dyadMeans, 'omitnan'));
 end

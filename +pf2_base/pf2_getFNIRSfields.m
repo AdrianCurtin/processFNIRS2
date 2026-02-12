@@ -18,11 +18,11 @@ function [outFields,alternateSpellings]=pf2_getFNIRSfields()
 %   None
 %
 % Outputs:
-%   outFields          - Cell array of standard field names {1 x 15 cell}
+%   outFields          - Cell array of standard field names {1 x 17 cell}
 %                        Contains: 'units', 'channels', 'info', 'DPF_factor',
 %                        'markers', 'fchMask', 'time', 'Aux', 'probeinfo',
 %                        'fs', 'ftimeChMask', 'ROI', 'segmentTimes', 't0',
-%                        'datetime'
+%                        'datetime', 'blocks', 'device'
 %   alternateSpellings - Cell array of alternate field name mappings
 %                        (currently empty, reserved for future use)
 %
@@ -42,6 +42,8 @@ function [outFields,alternateSpellings]=pf2_getFNIRSfields()
 %   segmentTimes  - Resampled time periods [start, period, mid, end]
 %   t0            - Reference time point (baseline start)
 %   datetime      - Recording date and time
+%   blocks        - Block definition struct array from defineBlocks
+%   device        - pf2.Device object (immutable device configuration)
 %
 % Example:
 %   % Get list of metadata fields
@@ -54,6 +56,6 @@ function [outFields,alternateSpellings]=pf2_getFNIRSfields()
 %
 % See also: pf2_getFNIRSbiomFields, pf2_initialize, processFNIRS2
 
-outFields={'units','channels','info','DPF_factor','markers','fchMask','time','Aux','probeinfo','fs','ftimeChMask','ROI','segmentTimes','t0','datetime'};
+outFields={'units','channels','info','DPF_factor','markers','fchMask','time','Aux','probeinfo','fs','ftimeChMask','ROI','segmentTimes','t0','datetime','blocks','device'};
 
 alternateSpellings={};

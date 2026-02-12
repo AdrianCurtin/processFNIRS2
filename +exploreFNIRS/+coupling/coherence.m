@@ -34,6 +34,17 @@ function result = coherence(x, y, fs, varargin)
 %   Significance threshold approximation: C_thresh = 1 - alpha^(1/(L-1))
 %   where L = number of segments. Values above this are significant at alpha.
 %
+% References:
+%   Welch, P. D. (1967). The use of fast Fourier transform for the
+%   estimation of power spectra: a method based on time averaging over
+%   short, modified periodograms. IEEE Transactions on Audio and
+%   Electroacoustics, 15(2), 70-73. DOI: 10.1109/TAU.1967.1161901
+%
+%   Carter, G. C., Knapp, C. H. & Nuttall, A. H. (1973). Estimation of
+%   the magnitude-squared coherence function via overlapped fast Fourier
+%   transform processing. IEEE Transactions on Audio and Electroacoustics,
+%   21(4), 337-344.
+%
 % See also: exploreFNIRS.coupling.pearson, exploreFNIRS.coupling.xcorr, mscohere
 
     p = inputParser;
@@ -96,14 +107,10 @@ function result = coherence(x, y, fs, varargin)
     alpha = 0.05;
     coherenceThreshold = 1 - alpha^(1 / (nSegments - 1));
 
-    % P-value approximation: fraction of band above threshold
-    if meanCoherence > coherenceThreshold
-        pval = alpha * (coherenceThreshold / meanCoherence);
-        pval = max(pval, 1e-10);
-    else
-        pval = 1 - (1 - alpha) * (meanCoherence / coherenceThreshold);
-        pval = min(pval, 1);
-    end
+    % P-value from coherence null distribution: P(C >= c) = (1 - c)^(L - 1)
+    % Note: this formula is exact for single-frequency-bin coherence.
+    % For band-averaged coherence it is an approximation (anti-conservative).
+    pval = (1 - min(meanCoherence, 1 - eps))^(nSegments - 1);
 
     result.value = meanCoherence;
     result.pvalue = pval;

@@ -59,6 +59,17 @@ function result = powerSpectrum(data, varargin)
 %   fprintf('Cardiac detected in %d/%d channels\n', ...
 %       sum(result.cardiac.detected), numel(result.channels));
 %
+% References:
+%   Welch, P. D. (1967). The use of fast Fourier transform for the
+%   estimation of power spectra: a method based on time averaging over
+%   short, modified periodograms. IEEE Transactions on Audio and
+%   Electroacoustics, 15(2), 70-73. DOI: 10.1109/TAU.1967.1161901
+%
+%   Scholkmann, F., Kleiser, S., Metz, A. J., et al. (2014). A review on
+%   continuous wave functional near-infrared spectroscopy and imaging
+%   instrumentation and methodology. NeuroImage, 85, 6-27.
+%   DOI: 10.1016/j.neuroimage.2013.05.004
+%
 % See also: pf2.qc.sci, pf2.qc.plotQuality, pwelch
 
 %% Parse inputs
@@ -142,12 +153,20 @@ hasPwelch = ~isempty(which('pwelch'));
 
 if hasPwelch
     % Use Signal Processing Toolbox pwelch
-    [pxx, f] = pwelch(sigMatrix(:,1), windowSamples, overlapSamples, nfft, fs);
-    % Preallocate
+    % pwelch does not accept NaN — replace with zeros for affected channels
+    sigClean = sigMatrix;
+    nanChannels = any(isnan(sigMatrix), 1);
+    for ch = find(nanChannels)
+        col = sigClean(:, ch);
+        col(isnan(col)) = 0;
+        sigClean(:, ch) = col;
+    end
+
+    [pxx, f] = pwelch(sigClean(:,1), windowSamples, overlapSamples, nfft, fs);
     psdMatrix = zeros(numel(f), nChannels);
     psdMatrix(:, 1) = pxx;
     for ch = 2:nChannels
-        psdMatrix(:, ch) = pwelch(sigMatrix(:, ch), windowSamples, overlapSamples, nfft, fs);
+        psdMatrix(:, ch) = pwelch(sigClean(:, ch), windowSamples, overlapSamples, nfft, fs);
     end
 else
     % FFT-based PSD (manual Welch implementation)

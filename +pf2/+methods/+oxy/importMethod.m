@@ -104,12 +104,12 @@ end
 
 function out = convertToCell(val)
 % Convert jsondecode output to cell array of strings
-if ischar(val) || isstring(val)
+if isstring(val) && ~isscalar(val)
+    out = cellstr(val);
+elseif ischar(val) || (isstring(val) && isscalar(val))
     out = {char(val)};
 elseif iscell(val)
     out = cellfun(@char, val, 'UniformOutput', false);
-elseif isstring(val) && ~isscalar(val)
-    out = cellstr(val);
 else
     out = {val};
 end

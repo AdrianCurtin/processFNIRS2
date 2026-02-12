@@ -138,7 +138,7 @@ end
 addParameter(p,'filename','',@ischar);
 
 
-addOptional(p,'data',[],@iscell); % Your data, as a cell of FNIRS structs (ideally with populated info fields and the task of interest starting at t=0)
+addOptional(p,'data',[],@(x) iscell(x) || isa(x, 'exploreFNIRS.core.Experiment')); % Cell of FNIRS structs, or an Experiment object
 addOptional(p,'timeShiftTo0',ExFNIRS.settings.timeShiftTo0,@islogical); %Specifies whether to automatically shift the start of the FNIRS period to 0, 
 		%best practice though is to turn this off and do it yourself before hand so that task starts at 0s and the baseline is before/after/during. See setT0fnirs()
 addOptional(p,'blStart', ExFNIRS.settings.baseline_start,validScalarNum);  %Time at which baseline starts (absolute)
@@ -152,14 +152,47 @@ addOptional(p,'resampleSize',nan,validScalarPosNum); % ExFNIRS.settings.grandavg
 
 parse(p,varargin{:});
 
-if(~isempty(p.Results.data)||~isfield(ExFNIRS,'data'))
-    ExFNIRS.data=p.Results.data;
-    
-    if(size(ExFNIRS.data,2)>size(ExFNIRS.data,1))
-        ExFNIRS.data=ExFNIRS.data';
+% Detect Experiment object and extract data + settings
+inputData = p.Results.data;
+experimentSource = [];
+
+if isa(inputData, 'exploreFNIRS.core.Experiment')
+    experimentSource = inputData;
+    inputData = experimentSource.data;
+
+    % Map Experiment settings → ExFNIRS settings
+    exS = experimentSource.settings;
+    ExFNIRS.settings.baseline_start = exS.baseline(1);
+    ExFNIRS.settings.baseline_end = exS.baseline(2);
+    ExFNIRS.settings.block_start = exS.taskStart;
+    ExFNIRS.settings.use_baseline = exS.useBaseline;
+    ExFNIRS.settings.timeShiftTo0 = false;
+    ExFNIRS.dataHierarchy = experimentSource.hierarchy;
+
+    if exS.barBinSize > 0
+        ExFNIRS.settings.barchart_resample_size = exS.barBinSize;
     end
-elseif(~isempty(p.Results.filename))
-   exploreFNIRS.loadEx(p.Results.filename);
+    if exS.resampleRate > 0
+        ExFNIRS.settings.grandavg_resample_size = exS.resampleRate;
+    end
+
+    % Map avgMode → within_sub_avg_mode popup index
+    switch lower(exS.avgMode)
+        case 'none',      ExFNIRS.settings.within_sub_avg_mode = 1;
+        case 'flat',      ExFNIRS.settings.within_sub_avg_mode = 2;
+        case 'hierarchy', ExFNIRS.settings.within_sub_avg_mode = 3;
+    end
+
+    fprintf('Loaded Experiment object (%d segments)\n', length(inputData));
+end
+
+if ~isempty(inputData) || ~isfield(ExFNIRS, 'data')
+    ExFNIRS.data = inputData;
+    if size(ExFNIRS.data,2) > size(ExFNIRS.data,1)
+        ExFNIRS.data = ExFNIRS.data';
+    end
+elseif ~isempty(p.Results.filename)
+    exploreFNIRS.loadEx(p.Results.filename);
 end
 
 
@@ -167,14 +200,24 @@ end
     
 
 
-ExFNIRS.settings.baseline_start=p.Results.blStart;
-ExFNIRS.settings.baseline_end=p.Results.blEnd;
-ExFNIRS.settings.block_start=p.Results.blockStart;
-ExFNIRS.settings.block_end=p.Results.blockEnd;
-ExFNIRS.settings.plot_start=p.Results.plotStart;
-ExFNIRS.settings.plot_end=p.Results.plotEnd;
-ExFNIRS.settings.barchart_resample_size=p.Results.barSegmentLength;
-ExFNIRS.settings.grandavg_resample_size=p.Results.resampleSize;
+if isempty(experimentSource)
+    ExFNIRS.settings.baseline_start=p.Results.blStart;
+    ExFNIRS.settings.baseline_end=p.Results.blEnd;
+    ExFNIRS.settings.block_start=p.Results.blockStart;
+    ExFNIRS.settings.block_end=p.Results.blockEnd;
+    ExFNIRS.settings.plot_start=p.Results.plotStart;
+    ExFNIRS.settings.plot_end=p.Results.plotEnd;
+    ExFNIRS.settings.barchart_resample_size=p.Results.barSegmentLength;
+    ExFNIRS.settings.grandavg_resample_size=p.Results.resampleSize;
+else
+    % Derive block_end and plot bounds from data
+    firstSeg = ExFNIRS.data{1};
+    if isfield(firstSeg, 'time') && ~isempty(firstSeg.time)
+        ExFNIRS.settings.block_end = max(firstSeg.time);
+    end
+    ExFNIRS.settings.plot_start = min(0, ExFNIRS.settings.block_start);
+    ExFNIRS.settings.plot_end = ExFNIRS.settings.block_end;
+end
 
 
 
@@ -208,11 +251,16 @@ end
 
 
 
-ExFNIRS.settings.within_sub_avg_mode=get(handles.popupmenu_within_sub_avg,'Value'); %0 none, 1 flat, 2 hierarchy
+if ~isempty(experimentSource)
+    % Set GUI widgets to match Experiment-provided values
+    set(handles.popupmenu_within_sub_avg,'Value', ExFNIRS.settings.within_sub_avg_mode);
+    set(handles.checkbox_usebaseline,'Value', ExFNIRS.settings.use_baseline);
+else
+    ExFNIRS.settings.within_sub_avg_mode=get(handles.popupmenu_within_sub_avg,'Value');
+    ExFNIRS.settings.timeShiftTo0=p.Results.timeShiftTo0;
+end
 
 set(handles.listbox_hierarchy,'String',ExFNIRS.dataHierarchy(2:end));
-
-ExFNIRS.settings.timeShiftTo0=p.Results.timeShiftTo0;
 
 set(handles.edit_baseline_start,'String',sprintf('%.2f',ExFNIRS.settings.baseline_start));
 set(handles.edit_baseline_end,'String',sprintf('%.2f',ExFNIRS.settings.baseline_end));
@@ -3988,6 +4036,7 @@ switch (ExFNIRS.settings.ChannelMode)
         
         if(isempty(uROI))
             warning('No ROIs present in data');
+            warndlg('No ROIs defined in loaded data. Define ROIs first.', 'Channel Mode');
             set(handles.popupmenu_ChannelMode,'Value',1);
             setExChannelMode('fNIR',handles,false,false);
         else
@@ -4020,6 +4069,8 @@ switch (ExFNIRS.settings.ChannelMode)
             cacheAuxVarNames={};
     
             fprintf('Scanning Aux fields...\n');
+            uAuxNames = {};
+            uAuxVarNames = {};
 
             if(pf2_base.isnestedfield(ExFNIRS,'curPreprocessedFNIR.fNIR')&&~isempty(ExFNIRS.curPreprocessedFNIR.fNIR))
     
@@ -4089,6 +4140,7 @@ switch (ExFNIRS.settings.ChannelMode)
                 uAuxVarNames=auxVarTable.Properties.VariableNames;
             else
                 warning('fNIRS data must be processed at least once first in order to flatten Aux data');
+                warndlg('Process data first to access auxiliary channels.', 'Channel Mode');
             end
             
         else
@@ -4104,6 +4156,7 @@ switch (ExFNIRS.settings.ChannelMode)
 
         if(isempty(uAuxVarNames)||isempty(auxVarNamesNoTime))
             warning('No Auxillary channels or data present in data');
+            warndlg('No auxiliary data present in loaded data.', 'Channel Mode');
             set(handles.popupmenu_ChannelMode,'Value',1);
             setExChannelMode('fNIR',handles,false,false);
         else

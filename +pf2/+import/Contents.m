@@ -1,5 +1,5 @@
 % pf2.import - Import functions for loading fNIRS data
-% processFNIRS2 v0.8
+% processFNIRS2 v1.0
 %
 % Auto-detect Import:
 %   import            - Auto-detect format from file extension (or file browser)
@@ -9,6 +9,9 @@
 %   importNIRX        - Import NIRx system files (.hdr, .wl1, .wl2)
 %   importSNIRF       - Import SNIRF format files (.snirf)
 %   importHitachiMES  - Import Hitachi ETG-4000 files (.csv)
+%
+% Batch Import:
+%   importDirectory   - Recursively import all files from a directory tree
 %
 % Sample Data:
 %   sampleData        - Load included example datasets (interactive)

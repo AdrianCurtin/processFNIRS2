@@ -8,8 +8,6 @@ function data = import(filepath)
 % Syntax:
 %   data = pf2.import.import(filepath)
 %   data = pf2.import.import()
-%   data = pf2.import(filepath)      % Package-level call
-%   data = pf2.import()              % Interactive file browser
 %
 % Inputs:
 %   filepath - (optional) Path to fNIRS data file. Supported formats:

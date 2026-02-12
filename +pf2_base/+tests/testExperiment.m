@@ -6,7 +6,7 @@ classdef testExperiment < matlab.unittest.TestCase
 %   - Selection and filtering
 %   - Groupby operations
 %   - Aggregation with preprocessing
-%   - Info variable analysis (plotInfoVar)
+%   - Info variable analysis (plotInfoBar)
 %   - Export to long/wide format
 %   - Headless plotting
 %
@@ -25,7 +25,7 @@ classdef testExperiment < matlab.unittest.TestCase
         function buildTestData(tc)
             % Process sample data and create multi-subject dataset
             raw = pf2.import.sampleData.fNIR2000();
-            processed = processFNIRS2(raw, 'ShowGUI', false);
+            processed = processFNIRS2(raw);
 
             rng(42);
             subjects = {'S01','S01','S01','S01', 'S02','S02','S02','S02', 'S03','S03','S03','S03'};
@@ -239,18 +239,18 @@ classdef testExperiment < matlab.unittest.TestCase
         function testPlotInfoVarBasic(tc)
             ex = exploreFNIRS.core.Experiment(tc.allData);
             ex.groupby('Condition');
-            fig = ex.plotInfoVar('reactionTime', 'Visible', 'off');
+            fig = ex.plotInfoBar('reactionTime', 'Visible', 'off');
             tc.verifyClass(fig, 'matlab.ui.Figure');
             close(fig);
         end
 
         function testPlotInfoVarSavesFile(tc)
-            outPath = fullfile(tempdir, 'test_plotInfoVar.png');
+            outPath = fullfile(tempdir, 'test_plotInfoBar.png');
             if exist(outPath, 'file'), delete(outPath); end
 
             ex = exploreFNIRS.core.Experiment(tc.allData);
             ex.groupby('Condition');
-            fig = ex.plotInfoVar('reactionTime', ...
+            fig = ex.plotInfoBar('reactionTime', ...
                 'SavePath', outPath, 'Visible', 'off');
             close(fig);
 
@@ -260,69 +260,69 @@ classdef testExperiment < matlab.unittest.TestCase
 
         function testPlotInfoVarRequiresGroupby(tc)
             ex = exploreFNIRS.core.Experiment(tc.allData);
-            tc.verifyError(@() ex.plotInfoVar('reactionTime'), ...
-                'exploreFNIRS:core:Experiment:plotInfoVar');
+            tc.verifyError(@() ex.plotInfoBar('reactionTime'), ...
+                'exploreFNIRS:core:Experiment:plotInfoBar');
         end
 
         function testPlotInfoVarRejectsNonNumeric(tc)
             ex = exploreFNIRS.core.Experiment(tc.allData);
             ex.groupby('Group');
-            tc.verifyError(@() ex.plotInfoVar('SubjectID', 'Visible', 'off'), ...
-                'exploreFNIRS:core:Experiment:plotInfoVar');
+            tc.verifyError(@() ex.plotInfoBar('SubjectID', 'Visible', 'off'), ...
+                'exploreFNIRS:core:Experiment:plotInfoBar');
         end
 
         function testPlotInfoVarMultiGroup(tc)
             ex = exploreFNIRS.core.Experiment(tc.allData);
             ex.groupby({'Group', 'Condition'});
-            fig = ex.plotInfoVar('reactionTime', 'Visible', 'off');
+            fig = ex.plotInfoBar('reactionTime', 'Visible', 'off');
             tc.verifyClass(fig, 'matlab.ui.Figure');
             close(fig);
         end
 
         function testPlotInfoVarNoAggregateNeeded(tc)
-            % plotInfoVar should work without calling aggregate()
+            % plotInfoBar should work without calling aggregate()
             ex = exploreFNIRS.core.Experiment(tc.allData);
             ex.groupby('Condition');
             % Do NOT call aggregate
             tc.verifyFalse(ex.isAggregated);
-            fig = ex.plotInfoVar('accuracy', 'Visible', 'off');
+            fig = ex.plotInfoBar('accuracy', 'Visible', 'off');
             tc.verifyClass(fig, 'matlab.ui.Figure');
             close(fig);
         end
 
-        %% --- Scatter Plot ---
+        %% --- Info Scatter Plot ---
 
-        function testPlotScatterBasic(tc)
+        function testPlotInfoScatterBasic(tc)
             ex = exploreFNIRS.core.Experiment(tc.allData);
             ex.groupby('Condition');
-            fig = ex.plotScatter('reactionTime', 'accuracy', 'Visible', 'off');
+            fig = ex.plotInfoScatter('reactionTime', 'accuracy', 'Visible', 'off');
             tc.verifyClass(fig, 'matlab.ui.Figure');
             close(fig);
         end
 
-        function testPlotScatterWithFitLine(tc)
+        function testPlotInfoScatterWithFitLine(tc)
             ex = exploreFNIRS.core.Experiment(tc.allData);
             ex.groupby('Group');
-            fig = ex.plotScatter('Age', 'reactionTime', ...
+            fig = ex.plotInfoScatter('Age', 'reactionTime', ...
                 'FitLine', true, 'Visible', 'off');
             tc.verifyClass(fig, 'matlab.ui.Figure');
             close(fig);
         end
 
-        function testPlotScatterNoGrouping(tc)
+        function testPlotInfoScatterNoGrouping(tc)
             ex = exploreFNIRS.core.Experiment(tc.allData);
             % No groupby - should still work with single color
-            fig = ex.plotScatter('reactionTime', 'accuracy', 'Visible', 'off');
+            fig = ex.plotInfoScatter('reactionTime', 'accuracy', 'Visible', 'off');
             tc.verifyClass(fig, 'matlab.ui.Figure');
             close(fig);
         end
 
-        function testPlotScatterSavesFile(tc)
+        function testPlotInfoScatterSavesFile(tc)
             outPath = fullfile(tempdir, 'test_scatter.png');
             if exist(outPath, 'file'), delete(outPath); end
 
             ex = exploreFNIRS.core.Experiment(tc.allData);
-            fig = ex.plotScatter('reactionTime', 'accuracy', ...
+            fig = ex.plotInfoScatter('reactionTime', 'accuracy', ...
                 'SavePath', outPath, 'Visible', 'off');
             close(fig);
 
@@ -330,10 +330,10 @@ classdef testExperiment < matlab.unittest.TestCase
             delete(outPath);
         end
 
-        function testPlotScatterRejectsNonNumeric(tc)
+        function testPlotInfoScatterRejectsNonNumeric(tc)
             ex = exploreFNIRS.core.Experiment(tc.allData);
-            tc.verifyError(@() ex.plotScatter('SubjectID', 'accuracy', 'Visible', 'off'), ...
-                'exploreFNIRS:core:Experiment:plotScatter');
+            tc.verifyError(@() ex.plotInfoScatter('SubjectID', 'accuracy', 'Visible', 'off'), ...
+                'exploreFNIRS:core:Experiment:plotInfoScatter');
         end
 
         %% --- InfoTable ---
@@ -573,9 +573,9 @@ classdef testExperiment < matlab.unittest.TestCase
             tc.verifySize(colors, [20, 3]);
         end
 
-        %% --- ScatterFNIRS ---
+        %% --- Scatter ---
 
-        function testScatterFNIRSBasic(tc)
+        function testScatterBasic(tc)
             ex = exploreFNIRS.core.Experiment(tc.allData);
             ex.groupby('Condition');
             ex.settings.resampleRate = 2;
@@ -583,14 +583,14 @@ classdef testExperiment < matlab.unittest.TestCase
             ex.settings.useBaseline = false;
             ex.aggregate();
 
-            [fig, stats] = ex.plotScatterFNIRS('reactionTime', ...
+            [fig, stats] = ex.plotScatter('reactionTime', ...
                 'Biomarkers', {'HbO'}, 'Channels', 1, 'Visible', 'off');
             tc.verifyClass(fig, 'matlab.ui.Figure');
             tc.verifyNotEmpty(stats);
             close(fig);
         end
 
-        function testScatterFNIRSSpearman(tc)
+        function testScatterSpearman(tc)
             ex = exploreFNIRS.core.Experiment(tc.allData);
             ex.groupby('Group');
             ex.settings.resampleRate = 2;
@@ -598,13 +598,13 @@ classdef testExperiment < matlab.unittest.TestCase
             ex.settings.useBaseline = false;
             ex.aggregate();
 
-            [fig, stats] = ex.plotScatterFNIRS('Age', ...
+            [fig, stats] = ex.plotScatter('Age', ...
                 'CorrType', 'Spearman', 'Channels', 1, 'Visible', 'off');
             tc.verifyClass(fig, 'matlab.ui.Figure');
             close(fig);
         end
 
-        function testScatterFNIRSMultiChannel(tc)
+        function testScatterMultiChannel(tc)
             ex = exploreFNIRS.core.Experiment(tc.allData);
             ex.groupby('Condition');
             ex.settings.resampleRate = 2;
@@ -612,13 +612,13 @@ classdef testExperiment < matlab.unittest.TestCase
             ex.settings.useBaseline = false;
             ex.aggregate();
 
-            [fig, ~] = ex.plotScatterFNIRS('reactionTime', ...
+            [fig, ~] = ex.plotScatter('reactionTime', ...
                 'Channels', [1, 2, 3], 'Visible', 'off');
             tc.verifyClass(fig, 'matlab.ui.Figure');
             close(fig);
         end
 
-        function testScatterFNIRSSavesFile(tc)
+        function testScatterSavesFile(tc)
             outPath = fullfile(tempdir, 'test_scatter_fnirs.png');
             if exist(outPath, 'file'), delete(outPath); end
 
@@ -629,21 +629,21 @@ classdef testExperiment < matlab.unittest.TestCase
             ex.settings.useBaseline = false;
             ex.aggregate();
 
-            [fig, ~] = ex.plotScatterFNIRS('reactionTime', ...
+            [fig, ~] = ex.plotScatter('reactionTime', ...
                 'Channels', 1, 'SavePath', outPath, 'Visible', 'off');
             close(fig);
             tc.verifyTrue(exist(outPath, 'file') > 0);
             delete(outPath);
         end
 
-        function testScatterFNIRSRequiresAggregate(tc)
+        function testScatterRequiresAggregate(tc)
             ex = exploreFNIRS.core.Experiment(tc.allData);
             ex.groupby('Condition');
-            tc.verifyError(@() ex.plotScatterFNIRS('reactionTime'), ...
-                'exploreFNIRS:core:Experiment:plotScatterFNIRS');
+            tc.verifyError(@() ex.plotScatter('reactionTime'), ...
+                'exploreFNIRS:core:Experiment:plotScatter');
         end
 
-        function testScatterFNIRSWithFitLine(tc)
+        function testScatterWithFitLine(tc)
             ex = exploreFNIRS.core.Experiment(tc.allData);
             ex.groupby('Group');
             ex.settings.resampleRate = 2;
@@ -651,7 +651,7 @@ classdef testExperiment < matlab.unittest.TestCase
             ex.settings.useBaseline = false;
             ex.aggregate();
 
-            [fig, stats] = ex.plotScatterFNIRS('Age', ...
+            [fig, stats] = ex.plotScatter('Age', ...
                 'FitLine', true, 'Channels', 1, 'Visible', 'off');
             tc.verifyClass(fig, 'matlab.ui.Figure');
             close(fig);
@@ -744,6 +744,121 @@ classdef testExperiment < matlab.unittest.TestCase
             tc.verifyNotEmpty(results.formula);
             tc.verifyTrue(contains(results.formula, 'Condition'));
             if ~isempty(fig), close(fig); end
+        end
+
+        %% --- Info LME ---
+
+        function testStatsInfoLMEBasic(tc)
+            ex = exploreFNIRS.core.Experiment(tc.allData);
+            ex.groupby('Condition');
+            results = ex.statsInfoLME('reactionTime');
+            tc.verifyNotEmpty(results);
+            tc.verifyNotEmpty(results.formula);
+            tc.verifyTrue(contains(results.formula, 'reactionTime'));
+            tc.verifyTrue(contains(results.formula, 'Condition'));
+            tc.verifyEqual(results.responseVar, 'reactionTime');
+            tc.verifyTrue(isempty(results.channels));
+        end
+
+        function testStatsInfoLMEReturnsModel(tc)
+            ex = exploreFNIRS.core.Experiment(tc.allData);
+            ex.groupby('Condition');
+            results = ex.statsInfoLME('reactionTime');
+            tc.verifyNotEmpty(results.models);
+            mdl = results.models{1, 1};
+            if ~isempty(mdl)
+                tc.verifyClass(mdl, 'LinearMixedModel');
+            end
+        end
+
+        function testStatsInfoLMEAnovaTable(tc)
+            ex = exploreFNIRS.core.Experiment(tc.allData);
+            ex.groupby('Condition');
+            results = ex.statsInfoLME('reactionTime');
+            tc.verifyClass(results.anova_pval, 'table');
+            tc.verifyGreaterThan(height(results.anova_pval), 0);
+        end
+
+        function testStatsInfoLMEMultiGroup(tc)
+            ex = exploreFNIRS.core.Experiment(tc.allData);
+            ex.groupby({'Group', 'Condition'});
+            results = ex.statsInfoLME('reactionTime');
+            tc.verifyNotEmpty(results.formula);
+            tc.verifyTrue(contains(results.formula, 'Group'));
+            tc.verifyTrue(contains(results.formula, 'Condition'));
+        end
+
+        function testStatsInfoLMERequiresGroupby(tc)
+            ex = exploreFNIRS.core.Experiment(tc.allData);
+            tc.verifyError(@() ex.statsInfoLME('reactionTime'), ...
+                'exploreFNIRS:core:Experiment:statsInfoLME');
+        end
+
+        function testStatsInfoLMENoAggregateNeeded(tc)
+            ex = exploreFNIRS.core.Experiment(tc.allData);
+            ex.groupby('Condition');
+            tc.verifyFalse(ex.isAggregated);
+            results = ex.statsInfoLME('reactionTime');
+            tc.verifyNotEmpty(results.formula);
+        end
+
+        function testStatsInfoLMECompatibleWithSummarize(tc)
+            ex = exploreFNIRS.core.Experiment(tc.allData);
+            ex.groupby('Condition');
+            results = ex.statsInfoLME('reactionTime');
+            T = ex.statsSummarize(results, 'Type', 'anova');
+            tc.verifyClass(T, 'table');
+            tc.verifyGreaterThan(height(T), 0);
+        end
+
+        %% --- Aux LME ---
+
+        function testStatsAuxLMEBasic(tc)
+            ex = exploreFNIRS.core.Experiment(tc.allData);
+            ex.groupby('Condition');
+            ex.settings.resampleRate = 2;
+            ex.settings.barBinSize = 10;
+            ex.settings.useBaseline = false;
+            ex.aggregate();
+
+            results = ex.statsAuxLME('heartRate');
+            tc.verifyNotEmpty(results);
+            tc.verifyNotEmpty(results.formula);
+        end
+
+        function testStatsAuxLMEReturnsModel(tc)
+            ex = exploreFNIRS.core.Experiment(tc.allData);
+            ex.groupby('Condition');
+            ex.settings.resampleRate = 2;
+            ex.settings.barBinSize = 10;
+            ex.settings.useBaseline = false;
+            ex.aggregate();
+
+            results = ex.statsAuxLME('heartRate');
+            tc.verifyNotEmpty(results.models);
+            mdl = results.models{1, 1};
+            if ~isempty(mdl)
+                tc.verifyClass(mdl, 'LinearMixedModel');
+            end
+        end
+
+        function testStatsAuxLMEMultiChannel(tc)
+            ex = exploreFNIRS.core.Experiment(tc.allData);
+            ex.groupby('Condition');
+            ex.settings.resampleRate = 2;
+            ex.settings.barBinSize = 10;
+            ex.settings.useBaseline = false;
+            ex.aggregate();
+
+            results = ex.statsAuxLME('accelerometer');
+            tc.verifyTrue(size(results.models, 2) >= 1);
+        end
+
+        function testStatsAuxLMERequiresAggregate(tc)
+            ex = exploreFNIRS.core.Experiment(tc.allData);
+            ex.groupby('Condition');
+            tc.verifyError(@() ex.statsAuxLME('heartRate'), ...
+                'exploreFNIRS:core:Experiment:statsAuxLME');
         end
 
     end

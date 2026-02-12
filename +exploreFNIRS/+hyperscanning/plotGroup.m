@@ -88,9 +88,10 @@ function plotSingleGroup(result, opts)
             'UniformOutput', false);
     end
 
-    fig = figure('Visible', opts.Visible, ...
-        'Position', [100, 100, opts.SaveWidth, opts.SaveHeight], ...
-        'Color', 'w');
+    fig = pf2_base.plot.createFigure('Visible', opts.Visible, ...
+        'Width', opts.SaveWidth, 'Height', opts.SaveHeight, ...
+        'SavePath', opts.SavePath);
+    sty = pf2_base.plot.PlotStyle.getDefault();
     ax = axes('Parent', fig);
 
     if isempty(opts.Colors)
@@ -104,13 +105,13 @@ function plotSingleGroup(result, opts)
     hold(ax, 'on');
 
     % Error bars
-    errorbar(ax, 1:nCh, meanVals, semVals, 'k.', 'LineWidth', 1, ...
-        'CapSize', 4);
+    errorbar(ax, 1:nCh, meanVals, semVals, '.', 'Color', sty.ForegroundColor, ...
+        'LineWidth', sty.AxisLineWidth, 'CapSize', 4);
 
     % Zero line
     if opts.ShowZeroLine
         plot(ax, [0.5, nCh + 0.5], [0, 0], '-', ...
-            'Color', [0.5, 0.5, 0.5], 'LineWidth', 0.5);
+            'Color', sty.ZeroLineColor, 'LineWidth', 0.5);
     end
 
     % Significance stars
@@ -152,7 +153,7 @@ function plotSingleGroup(result, opts)
 
     hold(ax, 'off');
 
-    set(ax, 'XTick', 1:nCh, 'XTickLabel', chLabels, 'XTickLabelRotation', 45);
+    set(ax, 'XTick', 1:nCh, 'XTickLabel', pf2_base.plot.escapeTeX(chLabels), 'XTickLabelRotation', 45);
     xlabel(ax, 'Channel');
     ylabel(ax, 'Coupling');
 
@@ -165,9 +166,9 @@ function plotSingleGroup(result, opts)
     end
 
     box(ax, 'on');
+    sty.applyToAxes(ax);
 
-    % Save
-    saveIfRequested(opts);
+    pf2_base.plot.handleSave(fig, opts);
 
 end
 
@@ -210,9 +211,10 @@ function plotBlockGroupBars(blockResults, opts)
         end
     end
 
-    fig = figure('Visible', opts.Visible, ...
-        'Position', [100, 100, opts.SaveWidth, opts.SaveHeight], ...
-        'Color', 'w');
+    fig = pf2_base.plot.createFigure('Visible', opts.Visible, ...
+        'Width', opts.SaveWidth, 'Height', opts.SaveHeight, ...
+        'SavePath', opts.SavePath);
+    sty = pf2_base.plot.PlotStyle.getDefault();
     ax = axes('Parent', fig);
 
     b = bar(ax, meanMat, 'grouped');
@@ -230,19 +232,19 @@ function plotBlockGroupBars(blockResults, opts)
     for k = 1:nBlocks
         xOff = (2 * k - nBlocks - 1) / (2 * nBlocks) * groupWidth;
         errorbar(ax, (1:nGroups) + xOff, meanMat(:, k), semMat(:, k), ...
-            'k.', 'LineWidth', 1, 'CapSize', 3);
+            '.', 'Color', sty.ForegroundColor, 'LineWidth', 1, 'CapSize', 3);
     end
 
     if opts.ShowZeroLine
         plot(ax, [0.5, nGroups + 0.5], [0, 0], '-', ...
-            'Color', [0.5, 0.5, 0.5], 'LineWidth', 0.5);
+            'Color', sty.ZeroLineColor, 'LineWidth', 0.5);
     end
     hold(ax, 'off');
 
-    set(ax, 'XTick', 1:nGroups, 'XTickLabel', chLabels, 'XTickLabelRotation', 45);
+    set(ax, 'XTick', 1:nGroups, 'XTickLabel', pf2_base.plot.escapeTeX(chLabels), 'XTickLabelRotation', 45);
     xlabel(ax, 'Channel');
     ylabel(ax, 'Coupling');
-    legend(ax, blockLabels, 'Location', 'best');
+    legend(ax, pf2_base.plot.escapeTeX(blockLabels), 'Location', 'best');
 
     if ~isempty(opts.Title)
         title(ax, opts.Title);
@@ -251,22 +253,8 @@ function plotBlockGroupBars(blockResults, opts)
     end
 
     box(ax, 'on');
+    sty.applyToAxes(ax);
 
-    saveIfRequested(opts);
+    pf2_base.plot.handleSave(fig, opts);
 
-end
-
-
-function saveIfRequested(opts)
-    if ~isempty(opts.SavePath)
-        fig = gcf;
-        if ~isempty(which('pf2_base.plot.saveFigure'))
-            pf2_base.plot.saveFigure(fig, opts.SavePath, ...
-                opts.SaveWidth, opts.SaveHeight, opts.SaveDPI);
-        else
-            set(fig, 'PaperPositionMode', 'auto');
-            print(fig, opts.SavePath, '-dpng', sprintf('-r%d', opts.SaveDPI));
-        end
-        fprintf('Saved: %s\n', opts.SavePath);
-    end
 end

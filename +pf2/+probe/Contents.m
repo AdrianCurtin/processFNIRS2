@@ -1,6 +1,9 @@
 % pf2.probe - Probe geometry and visualization
 % processFNIRS2 v0.8
 %
+% Functions:
+%   nearestBrodmann   - Find nearest Brodmann areas for each channel
+%
 % Visualization (auto-detect):
 %   plot              - Auto-select best visualization (3D, 2D, or arranged)
 %

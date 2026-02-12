@@ -153,6 +153,14 @@ elseif(sum(segSampleCount>1)>0)
     resample=true;
 end
 
+% Handle single-point data (e.g. GLM betas): when all segments have only
+% one timepoint, median(diff) yields NaN. Use a dummy sample interval of 1
+% so the time grid [minTime:1:maxTime] collapses to a single point.
+if (isnan(resampleSize) || resampleSize <= 0) && all(segSampleCount <= 1)
+    resampleSize = 1;
+    resample = false;
+end
+
 if(sum(segROIpresent)==length(FNIRScellArray))
     calcROI=true;
 elseif(sum(segROIpresent)>0)
@@ -244,6 +252,16 @@ if(~isempty(segmentTimesArr))
     outGA.segmentTimes=sort(outGA.segmentTimes,1);
      outGA.segmentTimes=round( outGA.segmentTimes,5);
     outGA.time=outGA.time(ismember(outGA.time,outGA.segmentTimes(:,1)));
+else
+    % Build segmentTimes from the time grid when not provided by input
+    % segments (e.g. single-point GLM betas). Format: [start, mid, end].
+    nT = length(outGA.time);
+    if nT == 1
+        outGA.segmentTimes = [outGA.time, outGA.time, outGA.time];
+    else
+        halfBin = resampleSize / 2;
+        outGA.segmentTimes = [outGA.time - halfBin, outGA.time, outGA.time + halfBin];
+    end
 end
 
 numSegs=length(outGA.time);

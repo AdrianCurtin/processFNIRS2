@@ -197,11 +197,13 @@ end
 idx2plot=ismember(probeInfo.ChannelList,rois2plot);
 
 
+sty = pf2_base.plot.PlotStyle.getDefault();
+
 if(~isempty(rois2plot))
     if(nargout>0)
-        figHandle=figure(); 
+        figHandle=figure('Color', sty.FigureColor);
     else
-        figure();
+        figure('Color', sty.FigureColor);
     end
 else
     warning('Nothing to Plot');
@@ -284,7 +286,7 @@ for(roiIdx=1:length(rois2plot))
 
     
     if(oxyMaxValue>0&&oxyMinValue<0)
-        zeroH=plot([tmin,tmax],[0,0],'--k','HandleVisibility','off');
+        zeroH=plot([tmin,tmax],[0,0],'--','Color',sty.ZeroLineColor,'HandleVisibility','off');
         hold on;
     end
    
@@ -310,8 +312,8 @@ for(roiIdx=1:length(rois2plot))
     end
     
     if(~isempty(baseline)||isempty(showMarkers))
-        maxH=plot([tmean],ylimit(2),'color',[1,1,1],'HandleVisibility','off');
-        minH=plot([tmean],ylimit(1),'color',[1,1,1],'HandleVisibility','off'); 
+        maxH=plot([tmean],ylimit(2),'color',sty.FigureColor,'HandleVisibility','off');
+        minH=plot([tmean],ylimit(1),'color',sty.FigureColor,'HandleVisibility','off'); 
     end
     
     if(~isempty(baseline))
@@ -330,9 +332,9 @@ for(roiIdx=1:length(rois2plot))
         for i=1:length(showMarkers)
             mrkName=sprintf('Mrk%i',showMarkers(i));
             if(numMarkers(i)<tooManyMarkers||plotTonsOfMarkers)
-                yLabelHeight=(1:length(showMarkers))*0.05+0.15;
+                yLabelHeight=min((1:length(showMarkers))*0.05+0.15, 0.95);
                 if(numMarkers(i)<tooManyLabels)
-                	pf2_base.external.vline(curMarkers(showMarkersIdx==i),'k',mrkName,yLabelHeight(i));
+                	pf2_base.external.vline(curMarkers(showMarkersIdx==i),sty.ForegroundColor,mrkName,yLabelHeight(i));
                 else
                     pf2_base.external.vline(curMarkers(showMarkersIdx==i),'lineTags',mrkName);
                     fprintf('Marker %i has too many instances to plot labels',showMarkers(i));
@@ -350,13 +352,13 @@ for(roiIdx=1:length(rois2plot))
     ylim(ylimit);
     
     
-    xlabel(sprintf('ROI%i: %s',roiNum,ROInames{roiNum}));
+    xlabel(sprintf('ROI%i: %s',roiNum,pf2_base.plot.escapeTeX(ROInames{roiNum})));
     
 
-    if(length(bioM)>1)
+    if(length(bioMlist)>1)
         ylblstring=sprintf('\\Delta[X]');
     else
-        ylblstring=sprintf('\\Delta[%s]',bioM{1});
+        ylblstring=sprintf('\\Delta[%s]',bioMlist{1});
     end
     
     if(isfield(fNIR,'units'))
@@ -373,6 +375,9 @@ end
 
 % Add figure title from processingInfo if available
 pf2_base.plot.addProcessingInfoTitle(fNIR, gcf());
+
+% Apply theme styling
+sty.applyToFigure(gcf());
 
 % Save figure if requested
 if ~isempty(savePath)

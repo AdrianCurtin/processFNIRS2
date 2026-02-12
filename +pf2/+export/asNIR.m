@@ -1,13 +1,46 @@
-function [ ] = asNIR( fNIRstruct, filepath )
+function [ ] = asNIR( fNIRstruct, filepath, varargin )
 %Takes fNIR struct and writes the basic nir file
 %   Use to construct artificial .nir files for future analysis
+%
+%   For batch export of a cell array, pass a directory path instead of a
+%   file path. Optional name-value pairs control subdirectory mapping and
+%   filename construction:
+%
+%   pf2.export.asNIR(allData, 'output/')
+%   pf2.export.asNIR(allData, 'output/', 'Dir1', 'Group', 'Prefix', {'SubjectID'})
+%
+%   Name-Value Parameters (batch mode only):
+%     'Dir1'..'Dir4'  - Info field names mapped to subdirectories
+%     'Prefix'        - Cell array of info field names for filename
+%     'Verbose'       - Print progress messages (default: true)
 
 if(nargin<1)
     error('No fnirs specified!');
 end
 
+% --- Batch mode: cell array input ---
+if iscell(fNIRstruct)
+    if nargin < 2 || isempty(filepath)
+        error('pf2:export:asNIR:noPath', ...
+            'A directory path is required for batch export.');
+    end
+    opts = parseBatchOpts(varargin{:});
+    paths = pf2_base.buildExportPaths(fNIRstruct, filepath, '.nir', opts);
+    n = numel(fNIRstruct);
+    for i = 1:n
+        if opts.Verbose
+            fprintf('  Exporting %d/%d: %s\n', i, n, paths{i});
+        end
+        pf2.export.asNIR(fNIRstruct{i}, paths{i});
+    end
+    if opts.Verbose
+        fprintf('Batch export complete: %d files written to %s\n', n, filepath);
+    end
+    return;
+end
+
 if nargin<2
-   [filename path]=uiputfile(['*.nir']); 
+   [filename path]=uiputfile(['*.nir']);
     filepath=[path filename];
 end
 
@@ -260,3 +293,16 @@ end
 
 end
 
+
+function opts = parseBatchOpts(varargin)
+% Parse batch export name-value parameters
+    p = inputParser;
+    p.addParameter('Dir1', '', @(x) ischar(x) || isstring(x));
+    p.addParameter('Dir2', '', @(x) ischar(x) || isstring(x));
+    p.addParameter('Dir3', '', @(x) ischar(x) || isstring(x));
+    p.addParameter('Dir4', '', @(x) ischar(x) || isstring(x));
+    p.addParameter('Prefix', {}, @iscell);
+    p.addParameter('Verbose', true, @islogical);
+    p.parse(varargin{:});
+    opts = p.Results;
+end

@@ -101,6 +101,13 @@ if(isfield(outFNIR,'markers'))
    end
 end
 
+if isfield(outFNIR, 'blocks') && ~isempty(outFNIR.blocks)
+    for bk = 1:length(outFNIR.blocks)
+        outFNIR.blocks(bk).startTime = outFNIR.blocks(bk).startTime - tDiff;
+        outFNIR.blocks(bk).endTime = outFNIR.blocks(bk).endTime - tDiff;
+    end
+end
+
 if(isfield(outFNIR,'raw'))
    %outFNIR.raw(:,1)= outFNIR.raw(:,1)-t0time;
 end
@@ -119,6 +126,14 @@ if(pf2_base.isnestedfield(outFNIR,'Aux')) && ~isempty(outFNIR.Aux)
         % Only modify numeric arrays with at least 2D where column 1 might be time
         if isnumeric(curField) && ismatrix(curField) && size(curField,1) > 1 && size(curField,2) >= 1
             outFNIR.Aux.(curFieldName)(:,1) = curField(:,1) - tDiff;
+        elseif istable(curField)
+            % Handle flattened Aux tables — shift the time column
+            tblVars = curField.Properties.VariableNames;
+            timeCol = intersect(timeFieldNames, tblVars);
+            if ~isempty(timeCol) && isnumeric(curField.(timeCol{1}))
+                outFNIR.Aux.(curFieldName).(timeCol{1}) = ...
+                    curField.(timeCol{1}) - tDiff;
+            end
         end
     end
 end

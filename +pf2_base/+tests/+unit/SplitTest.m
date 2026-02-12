@@ -23,7 +23,7 @@ classdef SplitTest < matlab.unittest.TestCase
     methods (TestClassSetup)
         function loadSampleData(testCase)
             testCase.rawData = pf2.import.sampleData.fNIR2000();
-            testCase.processedData = processFNIRS2(testCase.rawData, 'ShowGUI', false);
+            testCase.processedData = processFNIRS2(testCase.rawData);
         end
     end
 

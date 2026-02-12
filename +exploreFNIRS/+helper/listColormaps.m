@@ -38,7 +38,7 @@ matplotlibQualitative={'tab10','tab20','tab20b','tab20c'};
 
 qualitativeTypes=[matlabQualitativeTypes(1),brewerQualitative,matplotlibQualitative,matlabQualitativeTypes(2:end)];
 
-matlabSequentialTypes={'parula','turbo','hsv','hot','cool','spring','summer','autumn','winter','gray','bone','copper','pink'};
+matlabSequentialTypes={'parula','turbo','hsv','hot','cool','spring','summer','autumn','winter','gray','bone','copper','pink','jet','white'};
 brewerSequential={'Blues','BuGn','BuPu','GnBu','Greens','Greus','OrRd','Oranges','PuBu','PuBuGn','PuRd','Purples','RdPu','Reds','YlGn','YlGnBu','YlOrBr','YlOrRd'};
 matplotlibSequential={'viridis','inferno','plasma','cividis'};
 sequentialTypes=[matlabSequentialTypes,brewerSequential,matplotlibSequential];

@@ -52,7 +52,11 @@ if(nargin<1)
         return;
     end
 else
-    if(isstruct(fNIR)&&isfield(fNIR,'probeinfo')&&~isempty(fNIR.probeinfo))
+    if isstruct(fNIR) && isfield(fNIR, 'device') && isa(fNIR.device, 'pf2.Device')
+        probeInfo = fNIR.device.probeInfo;
+        return;
+
+    elseif(isstruct(fNIR)&&isfield(fNIR,'probeinfo')&&~isempty(fNIR.probeinfo))
         probeInfo=fNIR.probeinfo;
         return;
 

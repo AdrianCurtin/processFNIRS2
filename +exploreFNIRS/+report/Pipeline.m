@@ -95,12 +95,13 @@ classdef Pipeline < handle
         %   'temporal'     - Temporal plot
         %   'bar'          - Bar chart
         %   'demographics' - Demographics Table 1
+        %   'topo'         - Topo brain map of F-stats (requires prior 'lme' step)
         %   'connectivity' - Connectivity analysis
         %   'contrast'     - Contrast table (requires prior 'lme' step)
         %   'anova'        - ANOVA table (requires prior 'lme' step)
 
             validTypes = {'lme', 'temporal', 'bar', 'demographics', ...
-                'connectivity', 'contrast', 'anova'};
+                'connectivity', 'contrast', 'anova', 'topo'};
             if ~ismember(lower(stepType), validTypes)
                 error('exploreFNIRS:report:Pipeline:addStep', ...
                     'Unknown step type: %s. Valid types: %s', ...
@@ -243,6 +244,13 @@ classdef Pipeline < handle
                     res = obj.results.(lmeKey);
                     T = exploreFNIRS.report.anovaTable(res, step.args{:});
                     obj.tables.(step.name) = T;
+
+                case 'topo'
+                    % Re-run LME with ShowTopo=true to get brain map
+                    args = [step.args, {'Visible', 'off', 'ShowTopo', true, 'ShowBar', false}];
+                    [fig, ~] = ex.plotLME(args{:});
+                    applyReportStyle(fig);
+                    obj.figures.(step.name) = fig;
             end
         end
 
