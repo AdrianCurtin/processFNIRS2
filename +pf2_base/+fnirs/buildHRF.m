@@ -4,8 +4,8 @@ function [ hrf ] = buildHRF(fs,t, alpha1,alpha2,beta1,beta2,c )
 % Generates a hemodynamic response function (HRF) using a difference-of-gammas
 % model at a specified sampling frequency. The HRF models the expected BOLD or
 % fNIRS signal response to a brief neural event, consisting of a primary
-% positive response followed by a smaller undershoot. Output is normalized
-% and truncated when the function crosses zero.
+% positive response followed by a post-stimulus undershoot. Output is
+% normalized to peak = 1.
 %
 % Reference:
 %   Lindquist MA, Meng Loh J, Atlas LY, Wager TD. (2009).
@@ -23,8 +23,9 @@ function [ hrf ] = buildHRF(fs,t, alpha1,alpha2,beta1,beta2,c )
 % Inputs:
 %   fs     - Sampling frequency in Hz (default: 20)
 %            Higher values produce smoother HRF curves.
-%   t      - Duration of HRF in seconds (default: 15)
-%            Function is truncated when it crosses zero (becomes negative).
+%   t      - Duration of HRF in seconds (default: 32)
+%            Matches SPM canonical HRF duration, which includes the full
+%            post-stimulus undershoot.
 %   alpha1 - Shape parameter for primary gamma function (default: 6)
 %   alpha2 - Shape parameter for undershoot gamma function (default: 16)
 %   beta1  - Scale parameter for primary gamma function (default: 1)
@@ -36,7 +37,6 @@ function [ hrf ] = buildHRF(fs,t, alpha1,alpha2,beta1,beta2,c )
 %   hrf - Hemodynamic response function [N x 2]
 %         Column 1: Time in seconds
 %         Column 2: HRF amplitude (normalized to peak=1)
-%         N varies based on where function crosses zero.
 %
 % Algorithm:
 %   Via equation A1 from Lindquist et al. (2009):
@@ -45,11 +45,10 @@ function [ hrf ] = buildHRF(fs,t, alpha1,alpha2,beta1,beta2,c )
 %   3. Compute undershoot: same form with alpha2, beta2, scaled by c
 %   4. HRF = primary - c * undershoot
 %   5. Normalize to peak amplitude = 1
-%   6. Truncate at first zero crossing (when HRF becomes negative)
 %
 % Example:
 %   % Generate HRF at 10 Hz for GLM convolution
-%   hrf = buildHRF(10);  % 10 Hz, 15 sec duration
+%   hrf = buildHRF(10);  % 10 Hz, 32 sec duration
 %   plot(hrf(:,1), hrf(:,2));
 %   xlabel('Time (s)'); ylabel('Amplitude');
 %   title('Canonical HRF');
@@ -66,7 +65,8 @@ function [ hrf ] = buildHRF(fs,t, alpha1,alpha2,beta1,beta2,c )
 % Notes:
 %   - Default parameters from Lindquist et al. equation A1
 %   - HRF is automatically normalized to peak = 1.0
-%   - Output is truncated at zero crossing to avoid negative tail
+%   - Full HRF including undershoot is preserved (matches SPM, MNE-NIRS,
+%     NIRS Toolbox, and Cedalion conventions)
 %   - Commonly used for GLM design matrices in fNIRS/fMRI analysis
 %
 % See also: pf2_base.fnirs.bvoxy, conv
@@ -75,7 +75,7 @@ if(nargin<1)
 end
 
 if(nargin<2)
-    t=15;
+    t=32;
 end
 
 if(nargin<6)% Values specified next to A1
@@ -95,17 +95,7 @@ hrf=(time.^(alpha1-1).*beta1^alpha1.*exp(-beta1.*time))./gamma(alpha1)...
 
 hrf=hrf/max(hrf);
 
-iEnd=find(hrf<0);
-
 hrf=[time;hrf]';
-
-if ~isempty(iEnd)
-    hrf=hrf(1:iEnd(1)-1,:);
-else
-    % If HRF never goes negative, keep all values
-    hrf=hrf;
-end
-
 
 end
 

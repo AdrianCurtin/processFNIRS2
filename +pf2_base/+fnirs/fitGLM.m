@@ -110,12 +110,19 @@ if length(regressorNames) ~= P
         length(regressorNames), P);
 end
 
-% Determine GPU usage for OLS
+% Determine GPU usage
 useGPU = false;
 switch accelMode
     case 'auto'
         gpuInfo = pf2_base.accel.isGPUAvailable();
-        useGPU = gpuInfo.available && (T * nCh > 50000);
+        if gpuInfo.available
+            if strcmp(method, 'AR-IRLS')
+                % AR-IRLS iterates many times, so GPU pays off at lower sizes
+                useGPU = (T * nCh > 10000);
+            else
+                useGPU = (T * nCh > 50000);
+            end
+        end
     case 'gpu'
         useGPU = true;
     case 'none'
@@ -218,13 +225,18 @@ end
 function [beta, residuals, se, dof] = fitARIRLS(Y, X, arOrder, maxIter, tol, useGPU)
 % FITARIRLS Autoregressive iteratively reweighted least squares
 %
+% When GPU is enabled, data is transferred once at the start and kept on
+% GPU throughout all iterations. Only the small Yule-Walker solve (AR order
+% x AR order per channel) runs on CPU. Final results are gathered at the
+% end, avoiding per-iteration GPU<->CPU transfers.
+%
 % Inputs:
 %   Y       - Data matrix [T x C]
 %   X       - Design matrix [T x P]
 %   arOrder - AR model order [scalar]
 %   maxIter - Maximum iterations [scalar]
 %   tol     - Convergence tolerance [scalar]
-%   useGPU  - Whether to use GPU for OLS
+%   useGPU  - Whether to use GPU acceleration
 %
 % Outputs:
 %   beta      - Coefficients [P x C]
@@ -235,37 +247,66 @@ function [beta, residuals, se, dof] = fitARIRLS(Y, X, arOrder, maxIter, tol, use
 [T, nCh] = size(Y);
 P = size(X, 2);
 
-% Initial OLS
-[beta, residuals, ~, ~] = fitOLS(Y, X, useGPU);
+% Transfer to GPU once at the start (if requested)
+if useGPU
+    [Yg, onGPU] = pf2_base.accel.toGPU(Y, 'Force', true);
+    if onGPU
+        Xg = gpuArray(X);
+    else
+        Yg = Y;
+        Xg = X;
+        useGPU = false;
+    end
+else
+    Yg = Y;
+    Xg = X;
+end
 
+% Initial OLS (inline to stay on GPU)
+Xpinv = pinv(Xg);
+beta = Xpinv * Yg;
+residuals = Yg - Xg * beta;
 prevBeta = beta;
 
 for iter = 1:maxIter
-    % Estimate AR coefficients from residuals (vectorized across channels)
-    arCoeffs = yulewalkMulti(residuals, arOrder);
-    % Use mean AR coefficients across channels for consistent prewhitening
+    % AR estimation needs CPU (small Toeplitz systems)
+    arCoeffs = yulewalkMulti(pf2_base.accel.gather(residuals), arOrder);
     meanAR = mean(arCoeffs, 2);
 
-    % Build prewhitening filter matrix (vectorized)
-    Yw = applyARFilter(Y, meanAR);
-    Xw = applyARFilter(X, meanAR);
+    % Prewhiten (works transparently on gpuArrays)
+    Yw = applyARFilter(Yg, meanAR);
+    Xw = applyARFilter(Xg, meanAR);
 
-    % Re-fit OLS on prewhitened data
-    [beta, residuals_w, se, dof] = fitOLS(Yw, Xw, useGPU);
+    % Re-fit OLS on prewhitened data (inline)
+    beta = pinv(Xw) * Yw;
 
-    % Compute residuals in original space
-    residuals = Y - X * beta;
+    % Residuals in original space (stays on GPU)
+    residuals = Yg - Xg * beta;
 
-    % Check convergence
-    betaChange = max(abs(beta(:) - prevBeta(:)));
+    % Convergence check
+    betaChange = max(abs( ...
+        pf2_base.accel.gather(beta(:)) - pf2_base.accel.gather(prevBeta(:))));
     if betaChange < tol
         break;
     end
     prevBeta = beta;
 end
 
-% Adjust DOF for AR parameters
+% Final statistics from prewhitened fit
 dof = max(T - P - arOrder, 1);
+residuals_w = Yw - Xw * beta;
+MSE = sum(residuals_w.^2, 1) / dof;
+XwXwinv = pinv(Xw' * Xw);
+varBeta = diag(XwXwinv);  % [P x 1]
+se = sqrt(varBeta * MSE);  % [P x C]
+
+% Final residuals in original space
+residuals = Yg - Xg * beta;
+
+% Gather from GPU
+beta = pf2_base.accel.gather(beta);
+residuals = pf2_base.accel.gather(residuals);
+se = pf2_base.accel.gather(se);
 
 end
 

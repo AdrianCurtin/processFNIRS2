@@ -102,8 +102,10 @@ T = length(time);
 if isempty(customHRF)
     hrfData = pf2_base.fnirs.buildHRF(fs);
     hrf = hrfData(:, 2);  % Column 2 is amplitude
+    hrfDuration = hrfData(end, 1);  % Duration in seconds
 else
     hrf = customHRF(:);
+    hrfDuration = (length(hrf) - 1) / fs;  % Infer duration from length
 end
 
 % Build temporal derivative if requested
@@ -115,8 +117,9 @@ end
 
 % Build dispersion derivative if requested
 if includeDispersion
-    % Dispersion derivative: HRF with wider primary gamma
-    hrfWide = pf2_base.fnirs.buildHRF(fs, 15, 7, 16, 1, 1, 1/6);
+    % Dispersion derivative: HRF with wider primary gamma (alpha1=7 vs 6)
+    % Use same duration as primary HRF so subtraction is valid
+    hrfWide = pf2_base.fnirs.buildHRF(fs, hrfDuration, 7, 16, 1, 1, 1/6);
     hrfDisp = hrfWide(:, 2);
     % Match length to primary HRF
     if length(hrfDisp) > length(hrf)
