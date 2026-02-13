@@ -1290,7 +1290,7 @@ end
 function matches = scanFiles(dataDir, pattern)
 % SCANFILES Recursively find files matching a glob pattern.
 
-    matches = struct('name',{},'folder',{},'isdir',{});
+    matches = []; % Initialize the main window so that it can run with differing MATLAB versions without error
     stack = {dataDir};
     while ~isempty(stack)
         current = stack{end};
@@ -1312,6 +1312,9 @@ end
 
 function levels = analyzeDirectoryLevels(files, rootPath)
 % ANALYZEDIRECTORYLEVELS Extract unique directory names at each depth level.
+
+    % Resolve to absolute path so strrep matches dir() output (always absolute)
+    rootPath = char(java.io.File(rootPath).getCanonicalPath());
 
     allParts = {};
     for k = 1:numel(files)
