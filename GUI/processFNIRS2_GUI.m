@@ -484,13 +484,13 @@ if(outputData.ProcessRaw)
         stage2=nan(size(PF2.GUIPF2.data.stage{1}));
         stage3=stage2;
 
-        [stage3(startSample:endSample,:),stage2(startSample:endSample,:)]=pf2_base.fnirs.processStageRaw2OD(rawMethod,croppedData,fs,croppedTime,rawMask,PF2.GUIPF2.data.markers,PF2.GUIPF2.data.Aux,channelNumbers,wavelengths,curOptTable,PF2.GUIPF2.data);
+        [stage3(startSample:endSample,:),stage2(startSample:endSample,:)]=pf2_base.fnirs.processStageRaw2OD(rawMethod,croppedData,fs,croppedTime,rawMask,PF2.GUIPF2.data.markers,PF2.GUIPF2.data.Aux,channelNumbers,wavelengths,curOptTable,PF2.GUIPF2.data,true);
 
         PF2.GUIPF2.data.stage{2}=stage2;
         PF2.GUIPF2.data.stage{3}=stage3;
 
     else
-        [PF2.GUIPF2.data.stage{3},PF2.GUIPF2.data.stage{2}]=pf2_base.fnirs.processStageRaw2OD(rawMethod,PF2.GUIPF2.data.stage{1},fs,PF2.GUIPF2.data.time,rawMask,PF2.GUIPF2.data.markers,PF2.GUIPF2.data.Aux,channelNumbers,wavelengths,curOptTable,PF2.GUIPF2.data);
+        [PF2.GUIPF2.data.stage{3},PF2.GUIPF2.data.stage{2}]=pf2_base.fnirs.processStageRaw2OD(rawMethod,PF2.GUIPF2.data.stage{1},fs,PF2.GUIPF2.data.time,rawMask,PF2.GUIPF2.data.markers,PF2.GUIPF2.data.Aux,channelNumbers,wavelengths,curOptTable,PF2.GUIPF2.data,true);
     end
 
     if(outputData.ProcessOxy)
@@ -516,7 +516,10 @@ if(outputData.ProcessOxy)
     % Inline filter stage: pass explicit params to external function
     stageData = PF2.GUIPF2.data.stage{4};
     stageData.fchMask = PF2.GUIPF2.data.fchMask;
-    outData = pf2_base.fnirs.processStageFilterHb(oxyMethod, stageData, fs, curOptTable, outputData.ProcessRejected);
+    stageData.markers = PF2.GUIPF2.data.markers;
+    stageData.Aux = PF2.GUIPF2.data.Aux;
+    stageData.time = PF2.GUIPF2.data.time;
+    outData = pf2_base.fnirs.processStageFilterHb(oxyMethod, stageData, fs, curOptTable, outputData.ProcessRejected, true);
 
     if PF2.GUIPF2.processWindowOnly
         outData.validRows = findValidRows(outData, outputData.ProcessRejected);

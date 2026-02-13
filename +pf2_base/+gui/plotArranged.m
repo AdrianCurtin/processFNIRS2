@@ -43,7 +43,7 @@ addParameter(p, 'curConc', 1:5);
 addParameter(p, 'curWv', []);
 addParameter(p, 'curChSet', []);
 addParameter(p, 'curWvSet', []);
-addParameter(p, 'LightColorAuto', true, @islogical);
+addParameter(p, 'LightColorAuto', true);
 parse(p, varargin{:});
 opts = p.Results;
 

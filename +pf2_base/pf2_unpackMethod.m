@@ -92,7 +92,6 @@ function x=pf2_unpackMethod(method)
            F_noarray.args=cell(0,0);
            F_noarray.argvals=cell(0,0);
            F_noarray.default_argvals=cell(0,0);
-		   F_noarray.output=cell(0);
            for j=1:length(Fidx)
                 F_noarray.args{j}=Fidx(j).args;
                 F_noarray.argvals{j}=Fidx(j).argvals;
@@ -101,11 +100,13 @@ function x=pf2_unpackMethod(method)
                 else
                     F_noarray.default_argvals{j}=Fidx(j).argvals;
                 end
-				if(isfield(Fidx(j),'output'))
-                    F_noarray.output{j}=Fidx(j).output;
-                else
-                    F_noarray.output{j}=Fidx(j).output;
-                end
+           end
+           % Output is the same across all struct array elements (artifact of
+           % MATLAB struct() distributing scalar values). Take from first only.
+           if isfield(Fidx, 'output')
+               F_noarray.output = Fidx(1).output;
+           else
+               F_noarray.output = 'x';
            end
            Fidx=F_noarray;
         end
