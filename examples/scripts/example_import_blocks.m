@@ -99,6 +99,16 @@ fprintf('\n');
 % Blocks are embedded on each data struct (data.blocks) by default.
 %
 % Passing a cell array defines blocks on every subject in one call.
+%
+% Note: when importing SNIRF files with a companion BIDS _events.tsv,
+% importSNIRF stores the trial_type-to-value mapping in data.info.eventTypes.
+% defineBlocks then auto-populates ConditionMap from eventTypes, so you
+% don't need to specify it manually:
+%
+%   data = pf2.import.importSNIRF('sub-01_nirs.snirf');
+%   blocks = pf2.data.defineBlocks(data, [1, 2, 3]);  % auto-labeled
+%
+% Explicit ConditionMap always overrides eventTypes.
 
 fprintf('=== Step 3: Define blocks from markers ===\n');
 
@@ -201,7 +211,8 @@ fprintf('\n');
 fprintf('=== Step 5: Extract block segments ===\n');
 
 allSegments = pf2.data.extractBlocks(subjects, ...
-    'PreTime', 10, ...     % 10s before block onset for baseline
+    'PreTime', 120, ...    % 120s before block onset
+    'PostTime', 120, ...   % 120s after block end
     'SetT0', true);        % block onset = t=0
 
 fprintf('Extracted %d segments\n', length(allSegments));

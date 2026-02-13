@@ -1,5 +1,63 @@
 # Changelog
 
+## Unreleased
+
+### New Features
+
+**Pipeline Class Hierarchy:**
+- `pf2_base.PipelineFunction` — immutable value class encapsulating a single processing function with precomputed argument mappings and zero-overhead `execute()` method
+  - 12 special argument types (x, fs, fTime, fchMask, etc.) resolved at construction as uint8 enums
+  - `fromStruct(s)` / `toStruct()` for legacy method struct round-tripping
+  - `fromString(callStr)` for parsing MATLAB call syntax
+  - `detect(funcName)` for auto-discovering function signatures from source
+  - `register(pf)` for persisting to config file
+  - `setParam()`, `setParams()`, `addArg()`, `removeArg()`, `addOutput()`, `removeOutput()` for mutation (returns new copy)
+- `pf2_base.Pipeline` — ordered chain of PipelineFunction steps (value class)
+  - `add()`, `insert()`, `remove()`, `swapStep()`, `setParam()`, `setParams()` for chain manipulation
+  - `toMethod()` converts to legacy method struct for backward compatibility
+  - `fromMethod(name, stage)` builds Pipeline from existing named method
+  - `params()` returns aggregate table of all tunable parameters
+- `pf2_base.RawPipeline` — Stage 1 specialization with `hasIntensity2OD()` helper
+- `pf2_base.OxyPipeline` — Stage 3 specialization with `hasROI()`, `swapROI()`, `removeROI()` helpers
+- `processStageRaw2OD` and `processStageFilterHb` now support both PipelineFunction objects (precomputed context dispatch) and legacy structs (backward-compatible path)
+- `pf2_unpackMethod` now converts legacy structs to PipelineFunction via `fromStruct()`
+- Tutorials:
+  - `examples/scripts/example_pipeline_basics.m` — Pipeline API tutorial
+  - `examples/scripts/example_pipeline_custom_function.m` — Custom function tutorial
+
+**GLM Improvements:**
+- `pf2_base.fnirs.diagnoseGLM()` — comprehensive GLM diagnostic report (collinearity, VIF, partial R², residual ACF, task-data correlation, predicted amplitude, automatic flagging)
+- `fitGLM` AR-IRLS method now returns prewhitened design matrix (`Xw`) and prewhitened residuals (`residuals_w`); contrasts use prewhitened quantities for correct standard errors
+
+**New Processing Functions:**
+- `pf2_MotionCorrectSplineSG` — spline interpolation with Savitzky-Golay smoothing motion correction
+
+**SNIRF Import Improvements:**
+- Source and detector labels from SNIRF probe info now stored during import
+- Per-optode S_D channel labels (e.g., "S1_D11") built with fallback to numeric format
+
+**Interactive Setup Wizard:**
+- `pf2_scripts.quickSetup` — interactive wizard for first-time users
+
+### Config Changes
+- `pf2_functions_default.cfg` reformatted and alphabetized
+- Added `requiresOD` field to motion correction functions (TDDR, Wavelet, Spline, SplineSG, SMAR, SMAR2, MARA, kbWF, sSMART) — validated at runtime in processStageRaw2OD
+- New function entries: `pf2_MotionCorrectSpline`, `pf2_MotionCorrectSplineSG`
+
+### GUI Changes
+- Method configuration GUI now converts between PipelineFunction and legacy struct for editing
+- `requiresOD` added to reserved args in GUI
+
+### New Tests
+- **PipelineFunctionTest.m** — PipelineFunction construction, precomputed mapping, execute, round-trip
+- **PipelineTest.m** — Pipeline hierarchy: add, insert, remove, setParam, toMethod, fromMethod
+- **GLMDiagnosticsTest.m** — diagnoseGLM diagnostic output validation
+
+### Bug Fixes
+- Fixed AR-IRLS contrast p-values being anti-conservative — contrasts now use prewhitened X and residuals instead of original-space quantities
+
+---
+
 ## v1.0 (2026-02-11)
 Scriptable Group Analysis, Connectivity, Hyperscanning, Statistics & Processing Optimizations
 
@@ -278,6 +336,7 @@ Scriptable Group Analysis, Connectivity, Hyperscanning, Statistics & Processing 
 - `pf2_functions_default.cfg` updated: wavelet functions now include `wavelet` and `accelerate` parameters
 
 ### Bug Fixes
+- Fixed `pf2_unpackMethod` S# extraction always failing — `strcmp(string, cellArray)` returns a logical array, and `if(logicalArray)` requires ALL elements true, so the S# → `.F` conversion never executed. Replaced with `isfield`. This bug was dormant in the normal GUI workflow (the GUI unpacked methods before `pf2_unpackMethod` saw them), but broke any code path calling `pf2_unpackMethod` on raw INI data (Pipeline API, ProcessingContext). Consolidated three duplicate S# extraction implementations (GUI `unpackMethods`, raw `unpackMethodsLocal`, oxy `unpackMethodsLocal`) to delegate to the single fixed `pf2_unpackMethod`.
 - Fixed SNIRF import marker corruption — when SNIRF stimulus groups had names and 4+ data columns (e.g., amplitude), the stim name string was concatenated onto the numeric marker array, causing MATLAB to silently convert the entire marker matrix to `char`. This broke all downstream marker-dependent functions (`defineBlocks`, `extractBlocks`, `setT0`). Marker names are now discarded during import since the marker code in column 2 already encodes the stimulus identity.
 - Fixed Aux metadata fields (`varNames`, `unit`) being flattened into separate aux fields (e.g. `accelerometer_varNames`) that caused `grandAvgFNIRS` to error on cell array data. These fields are now skipped during flatten and `varNames` values are used as table column names instead.
 - Fixed `barweb` scatter data points leaking into legends as "data1", "data2" entries (`HandleVisibility` set to `'off'`)

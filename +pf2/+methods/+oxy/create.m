@@ -111,8 +111,11 @@ PF2.myOxyMethods.cfg.add(methodName, packedMethod);
 % Save to disk
 PF2.myOxyMethods.cfg.write();
 
-% Reload methods to update F field
-PF2.myOxyMethods = unpackMethodsLocal(PF2.myOxyMethods);
+% Set unpacked method directly in memory.
+% The INI round-trip (cfg.write -> unpackMethodsLocal) loses nested struct
+% data in S1/S2/... fields. Calling unpackMethodsLocal also wipes F for
+% previously created methods whose S fields were already consumed.
+PF2.myOxyMethods.cfg.(methodName) = method;
 
 fprintf('Created oxy method: %s\n', methodName);
 if ~isempty(functions)
@@ -123,55 +126,14 @@ end
 
 
 function myMethods = unpackMethodsLocal(myMethods)
-% Local copy of unpackMethods to avoid dependency on GUI
-% Handles struct arrays created by INI round-tripping of cell array fields
+% Delegates to pf2_base.pf2_unpackMethod for S# extraction and flattening
 
 for i = 1:length(myMethods.cfg.Sections)
-    x = myMethods.cfg.(myMethods.cfg.Sections{i});
-    if ~isstruct(x)
-        continue;
-    end
-
-    x_fields = fieldnames(x);
-    x.name = myMethods.cfg.Sections{i};
-    x.F = {};
-
-    for j = 1:length(x_fields)
-        fieldName = sprintf('S%d', j);
-        if isfield(x, fieldName)
-            x.F{end+1} = x.(fieldName);
-            x = rmfield(x, fieldName);
-        end
-    end
-
-    % Handle struct arrays created by INI cell-array distribution
-    for idx = 1:length(x.F)
-        Fidx = x.F{idx};
-        if isstruct(Fidx) && length(Fidx) > 1
-            F_fixed.f = Fidx(1).f;
-            F_fixed.args = cell(1, length(Fidx));
-            F_fixed.argvals = cell(1, length(Fidx));
-            F_fixed.default_argvals = cell(1, length(Fidx));
-            F_fixed.output = cell(1, length(Fidx));
-            for k = 1:length(Fidx)
-                F_fixed.args{k} = Fidx(k).args;
-                F_fixed.argvals{k} = Fidx(k).argvals;
-                if isfield(Fidx, 'default_argvals')
-                    F_fixed.default_argvals{k} = Fidx(k).default_argvals;
-                else
-                    F_fixed.default_argvals{k} = Fidx(k).argvals;
-                end
-                if isfield(Fidx, 'output')
-                    F_fixed.output{k} = Fidx(k).output;
-                else
-                    F_fixed.output{k} = 'x';
-                end
-            end
-            x.F{idx} = F_fixed;
-        end
-    end
-
-    myMethods.cfg.(myMethods.cfg.Sections{i}) = x;
+    section = myMethods.cfg.Sections{i};
+    x = myMethods.cfg.(section);
+    if ~isstruct(x), continue; end
+    x.name = section;
+    myMethods.cfg.(section) = pf2_base.pf2_unpackMethod(x);
 end
 
 end

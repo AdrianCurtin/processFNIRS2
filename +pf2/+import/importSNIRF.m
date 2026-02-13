@@ -34,6 +34,8 @@ function [fNIR] = importSNIRF(filepath, channelCheck, varargin)
 %          .markers   - Event markers [M x 4: time, value, duration, amplitude]
 %          .fchMask   - Channel quality mask [1 x C: 1=good, 0=bad]
 %          .info      - Metadata from SNIRF metaDataTags
+%                       .eventTypes - (if BIDS events.tsv exists) cell array
+%                                     {code, 'Label'; ...} mapping value to trial_type
 %          .t0        - Recording start datetime (if available)
 %          .probeinfo - Device and probe geometry structure
 %          .Aux       - Auxiliary data (if present in file)
@@ -53,6 +55,9 @@ function [fNIR] = importSNIRF(filepath, channelCheck, varargin)
 %   - Length units are converted to mm internally (cm input is multiplied by 10)
 %   - Short-separation channels (SD < 20mm) are automatically detected
 %   - Probe layout is automatically generated from 3D optode positions
+%   - BIDS events.tsv sidecar is auto-detected alongside the SNIRF file.
+%     When present, the trial_type-to-value mapping is stored in
+%     .info.eventTypes for automatic block labeling by defineBlocks.
 %
 % See also: pf2.import.importNIR, pf2.import.importNIRX, pf2.export.asSNIRF,
 %           pf2_base.external.jsnirfy.loadsnirf
@@ -134,9 +139,11 @@ else
 end
 fNIR.markers = pf2_base.normalizeMarkers(fNIR.markers);
 
-% Load BIDS events.tsv sidecar if markers are empty and file exists
+% Load BIDS events.tsv sidecar (always check for eventTypes mapping)
 if isempty(fNIR.markers) || size(fNIR.markers, 1) == 0
-    fNIR.markers = loadBIDSevents(filepath);
+    [fNIR.markers, bidsEventTypes] = loadBIDSevents(filepath);
+else
+    [~, bidsEventTypes] = loadBIDSevents(filepath);
 end
 
 % Extract nirs
@@ -212,6 +219,11 @@ end
 
 % Set metadata
 fNIR.info = metaDataTags;
+
+% Attach BIDS eventTypes mapping (trial_type ↔ value)
+if ~isempty(bidsEventTypes)
+    fNIR.info.eventTypes = bidsEventTypes;
+end
 
 % Device config
 device.Info.TimeIsSampleCount = 0;
@@ -574,6 +586,33 @@ for p = 1:1 % Just one probe for now
     device.Probe{p}.TableOpt.SD = device.Probe{p}.SD(:);
     device.Probe{p}.TableOpt.IsShortSeparation = device.Probe{p}.IsShortSeparation(:);
     
+    % Store source/detector labels from SNIRF if available
+    if isfield(probeInfo, 'sourceLabels')
+        device.Probe{p}.SourceLabels = probeInfo.sourceLabels;
+    end
+    if isfield(probeInfo, 'detectorLabels')
+        device.Probe{p}.DetectorLabels = probeInfo.detectorLabels;
+    end
+
+    % Build per-optode S_D channel labels (e.g., "S1_D11")
+    optLabels = cell(numOpt, 1);
+    for opt = 1:numOpt
+        sIdx = device.Probe{p}.TableOpt.SrcIdx(opt);
+        dIdx = device.Probe{p}.TableOpt.DetIdx(opt);
+        if isfield(probeInfo, 'sourceLabels') && sIdx <= length(probeInfo.sourceLabels) && ...
+           isfield(probeInfo, 'detectorLabels') && dIdx <= length(probeInfo.detectorLabels)
+            sLabel = probeInfo.sourceLabels{sIdx};
+            dLabel = probeInfo.detectorLabels{dIdx};
+            % Normalize to "S#_D#" format
+            if ~startsWith(sLabel, 'S'), sLabel = ['S' sLabel]; end
+            if ~startsWith(dLabel, 'D'), dLabel = ['D' dLabel]; end
+            optLabels{opt} = [sLabel '_' dLabel];
+        else
+            optLabels{opt} = sprintf('S%d_D%d', sIdx, dIdx);
+        end
+    end
+    device.Probe{p}.TableOpt.ChannelLabel = optLabels;
+
     % Store channel mapping info
     device.Probe{p}.probeNum = 1;
     device.Probe{p}.wvI = reshape(measurementList.('wavelengthIndex'), [1, height(measurementList)]);
@@ -770,20 +809,23 @@ function outStruct = stripStruct(structObj)
     end
 end
 
-function markers = loadBIDSevents(snirfPath)
-% LOADBIDSEVENTS Load markers from BIDS events.tsv sidecar file
+function [markers, eventTypes] = loadBIDSevents(snirfPath)
+% LOADBIDSEVENTS Load markers and event type mapping from BIDS events.tsv
 %
 % Looks for a companion _events.tsv file alongside the SNIRF file
 % following BIDS naming conventions. Parses onset, duration, trial_type,
 % and value columns into the pf2 marker format [time, value, duration, amplitude].
+% When both trial_type and value columns exist, builds a mapping between them.
 %
 % Inputs:
 %   snirfPath - Full path to the SNIRF file
 %
 % Outputs:
-%   markers - Marker array [M x 4] or empty []
+%   markers    - Marker array [M x 4] or empty []
+%   eventTypes - Cell array {code, 'Label'; ...} mapping value → trial_type, or {}
 
 markers = [];
+eventTypes = {};
 
 [parentDir, baseName, ~] = fileparts(snirfPath);
 
@@ -803,7 +845,9 @@ end
 try
     eventsTable = readtable(eventsFile, 'FileType', 'text', 'Delimiter', '\t');
 
-    if ~ismember('onset', eventsTable.Properties.VariableNames)
+    colNames = eventsTable.Properties.VariableNames;
+
+    if ~ismember('onset', colNames)
         return;
     end
 
@@ -811,29 +855,49 @@ try
     nEvents = length(onsets);
     durations = zeros(nEvents, 1);
     values = ones(nEvents, 1);
+    hasValue = false;
 
     % Duration column
-    if ismember('duration', eventsTable.Properties.VariableNames)
+    if ismember('duration', colNames)
         durations = eventsTable.duration;
     end
 
     % Value column (numeric codes)
-    if ismember('value', eventsTable.Properties.VariableNames)
+    if ismember('value', colNames)
         if isnumeric(eventsTable.value)
             values = eventsTable.value;
+            hasValue = true;
         end
     end
 
-    % If no numeric values, map trial_type strings to codes
-    if all(values == 1) && ismember('trial_type', eventsTable.Properties.VariableNames)
+    % If no numeric values, map trial_type strings to sequential codes
+    if ~hasValue && ismember('trial_type', colNames)
         types = eventsTable.trial_type;
         if iscell(types) || isstring(types)
-            [uniqueTypes, ~, typeIdx] = unique(types);
+            [uniqueTypes, ~, typeIdx] = unique(types, 'stable');
             values = typeIdx;
             fprintf('BIDS events: mapped %d trial types from %s\n', ...
                 length(uniqueTypes), eventsFile);
             for t = 1:length(uniqueTypes)
-                fprintf('  %s = %d\n', uniqueTypes{t}, t);
+                fprintf('  %s = %d\n', char(uniqueTypes(t)), t);
+            end
+        end
+    end
+
+    % Build trial_type → value mapping when trial_type column exists
+    if ismember('trial_type', colNames)
+        types = eventsTable.trial_type;
+        if iscell(types) || isstring(types)
+            [uniqueTypes, ~, ~] = unique(types, 'stable');
+            for t = 1:numel(uniqueTypes)
+                typeName = char(uniqueTypes(t));
+                mask = strcmp(types, typeName);
+                if hasValue
+                    code = eventsTable.value(find(mask, 1));
+                else
+                    code = t;
+                end
+                eventTypes(end+1, :) = {code, typeName}; %#ok<AGROW>
             end
         end
     end

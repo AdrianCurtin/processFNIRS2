@@ -41,7 +41,8 @@ function x=pf2_unpackMethod(method)
 %   unpacked = pf2_base.pf2_unpackMethod(method);
 %   fprintf('Method has %d processing steps\n', length(unpacked.F));
 %
-% See also: pf2_describeMethod, processStageRaw2OD, processStageFilterHb
+% See also: pf2_base.PipelineFunction, pf2_base.Pipeline,
+%           pf2_describeMethod, processStageRaw2OD, processStageFilterHb
     x=method;
     
     if(isempty(method))
@@ -65,22 +66,26 @@ function x=pf2_unpackMethod(method)
             end
             x.name=('Unknown Method');
         else
-            x.F=cell(0);
-            x_fields=fields(x);
-
-            numMethods=1;
+            x.F={};
+            x_fields=fieldnames(x);
             for j=1:length(x_fields)
-               if(strcmp(sprintf('S%i',j),x_fields))
-                   x.F{numMethods}=x.(sprintf('S%i',j));
-                   x=rmfield(x,sprintf('S%i',j));
-                   numMethods=numMethods+1;
-               end
+                fieldName=sprintf('S%d',j);
+                if isfield(x,fieldName)
+                    x.F{end+1}=x.(fieldName);
+                    x=rmfield(x,fieldName);
+                end
             end
         end
     end
     
     for idx=1:length(x.F)
         Fidx=x.F{idx};
+
+        % Already a PipelineFunction — skip conversion
+        if isa(Fidx, 'pf2_base.PipelineFunction')
+            continue
+        end
+
         if(length(Fidx)>1) %This is a struct array for some reason?
            %Change it back!
            F_noarray.f=Fidx(1).f;
@@ -102,9 +107,12 @@ function x=pf2_unpackMethod(method)
                     F_noarray.output{j}=Fidx(j).output;
                 end
            end
-           x.F{idx}=F_noarray;
+           Fidx=F_noarray;
         end
+
+        % Convert struct to PipelineFunction
+        x.F{idx}=pf2_base.PipelineFunction.fromStruct(Fidx);
     end
-    
+
 
 end

@@ -48,6 +48,12 @@ fprintf('  Processed %d subjects\n', nSubjects);
 % blocksToEvents groups blocks by condition. buildDesignMatrix convolves
 % each condition's boxcar with the HRF and adds drift regressors.
 %
+% No bandpass filtering is applied before GLM fitting. Drift regressors
+% model low-frequency trends explicitly (replacing a high-pass filter),
+% and AR-IRLS handles serial correlation (replacing a low-pass filter).
+% Pre-filtering can distort the HRF peak shape and remove variance that
+% the model should capture.
+%
 % buildDesignMatrix options:
 %   'DriftOrder'        - Legendre polynomial order (default: 3)
 %   'DriftType'         - 'legendre' or 'dct' (SPM-style)

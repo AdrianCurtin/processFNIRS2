@@ -569,6 +569,13 @@ if(~isempty(selectedMethod))
     selectedMethodName=selectedMethodName{selectedMethod};
     PF2.currentMethod=pf2_base.pf2_unpackMethod(PF2.myMethods.cfg.(PF2.myMethods.cfg.Sections{selectedMethod}));
 
+    % Convert PipelineFunction objects back to structs for GUI editing
+    for iiPF = 1:length(PF2.currentMethod.F)
+        if isa(PF2.currentMethod.F{iiPF}, 'pf2_base.PipelineFunction')
+            PF2.currentMethod.F{iiPF} = PF2.currentMethod.F{iiPF}.toStruct();
+        end
+    end
+
     PF2.currentMethod.name=selectedMethodName;
     set(handles.edit_methodName,'String',PF2.currentMethod.name);
     
@@ -744,7 +751,7 @@ function listbox_inputSelect_Callback(hObject, eventdata, handles)
 %        contents{get(hObject,'Value')} returns selected item from listbox_inputSelect
 global PF2
 
-reservedArgs={'Name','Description','validStages','Arguments','x','fs','fTime','fchMask','ftimeChMask','fMarkers','fChannelNumbers','fMarkers','fChannelSD','fAmbient','fNIRstruct','argvals','default_argvals'};
+reservedArgs={'Name','Description','validStages','requiresOD','Arguments','x','fs','fTime','fchMask','ftimeChMask','fMarkers','fChannelNumbers','fMarkers','fChannelSD','fAmbient','fNIRstruct','argvals','default_argvals'};
 
 curFunction=get(handles.listbox_currentFunctions,'Value');
 curFunctionNames=get(handles.listbox_currentFunctions,'String');
@@ -1253,7 +1260,7 @@ if(~iscell(f2add))
     f2add{1}=temp;
 end
 
-reservedArgs={'Name','Description','validStages','Arguments','x','fs','fTime','fchMask','fChannelSD','fAmbient','fMarkers','fChannelNumbers','fNIRstruct','argvals','default_argvals','Output'};
+reservedArgs={'Name','Description','validStages','requiresOD','Arguments','x','fs','fTime','fchMask','fChannelSD','fAmbient','fMarkers','fChannelNumbers','fNIRstruct','argvals','default_argvals','Output'};
 
 if(iscell(f2add))
    for i=1:length(f2add)
@@ -1333,10 +1340,14 @@ for i=1:length(myMethods.cfg.Sections)
     if(isfield(x,'F'))
         for j=1:length(x.F)
             if(~isempty(x.F{j}))
-                x.(sprintf('S%i',j))=x.F{j};
+                Fj = x.F{j};
+                if isa(Fj, 'pf2_base.PipelineFunction')
+                    Fj = Fj.toStruct();
+                end
+                x.(sprintf('S%i',j))=Fj;
             end
         end
-    
+
         x=rmfield(x,'F');
     end
 
@@ -1349,57 +1360,26 @@ end
 function myMethods=unpackMethods(myMethods)
 %Converts mymethods function from .S to fields in F
 for i=1:length(myMethods.cfg.Sections)
+    section=myMethods.cfg.Sections{i};
+    x=myMethods.cfg.(section);
+    if ~isstruct(x), continue; end
+    x.name=section;
+    unpacked=pf2_base.pf2_unpackMethod(x);
+
+    % Detect improperly formatted function strings (GUI safety check)
     flagBad=false;
-    x=myMethods.cfg.(myMethods.cfg.Sections{i});
-    x_fields=fields(x);
-    x.name=myMethods.cfg.Sections{i};
-    x.F=cell(0);
-    numMethods=1;
-    for j=1:(length(x_fields))
-       if(sum(strcmp(x_fields,sprintf('S%i',j))==1))
-           x.F{numMethods}=x.(sprintf('S%i',j));
-           x=rmfield(x,sprintf('S%i',j));
-           numMethods=numMethods+1;
-       end
-    end
-    
-    for idx=1:length(x.F)
-        Fidx=x.F{idx};
-        if(ischar(Fidx)&&contains(Fidx,'struct(''f'))
+    for idx=1:length(unpacked.F)
+        Fidx=unpacked.F{idx};
+        if ischar(Fidx)&&contains(Fidx,'struct(''f')
             warning('Improperly formatted function found. Some settings may be lost');
-            
             flagBad=true;
             break;
-        elseif(length(Fidx)>1) %This is a struct array for some reason?
-           %Change it back!
-           F_noarray.f=Fidx(1).f;
-           F_noarray.args=cell(0);
-           F_noarray.argvals=cell(0);
-           F_noarray.default_argvals=cell(0);
-           F_noarray.output=cell(0);
-           for j=1:size(Fidx,2)
-                F_noarray.args{j}=Fidx(j).args;
-                F_noarray.argvals{j}=Fidx(j).argvals;
-                if isfield(Fidx, 'default_argvals')
-                    F_noarray.default_argvals{j}=Fidx(j).default_argvals;
-                else
-                    F_noarray.default_argvals{j}=Fidx(j).argvals;
-                end
-                if(isfield(Fidx(j),'output'))
-                    F_noarray.output{1}=Fidx(1).output;
-                else
-                    F_noarray.output{1}='x';
-                    %warning('please make sure your functions have an output feature');
-                end
-           end
-           x.F{idx}=F_noarray;
         end
     end
-    if(~flagBad)
-        myMethods.cfg.remove(x.name);
-        myMethods.cfg.add(x.name,x);
-    else
-       flagBad=false; 
+
+    if ~flagBad
+        myMethods.cfg.remove(section);
+        myMethods.cfg.add(section,unpacked);
     end
 end
 

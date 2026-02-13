@@ -41,6 +41,8 @@ function blocks = defineBlocks(data, varargin)
 %                    Two-column: {code1, 'Label1'; code2, 'Label2'}
 %                    Multi-column: {code1, 'Easy', 'Stroop'; code2, 'Hard', 'Stroop'}
 %                    Extra columns map to extra fields via ConditionField.
+%                    When omitted and data.info.eventTypes exists (from BIDS
+%                    events.tsv), the mapping is auto-populated for requested codes.
 %   'ConditionField' - Field name(s) for ConditionMap labels (default: 'Condition')
 %                      Char for single field, cell array for multiple:
 %                      {'Condition', 'Task'} maps columns 2, 3 of ConditionMap.
@@ -80,8 +82,9 @@ function blocks = defineBlocks(data, varargin)
 %      with the next available end marker to determine duration
 %   4. Build struct array with startTime, endTime, duration, markerCode, markerIndex
 %   5. Apply PrePad/PostPad to extend block boundaries
-%   6. Apply ConditionMap, InfoTable, InfoFields to .info
-%   7. Filter by MinDuration/MaxDuration, sort by time
+%   6. Auto-populate ConditionMap from data.info.eventTypes if not provided
+%   7. Apply ConditionMap, InfoTable, InfoFields to .info
+%   8. Filter by MinDuration/MaxDuration, sort by time
 %
 % Example:
 %   % Simple: marker codes + fixed duration
@@ -114,6 +117,11 @@ function blocks = defineBlocks(data, varargin)
 %   allData = pf2.data.defineBlocks(allData, [49,50], 30, ...
 %       'ConditionMap', {49,'Easy';50,'Hard'}, 'Embed', true);
 %   segments = pf2.data.extractBlocks(allData);
+%
+%   % BIDS auto-labeling: when data has .info.eventTypes from events.tsv,
+%   % ConditionMap is auto-populated (no manual mapping needed)
+%   data = pf2.import.importSNIRF('sub-01_nirs.snirf');
+%   blocks = pf2.data.defineBlocks(data, [1, 2, 3]);  % auto-labeled
 %
 % See also: pf2.data.extractBlocks, pf2.data.getMarkers, pf2.data.split
 
@@ -267,6 +275,29 @@ end
 % Assign BlockNumber
 for k = 1:length(blocks)
     blocks(k).info.BlockNumber = k;
+end
+
+% Auto-populate ConditionMap from BIDS eventTypes when not explicitly provided
+if isempty(conditionMap) && ismember('ConditionMap', p.UsingDefaults) && ...
+        isstruct(data) && isfield(data, 'info') && isfield(data.info, 'eventTypes')
+    eventTypes = data.info.eventTypes;
+    if ~isempty(eventTypes) && size(eventTypes, 2) >= 2
+        % Determine which codes are being extracted
+        if hasMarkerCode
+            allCodes = markerCode(:);
+        elseif hasStartMarker
+            allCodes = startMarker(:);
+        else
+            allCodes = [];
+        end
+        if ~isempty(allCodes)
+            mapCodes = cell2mat(eventTypes(:, 1));
+            keep = ismember(mapCodes, allCodes);
+            if any(keep)
+                conditionMap = eventTypes(keep, :);
+            end
+        end
+    end
 end
 
 % Apply ConditionMap

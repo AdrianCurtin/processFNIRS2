@@ -331,8 +331,8 @@ end
 % PreTime adds a baseline period before each block onset.
 % SetT0 shifts time so each block starts at t=0.
 segments = pf2.data.extractBlocks(processed, blocks, ...
-    'PreTime', 5, ...       % 5 seconds before block onset
-    'PostTime', 0, ...      % no extra time after block
+    'PreTime', 120, ...     % 120 seconds before block onset
+    'PostTime', 120, ...    % 120 seconds after block end
     'SetT0', true);         % block onset = t=0
 
 fprintf('\n  Extracted %d segments\n', length(segments));
@@ -352,8 +352,10 @@ title('Block 2 (aligned to onset)');
 % --- 8e: Extract with baseline correction ---
 % BaselineWindow subtracts the mean of the specified time window from
 % each channel. [-5, 0] means the 5 seconds before block onset.
+% PreTime/PostTime control how much surrounding data to include.
 correctedSegments = pf2.data.extractBlocks(processed, blocks, ...
-    'PreTime', 5, ...
+    'PreTime', 120, ...
+    'PostTime', 120, ...
     'BaselineWindow', [-5, 0], ...
     'SetT0', true);
 

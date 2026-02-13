@@ -43,7 +43,7 @@ function results = fitGLM(Y, X, regressorNames, varargin)
 %     .tstat      - T-statistics for each beta [P x C]
 %     .pval       - Two-tailed p-values [P x C]
 %     .se         - Standard errors [P x C]
-%     .residuals  - Residual time series [T x C]
+%     .residuals  - Residual time series [T x C] (original space, unwhitened)
 %     .R2         - Coefficient of determination [1 x C]
 %     .dof        - Degrees of freedom [scalar]
 %     .method     - Estimation method used [char]
@@ -130,12 +130,15 @@ switch accelMode
 end
 
 % --- Fit model ---
+% Xw and residuals_w hold prewhitened versions (AR-IRLS) or original (OLS)
 switch method
     case 'OLS'
         [beta, residuals, se, dof] = fitOLS(Y, X, useGPU);
+        Xw = X;
+        residuals_w = residuals;
 
     case 'AR-IRLS'
-        [beta, residuals, se, dof] = fitARIRLS(Y, X, arOrder, maxIter, tol, useGPU);
+        [beta, residuals, se, dof, Xw, residuals_w] = fitARIRLS(Y, X, arOrder, maxIter, tol, useGPU);
 end
 
 % --- Compute statistics ---
@@ -159,8 +162,14 @@ results.method = method;
 results.regressorNames = regressorNames;
 
 % --- Contrast testing ---
+% Use prewhitened X and residuals so contrast SEs are consistent with
+% the main-effect SEs (critical for AR-IRLS where original-space
+% residuals would produce anti-conservative p-values).
+% Note: results.residuals stores original-space residuals (for
+% diagnostics/plotting), while contrasts use prewhitened residuals
+% (for valid statistical inference under AR-IRLS).
 if ~isempty(C)
-    results.contrast = computeContrasts(C, contrastNames, beta, se, X, dof, residuals);
+    results.contrast = computeContrasts(C, contrastNames, beta, se, Xw, dof, residuals_w);
 end
 
 end
@@ -222,7 +231,7 @@ se = sqrt(varBeta * MSE);  % [P x C]
 
 end
 
-function [beta, residuals, se, dof] = fitARIRLS(Y, X, arOrder, maxIter, tol, useGPU)
+function [beta, residuals, se, dof, Xw, residuals_w] = fitARIRLS(Y, X, arOrder, maxIter, tol, useGPU)
 % FITARIRLS Autoregressive iteratively reweighted least squares
 %
 % When GPU is enabled, data is transferred once at the start and kept on
@@ -239,10 +248,12 @@ function [beta, residuals, se, dof] = fitARIRLS(Y, X, arOrder, maxIter, tol, use
 %   useGPU  - Whether to use GPU acceleration
 %
 % Outputs:
-%   beta      - Coefficients [P x C]
-%   residuals - Residuals [T x C]
-%   se        - Standard errors [P x C]
-%   dof       - Effective degrees of freedom [scalar]
+%   beta        - Coefficients [P x C]
+%   residuals   - Residuals [T x C] (original space)
+%   se          - Standard errors [P x C]
+%   dof         - Effective degrees of freedom [scalar]
+%   Xw          - Prewhitened design matrix [T x P]
+%   residuals_w - Prewhitened residuals [T x C]
 
 [T, nCh] = size(Y);
 P = size(X, 2);
@@ -307,6 +318,8 @@ residuals = Yg - Xg * beta;
 beta = pf2_base.accel.gather(beta);
 residuals = pf2_base.accel.gather(residuals);
 se = pf2_base.accel.gather(se);
+Xw = pf2_base.accel.gather(Xw);
+residuals_w = pf2_base.accel.gather(residuals_w);
 
 end
 

@@ -72,6 +72,11 @@ gx.settings.rawMethod = rawMethod;
 gx.settings.oxyMethod = oxyMethod;
 
 % GLM model configuration
+% Note: No bandpass filtering (oxy method = 'None') because the GLM handles
+% temporal structure explicitly:
+%   - Drift regressors (polynomial/DCT) model low-frequency trends
+%   - AR-IRLS corrects for serial correlation
+%   - Pre-filtering can distort the HRF peak shape
 gx.glm.conditions = {'Easy', 'Hard'};   % exclude Rest from analysis
 gx.glm.auxFields = {'heartRate'};       % also fit GLM on heart rate
 
