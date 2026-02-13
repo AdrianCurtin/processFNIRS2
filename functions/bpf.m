@@ -24,9 +24,12 @@ end
 %-----------------------------------------------------------------
 half_fs = fs/2;    %half of sampling freq. equal to pi
 
-[A,B,C,D] = butter(filtOrder,[lowF highF]/half_fs);
-
-sos = ss2sos(A,B,C,D);
+% Use zero-pole-gain form for numerical stability at low normalized
+% frequencies (e.g., 0.01 Hz at 5 Hz sampling). The state-space form
+% [A,B,C,D]=butter + ss2sos can produce unstable filters due to
+% ill-conditioned intermediate matrices. ZPK -> SOS avoids this.
+[z, p, k] = butter(filtOrder, [lowF highF]/half_fs);
+sos = zp2sos(z, p, k);
 
 % Filter each column, handling NaN-padded regions per channel
 dataf = NaN(size(data));

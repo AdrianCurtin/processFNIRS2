@@ -448,16 +448,30 @@ end
 
 function processFNIR_GUI()
 global PF2
-%1 is raw, 
-%2 is processed raw, 
-%3 is processed OD, 
-%4 is oxy, 
+%1 is raw,
+%2 is processed raw,
+%3 is processed OD,
+%4 is oxy,
 %5 is processed oxy
 
 global outputData
 global setF
 
+% Sync GUI state into GUIContext before processing
+syncContextFromGUI();
+
 clearAutoRejectedChannels();
+
+% Gather explicit params from GUI state (same pattern as headless path)
+rawMethod = PF2.GUIPF2.stageRawMethod;
+oxyMethod = PF2.GUIPF2.stageOxyMethod;
+fs = PF2.GUIPF2.data.fs;
+rawMask = PF2.GUIPF2.data.rawMask;
+channelNumbers = PF2.curCh.OptodeNumber;
+wavelengths = PF2.curCh.Wavelength;
+curOptTable = PF2.curOpt;
+probeIdx = 1;
+curProbe = setF.device.Probe{probeIdx};
 
 if(outputData.ProcessRaw)
     if(PF2.GUIPF2.processWindowOnly)
@@ -466,25 +480,23 @@ if(outputData.ProcessRaw)
         endSample=min([length(PF2.GUIPF2.data.time),find(PF2.GUIPF2.data.time>=PF2.GUIPF2.view.endTime,1)]);
         croppedData=croppedData(startSample:endSample,:);
         croppedTime=PF2.GUIPF2.data.time(startSample:endSample);
-        
+
         stage2=nan(size(PF2.GUIPF2.data.stage{1}));
         stage3=stage2;
-        
 
-        
-        [stage3(startSample:endSample,:),stage2(startSample:endSample,:)]=processStageRaw2OD(croppedData,croppedTime,PF2.GUIPF2.data.markers,PF2.GUIPF2.data.Aux); % Raw data processing
-        
+        [stage3(startSample:endSample,:),stage2(startSample:endSample,:)]=pf2_base.fnirs.processStageRaw2OD(rawMethod,croppedData,fs,croppedTime,rawMask,PF2.GUIPF2.data.markers,PF2.GUIPF2.data.Aux,channelNumbers,wavelengths,curOptTable,PF2.GUIPF2.data);
+
         PF2.GUIPF2.data.stage{2}=stage2;
         PF2.GUIPF2.data.stage{3}=stage3;
-        
+
     else
-        [PF2.GUIPF2.data.stage{3},PF2.GUIPF2.data.stage{2}]=processStageRaw2OD(PF2.GUIPF2.data.stage{1},PF2.GUIPF2.data.time,PF2.GUIPF2.data.markers,PF2.GUIPF2.data.Aux); % Raw data processing
+        [PF2.GUIPF2.data.stage{3},PF2.GUIPF2.data.stage{2}]=pf2_base.fnirs.processStageRaw2OD(rawMethod,PF2.GUIPF2.data.stage{1},fs,PF2.GUIPF2.data.time,rawMask,PF2.GUIPF2.data.markers,PF2.GUIPF2.data.Aux,channelNumbers,wavelengths,curOptTable,PF2.GUIPF2.data);
     end
-    
+
     if(outputData.ProcessOxy)
         PF2.GUIPF2.data.stage{4}=processStageOD2Hb(PF2.GUIPF2.data.stage{3},PF2.GUIPF2.curDPF_age); % Beer-Lambert conversion
     end
-    
+
     if(pf2_base.isnestedfield(PF2,'data.ROI.info'))
         PF2.GUIPF2.data.stage{4}.ROI.info=PF2.GUIPF2.data.ROI.info; %Regenerate from info
     end
@@ -501,27 +513,56 @@ end
 
 
 if(outputData.ProcessOxy)
-    PF2.GUIPF2.data.stage{5}=processStageFilterHb(PF2.GUIPF2.data.stage{4}); % Oxy data processing
+    % Inline filter stage: pass explicit params to external function
+    stageData = PF2.GUIPF2.data.stage{4};
+    stageData.fchMask = PF2.GUIPF2.data.fchMask;
+    outData = pf2_base.fnirs.processStageFilterHb(oxyMethod, stageData, fs, curOptTable, outputData.ProcessRejected);
+
+    if PF2.GUIPF2.processWindowOnly
+        outData.validRows = findValidRows(outData, outputData.ProcessRejected);
+    end
+
+    PF2.GUIPF2.data.stage{5} = outData;
 else
     PF2.GUIPF2.data.stage{5}=PF2.GUIPF2.data.stage{4};
 end
 
 
+function validRows = findValidRows(outData, processRejected)
+% FINDVALIDROWS Find first and last non-NaN rows for window-only processing
+    validChannels = false(size(outData.channels));
+    numOptodes = length(outData.channels(outData.channels > 0));
+    validChannels(outData.channels > 0) = outData.channels(outData.channels > 0) & (reshape(outData.fchMask(:) | processRejected, [numOptodes, 1]));
 
-function [outDataOD,outDataRaw]=processStageRaw2OD(data,time,fMarkers,fAux)
- % Raw data processing
- 
-global PF2
- 
-[outDataOD,outDataRaw]=pf2_base.fnirs.processStageRaw2OD(PF2.GUIPF2.stageRawMethod,data,PF2.GUIPF2.data.fs,time,PF2.GUIPF2.data.rawMask,fMarkers,fAux,PF2.curCh.OptodeNumber,PF2.curCh.Wavelength,PF2.curOpt,PF2.GUIPF2.data); % Raw data processing
+    firstValidRow = nan;
+    for i = 1:size(outData.HbO, 1)
+        if any(~isnan(outData.HbO(i, validChannels)))
+            firstValidRow = i;
+            break;
+        end
+    end
+
+    lastValidRow = nan;
+    for i = size(outData.HbO, 1):-1:1
+        if any(~isnan(outData.HbO(i, validChannels)))
+            lastValidRow = i;
+            break;
+        end
+    end
+
+    if isnan(firstValidRow) || isnan(lastValidRow)
+        warning('All Data is invalid');
+        validRows = 1;
+    else
+        validRows = firstValidRow:lastValidRow;
+    end
 
 
 function outData=processStageOD2Hb(data,subAge)
 % PROCESSSTAGEOD2HB Beer-Lambert conversion (GUI wrapper)
 %
-% Wraps pf2_base.fnirs.processStageOD2Hb with GUI-specific baseline modes:
-%   - processWindowOnly: uses current view window for baseline
-%   - relative2View: calculates baseline relative to view start time
+% Computes baseline samples for view-relative modes, then delegates to the
+% shared processStageOD2Hb with the BaselineSamples option.
 
 global setF
 global PF2
@@ -530,31 +571,28 @@ global outputData
 probeIdx = 1;
 curProbe = setF.device.Probe{probeIdx};
 
-% Determine if we can use standard external function or need GUI-specific logic
+baseline = struct('startTime', PF2.GUIPF2.baseline.startTime, ...
+                  'blLength', PF2.GUIPF2.baseline.blLength);
+
+if isempty(subAge)
+    subAge = PF2.GUIPF2.curDPF_age;
+end
+
+% Determine if view-relative baseline is needed
 useViewRelativeBaseline = PF2.GUIPF2.baseline.relative2View == 1 || PF2.GUIPF2.processWindowOnly;
 
 if ~useViewRelativeBaseline
-    % Standard processing - use external function directly
-    baseline = struct('startTime', PF2.GUIPF2.baseline.startTime, ...
-                      'blLength', PF2.GUIPF2.baseline.blLength);
-
-    if isempty(subAge)
-        subAge = PF2.GUIPF2.curDPF_age;
-    end
-
+    % Standard processing - delegate directly
     outData = pf2_base.fnirs.processStageOD2Hb(data, PF2.GUIPF2.data.time, subAge, ...
         outputData.DirtyBaseline, curProbe, baseline, ...
         PF2.GUIPF2.dpf_mode, PF2.GUIPF2.curDPF_fixed, PF2.GUIPF2.curDPF_age);
 else
-    % GUI-specific: view-relative or window-only baseline
-    % Must compute baseline samples manually
-
+    % Compute baseline samples for view-relative/window-only modes
     if outputData.DirtyBaseline && ~PF2.GUIPF2.processWindowOnly
         baselineSamples = 1:length(PF2.GUIPF2.data.time);
     elseif outputData.DirtyBaseline && PF2.GUIPF2.processWindowOnly
         baselineSamples = PF2.GUIPF2.data.timeInd;
     else
-        % View-relative baseline calculation
         if isfield(PF2.GUIPF2.baseline, 'windowStartTime')
             windowStartTime = PF2.GUIPF2.baseline.windowStartTime;
         else
@@ -562,73 +600,67 @@ else
         end
         startTime = PF2.GUIPF2.view.startTime + windowStartTime;
         endTime = startTime + PF2.GUIPF2.baseline.blLength;
-
         startSample = find(PF2.GUIPF2.data.time >= startTime, 1);
         endSample = find(PF2.GUIPF2.data.time >= endTime, 1);
         baselineSamples = startSample:endSample;
     end
 
-    % Determine DPF settings
-    NoPathlength = strcmp(PF2.GUIPF2.dpf_mode, 'None');
-    if strcmp(PF2.GUIPF2.dpf_mode, 'Fixed')
-        fixedDPF = PF2.GUIPF2.curDPF_fixed;
-    else
-        fixedDPF = 0;
-    end
-
-    if isempty(subAge)
-        subAge = PF2.GUIPF2.curDPF_age;
-    end
-
-    % Call bvoxy directly for GUI-specific cases
-    [outData.HbO, outData.HbR, outData.HbTotal, outData.HbDiff, outData.CBSI, ...
-        outData.channels, ~, outData.units, outData.DPF_factor] = ...
-        pf2_base.fnirs.bvoxy(data, curProbe.TableCh.OptodeNumber, ...
-        curProbe.TableCh.Wavelength, curProbe.TableOpt.SD, baselineSamples, ...
-        subAge, [], true, 'NoPathlength', NoPathlength, 'DiffPathlengthFactor', fixedDPF);
-    outData.time = PF2.GUIPF2.data.time;
+    % Delegate to shared function with pre-computed baseline samples
+    outData = pf2_base.fnirs.processStageOD2Hb(data, PF2.GUIPF2.data.time, subAge, ...
+        false, curProbe, baseline, ...
+        PF2.GUIPF2.dpf_mode, PF2.GUIPF2.curDPF_fixed, PF2.GUIPF2.curDPF_age, ...
+        'BaselineSamples', baselineSamples);
 end
 
 
+function syncContextFromGUI()
+% SYNCCONTEXTFROMGUI Copy GUI state into GUIContext before processing
+%
+% Lightweight sync called at the top of processFNIR_GUI. Copies current
+% PF2.GUIPF2 fields into PF2.GUIPF2.ctx so the context stays fresh.
 
-function outData=processStageFilterHb(data)
-% Oxy data processing
-global outputData
 global PF2
 
-data.fchMask=PF2.GUIPF2.data.fchMask;
-
-outData=pf2_base.fnirs.processStageFilterHb(PF2.GUIPF2.stageOxyMethod,data,PF2.GUIPF2.data.fs,PF2.curOpt,outputData.ProcessRejected);
-
-if(PF2.GUIPF2.processWindowOnly)
-    validChannels=false(size(outData.channels));
-    numOptodes=length(outData.channels(outData.channels>0));
-    validChannels(outData.channels>0)=outData.channels(outData.channels>0)&(reshape(outData.fchMask(:)|outputData.ProcessRejected,[numOptodes,1]));
-
-    firstValidRow=nan;
-    for i=1:size(outData.HbO,1)
-       if(any(~isnan(outData.HbO(i,validChannels))))
-           firstValidRow=i;
-           break;
-       end
-    end
-
-    lastValidRow=nan;
-    for i=size(outData.HbO,1):-1:1
-       if(any(~isnan(outData.HbO(i,validChannels))))
-           lastValidRow=i;
-           break;
-       end
-    end
-
-    if(isnan(firstValidRow)||isnan(lastValidRow))
-       warning('All Data is invalid'); 
-       validRows=1;
-    else
-       validRows=firstValidRow:lastValidRow; 
-    end
-    outData.validRows=validRows;
+if ~isfield(PF2, 'GUIPF2') || ~isfield(PF2.GUIPF2, 'ctx') || isempty(PF2.GUIPF2.ctx)
+    return;
 end
+
+ctx = PF2.GUIPF2.ctx;
+
+% Processing settings
+if isfield(PF2.GUIPF2, 'dpf_mode')
+    ctx.dpfMode = PF2.GUIPF2.dpf_mode;
+end
+if isfield(PF2.GUIPF2, 'curDPF_fixed')
+    ctx.dpfFixedValue = PF2.GUIPF2.curDPF_fixed;
+end
+if isfield(PF2.GUIPF2, 'curDPF_age')
+    ctx.subjectAge = PF2.GUIPF2.curDPF_age;
+end
+
+% Baseline settings
+if isfield(PF2.GUIPF2, 'baseline')
+    if isfield(PF2.GUIPF2.baseline, 'startTime')
+        ctx.baselineStartTime = PF2.GUIPF2.baseline.startTime;
+    end
+    if isfield(PF2.GUIPF2.baseline, 'blLength')
+        ctx.baselineLength = PF2.GUIPF2.baseline.blLength;
+    end
+end
+
+% Methods
+if isfield(PF2.GUIPF2, 'stageRawMethod')
+    ctx.rawMethod = PF2.GUIPF2.stageRawMethod;
+end
+if isfield(PF2.GUIPF2, 'stageOxyMethod')
+    ctx.oxyMethod = PF2.GUIPF2.stageOxyMethod;
+end
+
+% View settings
+if isfield(PF2.GUIPF2, 'view')
+    ctx.view = PF2.GUIPF2.view;
+end
+ctx.processWindowOnly = PF2.GUIPF2.processWindowOnly;
 
 
 % UIWAIT makes processFNIRS2_GUI wait for user response (see UIRESUME)
@@ -638,109 +670,37 @@ function updateCurrentDevice()
 global setF
 global PF2
 
-PF2.curChSet=[];
-PF2.curWvSet=[];
-PF2.curSDSet=[];
-PF2.curProbeInd=[];
+% Delegate to shared function
+result = pf2_base.gui.updateCurrentDevice(setF.device, PF2.GUIPF2.data);
 
-if(length(setF.device.Probe)==1)
-    PF2.mergedProbe=true;
-else
-    PF2.mergedProbe=true;
-    warning('Multiple Probes may not be fully supported');
+% Write results to globals
+PF2.curCh = result.curCh;
+PF2.curOpt = result.curOpt;
+PF2.curSD = result.curSD;
+PF2.curChList = result.curChList;
+PF2.timeIndex = result.timeIndex;
+PF2.mergedProbe = result.mergedProbe;
+PF2.curChSet = [];
+PF2.curWvSet = [];
+PF2.curSDSet = [];
+PF2.curProbeInd = [];
+
+% Write resolved time/fs to GUI data
+if ~isempty(result.time)
+    PF2.GUIPF2.data.time = result.time;
+end
+if ~isempty(result.sampleTime)
+    PF2.GUIPF2.data.sampleTime = result.sampleTime;
+end
+if ~isempty(result.fs)
+    PF2.GUIPF2.data.fs = result.fs;
 end
 
-if(PF2.mergedProbe) %All channel numbers are unique for merged probes
-    for i =1:length(setF.device.Probe)
-        curProbe=setF.device.Probe{i};
-        
-        curChTable=curProbe.TableCh;
-        curOptTable=curProbe.TableOpt;
-        curSDTable=curProbe.TableSD;
-        
-        curChTable.ProbeInd(:)=i;
-        curOptTable.ProbeInd(:)=i;
-        curSDTable.ProbeInd(:)=i;
-        
-        if(i==1)
-            PF2.curCh=curChTable;
-            PF2.curOpt=curOptTable;
-            PF2.curSD=curSDTable;
-        else
-            PF2.curCh=[PF2.curCh;curChTable];
-            PF2.curOpt=[PF2.curOpt;curOptTable];
-            PF2.curSD=[PF2.curSD;curSDTable];
-        end
-    end
-    PF2.timeIndex=find(PF2.curCh.isTime);
-    if(isempty(PF2.timeIndex)||setF.device.Info.TimeIsSampleCount)
-        if(~setF.device.Info.TimeIsSampleCount)
-            warning('Time column could not be found, assuming each row contains samples only');
-        end
-        
-        if(isempty(PF2.timeIndex))
-            PF2.timeIndex=0;
-        end
-    end
-else
-    error('Not Yet Implemented for seperate probe data,\nAssumes concatenated datasets with unique channels in the config file'); 
-end
-
-[~,i]=unique(PF2.curChSet);
-PF2.curChList=PF2.curChSet(i);
-
-
-if(PF2.mergedProbe) %All channel numbers are unique for merged probes  
-    
-    data=PF2.GUIPF2.data.stage{1};
-    if(~isempty(data))
-        if(PF2.timeIndex==0) % No time index
-            PF2.GUIPF2.data.sampleTime=1:length(data(:,1));
-            PF2.GUIPF2.data.time=(PF2.GUIPF2.data.sampleTime-1)./setF.device.Info.DefaultSamplingRate;
-            PF2.GUIPF2.data.fs=setF.device.Info.DefaultSamplingRate;
-        elseif(setF.device.Info.TimeIsSampleCount==1)  %time index is sample time
-            PF2.GUIPF2.data.sampleTime=data(:,PF2.timeIndex);
-            PF2.GUIPF2.data.time=(PF2.GUIPF2.data.sampleTime-1)./setF.device.Info.DefaultSamplingRate;
-            PF2.GUIPF2.data.fs=setF.device.Info.DefaultSamplingRate;
-        elseif(isfield(PF2.GUIPF2.data,'time'))
-            PF2.GUIPF2.data.sampleTime=1:length(data(:,1));
-            %PF2.GUIPF2.data.time=data(:,PF2.timeIndex);
-            PF2.GUIPF2.data.fs=1./median(diff(PF2.GUIPF2.data.time));
-        else
-            PF2.GUIPF2.data.sampleTime=1:length(data(:,1));
-            PF2.GUIPF2.data.time=data(:,PF2.timeIndex);
-            PF2.GUIPF2.data.fs=1./median(diff(PF2.GUIPF2.data.time));
-        end
-
-        PF2.GUIPF2.view.startTime=min(PF2.GUIPF2.data.time);
-        PF2.GUIPF2.view.endTime=max(PF2.GUIPF2.data.time);
-        PF2.GUIPF2.view.timeStepSize=round((max(PF2.GUIPF2.data.time)-min(PF2.GUIPF2.data.time))/10);
-    elseif(isfield(data,'time')&&~isempty(PF2.GUIPF2.data.time))  %If time exists
-        PF2.GUIPF2.data.sampleTime=1:length(PF2.GUIPF2.data.time);
-        PF2.GUIPF2.data.fs=1./median(diff(PF2.GUIPF2.data.time));
-    elseif(~isempty(PF2.GUIPF2.data.stage{4})) %try to calculate from oxy data
-        data=PF2.GUIPF2.data.stage{4};
-        if(PF2.timeIndex==0)
-            PF2.GUIPF2.data.sampleTime=1:length(data.HbO(:,1));
-            PF2.GUIPF2.data.time=(PF2.GUIPF2.data.sampleTime-1)./setF.device.Info.DefaultSamplingRate;
-            PF2.GUIPF2.data.fs=setF.device.Info.DefaultSamplingRate;
-        elseif(setF.device.Info.TimeIsSampleCount==1)
-            PF2.GUIPF2.data.sampleTime=data.HbO(:,PF2.timeIndex);
-            PF2.GUIPF2.data.time=(PF2.GUIPF2.data.sampleTime-1)./setF.device.Info.DefaultSamplingRate;
-            PF2.GUIPF2.data.fs=setF.device.Info.DefaultSamplingRate;
-        else
-            PF2.GUIPF2.data.sampleTime=1:length(data.HbO(:,1));
-            PF2.GUIPF2.data.time=data.HbO(:,PF2.timeIndex);
-            PF2.GUIPF2.data.fs=1./median(diff(PF2.GUIPF2.data.time));
-        end
-
-        PF2.GUIPF2.view.startTime=min(PF2.GUIPF2.data.time);
-        PF2.GUIPF2.view.endTime=max(PF2.GUIPF2.data.time);
-        PF2.GUIPF2.view.timeStepSize=round((max(PF2.GUIPF2.data.time)-min(PF2.GUIPF2.data.time))/10);
-    end
-
-else
-   error('Not Yet Implemented for seperate probe data,\nAssumes concatenated datasets with unique channels in the config file'); 
+% Set view window from resolved time
+if ~isempty(result.time)
+    PF2.GUIPF2.view.startTime = min(result.time);
+    PF2.GUIPF2.view.endTime = max(result.time);
+    PF2.GUIPF2.view.timeStepSize = round((max(result.time) - min(result.time)) / 10);
 end
 
 function segInfoStr=BuildSegmentInfoString(info)
@@ -1443,411 +1403,74 @@ set(timelineAxesHandle,'xtick',[],'ytick',[])
 set(timelineAxesHandle,'Tag','Timeline');
 
 
-%%%%%% Plot Stage 1
+%%%%%% Plot Stages 1-4 using shared helpers
 global stageAxesHandles
-axes(stageAxesHandles{1});
-
-%if(~fmask(ch))
-%    text(max(nirsData(:,1))/2+15,2000,'X','FontSize',40,'Color','red');
-%    hold on;
-%end
-data=PF2.GUIPF2.data.stage{1};
 optTable=PF2.GUIPF2.optodeTable;
 
-if(~isempty(data))
-    plotOptTable=optTable(PF2.curCh_listIdx,:);
-    %plotOptTable=plotOptTable(~plotOptTable.ManualRej,:);
-    
-    if(sum(plotOptTable.IsROI)>0)
-        plotROITable=plotOptTable(plotOptTable.IsROI==1,:);
-        allROIch=[];
-        for idx=1:size(plotROITable)
-            allROIch=[allROIch,plotROITable.Optodes_roi{idx}];
-        end
-        allROIch=unique(allROIch);
-        
-        single_roi_idx=~optTable.IsROI&ismember(optTable.Optode,allROIch);
-        if(sum(single_roi_idx)>0)
-            plotSingleROImerge=optTable(single_roi_idx,:);
-        else
-            plotSingleROImerge=[];
-        end
-    else
-        plotROITable=[];
-        plotSingleROImerge=[];
-    end
-    
-    
-    
-    if(sum(~plotOptTable.IsROI)>0)
-        plotSingleTable=plotOptTable(~plotOptTable.IsROI,:);
-    else
-        if(~isempty(plotSingleROImerge))
-            plotSingleTable=plotSingleROImerge;
-        else
-            plotSingleTable=[];
-        end
-    end
-    
-    
-    if(~isempty(plotSingleTable))
-        plotIdx=(ismember(PF2.curChSet,plotSingleTable.Optode));
-    else
-       plotIdx=false(size(PF2.curChSet));
-    end
-    plotIdx2=(ismember(PF2.curWvSet,PF2.curWv));
-    plotIdx=find(plotIdx.*plotIdx2);
-    num2Plot=length(plotIdx);
+% Build shared view/device structs for helpers
+rawViewSettings = struct(...
+    'LightColorAuto', PF2.GUIPF2.view.LightColorAuto, ...
+    'LightAuto', PF2.GUIPF2.view.LightAuto, ...
+    'LightMin', PF2.GUIPF2.view.LightMin, ...
+    'LightMax', PF2.GUIPF2.view.LightMax, ...
+    'startTime', PF2.GUIPF2.view.startTime, ...
+    'endTime', PF2.GUIPF2.view.endTime);
 
-    if(PF2.GUIPF2.view.LightColorAuto)
-        % Use helper for wavelength-based coloring
-        [cIndex, ~] = pf2_base.gui.getWavelengthColors(PF2.curWvSet, plotIdx);
-    else
-        cc=lines(num2Plot);
-        cIndex=cc;
-    end
+oxyViewSettings = struct(...
+    'OxyAuto', PF2.GUIPF2.view.OxyAuto, ...
+    'OxyMin', PF2.GUIPF2.view.OxyMin, ...
+    'OxyMax', PF2.GUIPF2.view.OxyMax, ...
+    'startTime', PF2.GUIPF2.view.startTime, ...
+    'endTime', PF2.GUIPF2.view.endTime);
 
+devInfo = struct('RawMax', setF.device.Info.RawMax, ...
+    'TimeIsSampleCount', setF.device.Info.TimeIsSampleCount);
 
-    cla(stageAxesHandles{1});
-    for i=1:num2Plot
-       h=plot(stageAxesHandles{1},PF2.GUIPF2.data.time(timeInd),data(timeInd,plotIdx(i)),'color',cIndex(i,:)); 
-       set(h,'Tag',sprintf('Ch%i_%inm',PF2.curChSet(plotIdx(i)),PF2.curWvSet(plotIdx(i))));
-       hold(stageAxesHandles{1},'on');
-    end
+% Stage 1: Raw intensity
+axes(stageAxesHandles{1});
+pf2_base.gui.plotStageRaw(stageAxesHandles{1}, PF2.GUIPF2.data.stage{1}, ...
+    time, timeInd, optTable, PF2.curCh_listIdx, PF2.curChSet, PF2.curWvSet, PF2.curWv, ...
+    rawViewSettings, devInfo, ...
+    'excludeManualRej', false, 'yLabel', 'Intensity -  I_i_n', 'axTag', 'Stage1');
+xl=[PF2.GUIPF2.view.startTime,PF2.GUIPF2.view.endTime]; plotMarkers(xl,stageAxesHandles{1});
 
-    if(~PF2.GUIPF2.view.LightAuto)
-       ylim(stageAxesHandles{1},[PF2.GUIPF2.view.LightMin,PF2.GUIPF2.view.LightMax]); 
-    end
-
-
-    if(~isempty(plotIdx))
-       yl=ylim(stageAxesHandles{1});
-
-       if(max(yl)>0.95*setF.device.Info.RawMax)
-           plot(stageAxesHandles{1},PF2.GUIPF2.data.time(timeInd),PF2.GUIPF2.data.time(timeInd)*0+setF.device.Info.RawMax,'--r','linewidth',2);
-       end
-    end
-
-    xl=[PF2.GUIPF2.view.startTime,PF2.GUIPF2.view.endTime]; plotMarkers(xl,stageAxesHandles{1});
-    hold(stageAxesHandles{1},'off');
-    xlim(stageAxesHandles{1},xl);
-    if(setF.device.Info.TimeIsSampleCount)
-        xlabel(stageAxesHandles{1},'Time (samples)');
-    else
-        xlabel(stageAxesHandles{1},'Time (s)');
-    end
-
-    %*%xlim([PF2.GUIPF2.view.startTime,PF2.GUIPF2.view.endTime])
-
-    ylabel(stageAxesHandles{1},'Intensity -  I_i_n');
-    set(stageAxesHandles{1},'Tag','Stage1');
-end
-
-%%%%%%%%%%%%%%%%% Plot Stage 2
+% Stage 2: Processed raw or OD
 axes(stageAxesHandles{2});
-
-%if(~fmask(ch))
-%    text(max(nirsData(:,1))/2+15,2000,'X','FontSize',40,'Color','red');
-%    hold on;
-%end
 if(PF2.GUIPF2.view.plotOD)
-    data=PF2.GUIPF2.data.stage{3};
+    stage2data=PF2.GUIPF2.data.stage{3};
+    stage2label='Optical Denisty -  log_1_0(I_i_n)';
 else
-    data=PF2.GUIPF2.data.stage{2};
+    stage2data=PF2.GUIPF2.data.stage{2};
+    stage2label='Intensity - I_i_n';
 end
-
-cla(stageAxesHandles{2});
-
-plotOptTable=optTable(PF2.curCh_listIdx,:);
-plotOptTable=plotOptTable(~plotOptTable.ManualRej,:);
-    
-if(sum(plotOptTable.IsROI)>0)
-    plotROITable=plotOptTable(plotOptTable.IsROI==1,:);
-    allROIch=[];
-    for idx=1:size(plotROITable)
-        allROIch=[allROIch,plotROITable.Optodes_roi{idx}];
-    end
-    allROIch=unique(allROIch);
-
-    single_roi_idx=~optTable.IsROI&ismember(optTable.Optode,allROIch);
-    if(sum(single_roi_idx)>0)
-        plotSingleROImerge=optTable(single_roi_idx,:);
-    else
-        plotSingleROImerge=[];
-    end
-else
-    plotROITable=[];
-    plotSingleROImerge=[];
+% For stage 2, don't enforce LightAuto when plotting OD
+stage2ViewSettings = rawViewSettings;
+if PF2.GUIPF2.view.plotOD
+    stage2ViewSettings.LightAuto = true;
 end
+pf2_base.gui.plotStageRaw(stageAxesHandles{2}, stage2data, ...
+    time, timeInd, optTable, PF2.curCh_listIdx, PF2.curChSet, PF2.curWvSet, PF2.curWv, ...
+    stage2ViewSettings, devInfo, ...
+    'excludeManualRej', true, 'yLabel', stage2label, 'axTag', 'Stage2');
+xl=[PF2.GUIPF2.view.startTime,PF2.GUIPF2.view.endTime]; plotMarkers(xl,stageAxesHandles{2});
 
-
-
-if(sum(~plotOptTable.IsROI)>0)
-    plotSingleTable=plotOptTable(~plotOptTable.IsROI,:);
-else
-    if(~isempty(plotSingleROImerge))
-        plotSingleTable=plotSingleROImerge;
-    else
-        plotSingleTable=[];
-    end
-end
-
-if(~isempty(data)&&~isempty(plotSingleTable))
-    plotIdx=(ismember(PF2.curChSet,plotSingleTable.Optode));
-    plotIdx2=(ismember(PF2.curWvSet,PF2.curWv));
-    plotIdx=find(plotIdx.*plotIdx2);
-    num2Plot=length(plotIdx);
-
-    if(PF2.GUIPF2.view.LightColorAuto)
-        % Use helper for wavelength-based coloring
-        [cIndex, ~] = pf2_base.gui.getWavelengthColors(PF2.curWvSet, plotIdx);
-    else
-        cc=lines(num2Plot);
-        cIndex=cc;
-    end
-
-
-
-    for i=1:num2Plot
-       h=plot(stageAxesHandles{2},PF2.GUIPF2.data.time(timeInd),data(timeInd,plotIdx(i)),'color',cIndex(i,:)); 
-       set(h,'Tag',sprintf('Ch%i_%inm',PF2.curChSet(plotIdx(i)),PF2.curWvSet(plotIdx(i))));
-       hold(stageAxesHandles{2},'on');
-    end
-
-
-    if(~PF2.GUIPF2.view.LightAuto&&~PF2.GUIPF2.view.plotOD)
-       ylim([PF2.GUIPF2.view.LightMin,PF2.GUIPF2.view.LightMax]); 
-    else
-        %ylim(yl);
-    end
-
-    if(~isempty(plotIdx))
-       yl=ylim(stageAxesHandles{2});
-
-       if(max(yl)>0.95*setF.device.Info.RawMax)
-           plot(stageAxesHandles{2},PF2.GUIPF2.data.time(timeInd),PF2.GUIPF2.data.time(timeInd)*0+setF.device.Info.RawMax,'--r','linewidth',2);
-       end
-    end
-
-    xl=[PF2.GUIPF2.view.startTime,PF2.GUIPF2.view.endTime]; plotMarkers(xl,stageAxesHandles{2});
-    hold(stageAxesHandles{2},'off');
-    xlim(stageAxesHandles{2},xl);
-    if(setF.device.Info.TimeIsSampleCount)
-        xlabel(stageAxesHandles{2},'Time (samples)');
-    else
-        xlabel(stageAxesHandles{2},'Time (s)');
-    end
-
-    %*%xlim([PF2.GUIPF2.view.startTime,PF2.GUIPF2.view.endTime])
-    if(PF2.GUIPF2.view.plotOD)
-        ylabel(stageAxesHandles{2},'Optical Denisty -  log_1_0(I_i_n)');
-    else
-        ylabel(stageAxesHandles{2},'Intensity - I_i_n');
-    end
-    
-    set(stageAxesHandles{2},'Tag','Stage2');
-end
-%%%%%% Plot Stage 3
+% Stage 3: Hemoglobin (pre-filter)
 axes(stageAxesHandles{3});
+pf2_base.gui.plotStageHb(stageAxesHandles{3}, PF2.GUIPF2.data.stage{4}, ...
+    time, timeInd, optTable, PF2.curCh_listIdx, PF2.curConc, ...
+    oxyViewSettings, PF2.GUIPF2.dpf_mode, ...
+    'excludeManualRej', true, 'excludeAutoRej', false, 'plotROI', false, ...
+    'axTag', 'Stage3', 'deviceInfo', devInfo);
+xl=[PF2.GUIPF2.view.startTime,PF2.GUIPF2.view.endTime]; plotMarkers(xl,stageAxesHandles{3});
 
-%if(~fmask(ch))
-%    text(max(nirsData(:,1))/2+15,2000,'X','FontSize',40,'Color','red');
-%    hold on;
-%end
-data=PF2.GUIPF2.data.stage{4};
-
-
-if(~isempty(data))
-    plotOptTable=optTable(PF2.curCh_listIdx,:);
-    plotOptTable=plotOptTable(~plotOptTable.ManualRej,:);
-    
-    if(sum(plotOptTable.IsROI)>0)
-        plotROITable=plotOptTable(plotOptTable.IsROI==1,:);
-        allROIch=[];
-        for idx=1:size(plotROITable)
-            allROIch=[allROIch,plotROITable.Optodes_roi{idx}];
-        end
-        allROIch=unique(allROIch);
-        
-        single_roi_idx=~optTable.IsROI&ismember(optTable.Optode,allROIch);
-        if(sum(single_roi_idx)>0)
-            plotSingleROImerge=optTable(single_roi_idx,:);
-        else
-            plotSingleROImerge=[];
-        end
-    else
-        plotROITable=[];
-        plotSingleROImerge=[];
-    end
-    
-    
-    
-    if(sum(~plotOptTable.IsROI)>0)
-        plotSingleTable=plotOptTable(~plotOptTable.IsROI,:);
-    else
-        if(~isempty(plotSingleROImerge))
-            plotSingleTable=plotSingleROImerge;
-        else
-            plotSingleTable=[];
-        end
-    end
-    
-
-
-    %plotIdx2=(ismember(PF2.curConcSet,PF2.curConc));
-    
-
-    % if(PF2.GUIPF2.view.OxyColorAuto)
-    %     [wvUnique]=sort(unique(round(PF2.curWvSet)));
-    %     wvUnique(isnan(wvUnique))=[];
-    %      cc=lines(length(wvUnique));%linspecer(length(wvUnique),'qualitative');
-    %     
-    %     rInd=zeros(1,num2Plot);
-    %     for i=1:length(wvUnique)
-    %         rInd=rInd+(PF2.curWvSet(plotIdx)==wvUnique(i)).*i;
-    %         
-    %     end
-    %     cIndex=cc(rInd,:);
-    % else
-    %     cc=lines(num2Plot);%linspecer(num2Plot,'qualitative');
-    %     cIndex=cc;
-    % end
-    yl=[PF2.GUIPF2.view.OxyMin,PF2.GUIPF2.view.OxyMax];
-
-    cla(stageAxesHandles{3})
-    
-    colorsTable=pf2_base.getBioColors();
-
-    bioM=colorsTable.Properties.VariableNames;
-    bioMclr=table2cell(colorsTable);
-    numBioM=length(bioM);
-    
-    for b=1:numBioM
-        if(sum(ismember(PF2.curConc,b))>0)
-            for i=1:size(plotSingleTable,1)
-               h=plot(stageAxesHandles{3},PF2.GUIPF2.data.time(timeInd),data.(bioM{b})(timeInd,plotSingleTable.OptIndex(i)),'color',bioMclr{b}); 
-               set(h,'Tag',sprintf('Opt%i_%s',plotSingleTable.Optode(i),bioM{b}));
-               hold(stageAxesHandles{3},'on');
-            end
-        end
-    end
-
-
-    if(~PF2.GUIPF2.view.OxyAuto)
-       ylim(stageAxesHandles{3},[PF2.GUIPF2.view.OxyMin,PF2.GUIPF2.view.OxyMax]); 
-    end
-
-
-    if(size(plotOptTable,1)>0)
-       yl=ylim(stageAxesHandles{3});
-
-       plot(stageAxesHandles{3},PF2.GUIPF2.data.time(timeInd),PF2.GUIPF2.data.time(timeInd)*0,'--k','linewidth',1);
-    end
-
-    xl=[PF2.GUIPF2.view.startTime,PF2.GUIPF2.view.endTime]; plotMarkers(xl,stageAxesHandles{3});
-    hold(stageAxesHandles{3},'off');
-    xlim(stageAxesHandles{3},xl);
-    if(setF.device.Info.TimeIsSampleCount)
-        xlabel(stageAxesHandles{3},'Time (samples)');
-    else
-        xlabel(stageAxesHandles{3},'Time (s)');
-    end
-
-    %*%xlim([PF2.GUIPF2.view.startTime,PF2.GUIPF2.view.endTime])
-
-    if(strcmp(PF2.GUIPF2.dpf_mode,'None'))
-        ylabel(stageAxesHandles{3},'\Delta[X] (mM*mm)');
-    else
-        ylabel(stageAxesHandles{3},'\Delta[X] (\muM)');
-    end
-    set(stageAxesHandles{3},'Tag','Stage3');
-end
-
+% Stage 4: Hemoglobin (filtered) with ROI overlay
 axes(stageAxesHandles{4});
-
-%if(~fmask(ch))
-%    text(max(nirsData(:,1))/2+15,2000,'X','FontSize',40,'Color','red');
-%    hold on;
-%end
-data=PF2.GUIPF2.data.stage{5};
-
-if(~isempty(data))
-    plotOptTable=plotOptTable(~plotOptTable.AutoRej,:);
-    
-    if(sum(~plotOptTable.IsROI)>0)
-        plotST_idx=~plotOptTable.IsROI&~plotOptTable.AutoRej&~plotOptTable.ManualRej;
-        if(sum(plotST_idx)>0)
-            plotSingleTable=plotOptTable(plotST_idx,:);
-        else
-            plotSingleTable=[];
-        end
-    else
-        plotSingleTable=[];
-    end
-
-    cla(stageAxesHandles{4});
-    for b=1:numBioM
-        if(sum(ismember(PF2.curConc,b))>0)
-            for i=1:size(plotSingleTable,1)
-               h=plot(stageAxesHandles{4},PF2.GUIPF2.data.time(timeInd),data.(bioM{b})(timeInd,plotSingleTable.OptIndex(i)),'color',bioMclr{b}); 
-               set(h,'Tag',sprintf('Opt%i_%s',plotSingleTable.Optode(i),bioM{b}));
-               hold(stageAxesHandles{4},'on');
-            end
-        end
-    end
-    
-    
-    for i=1:size(plotROITable,1)
-        if(pf2_base.isnestedfield(data,'ROI.HbO'))
-            for b=1:numBioM
-                if(sum(ismember(PF2.curConc,b))>0)
-                   h=plot(stageAxesHandles{4},PF2.GUIPF2.data.time(timeInd),data.ROI.(bioM{b})(timeInd,plotROITable.Optode(i)),'color',bioMclr{b}*0.8,'linewidth',1); 
-                   set(h,'Tag',sprintf('%s_%s',plotROITable.Label{i},bioM{b}));
-                   hold(stageAxesHandles{4},'on');
-                end
-
-            end
-          else
-            fprintf(2,'ROIs have not been built, use a function in Oxy Stage to build ROIs\n');
-        end  
-    end
-    
-
-
-
-    if(~PF2.GUIPF2.view.OxyAuto)
-       ylim(stageAxesHandles{4},[PF2.GUIPF2.view.OxyMin,PF2.GUIPF2.view.OxyMax]); 
-    else
-
-        %ylim(stageAxesHandles{4},yl);
-    end
-
-
-    if(size(plotOptTable,1)>0)
-       yl=ylim(stageAxesHandles{4});
-
-       plot(stageAxesHandles{4},PF2.GUIPF2.data.time(timeInd),PF2.GUIPF2.data.time(timeInd)*0,'--k','linewidth',1);
-    end
-
-    xl=[PF2.GUIPF2.view.startTime,PF2.GUIPF2.view.endTime]; plotMarkers(xl,stageAxesHandles{4});
-    xlim(stageAxesHandles{4},xl);
-    hold(stageAxesHandles{4},'off');
-
-    if(setF.device.Info.TimeIsSampleCount)
-        xlabel(stageAxesHandles{4},'Time (samples)');
-    else
-        xlabel(stageAxesHandles{4},'Time (s)');
-    end
-
-    %*%xlim([PF2.GUIPF2.view.startTime,PF2.GUIPF2.view.endTime])
-
-    if(strcmp(PF2.GUIPF2.dpf_mode,'None'))
-        ylabel(stageAxesHandles{4},'\Delta[X] (mM*mm)');
-    else
-        ylabel(stageAxesHandles{4},'\Delta[X] (\muM)');
-    end
-    set(stageAxesHandles{4},'Tag','Stage4');
-end
+pf2_base.gui.plotStageHb(stageAxesHandles{4}, PF2.GUIPF2.data.stage{5}, ...
+    time, timeInd, optTable, PF2.curCh_listIdx, PF2.curConc, ...
+    oxyViewSettings, PF2.GUIPF2.dpf_mode, ...
+    'excludeManualRej', true, 'excludeAutoRej', true, 'plotROI', true, ...
+    'axTag', 'Stage4', 'deviceInfo', devInfo);
+xl=[PF2.GUIPF2.view.startTime,PF2.GUIPF2.view.endTime]; plotMarkers(xl,stageAxesHandles{4});
 
 if(isfield(PF2,'rawTopo'))
     for pt=1:length(PF2.rawTopo)
@@ -2802,163 +2425,50 @@ plotOxyArranged(handles,false);
 
 function plotOxyArranged(handles,preProcessed)
 
-
 global PF2
 global setF
-PF2.curProbe=get(handles.listbox_probes,'Value');
-PF2.curCh_listIdx=get(handles.listbox_optodes,'Value');
-PF2.curWv=get(handles.listbox_wavelengths,'Value');
-PF2.curConc=get(handles.listbox_conc,'Value');
-PF2.curChSet=[];
-PF2.curWvSet=[];
-PF2.curProbeInd=[];
 
-if(PF2.mergedProbe) %All channel numbers are unique for merged probes
-    for i =1:length(setF.device.Probe)
-        PF2.curProbeInd=[PF2.curProbeInd,i*size(setF.device.Probe{i}.TableCh,2)];
-        PF2.curChSet=[PF2.curChSet,setF.device.Probe{i}.TableCh.OptodeNumber];
-        PF2.curWvSet=[PF2.curWvSet,setF.device.Probe{i}.TableCh.Wavelength];
-        PF2.topoPlotInfo{i}=setF.device.Probe{i}.OptPos;
-    end
-
-    tempWvSet=sort(unique(PF2.curWvSet));
-    PF2.curWv=tempWvSet(PF2.curWv);
-else
-   error('Not Yet Implemented for seperate probe data,\nAssumes concatenated datasets with unique channels in the config file'); 
-end
+% Gather GUI state
+gatherArrangedState(handles, setF);
 
 time=PF2.GUIPF2.data.time;
-
-% Use helper function for time index calculation
 [timeInd, ~, ~] = pf2_base.gui.getTimeIndices(time, PF2.GUIPF2.view.startTime, PF2.GUIPF2.view.endTime);
 
 if(preProcessed)
     data=PF2.GUIPF2.data.stage{4};
+    titlePrefix='Preprocessed Oxy';
+    figBase=210;
 else
     data=PF2.GUIPF2.data.stage{5};
+    titlePrefix='Processed Oxy';
+    figBase=200;
 end
 
-if(~isempty(data))
+oxyViewSettings = struct(...
+    'OxyAuto', PF2.GUIPF2.view.OxyAuto, ...
+    'OxyMin', PF2.GUIPF2.view.OxyMin, ...
+    'OxyMax', PF2.GUIPF2.view.OxyMax, ...
+    'startTime', PF2.GUIPF2.view.startTime, ...
+    'endTime', PF2.GUIPF2.view.endTime);
 
-    %%%%%% Plot for each probe
-    for prb=1:length(PF2.topoPlotInfo)
-        curTopoInfo=PF2.topoPlotInfo{prb};
-        
-        if(preProcessed)
-            PF2.oxyTopo_pre{prb}=figure(200+prb+10*preProcessed);
-            clf(PF2.oxyTopo_pre{prb});
-            annotstr=sprintf('Probe %i: Preprocessed Oxy',prb); 
-            th=annotation(PF2.oxyTopo_pre{prb},'textbox',[0,1,0,0],'String',annotstr,'FitBoxToText','on');
-        else
-            PF2.oxyTopo{prb}=figure(200+prb+10*preProcessed);
-            clf(PF2.oxyTopo{prb});
-            annotstr=sprintf('Probe %i: Processed Oxy',prb); 
-            th=annotation(PF2.oxyTopo{prb},'textbox',[0,1,0,0],'String',annotstr,'FitBoxToText','on');
-            
-        end
+devInfo = struct('RawMax', setF.device.Info.RawMax, ...
+    'TimeIsSampleCount', setF.device.Info.TimeIsSampleCount);
 
-        numOptodes=size(curTopoInfo,1);
-        
-        for optIdx=1:numOptodes
-            h{optIdx}= axes('Position',[0 0 .001 .001],'Box','on');
-            h{optIdx}.OuterPosition=curTopoInfo.subplot_layout_ss{optIdx};
-        end
+pf2_base.gui.plotArranged(data, time, timeInd, PF2.topoPlotInfo, ...
+    oxyViewSettings, PF2.GUIPF2.dpf_mode, devInfo, ...
+    'colorScheme', 'biomarker', 'figureBase', figBase, ...
+    'titlePrefix', titlePrefix, 'curConc', PF2.curConc);
 
-        for optIdx=1:numOptodes
-            axes(h{optIdx});
-            
-
-            plotIdx=(ismember(data.channels,optIdx));
-            %plotIdx2=(ismember(PF2.curConcSet,PF2.curConc));
-            plotIdx=find(plotIdx);%.*plotIdx2);
-
-            % if(PF2.GUIPF2.view.OxyColorAuto)
-            %     [wvUnique]=sort(unique(round(PF2.curWvSet)));
-            %     wvUnique(isnan(wvUnique))=[];
-            %      cc=lines(length(wvUnique));%linspecer(length(wvUnique),'qualitative');
-            %     
-            %     rInd=zeros(1,num2Plot);
-            %     for i=1:length(wvUnique)
-            %         rInd=rInd+(PF2.curWvSet(plotIdx)==wvUnique(i)).*i;
-            %         
-            %     end
-            %     cIndex=cc(rInd,:);
-            % else
-            %     cc=lines(num2Plot);%linspecer(num2Plot,'qualitative');
-            %     cIndex=cc;
-            % end
-
-            cla
-            if(sum(ismember(PF2.curConc,1))>0)
-                for i=1:length(plotIdx)
-                   plot(data.time(timeInd),data.HbO(timeInd,plotIdx(i)),'r'); 
-                   hold on;
-                end
-            end
-
-            if(sum(ismember(PF2.curConc,2))>0)
-                for i=1:length(plotIdx)
-                   plot(data.time(timeInd),data.HbR(timeInd,plotIdx(i)),'b'); 
-                   hold on;
-                end
-            end
-
-            if(sum(ismember(PF2.curConc,3))>0)
-                for i=1:length(plotIdx)
-                   plot(data.time(timeInd),data.HbDiff(timeInd,plotIdx(i)),'k'); 
-                   hold on;
-                end
-            end
-
-            if(sum(ismember(PF2.curConc,4))>0)
-                for i=1:length(plotIdx)
-                   plot(data.time(timeInd),data.HbTotal(timeInd,plotIdx(i)),'color',[0.6,0,0.6]);
-                   hold on;
-                end
-            end
-
-            if(sum(ismember(PF2.curConc,5))>0)
-                for i=1:length(plotIdx)
-                   plot(data.time(timeInd),data.CBSI(timeInd,plotIdx(i)),'color',[0,0.7,0.7]); 
-                   hold on;
-                end
-            end
-
-            if(~PF2.GUIPF2.view.OxyAuto)
-               ylim([PF2.GUIPF2.view.OxyMin,PF2.GUIPF2.view.OxyMax]); 
-            end
-
-
-            if(~isempty(plotIdx))
-               yl=ylim;
-
-               plot(data.time(timeInd),data.time(timeInd)*0,'--k','linewidth',1);
-            else
-               
-               th=text(0.5,0.5,'X','FontSize',40,'color',[1,0,0]); axis off
-            end
-
-            xl=[PF2.GUIPF2.view.startTime,PF2.GUIPF2.view.endTime]; plotMarkers(xl);
-            hold off;
-
-            if(setF.device.Info.TimeIsSampleCount)
-                xlabel('Time (samples)');
-            else
-                xlabel('Time (s)');
-            end
-
-            %*%xlim([PF2.GUIPF2.view.startTime,PF2.GUIPF2.view.endTime])
-            title(sprintf('P%i: Opt%i',prb,optIdx));
-            if(strcmp(PF2.GUIPF2.dpf_mode,'None'))
-                ylabel('\Delta[X] (mM*mm)');
-            else
-                ylabel('\Delta[X] (\muM)');
-            end
-        end
-
+% Store figure handles back into PF2 for update tracking
+for prb=1:length(PF2.topoPlotInfo)
+    figH = figure(figBase + prb);
+    if preProcessed
+        PF2.oxyTopo_pre{prb} = figH;
+    else
+        PF2.oxyTopo{prb} = figH;
     end
-    
-    
+    % Add markers to each subplot
+    plotMarkersOnArrangedFigure(figH);
 end
 
 % --- Executes on button press in pushbutton_arranged_raw.
@@ -2977,129 +2487,58 @@ if(nargin<3)
 end
 global PF2
 global setF
-PF2.curProbe=get(handles.listbox_probes,'Value');
-PF2.curCh_listIdx=get(handles.listbox_optodes,'Value');
-PF2.curWv=get(handles.listbox_wavelengths,'Value');
-PF2.curConc=get(handles.listbox_conc,'Value');
-PF2.curChSet=[];
-PF2.curWvSet=[];
-PF2.curProbeInd=[];
 
-if(PF2.mergedProbe) %All channel numbers are unique for merged probes
-    for i =1:length(setF.device.Probe)
-        PF2.curProbeInd=[PF2.curProbeInd,i*size(setF.device.Probe{i}.TableCh,1)];
-        PF2.curChSet=[PF2.curChSet,setF.device.Probe{i}.TableCh.OptodeNumber];
-        PF2.curWvSet=[PF2.curWvSet,setF.device.Probe{i}.TableCh.Wavelength];
-        PF2.topoPlotInfo{i}=setF.device.Probe{i}.OptPos;
-    end
-
-    tempWvSet=sort(unique(PF2.curWvSet));
-    PF2.curWv=tempWvSet(PF2.curWv);
-else
-   error('Not Yet Implemented for seperate probe data,\nAssumes concatenated datasets with unique channels in the config file'); 
-end
+% Gather GUI state
+gatherArrangedState(handles, setF);
 
 time=PF2.GUIPF2.data.time;
-
-% Use helper function for time index calculation
 [timeInd, ~, ~] = pf2_base.gui.getTimeIndices(time, PF2.GUIPF2.view.startTime, PF2.GUIPF2.view.endTime);
 
 if(preProcessed==true)
     data=PF2.GUIPF2.data.stage{1};
+    titlePrefix='Preprocessed Raw';
+    figBase=110;
 elseif(plotIntensity)
     data=PF2.GUIPF2.data.stage{2};
-else % plot OD
+    titlePrefix='Partially Processed Intensity';
+    figBase=120;
+else
     data=PF2.GUIPF2.data.stage{3};
+    titlePrefix='Processed Raw';
+    figBase=100;
 end
 
-if(~isempty(data))
+rawViewSettings = struct(...
+    'LightColorAuto', PF2.GUIPF2.view.LightColorAuto, ...
+    'LightAuto', PF2.GUIPF2.view.LightAuto || ~plotIntensity, ...
+    'LightMin', PF2.GUIPF2.view.LightMin, ...
+    'LightMax', PF2.GUIPF2.view.LightMax, ...
+    'startTime', PF2.GUIPF2.view.startTime, ...
+    'endTime', PF2.GUIPF2.view.endTime, ...
+    'isOD', ~plotIntensity);
 
-    plotIdx2=(ismember(PF2.curWvSet,PF2.curWv));
+devInfo = struct('RawMax', setF.device.Info.RawMax, ...
+    'TimeIsSampleCount', setF.device.Info.TimeIsSampleCount);
 
-%%%%%% Plot for each probe
-    for prb=1:length(PF2.topoPlotInfo)
-        curTopoInfo=PF2.topoPlotInfo{prb};
-        if(preProcessed)
-             PF2.rawTopo_pre{prb}=figure(100+prb+10*preProcessed);
-             clf(PF2.rawTopo_pre{prb});
-            annotstr=sprintf('Probe %i: Preprocessed Raw',prb);
-            th=annotation(PF2.rawTopo_pre{prb},'textbox',[0,1,0,0],'String',annotstr,'FitBoxToText','on');
-        elseif(plotIntensity)
-            PF2.rawTopo_I{prb}=figure(100+prb+10*preProcessed+20*plotIntensity);
-            clf(PF2.rawTopo_I{prb});
-            annotstr=sprintf('Probe %i: Partially Processed Intensity',prb);
-            th=annotation(PF2.rawTopo_I{prb},'textbox',[0,1,0,0],'String',annotstr,'FitBoxToText','on');
-        else
+pf2_base.gui.plotArranged(data, time, timeInd, PF2.topoPlotInfo, ...
+    rawViewSettings, '', devInfo, ...
+    'colorScheme', 'wavelength', 'figureBase', figBase, ...
+    'titlePrefix', titlePrefix, ...
+    'curWv', PF2.curWv, 'curChSet', PF2.curChSet, 'curWvSet', PF2.curWvSet, ...
+    'LightColorAuto', PF2.GUIPF2.view.LightColorAuto);
 
-            PF2.rawTopo{prb}=figure(100+prb+10*preProcessed);
-            clf(PF2.rawTopo{prb});
-            annotstr=sprintf('Probe %i: Processed Raw',prb);
-            th=annotation(PF2.rawTopo{prb},'textbox',[0,1,0,0],'String',annotstr,'FitBoxToText','on');
-        end
-        numOptodes=size(curTopoInfo,1);
-        
-        
-        for optIdx=1:numOptodes
-            h{optIdx}= axes('Position',[0 0 .001 .001],'Box','on');
-            h{optIdx}.OuterPosition=curTopoInfo.subplot_layout_ss{optIdx};
-        end
-
-        for optIdx=1:numOptodes
-            axes(h{optIdx});
-            
-            plotIdx=(ismember(PF2.curChSet,optIdx));
-
-            plotIdx=find(plotIdx.*plotIdx2==1);
-            num2Plot=length(plotIdx);
-
-            if(PF2.GUIPF2.view.LightColorAuto)
-                % Use helper for wavelength-based coloring
-                [cIndex, ~] = pf2_base.gui.getWavelengthColors(PF2.curWvSet, plotIdx);
-            else
-                cc=lines(num2Plot);
-                cIndex=cc;
-            end
-
-
-            cla
-            for i=1:num2Plot
-               plot(PF2.GUIPF2.data.time(timeInd),data(timeInd,plotIdx(i)),'color',cIndex(i,:)); 
-               hold on;
-            end
-
-            if(~PF2.GUIPF2.view.LightAuto&&plotIntensity)
-               ylim([PF2.GUIPF2.view.LightMin,PF2.GUIPF2.view.LightMax]); 
-            end
-
-
-            if(~isempty(plotIdx))
-               yl=ylim;
-
-               if(max(yl)>0.95*setF.device.Info.RawMax)
-                   plot(PF2.GUIPF2.data.time(timeInd),PF2.GUIPF2.data.time(timeInd)*0+setF.device.Info.RawMax,'--r','linewidth',2);
-               end
-            end
-
-            xl=[PF2.GUIPF2.view.startTime,PF2.GUIPF2.view.endTime]; plotMarkers(xl);
-            hold off;
-
-            if(setF.device.Info.TimeIsSampleCount)
-                xlabel('Time (samples)');
-            else
-                xlabel('Time (s)');
-            end
-
-            title(sprintf('P%i: Opt%i',prb,optIdx));
-
-            %*%xlim([PF2.GUIPF2.view.startTime,PF2.GUIPF2.view.endTime])
-            if(plotIntensity)
-                ylabel('Intensity (I_in)');
-            else
-                ylabel('\Delta OD');
-            end
-                
-        end
-    end 
+% Store figure handles back into PF2 for update tracking
+for prb=1:length(PF2.topoPlotInfo)
+    figH = figure(figBase + prb);
+    if preProcessed
+        PF2.rawTopo_pre{prb} = figH;
+    elseif plotIntensity
+        PF2.rawTopo_I{prb} = figH;
+    else
+        PF2.rawTopo{prb} = figH;
+    end
+    % Add markers to each subplot
+    plotMarkersOnArrangedFigure(figH);
 end
 
 % --- Executes on button press in checkbox_baseline_relative_to_view.
@@ -3237,6 +2676,52 @@ if(isfield(PF2,'curMarkersPlot')&&~isempty(PF2.curMarkersPlot))
     if(~isempty(reducedMarkers))
         hhh=pf2_base.external.vline(curAx,reducedMarkers(:,1),'-k',{},'lineTags',cellstr(num2str(reducedMarkers(:,2))));
     end
+end
+
+
+function gatherArrangedState(handles, setF)
+% GATHERARRANGEDSTATE Read GUI listbox state and build channel/wavelength sets
+%
+% Shared preamble for plotOxyArranged and plotRawArranged.
+
+global PF2
+
+PF2.curProbe=get(handles.listbox_probes,'Value');
+PF2.curCh_listIdx=get(handles.listbox_optodes,'Value');
+PF2.curWv=get(handles.listbox_wavelengths,'Value');
+PF2.curConc=get(handles.listbox_conc,'Value');
+PF2.curChSet=[];
+PF2.curWvSet=[];
+PF2.curProbeInd=[];
+
+if(PF2.mergedProbe)
+    for i =1:length(setF.device.Probe)
+        PF2.curProbeInd=[PF2.curProbeInd,i*size(setF.device.Probe{i}.TableCh,1)];
+        PF2.curChSet=[PF2.curChSet,setF.device.Probe{i}.TableCh.OptodeNumber];
+        PF2.curWvSet=[PF2.curWvSet,setF.device.Probe{i}.TableCh.Wavelength];
+        PF2.topoPlotInfo{i}=setF.device.Probe{i}.OptPos;
+    end
+
+    tempWvSet=sort(unique(PF2.curWvSet));
+    PF2.curWv=tempWvSet(PF2.curWv);
+else
+   error('Not Yet Implemented for seperate probe data,\nAssumes concatenated datasets with unique channels in the config file');
+end
+
+
+function plotMarkersOnArrangedFigure(figH)
+% PLOTMARKERSONARRANGEDFIGURE Add markers to all axes in an arranged figure
+
+global PF2
+
+if ~isfield(PF2,'curMarkersPlot') || isempty(PF2.curMarkersPlot)
+    return;
+end
+
+xl=[PF2.GUIPF2.view.startTime,PF2.GUIPF2.view.endTime];
+allAxes = findobj(figH, 'Type', 'axes');
+for i = 1:length(allAxes)
+    plotMarkers(xl, allAxes(i));
 end
 
 

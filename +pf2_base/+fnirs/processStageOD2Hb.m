@@ -1,4 +1,4 @@
-function outData = processStageOD2Hb(data, time, subjectAge, DirtyBaseline, curProbe, baseline, dpfMode, dpfFixed, defaultAge)
+function outData = processStageOD2Hb(data, time, subjectAge, DirtyBaseline, curProbe, baseline, dpfMode, dpfFixed, defaultAge, options)
 % PROCESSSTAGEOD2HB Convert optical density to hemoglobin concentrations
 %
 % Beer-Lambert conversion stage of the fNIRS processing pipeline.
@@ -7,6 +7,7 @@ function outData = processStageOD2Hb(data, time, subjectAge, DirtyBaseline, curP
 %
 % Syntax:
 %   outData = processStageOD2Hb(data, time, subjectAge, DirtyBaseline, curProbe, baseline, dpfMode, dpfFixed, defaultAge)
+%   outData = processStageOD2Hb(..., 'BaselineSamples', samples)
 %
 % Inputs:
 %   data          - [T x C] Optical density data (T=timepoints, C=channels)
@@ -20,6 +21,12 @@ function outData = processStageOD2Hb(data, time, subjectAge, DirtyBaseline, curP
 %   dpfMode       - DPF mode: 'None', 'Fixed', or 'Calc'
 %   dpfFixed      - Fixed DPF value (used when dpfMode is 'Fixed')
 %   defaultAge    - Default age for DPF calculation when subjectAge empty
+%
+% Name-Value Arguments:
+%   BaselineSamples - Pre-computed sample indices for baseline. When
+%                     provided, overrides the DirtyBaseline and baseline
+%                     struct computation. Used by the GUI for view-relative
+%                     baseline modes.
 %
 % Outputs:
 %   outData       - Struct containing:
@@ -39,7 +46,24 @@ function outData = processStageOD2Hb(data, time, subjectAge, DirtyBaseline, curP
 %   outData = pf2_base.fnirs.processStageOD2Hb(odData, time, 25, false, ...
 %       curProbe, baseline, 'Calc', 5.93, 25);
 %
+%   % Process with pre-computed baseline samples (GUI view-relative mode)
+%   outData = pf2_base.fnirs.processStageOD2Hb(odData, time, 25, false, ...
+%       curProbe, baseline, 'Calc', 5.93, 25, 'BaselineSamples', 1:100);
+%
 % See also: pf2_base.fnirs.processStageRaw2OD, pf2_base.fnirs.processStageFilterHb, pf2_base.fnirs.bvoxy
+
+arguments
+    data
+    time
+    subjectAge
+    DirtyBaseline
+    curProbe
+    baseline
+    dpfMode
+    dpfFixed
+    defaultAge
+    options.BaselineSamples = []
+end
 
 % Determine DPF settings
 if strcmp(dpfMode, 'None')
@@ -59,7 +83,10 @@ if isempty(subjectAge)
 end
 
 % Determine baseline samples
-if DirtyBaseline
+if ~isempty(options.BaselineSamples)
+    % Use pre-computed baseline samples (e.g., GUI view-relative mode)
+    baselineSamples = options.BaselineSamples;
+elseif DirtyBaseline
     % Use entire signal mean as baseline
     baselineSamples = 1:length(time);
 else

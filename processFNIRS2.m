@@ -685,107 +685,38 @@ function fData=updateCurrentDevice(fData)
 global setF
 global PF2
 
-PF2.curChSet=[];
-PF2.curWvSet=[];
-PF2.curSDSet=[];
-PF2.curProbeInd=[];
-
 if(length(setF)>1)
     setF=setF(1);
-end
-
-if(length(setF.device.Probe)==1)
-    PF2.mergedProbe=true;
-else
-    PF2.mergedProbe=true;
-    warning('Multiple Probes may not be fully supported');
 end
 
 if(isfield(fData,'probeInfo'))
     setF.device=probeInfo;
 end
 
-if(PF2.mergedProbe) %All channel numbers are unique for merged probes
-    for i =1:length(setF.device.Probe)
-        curProbe=setF.device.Probe{i};
-        curChTable=curProbe.TableCh;
-        curOptTable=curProbe.TableOpt;
-        curSDTable=curProbe.TableSD;
-        
-        curChTable.ProbeInd(:)=i;
-        curOptTable.ProbeInd(:)=i;
-        curSDTable.ProbeInd(:)=i;
-        
-        if(i==1)
-            PF2.curCh=curChTable;
-            PF2.curOpt=curOptTable;
-            PF2.curSD=curSDTable;
-        else
-            PF2.curCh=[PF2.curCh;curChTable];
-            PF2.curOpt=[PF2.curOpt;curOptTable];
-            PF2.curSD=[PF2.curSD;curSDTable];
-        end
-        
-    end
-    PF2.timeIndex=find(PF2.curCh.isTime);
-    if(isempty(PF2.timeIndex))
-        PF2.timeIndex=0;
-    end
-else
-    error('Not yet implemented for seperate probe data,\nAssumes concatenated datasets with unique channels in the config file'); 
+% Delegate to shared function
+result = pf2_base.gui.updateCurrentDevice(setF.device, fData);
+
+% Write results to globals
+PF2.curCh = result.curCh;
+PF2.curOpt = result.curOpt;
+PF2.curSD = result.curSD;
+PF2.curChList = result.curChList;
+PF2.timeIndex = result.timeIndex;
+PF2.mergedProbe = result.mergedProbe;
+PF2.curChSet = [];
+PF2.curWvSet = [];
+PF2.curSDSet = [];
+PF2.curProbeInd = [];
+
+% Write resolved time/fs back to fData
+if ~isempty(result.time)
+    fData.time = result.time;
 end
-
-[~,i]=unique(PF2.curCh.OptodeNumber);
-PF2.curChList=PF2.curCh.OptodeNumber(i);
-
-
-if(PF2.mergedProbe) %All channel numbers are unique for merged probes  
-    
-    data=fData.stage{1};
-    
-    if(~isempty(data))
-        if(isfield(fData,'time')&&~isempty(fData.time))
-            fData.fs=1./median(diff(fData.time));
-            fData.sampleTime=1:length(data(:,1));
-        elseif(PF2.timeIndex==0)
-            warning('Time column could not be found, assuming each row is a sample');
-            fData.sampleTime=1:length(data(:,1));
-            fData.time=(fData.sampleTime-1)./setF.device.Info.DefaultSamplingRate;
-            fData.fs=setF.device.Info.DefaultSamplingRate;
-        elseif(setF.device.Info.TimeIsSampleCount==1)
-            fData.sampleTime=data(:,PF2.timeIndex);
-            fData.time=(fData.sampleTime-1)./setF.device.Info.DefaultSamplingRate;
-            fData.fs=setF.device.Info.DefaultSamplingRate;
-        else
-            fData.sampleTime=1:length(data(:,1));
-            fData.time=data(:,PF2.timeIndex);
-            fData.fs=1./median(diff(fData.time));
-        end
-    elseif(isfield(data,'time')&&~isempty(fData.time))  %If time exists
-        fData.sampleTime=1:length(fData.time);
-        fData.fs=1./median(diff(fData.time));
-    elseif(~isempty(fData.stage{4})) %try to calculate from oxy data
-        data=fData.stage{4};
-        if(isfield(fData,'time')&&~isempty(fData.time))
-            fData.fs=1./median(diff(fData.time));
-            fData.sampleTime=1:length(data(:,1));
-        elseif(PF2.timeIndex==0)
-            fData.sampleTime=1:length(data.HbO(:,1));
-            fData.time=(fData.sampleTime-1)./setF.device.Info.DefaultSamplingRate;
-            fData.fs=setF.device.Info.DefaultSamplingRate;
-        elseif(setF.device.Info.TimeIsSampleCount==1)
-            fData.sampleTime=data.HbO(:,PF2.timeIndex);
-            fData.time=(fData.sampleTime-1)./setF.device.Info.DefaultSamplingRate;
-            fData.fs=setF.device.Info.DefaultSamplingRate;
-        else
-            fData.sampleTime=1:length(data.HbO(:,1));
-            fData.time=data.HbO(:,PF2.timeIndex);
-            fData.fs=1./median(diff(fData.time));
-        end
-    end
-
-else
-   error('Not Yet Implemented for seperate probe data,\nAssumes concatenated datasets with unique channels in the config file'); 
+if ~isempty(result.sampleTime)
+    fData.sampleTime = result.sampleTime;
+end
+if ~isempty(result.fs)
+    fData.fs = result.fs;
 end
 end
 
