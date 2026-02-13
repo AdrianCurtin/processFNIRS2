@@ -34,6 +34,16 @@
 %   signal_out = pf2_kbWF(signal);
 %   signal_out = pf2_kbWF(signal, 3.3, 3, 'sym8');
 %
+% Notes:
+%   - Only detail coefficients (levels minlvl to L-1) are processed and
+%     reconstructed. Approximation coefficients (level 0, the low-frequency
+%     baseline) are zeroed, effectively removing the DC/slow-drift component.
+%     This is by design in Chiarelli et al. (2015) — the output contains
+%     only the artifact-cleaned high-frequency content. Downstream filtering
+%     (e.g., band-pass) should account for this.
+%   - The signal is zero-padded to the next power of 2 for the DWT. The
+%     output is truncated back to the original length.
+%
 % See also: pf2_MotionCorrectWavelet, waveClean, pf2_base.wavelet.resolveWavelet
 
 

@@ -64,31 +64,7 @@ for ch=1:numCh
     [y(:,ch)] = MAReconstruction(segments,x_n,fs)';
 
 
-    %__________________________________________________________________________
-    a = size(x_n);
-    for i = 1:a(2);
-        s(i) = length(x_n{:,i});
-    end
-    S = sum(s); l = length(x);
-    ASR = (S/l)*100; SAR = 100-ASR;
 
-    % % % % Plot the results
-    % % % subplot(313);
-    % % % min1 = min(x);min2 = min(y); minG = min([min1,min2]);
-    % % % max1 = max(x);max2 = max(y); maxG = max([max1,max2]);
-    % % % ylim([minG,maxG]); hold on
-    % % % 
-    % % % vline([A_Idx]/(fs*60),'-y');
-    % % % plot([1:length(x)]/(fs*60),x,'k'); hold on
-    % % % plot([1:length(y)]/(fs*60), y,'color',[0.2,0.4,1]); axis tight;
-    % % % title (['Artifact-to-signal ratio (ASR): ' num2str(ASR) '%   |  Signal-to-artifact ratio (SAR): ' num2str(SAR) '%'] ,'FontSize', 14);
-    % % % ylabel ('Intensity','FontSize', 12)
-    % % % xlabel ('Time [min]','FontSize', 12)
-    % % % legend('Input signal','Reconstructed signal');
-    % % % box on
-    % % % 
-    % % % disp(['---->  Duration: ' num2str(toc) ' s.']);
-    
 end
 
 
@@ -129,26 +105,6 @@ if nanmin(s2) > T
     %msgbox(['--->   Please choose a propper T value! T must be > ' num2str(min(s2))], 'Error','error');
 end
 
-% % % % (2) Plot the MSD time series
-% % % scrsz = get(0,'ScreenSize');
-% % % figure('Position',[0 0 scrsz(3) scrsz(4)]);
-% % % set(gcf, 'color', 'w')
-% % % set(gcf, 'renderer', 'painters');
-% % % 
-% % % subplot(311); plot([1:length(x)]/(fs*60),x,'k'); axis tight
-% % % title ('Input signal', 'FontSize', 14);
-% % % ylabel ('Intensity','FontSize', 12)
-% % % xlabel ('Time [min]','FontSize', 12)
-% % % box on
-% % % 
-% % % subplot(312);
-% % % min1 = min(s2);
-% % % max1 = max(s2);
-% % % ylim([min1,max1]); hold on
-% % % plot([1:length(s2)]/(fs*60),s2,'k')
-% % % axis tight
-% % % hold on
-
 % (3) Threshholding the MSD time series
 s2_2 = (abs(s2_1)>T).*s2_1;
 
@@ -166,17 +122,6 @@ end
 
 d = find (q1>0);  
 A_Idx = q1(d);
-
-
-% % % hline([T],'r-','Threshold (T)')
-% % % hold on
-% % % vline([A_Idx]/(fs*60),'-y')
-% % % plot([1:length(s2)]/(fs*60),s2,'k')
-% % % title (['Moving standard deviation (MSD). MARA paramters: L = ' num2str(L) ', T = ' num2str(T) ', \alpha = ' num2str(alpha)],'FontSize', 14);
-% % % ylabel ('MSD','FontSize', 12)
-% % % xlabel ('Time [min]','FontSize', 12)
-% % % box on
-%__________________________________________________________________________
 
 
 

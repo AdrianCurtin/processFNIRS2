@@ -46,6 +46,9 @@ function [ dataf ] = pf2_bandstop( data,filtOrder,fs,lowF,highF)
 %   - Row vectors are automatically handled but returned in original shape
 %   - For notch filters targeting a specific frequency, set lowF and highF
 %     to bracket the target frequency (e.g., 59-61 Hz for 60 Hz notch)
+%   - NaN handling: filtfilt does not tolerate NaN values. If your data
+%     contains NaN-masked channels, filter only finite columns or use a
+%     NaN-aware wrapper (see pf2_lpf NaN_mode options for examples).
 %
 % See also: pf2_bpf_butter, pf2_lpf, pf2_hpf, designfilt, filtfilt
 
@@ -64,12 +67,7 @@ d = designfilt('bandstopiir','FilterOrder',filtOrder, ...
            'HalfPowerFrequency1',lowF,'HalfPowerFrequency2',highF, ...
            'DesignMethod','butter','SampleRate',fs);
 
-% [A,B,C,D] = butter(filtOrder,[lowF highF]/half_fs);
-% 
-% sos = ss2sos(A,B,C,D);
-% dataf=filtfilt(sos,1,data);
-
-dataf=(filtfilt(d,data));
+dataf = filtfilt(d, data);
 
 
 if Mini==1 %if the data is a row vector converts it to column vector

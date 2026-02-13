@@ -1,22 +1,27 @@
 function [ dataf ] = lpf( data,ft,fs,freq_cut,Nf )
-
-% inputs ------------------------
-% data: data to be filtered
-% ft: filter type
-% fs: sampling freq.
-% freq_cut: cut-off frequency
-% Nf: filter length / filter order
-% outputs -----------------------
-% dataf: filtered data
-%--------------------------------
-% lpf function designs lowpass filter with the specified cut-off frequency
-% and order/length. It filters the data columnwise as its output.
+% LPF Low-pass filter (numerically stable variant)
 %
-% Filter types:
-%   ft=1: FIR (fir1), Nf = filter length
-%   ft=2: FIR (Parks-McClellan / remez), Nf = filter length
-%   ft=3: IIR Butterworth (zero-pole-gain -> SOS for stability), Nf = filter order
-%--------------------------------
+% Designs and applies a zero-phase low-pass filter. For IIR Butterworth
+% (ft=3), uses zero-pole-gain form converted to second-order sections for
+% numerical stability at low normalized frequencies.
+%
+% Unlike pf2_lpf, this version does not support NaN_mode options but uses
+% per-column finite-span filtering for NaN-padded data.
+%
+% Syntax:
+%   dataf = lpf(data, ft, fs, freq_cut, Nf)
+%
+% Inputs:
+%   data     - Input signal matrix [T x C]
+%   ft       - Filter type: 1=FIR (fir1), 2=Equiripple (remez), 3=Butterworth
+%   fs       - Sampling frequency in Hz
+%   freq_cut - Cutoff frequency in Hz
+%   Nf       - Filter length (ft=1,2) or order (ft=3)
+%
+% Outputs:
+%   dataf - Filtered signal [T x C], NaN where data is insufficient
+%
+% See also: pf2_lpf, hpf, bpf, filtfilt
 
 [Mini,Nini]=size(data);
 if Mini==1 %if the data is a row vector converts it to column vector

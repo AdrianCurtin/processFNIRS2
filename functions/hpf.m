@@ -1,18 +1,26 @@
 function [ dataf ] = hpf( data,filtOrder,fs,freq_cut )
-
-% inputs ------------------------
-% data: data to be filtered
-% filtOrder: filter order
-% fs: sampling freq.
-% freq_cut: highpass cut-off frequency
-% outputs -----------------------
-% dataf: filtered data
-%--------------------------------
-% hpf function designs a highpass Butterworth filter with the specified
-% cut-off frequency and order. Uses zero-pole-gain form converted to
-% second-order sections (SOS) for numerical stability at low normalized
-% frequencies. It filters the data columnwise as its output.
-%--------------------------------
+% HPF High-pass Butterworth filter (numerically stable variant)
+%
+% Designs and applies a zero-phase high-pass Butterworth filter using
+% zero-pole-gain form converted to second-order sections for numerical
+% stability at low normalized frequencies.
+%
+% Unlike pf2_hpf, this version does not support NaN_mode options or
+% multiple filter types but uses per-column finite-span filtering.
+%
+% Syntax:
+%   dataf = hpf(data, filtOrder, fs, freq_cut)
+%
+% Inputs:
+%   data      - Input signal matrix [T x C]
+%   filtOrder - Butterworth filter order (typical: 2-6)
+%   fs        - Sampling frequency in Hz
+%   freq_cut  - Cutoff frequency in Hz
+%
+% Outputs:
+%   dataf - Filtered signal [T x C], NaN where data is insufficient
+%
+% See also: pf2_hpf, lpf, bpf, filtfilt
 
 [Mini,Nini]=size(data);
 if Mini==1 %if the data is a row vector converts it to column vector

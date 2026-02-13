@@ -86,6 +86,14 @@ function [x_recon, maskCV, MA_idx] = pf2_sSMART(x, fs, chNum, tauArtifact, tauCl
 %   % Spline interpolation + shift correction
 %   [corrected, mask, idx] = pf2_sSMART(odData, 10, [], 4, 2, 10, 5, 'spline', true);
 %
+% Notes:
+%   - The SMAR2 detection stage is based on Ayaz et al. (2010). The
+%     interpolation-based reconstruction and DC-shift correction stages are
+%     original to processFNIRS2 and are not part of the published algorithm.
+%   - Interpolation fills gaps smoothly but cannot recover true underlying
+%     neural signal. Short gaps (< few seconds) are typically acceptable;
+%     long gaps should be treated with caution in downstream analysis.
+%
 % See also: pf2_SMAR2, pf2_SMAR, pf2_MotionCorrectTDDR, interp1
 
 % --- Defaults ---

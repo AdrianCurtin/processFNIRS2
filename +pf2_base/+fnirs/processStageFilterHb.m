@@ -149,10 +149,9 @@ if(pf2_base.isnestedfield(data,'ROI.HbO')&&~isempty(data.ROI.HbO))
     curftimeMask_roi=true(size(data.ROI.('HbO')));
 end
 
-global PF2
-
 % Fallback to global method if none provided
 if isempty(method)
+    global PF2
     if ~isfield(PF2, 'stageOxyMethod')
         disp('No oxy method configured');
         outData = data;

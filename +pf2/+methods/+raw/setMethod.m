@@ -1,4 +1,4 @@
-function setMethod(raw_method)
+function setMethod(raw_method, ctx)
 % SETMETHOD Select the active raw processing method for Stage 1 processing
 %
 % Sets the raw processing method used during the Raw-to-Optical Density
@@ -45,14 +45,16 @@ if(nargin<1)
 end
 
 
+if nargin < 2, ctx = []; end
+
 if(isnumeric(raw_method)) % Lookup method based on index
-	global PF2
-	if(pf2_base.isnestedfield(PF2,'myRawMethods.cfg.Sections'))
-        if(raw_method<=length(PF2.myRawMethods.cfg.Sections))
+	methodsLib = pf2_base.resolveMethodsLib('raw', ctx);
+	if(isfield(methodsLib,'cfg')&&isfield(methodsLib.cfg,'Sections'))
+        if(raw_method<=length(methodsLib.cfg.Sections))
             if(raw_method==0)
                 raw_method=1;
             end
-            raw_method=PF2.myRawMethods.cfg.Sections{raw_method};
+            raw_method=methodsLib.cfg.Sections{raw_method};
         end
 	end
 	

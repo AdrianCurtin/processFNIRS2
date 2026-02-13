@@ -65,9 +65,11 @@ half_fs = fs/2;    %half of sampling freq. equal to pi
 
 if ft==1
     [b,a] = fir1(Nf,freq_cut/half_fs,'high');  % use FIR1 to obtain linear phase filter; b=impulse response
-
 elseif ft==3
     [b,a] = butter(Nf,freq_cut/half_fs,'high');
+else
+    error('pf2:hpf:unsupportedFilterType', ...
+        'Filter type %d is not supported for high-pass. Use ft=1 (FIR) or ft=3 (Butterworth).', ft);
 end
 
 %-----------------------------------------------------------------

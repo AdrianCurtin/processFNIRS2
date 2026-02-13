@@ -44,6 +44,16 @@ function fMask=pf2_TakizawaRejection(fNIR,strictCriteria)
 %   fMask = pf2_TakizawaRejection(processedData);
 %   fMask = pf2_TakizawaRejection(processedData, true);  % strict mode
 %
+% Notes:
+%   - Thresholds were derived from Hitachi ETG-4000 data at 10 Hz during
+%     ~60 s verbal fluency tasks (VFT). Adaptations are made for other
+%     devices (proportional windows, unit conversion), but thresholds may
+%     need tuning for substantially different paradigms or devices.
+%   - Rule 4 uses a 90-second scaling constant from the original VFT
+%     protocol length when computing the maximum allowed artifact blocks.
+%   - The final rejection uses 2014 criteria (LF + correlation) rather
+%     than the 2008 band-power rules for better cross-device generality.
+%
 % See also: pf2_SMAR, pf2.data.applyChannelMask
      
      if(nargin<2)

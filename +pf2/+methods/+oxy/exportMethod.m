@@ -1,4 +1,4 @@
-function exportMethod(methodName, filePath)
+function exportMethod(methodName, filePath, ctx)
 % EXPORTMETHOD Export an oxy processing method to a JSON file
 %
 % Saves an oxy processing method as a portable JSON file that can be
@@ -22,21 +22,20 @@ validateattributes(methodName, {'char', 'string'}, {'scalartext'});
 validateattributes(filePath, {'char', 'string'}, {'scalartext'});
 methodName = pf2_base.cleanNameForINI(methodName);
 
-% Initialize PF2 if needed
-global PF2
-if isempty(PF2) || ~isfield(PF2, 'myOxyMethods')
-    pf2_base.pf2_initialize();
-end
+if nargin < 3, ctx = []; end
+
+% Resolve methods library (uses Context if provided, otherwise global PF2)
+methodsLib = pf2_base.resolveMethodsLib('oxy', ctx);
 
 % Check method exists
-if ~ismember(methodName, PF2.myOxyMethods.cfg.Sections)
+if ~ismember(methodName, methodsLib.cfg.Sections)
     error('pf2:MethodNotFound', ...
         'Method ''%s'' not found. Use pf2.methods.oxy.list() to see available methods.', ...
         methodName);
 end
 
 % Get method
-method = PF2.myOxyMethods.cfg.(methodName);
+method = methodsLib.cfg.(methodName);
 
 % Build JSON structure
 jsonStruct = struct();

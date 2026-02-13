@@ -1,4 +1,4 @@
-function [fNIR] = importNIR(nir_filename, mrk_filename, channelCheck)
+function [fNIR] = importNIR(nir_filename, mrk_filename, channelCheck, varargin)
 % IMPORTNIR Import fNIRS data from fNIR Devices/Biopac .nir files
 %
 % Imports raw fNIRS data from COBI Studio software (.nir files) used with
@@ -77,6 +77,12 @@ fchMask=[];
 autoLoadMrk=true;
 
 forceChannelCheck=false; % if channelcheck is enabled manually, then honor, otherwise load only first time
+channelCheckVersion=1;
+for vi_=1:2:numel(varargin)
+    if ischar(varargin{vi_}) && strcmpi(varargin{vi_},'ChannelCheckVersion')
+        channelCheckVersion=varargin{vi_+1};
+    end
+end
 
 if nargin < 1 % No Arguments - Open fNIRS and mrk file
 	[nir_filename, pathname] = uigetfile({'*.nir';'*.*'},'Open fNIRS nir_filename');
@@ -574,9 +580,14 @@ end
 
 if(channelCheck)
     if(forceChannelCheck)
-        fNIR=probeCheckGUI(fNIR,nir_filename,forceChannelCheck);
+        if channelCheckVersion == 2
+            app = pf2.qc.ChannelCheck(fNIR, 'CalledFromImport', true, 'SkipConfirmation', true);
+            if isvalid(app), fNIR = app.OutputData; delete(app); end
+        else
+            fNIR=probeCheckGUI(fNIR,nir_filename,forceChannelCheck);
+        end
     else
-        fNIR=pf2_base.loadExistingMaskOrCheck(fNIR,nir_filename); 
+        fNIR=pf2_base.loadExistingMaskOrCheck(fNIR,nir_filename,channelCheckVersion);
     end
 else
    if(~isempty(fmask))

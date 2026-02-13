@@ -10,6 +10,13 @@ function dod = pf2_Intensity2OD( d )
 %   Imported from HomerLibrary, modified to use log10 instead of natural log.
 %   Standard Beer-Lambert law: OD = -log10(I / I0)
 %
+% Convention note:
+%   This function uses log10 (common logarithm), not log (natural logarithm).
+%   Most fNIRS literature and Homer2/3 use natural log. The extinction
+%   coefficient matrix in pf2's bvoxy is matched to this log10 convention.
+%   If integrating with external toolboxes that assume natural log, scale
+%   OD values by ln(10) ~ 2.303.
+%
 % Syntax:
 %   dod = pf2_Intensity2OD(d)
 %

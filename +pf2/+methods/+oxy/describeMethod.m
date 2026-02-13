@@ -1,4 +1,4 @@
-function [descrip,functions]=describeMethod(oxyMethod)
+function [descrip,functions]=describeMethod(oxyMethod, ctx)
 % DESCRIBEMETHOD Display detailed information about an oxy processing method
 %
 % Shows the complete configuration of an oxy (hemoglobin) processing method,
@@ -44,11 +44,10 @@ function [descrip,functions]=describeMethod(oxyMethod)
 % See also: pf2.methods.oxy.list, pf2.methods.oxy.setMethod,
 %           pf2.methods.raw.describeMethod, pf2.methods.describeCurrentMethods
 
-global PF2
+if nargin < 2, ctx = []; end
 
-if(isempty(PF2))
-   pf2_base.pf2_initialize(); 
-end
+% Resolve methods library (uses Context if provided, otherwise global PF2)
+methodsLib = pf2_base.resolveMethodsLib('oxy', ctx);
 
 if(nargin<1)
    oxyMethod=pf2.methods.oxy(true); 
@@ -60,8 +59,8 @@ else
 end
 
     
-if(pf2_base.isnestedfield(PF2,'myOxyMethods.cfg.Sections')&&~isempty(PF2.myOxyMethods.cfg.Sections))
-    oxyMethods=PF2.myOxyMethods.cfg.Sections;
+if(isfield(methodsLib,'cfg')&&isfield(methodsLib.cfg,'Sections')&&~isempty(methodsLib.cfg.Sections))
+    oxyMethods=methodsLib.cfg.Sections;
     
     if(getByIndex)
         if(oxyMethod>0&&oxyMethod<=length(oxyMethods))
@@ -71,8 +70,8 @@ if(pf2_base.isnestedfield(PF2,'myOxyMethods.cfg.Sections')&&~isempty(PF2.myOxyMe
         end
     end
     
-    if(ismember(oxyMethod,oxyMethods)&&~isempty(PF2.myOxyMethods.cfg.(oxyMethod)))
-        oxyMethodCfg=PF2.myOxyMethods.cfg.(oxyMethod);
+    if(ismember(oxyMethod,oxyMethods)&&~isempty(methodsLib.cfg.(oxyMethod)))
+        oxyMethodCfg=methodsLib.cfg.(oxyMethod);
     else
        error('Unable to find current Oxy Method name %s',oxyMethod); 
     end

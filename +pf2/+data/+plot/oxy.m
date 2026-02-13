@@ -44,7 +44,7 @@ end
 paramNames = {'markers', 'biomarkers', 'biomlist', 'baseline', 'ylim', ...
               'ylimit', 'arranged', 'plotarranged', 'lineprops', ...
               'rejectedlineprops', 'showmarkers', 'interactive', ...
-              'savepath', 'savewidth', 'saveheight', 'savedpi'};
+              'savepath', 'savewidth', 'saveheight', 'savedpi', 'rejectlevel'};
 
 % Extract positional 'channels' argument if present
 channels = [];
@@ -86,6 +86,7 @@ addParameter(p, 'savePath', '', @(x) ischar(x) || isstring(x));
 addParameter(p, 'saveWidth', [], @(x) isempty(x) || isnumeric(x));
 addParameter(p, 'saveHeight', [], @(x) isempty(x) || isnumeric(x));
 addParameter(p, 'saveDPI', 150, @isnumeric);
+addParameter(p, 'rejectLevel', 0, @isnumeric);
 
 parse(p, varargin{nvStart:end});
 
@@ -112,14 +113,7 @@ if isempty(plotArranged)
     plotArranged = false;
 end
 
-
-global PF2
-if(~isfield(PF2,'RejectLevel'))
-    pf2_base.pf2_initialize();
-end
-if(isfield(fNIR,'fchMask'))
-    rejectLevel=PF2.RejectLevel;
-end
+rejectLevel = p.Results.rejectLevel;
 
 if(~iscell(bioMlist))
     if(any(~ischar(bioMlist)))

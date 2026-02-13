@@ -42,7 +42,7 @@ function x=pf2_unpackMethod(method)
 %   fprintf('Method has %d processing steps\n', length(unpacked.F));
 %
 % See also: pf2_base.PipelineFunction, pf2_base.Pipeline,
-%           pf2_describeMethod, processStageRaw2OD, processStageFilterHb
+%           processStageRaw2OD, processStageFilterHb
     x=method;
     
     if(isempty(method))

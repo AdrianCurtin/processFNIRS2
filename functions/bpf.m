@@ -1,17 +1,27 @@
 function [ dataf ] = bpf( data,filtOrder,fs,lowF,highF)
-
-% inputs ------------------------
-% data: data to be filtered
-% filtOrder: filter order
-% fs: sampling freq.
-% lowF: highpass cut-off frequency
-% highF: lowpass cutoff frequency
-% outputs -----------------------
-% dataf: filtered data
-%--------------------------------
-% bpf function designs bandpass butterworth filter with the specified cut-off frequencies and order.
-% It filters the data columnwise as its output
-%--------------------------------
+% BPF Band-pass Butterworth filter (numerically stable variant)
+%
+% Designs and applies a zero-phase Butterworth band-pass filter using
+% zero-pole-gain form converted to second-order sections for numerical
+% stability at low normalized frequencies.
+%
+% Unlike pf2_bpf_butter, this version does not support NaN_mode options
+% but uses per-column finite-span filtering for NaN-padded data.
+%
+% Syntax:
+%   dataf = bpf(data, filtOrder, fs, lowF, highF)
+%
+% Inputs:
+%   data      - Input signal matrix [T x C]
+%   filtOrder - Butterworth filter order (typical: 2-6)
+%   fs        - Sampling frequency in Hz
+%   lowF      - High-pass cutoff frequency in Hz (lower bound)
+%   highF     - Low-pass cutoff frequency in Hz (upper bound)
+%
+% Outputs:
+%   dataf - Filtered signal [T x C], NaN where data is insufficient
+%
+% See also: pf2_bpf_butter, pf2_bpf_fir, lpf, hpf, filtfilt
 
 [Mini,Nini]=size(data);
 if Mini==1 %if the data is a row vector converts it to column vector

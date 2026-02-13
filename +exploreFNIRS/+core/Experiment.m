@@ -1547,6 +1547,24 @@ classdef Experiment < handle
         end
 
 
+        function results = statsClusterPermutation(obj, lmeResults, varargin)
+        % STATSCLUSTERPERMUTATION Cluster-based permutation testing
+        %
+        %   results = ex.statsFitLME('Biomarkers', {'HbO'});
+        %   cp = ex.statsClusterPermutation(results)
+        %   cp = ex.statsClusterPermutation(results, 'Permutations', 500)
+        %
+        % Performs nonparametric cluster-based permutation testing using
+        % spatial adjacency to identify significant channel clusters.
+        % Controls family-wise error rate at the cluster level.
+        %
+        % See also: exploreFNIRS.stats.clusterPermutation, statsFitLME
+
+            results = exploreFNIRS.stats.clusterPermutation( ...
+                lmeResults, obj.data, varargin{:});
+        end
+
+
         function T = infoTable(obj)
         % INFOTABLE Return the selected metadata as a plain table
         %
@@ -1712,6 +1730,111 @@ classdef Experiment < handle
         end
 
 
+        function result = graphMetrics(obj, varargin)
+        % GRAPHMETRICS Graph theory metrics from within-group connectivity
+        %
+        %   result = ex.graphMetrics()
+        %   result = ex.graphMetrics('Method', 'pearson', 'Threshold', 0.3)
+        %   result = ex.graphMetrics('Metrics', {'degree', 'modularity'})
+        %   result = ex.graphMetrics('Blocks', blocks)
+        %
+        % For each group, computes a connectivity matrix (via connectivity()),
+        % thresholds it, and computes selected graph theory metrics. Requires
+        % groupby() first.
+        %
+        % Name-Value Parameters:
+        %   Method          - Coupling method for connectivity (default: 'pearson')
+        %   Biomarker       - 'HbO' (default), 'HbR', etc.
+        %   Threshold       - Threshold value (default: 0.3)
+        %   ThresholdMethod - 'absolute' (default), 'proportional', 'significance'
+        %   Binarize        - Binarize graph (default: false)
+        %   Metrics         - Cell array of metric names (default: all except smallWorld)
+        %   Gamma           - Modularity resolution (default: 1)
+        %   NReplicates     - Modularity replicates (default: 100)
+        %   NRandom         - Small-world null count (default: 100)
+        %   Blocks          - Block struct array for block-wise analysis
+        %   Align           - Channel alignment: 'union' (default), 'intersection'
+        %   Channels        - Channel indices to include
+        %   TimeWindow      - [start, end] seconds
+        %   CouplingArgs    - Extra coupling args
+        %   UseROI          - Use ROI data (default: false)
+        %
+        % Outputs:
+        %   result - Struct array (one per group) with fields from computeMetrics
+        %            plus .label (group name).
+        %            When Blocks provided: struct array (one per block) with
+        %            .blockNumber, .startTime, .endTime, .blockInfo, .groups.
+        %
+        % See also: exploreFNIRS.graph.computeMetrics,
+        %   exploreFNIRS.graph.plotNetwork, exploreFNIRS.graph.metricsToTable
+
+            if ~obj.isGrouped
+                error('exploreFNIRS:core:Experiment:graphMetrics', ...
+                    'Call groupby() before graphMetrics()');
+            end
+
+            % Separate graph-specific params from connectivity params
+            graphParamNames = {'Threshold', 'ThresholdMethod', 'Binarize', ...
+                'Metrics', 'Gamma', 'NReplicates', 'NRandom'};
+            graphArgs = {};
+            connArgs = {};
+
+            i = 1;
+            while i <= length(varargin)
+                if ischar(varargin{i}) && any(strcmpi(varargin{i}, graphParamNames))
+                    graphArgs = [graphArgs, varargin(i:i+1)]; %#ok<AGROW>
+                    i = i + 2;
+                else
+                    connArgs = [connArgs, varargin(i)]; %#ok<AGROW>
+                    i = i + 1;
+                end
+            end
+
+            % Compute connectivity (handles Blocks internally)
+            connResult = obj.connectivity(connArgs{:});
+
+            % Check if block-wise
+            if ~isempty(connResult) && isfield(connResult, 'groups')
+                % Block-wise: connResult is struct array with .groups per block
+                nBlocks = length(connResult);
+                result = connResult;  % preserve block metadata
+                for b = 1:nBlocks
+                    nGrp = length(connResult(b).groups);
+                    grpMetrics = struct([]);
+                    for g = 1:nGrp
+                        m = exploreFNIRS.graph.computeMetrics( ...
+                            connResult(b).groups(g), graphArgs{:});
+                        if isfield(connResult(b).groups(g), 'label')
+                            m.label = connResult(b).groups(g).label;
+                        end
+                        if isempty(grpMetrics)
+                            grpMetrics = m;
+                        else
+                            grpMetrics(g) = m;
+                        end
+                    end
+                    result(b).groups = grpMetrics;
+                end
+            else
+                % Standard: connResult is struct array (one per group)
+                nGrp = length(connResult);
+                result = struct([]);
+                for g = 1:nGrp
+                    m = exploreFNIRS.graph.computeMetrics( ...
+                        connResult(g), graphArgs{:});
+                    if isfield(connResult(g), 'label')
+                        m.label = connResult(g).label;
+                    end
+                    if isempty(result)
+                        result = m;
+                    else
+                        result(g) = m;
+                    end
+                end
+            end
+        end
+
+
         function result = hyperscanning(obj, varargin)
         % HYPERSCANNING Inter-brain synchrony analysis across paired subjects
         %
@@ -1838,6 +1961,118 @@ classdef Experiment < handle
                         opts.Permutations, opts.PThreshold, alignMode);
                 end
                 fprintf('Computed hyperscanning for %d blocks across %d dyads.\n', ...
+                    nBlocks, length(pairs));
+            end
+        end
+
+
+        function result = hbica(obj, varargin)
+        % HBICA Hyper-Brain ICA for inter-brain network detection
+        %
+        %   result = ex.hbica()
+        %   result = ex.hbica('Biomarker', 'HbR', 'GOFThreshold', -0.5)
+        %   result = ex.hbica('ManualPairs', {{1,2},{3,4}})
+        %   result = ex.hbica('Blocks', blocks)
+        %
+        % Pairs subjects using .info.DyadID metadata, runs HB-ICA
+        % decomposition for each dyad, and aggregates results.
+        %
+        % Name-Value Parameters:
+        %   Biomarker        - 'HbO' (default), 'HbR', 'HbTotal', 'HbDiff', 'CBSI'
+        %   Channels         - Channel indices (default: intersection of good channels)
+        %   TimeWindow       - [start, end] seconds
+        %   NumComponents    - ICA components (default: auto)
+        %   VarianceRetained - PCA threshold (default: 0.99)
+        %   Lags             - TDSEP lags (default: auto)
+        %   GOFThreshold     - Inter-brain classification threshold (default: 0)
+        %   Detrend          - Polynomial detrend order (default: 1)
+        %   ZScore           - Z-score channels before concat (default: true)
+        %   UseROI           - Use ROI-level data instead of channels (default: false)
+        %   ManualPairs      - Manual pairing override (see pairSubjects)
+        %   DyadField        - Info field for dyad ID (default: 'DyadID')
+        %   RoleField        - Info field for role (default: 'Role')
+        %   Blocks           - Block struct array from pf2.data.defineBlocks
+        %
+        % Outputs (without Blocks):
+        %   result - Struct with fields:
+        %     .dyads         - Cell array of per-dyad hbica results
+        %     .dyadIDs       - Cell array of dyad ID strings
+        %     .pairs         - Pairs struct from pairSubjects
+        %     .summary       - Struct with .meanGOF, .nInterBrain per dyad
+        %
+        % Outputs (with Blocks):
+        %   result - Struct array (one per block) with fields:
+        %     .blockNumber, .startTime, .endTime, .blockInfo, .hbica
+        %
+        % See also: exploreFNIRS.hyperscanning.hbica,
+        %   exploreFNIRS.hyperscanning.plotHBICA,
+        %   exploreFNIRS.hyperscanning.pairSubjects
+
+            ip = inputParser;
+            addParameter(ip, 'Biomarker', 'HbO', @ischar);
+            addParameter(ip, 'Channels', [], @isnumeric);
+            addParameter(ip, 'TimeWindow', [], @(v) isnumeric(v) && (isempty(v) || length(v) == 2));
+            addParameter(ip, 'NumComponents', 0, @(v) isnumeric(v) && isscalar(v));
+            addParameter(ip, 'VarianceRetained', 0.99, @(v) isnumeric(v) && isscalar(v));
+            addParameter(ip, 'Lags', [], @(v) isnumeric(v));
+            addParameter(ip, 'GOFThreshold', 0, @(v) isnumeric(v) && isscalar(v));
+            addParameter(ip, 'Detrend', 1, @(v) isnumeric(v) && isscalar(v));
+            addParameter(ip, 'ZScore', true, @islogical);
+            addParameter(ip, 'UseROI', false, @islogical);
+            addParameter(ip, 'ManualPairs', {}, @iscell);
+            addParameter(ip, 'DyadField', 'DyadID', @ischar);
+            addParameter(ip, 'RoleField', 'Role', @ischar);
+            addParameter(ip, 'Blocks', [], @(x) isempty(x) || isstruct(x));
+            parse(ip, varargin{:});
+            opts = ip.Results;
+
+            selData = obj.getSelectedData();
+
+            % Pair subjects
+            pairArgs = {};
+            if ~isempty(opts.ManualPairs)
+                pairArgs = [pairArgs, 'ManualPairs', {opts.ManualPairs}];
+            end
+            pairArgs = [pairArgs, 'DyadField', opts.DyadField, 'RoleField', opts.RoleField];
+            pairs = exploreFNIRS.hyperscanning.pairSubjects(selData, pairArgs{:});
+
+            if isempty(pairs)
+                error('exploreFNIRS:core:Experiment:hbica', ...
+                    'No valid pairs found. Check .info.%s or use ManualPairs.', opts.DyadField);
+            end
+
+            % Build HB-ICA args
+            hbicaArgs = {'Biomarker', opts.Biomarker, ...
+                'NumComponents', opts.NumComponents, ...
+                'VarianceRetained', opts.VarianceRetained, ...
+                'GOFThreshold', opts.GOFThreshold, ...
+                'Detrend', opts.Detrend, ...
+                'ZScore', opts.ZScore};
+            if ~isempty(opts.Channels)
+                hbicaArgs = [hbicaArgs, 'Channels', opts.Channels];
+            end
+            if ~isempty(opts.Lags)
+                hbicaArgs = [hbicaArgs, 'Lags', opts.Lags];
+            end
+            if opts.UseROI
+                hbicaArgs = [hbicaArgs, 'UseROI', true];
+            end
+
+            if isempty(opts.Blocks)
+                result = computeHBICAcore(selData, pairs, hbicaArgs, opts.TimeWindow);
+            else
+                blocks = opts.Blocks;
+                nBlocks = length(blocks);
+                result = struct([]);
+                for b = 1:nBlocks
+                    tw = [blocks(b).startTime, blocks(b).endTime];
+                    result(b).blockNumber = b;
+                    result(b).startTime = blocks(b).startTime;
+                    result(b).endTime = blocks(b).endTime;
+                    result(b).blockInfo = blocks(b).info;
+                    result(b).hbica = computeHBICAcore(selData, pairs, hbicaArgs, tw);
+                end
+                fprintf('Computed HB-ICA for %d blocks across %d dyads.\n', ...
                     nBlocks, length(pairs));
             end
         end
@@ -2376,6 +2611,51 @@ if nPerms > 0
         'PThreshold', pThreshold, ...
         'Align', align, ...
         groupArgs{:});
+end
+
+
+function result = computeHBICAcore(selData, pairs, hbicaArgs, timeWindow)
+% COMPUTEHBICACORE Core HB-ICA computation across dyads
+
+nDyads = length(pairs);
+dyads = cell(nDyads, 1);
+dyadIDs = cell(nDyads, 1);
+
+for d = 1:nDyads
+    idxA = pairs(d).indexA;
+    idxB = pairs(d).indexB;
+    dataA = selData{idxA};
+    dataB = selData{idxB};
+
+    args = hbicaArgs;
+    if ~isempty(timeWindow)
+        args = [args, 'TimeWindow', timeWindow]; %#ok<AGROW>
+    end
+
+    dyads{d} = exploreFNIRS.hyperscanning.hbica(dataA, dataB, args{:});
+
+    if isfield(pairs(d), 'dyadID')
+        dyadIDs{d} = pairs(d).dyadID;
+    else
+        dyadIDs{d} = sprintf('Dyad%d', d);
+    end
+end
+
+% Summary statistics
+meanGOF = zeros(nDyads, 1);
+nInterBrain = zeros(nDyads, 1);
+for d = 1:nDyads
+    meanGOF(d) = mean(dyads{d}.GOF);
+    nInterBrain(d) = sum(dyads{d}.isInterBrain);
+end
+
+result.dyads = dyads;
+result.dyadIDs = dyadIDs;
+result.pairs = pairs;
+result.summary.meanGOF = meanGOF;
+result.summary.nInterBrain = nInterBrain;
+result.summary.nDyads = nDyads;
+
 end
 
 end

@@ -42,16 +42,15 @@ p = inputParser;
 addRequired(p, 'methodName', @(x) ischar(x) || isstring(x));
 addOptional(p, 'functions', {}, @iscell);
 addParameter(p, 'Replace', false, @islogical);
+addParameter(p, 'Context', [], @(x) isempty(x) || isstruct(x) || isobject(x));
 parse(p, methodName, varargin{:});
 
 functions = p.Results.functions;
 replaceExisting = p.Results.Replace;
+ctx = p.Results.Context;
 
-% Initialize PF2 if needed
-global PF2
-if isempty(PF2) || ~isfield(PF2, 'myOxyMethods')
-    pf2_base.pf2_initialize();
-end
+% Resolve methods library (uses Context if provided, otherwise global PF2)
+methodsLib = pf2_base.resolveMethodsLib('oxy', ctx);
 
 % Sanitize method name
 methodName = pf2_base.cleanNameForINI(methodName);
@@ -62,7 +61,7 @@ if strcmpi(methodName, 'None')
 end
 
 % Check if method already exists
-methodExists = ismember(methodName, PF2.myOxyMethods.cfg.Sections);
+methodExists = ismember(methodName, methodsLib.cfg.Sections);
 if methodExists && ~replaceExisting
     error('pf2:MethodExists', ...
         'Method ''%s'' already exists. Use ''Replace'', true to overwrite.', ...
@@ -95,7 +94,7 @@ end
 
 % Remove existing method if replacing
 if methodExists
-    PF2.myOxyMethods.cfg.remove(methodName);
+    methodsLib.cfg.remove(methodName);
 end
 
 % Pack method for storage (convert F to S1, S2, etc.)
@@ -106,16 +105,19 @@ for j = 1:length(method.F)
 end
 
 % Add to config
-PF2.myOxyMethods.cfg.add(methodName, packedMethod);
+methodsLib.cfg.add(methodName, packedMethod);
 
 % Save to disk
-PF2.myOxyMethods.cfg.write();
+methodsLib.cfg.write();
 
 % Set unpacked method directly in memory.
 % The INI round-trip (cfg.write -> unpackMethodsLocal) loses nested struct
 % data in S1/S2/... fields. Calling unpackMethodsLocal also wipes F for
 % previously created methods whose S fields were already consumed.
-PF2.myOxyMethods.cfg.(methodName) = method;
+methodsLib.cfg.(methodName) = method;
+
+% Persist updated methods library back to context or global
+pf2_base.storeMethodsLib('oxy', methodsLib, ctx);
 
 fprintf('Created oxy method: %s\n', methodName);
 if ~isempty(functions)

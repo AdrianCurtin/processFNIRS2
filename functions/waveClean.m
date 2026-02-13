@@ -67,7 +67,6 @@ function [cleanOD_out] = waveClean(dataIn, level, alpha, convert2OD, showPlot, w
 % See also: pf2_MotionCorrectWavelet, pf2_SMAR, pf2_MotionCorrectTDDR, pf2_base.wavelet.resolveWavelet
 
 
-disp('Wave Clean - Beta 01');
 global WAVELABPATH
 if(isempty(WAVELABPATH))
     pf2_base.toolboxes.setup_wavelab();

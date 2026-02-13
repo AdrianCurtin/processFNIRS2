@@ -1,4 +1,4 @@
-function delete(methodName)
+function delete(methodName, ctx)
 % DELETE Delete an entire oxy processing method permanently
 %
 % Removes an oxy processing method from the configuration file. This
@@ -29,27 +29,29 @@ if strcmpi(methodName, 'None')
     error('pf2:ReservedName', '''None'' is a reserved method and cannot be deleted.');
 end
 
-% Initialize PF2 if needed
-global PF2
-if isempty(PF2) || ~isfield(PF2, 'myOxyMethods')
-    pf2_base.pf2_initialize();
-end
+if nargin < 2, ctx = []; end
+
+% Resolve methods library (uses Context if provided, otherwise global PF2)
+methodsLib = pf2_base.resolveMethodsLib('oxy', ctx);
 
 % Check method exists
-if ~ismember(methodName, PF2.myOxyMethods.cfg.Sections)
+if ~ismember(methodName, methodsLib.cfg.Sections)
     error('pf2:MethodNotFound', ...
         'Method ''%s'' not found. Use pf2.methods.oxy.list() to see available methods.', ...
         methodName);
 end
 
 % Remove from config
-PF2.myOxyMethods.cfg.remove(methodName);
+methodsLib.cfg.remove(methodName);
 
 % Save to disk
-PF2.myOxyMethods.cfg.write();
+methodsLib.cfg.write();
 
 % Reload methods
-PF2.myOxyMethods = unpackMethodsLocal(PF2.myOxyMethods);
+methodsLib = unpackMethodsLocal(methodsLib);
+
+% Persist updated methods library back to context or global
+pf2_base.storeMethodsLib('oxy', methodsLib, ctx);
 
 fprintf('Deleted oxy method: %s\n', methodName);
 

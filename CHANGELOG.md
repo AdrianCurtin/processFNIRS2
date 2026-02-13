@@ -4,6 +4,50 @@
 
 ### New Features
 
+**HB-ICA (Hyper-Brain Independent Component Analysis):**
+- `exploreFNIRS.hyperscanning.hbica()` — component-based inter-brain network detection for hyperscanning data using TDSEP ICA and Goodness-of-Fit classification (Luo et al. 2024)
+  - Concatenates dual-subject channel data, decomposes via TDSEP, classifies components as inter-brain or intra-brain using GOF index
+  - Dual regression provides subject-specific sources and spatial maps
+  - Supports all biomarkers, time windowing, channel selection, adjustable GOF threshold
+- `pf2_base.signal.tdsep()` — Temporal Decorrelation Source Separation (Ziehe & Muller 1998)
+  - PCA whitening, time-lagged covariance matrices, Jacobi joint diagonalization
+  - Configurable lags, variance retention threshold, number of components
+- `exploreFNIRS.coupling.hbica()` — pairwise coupling adapter for HB-ICA (API compatibility with dispatch system)
+- `exploreFNIRS.hyperscanning.plotHBICA()` — visualization: GOF bar chart, dual-brain spatial patterns, source time courses
+- `Experiment.hbica()` — group-level HB-ICA with automatic subject pairing, block-wise analysis, and summary statistics
+- HB-ICA registered in coupling dispatch for `computeMatrix` and `computeDyad`
+- `examples/scripts/example_hbica.m` — HB-ICA tutorial: standalone dyad, group-level, block-wise, and pairwise comparison
+
+**Graph Theory Metrics (`+exploreFNIRS/+graph/`):**
+- `threshold()` — connectivity matrix to graph struct (absolute, proportional, or significance-based thresholding)
+- `degree()`, `charPathLength()`, `clusteringCoefficient()`, `betweenness()`, `efficiency()` — standard graph-theoretic metrics
+- `modularity()` — Louvain community detection (Blondel et al. 2008), participation coefficient
+- `smallWorld()` — sigma/omega small-world indices with Maslov-Sneppen null model rewiring
+- `detectHubs()` — composite z-score hub classification (provincial vs connector hubs)
+- `computeMetrics()` — convenience dispatcher for computing multiple metrics at once
+- `plotNetwork()` — graph visualization with force-directed, circle, or probe-based layouts and community coloring
+- `plotMetrics()` — grouped bar charts for comparing graph metrics across conditions
+- `metricsToTable()` — long-format table export with optional CSV save
+- `Experiment.graphMetrics()` — wrapper delegating to `connectivity()` + `computeMetrics()`
+
+**Cluster-Based Permutation Testing:**
+- `exploreFNIRS.stats.clusterPermutation()` — non-parametric cluster-based testing for LME results (Maris & Oostenveld 2007)
+- `exploreFNIRS.stats.findClusters()` — BFS connected-component cluster identification on thresholded stat maps
+- `pf2.probe.computeAdjacency()` — spatial adjacency matrix from MNI coordinates for cluster permutation
+- `Experiment.statsClusterPermutation()` — wrapper for cluster-based permutation testing
+
+**Channel Quality Check GUI:**
+- `pf2.qc.ChannelCheck` — App Designer GUI for interactive channel quality assessment
+  - Spatial probe mini-plot grid, detail waveform + PSD views, undo/redo, bulk operations
+  - Auto-runs QC pipeline on open (saturation, SCI, cardiac, CoV, Takizawa)
+  - Configurable QC thresholds with persistent preferences
+  - Two modes: single dataset or cell array with prev/next navigation
+  - Dark mode support; opt-in via `'ChannelCheckVersion', 2` on import functions
+
+**Internal Refactoring:**
+- `pf2_base.resolveMethodsLib()` / `pf2_base.storeMethodsLib()` — method library access abstracted from global PF2
+- `global PF2` scoping reduced in processing stages and plot functions — explicit parameters replace global reads
+
 **Pipeline Class Hierarchy:**
 - `pf2_base.PipelineFunction` — immutable value class encapsulating a single processing function with precomputed argument mappings and zero-overhead `execute()` method
   - 12 special argument types (x, fs, fTime, fchMask, etc.) resolved at construction as uint8 enums
@@ -52,9 +96,31 @@
 - **PipelineFunctionTest.m** — PipelineFunction construction, precomputed mapping, execute, round-trip
 - **PipelineTest.m** — Pipeline hierarchy: add, insert, remove, setParam, toMethod, fromMethod
 - **GLMDiagnosticsTest.m** — diagnoseGLM diagnostic output validation
+- **HBICATest.m** — HB-ICA decomposition, inter/intra-brain detection, coupling adapter, ROI mode
+- **TDSEPTest.m** — TDSEP mixing recovery, dimensionality reduction, reconstruction
+- **GraphMetricsTest.m** — Graph theory metrics on known topologies (K5, star, ring, block-diagonal)
+- **ClusterPermutationTest.m** — Adjacency computation, cluster finding, null distribution
+
+### GUI Refactoring
+- `updateCurrentDevice` consolidated: GUI and headless paths now delegate to shared `pf2_base.gui.updateCurrentDevice`
+- `updatePlots` extracted into per-stage helpers: `pf2_base.gui.plotStageRaw` (stages 1–2) and `pf2_base.gui.plotStageHb` (stages 3–4)
+- `plotOxyArranged` / `plotRawArranged` consolidated into single `pf2_base.gui.plotArranged` helper
+- `processStageOD2Hb` GUI wrapper now delegates to shared function with `BaselineSamples` option instead of calling `bvoxy` directly
+- `processFNIR_GUI` inlined raw and filter-Hb wrappers — processing calls now use explicit parameters instead of reading globals inside wrapper functions
+- `GUIContext` sync wired up via `syncContextFromGUI()` at the start of each processing cycle
+- GUI processing calls now pass `showGUIerrors=true` so pipeline errors show as dialog boxes instead of crashing
 
 ### Bug Fixes
 - Fixed AR-IRLS contrast p-values being anti-conservative — contrasts now use prewhitened X and residuals instead of original-space quantities
+- Fixed `pf2_unpackMethod` struct array output duplication — when INI-stored method definitions used `struct()` with cell array values, MATLAB creates a struct array; the old code iterated all elements to build the `output` field, producing e.g. `{'x','x','x','x','x'}` instead of `{'x'}`, which caused "Too many output arguments" errors when executing pipeline functions
+- Fixed missing `data.markers` crash in GUI filter-Hb processing — `processStageFilterHb` accesses `data.markers` for the pipeline context, but the GUI's stage{4} data lacked `.markers`, `.Aux`, and `.time` fields
+- Fixed `plotArranged` `LightColorAuto` validation error — parameter used `@islogical` validator but the GUI stores the value as numeric 0/1
+- Fixed HB-ICA GOF computation — combined GOF was always zero for two-subject case due to symmetric z-score cancellation; now uses absolute loading ratios
+- Fixed `clusterPermutation` permutation loop fitting the same formula (same dependent variable) for all channels instead of rewriting per channel
+- Fixed `clusterPermutation` RNG seeded inside the inner channel loop instead of per permutation
+- Fixed `plotHBICA` subplot layout — `subplot(nRows,1,1)` conflicted with `subplot(nRows,3,...)` destroying the GOF panel
+- Fixed `ChannelCheck` QC tooltip referencing non-existent `pctSaturated` field instead of `totalPct`
+- Fixed `ChannelCheck` ambient/marker/reference lines accumulating on mini-plots during repeated redraws
 
 ---
 
@@ -210,7 +276,7 @@ Scriptable Group Analysis, Connectivity, Hyperscanning, Statistics & Processing 
 - `pf2.qc.powerSpectrum()` — Power spectral density with physiological peak detection
 - `pf2.qc.plotQuality()` — Unified QC visualization (SCI bar chart or PSD line plots)
 - **QC Pipeline** (`pf2.qc.pipeline.*`) — Standalone, orchestrated channel quality assessment independent of the processing pipeline
-  - `assess()` — runs configurable checks (SCI, cardiac peak, CoV, Takizawa) on raw data with lightweight internal processing
+  - `assess()` — runs configurable checks (saturation, SCI, cardiac peak, CoV, Takizawa) on raw data with lightweight internal processing
   - `apply()` — applies QC report to `fchMask` (AND-only, never promotes rejected channels), stores report for traceability
   - `report()` — prints formatted channel-by-channel summary with per-check values and rejection reasons
   - `plotReport()` — 4-panel visual dashboard (SCI bars, cardiac SNR bars, CoV bars, Takizawa rule heatmap)

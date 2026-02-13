@@ -454,9 +454,11 @@ function fn = getCouplingFn(method)
             fn = @exploreFNIRS.coupling.granger;
         case 'transferentropy'
             fn = @exploreFNIRS.coupling.transferEntropy;
+        case 'hbica'
+            fn = @exploreFNIRS.coupling.hbica;
         otherwise
             error('exploreFNIRS:connectivity:computeMatrix', ...
-                'Unknown coupling method "%s". Use: pearson, spearman, xcorr, coherence, wcoherence, granger, transferentropy', method);
+                'Unknown coupling method "%s". Use: pearson, spearman, xcorr, coherence, wcoherence, granger, transferentropy, hbica', method);
     end
 end
 

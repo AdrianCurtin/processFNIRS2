@@ -89,14 +89,15 @@ if isfield(data, 'probeinfo')
     end
 end
 
-% Also check global device info
-global setF
-if ~has3D && ~isempty(setF) && pf2_base.isnestedfield(setF, 'device.Probe1')
-    p1 = setF.device.Probe1;
-    if isfield(p1, 'DetPos3DX') && ~isempty(p1.DetPos3DX)
+% Also check device object attached to data
+if ~has3D && isfield(data, 'device') && isa(data.device, 'pf2.Device')
+    dev = data.device;
+    mni = dev.mniPositions();
+    if ~isempty(mni)
         has3D = true;
     end
-    if isfield(p1, 'DetPosX') && ~isempty(p1.DetPosX)
+    lay = dev.layout2D();
+    if ~isempty(lay)
         has2D = true;
     end
 end

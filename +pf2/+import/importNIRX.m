@@ -1,4 +1,4 @@
-function [fNIR] = importNIRX(folderDIR,channelCheck)
+function [fNIR] = importNIRX(folderDIR,channelCheck,varargin)
 % IMPORTNIRX Import fNIRS data from NIRx system recordings
 %
 % Reads fNIRS data from NIRx systems (NIRScout, NIRSport) which store data
@@ -63,10 +63,17 @@ function [fNIR] = importNIRX(folderDIR,channelCheck)
 % See also: pf2.import.importSNIRF, pf2.import.importNIR, pf2.import.importHitachiMES
 
 if(nargin<2)
-   channelCheck=true; 
+   channelCheck=true;
    forceChannelCheck=false;
 else
-   forceChannelCheck=true; 
+   forceChannelCheck=true;
+end
+
+channelCheckVersion=1;
+for vi_=1:2:numel(varargin)
+    if ischar(varargin{vi_}) && strcmpi(varargin{vi_},'ChannelCheckVersion')
+        channelCheckVersion=varargin{vi_+1};
+    end
 end
 
 includeSSchannels=true;
@@ -558,7 +565,12 @@ else
 end
 
 if(channelCheck)
-    fNIR=probeCheckGUI(fNIR,sprintf('%s.nirs',fileroot),forceChannelCheck);
+    if channelCheckVersion == 2
+        app = pf2.qc.ChannelCheck(fNIR, 'CalledFromImport', true, 'SkipConfirmation', true);
+        if isvalid(app), fNIR = app.OutputData; delete(app); end
+    else
+        fNIR=probeCheckGUI(fNIR,sprintf('%s.nirs',fileroot),forceChannelCheck);
+    end
 else
    if(~isempty(fmask))
        fNIR.fchMask=fmask; 

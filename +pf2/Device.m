@@ -31,6 +31,8 @@ classdef Device
         nShortSep       % Short-separation channel count
         defaultFs       % Default sampling rate (Hz)
         wavelengthSet   % Unique wavelengths in nm, e.g. [730, 850]
+        rawMax          % Raw intensity saturation ceiling (device-specific)
+        rawMin          % Raw intensity floor (device-specific)
         probeInfo       % Full legacy probeInfo struct (backward compat)
     end
 
@@ -77,6 +79,18 @@ classdef Device
             wl = probe.TableCh.Wavelength(:)';
             validWl = wl(wl > 0 & ~isnan(wl));
             obj.wavelengthSet = unique(validWl);
+
+            % Raw intensity bounds (saturation detection)
+            if isfield(info, 'RawMax')
+                obj.rawMax = info.RawMax;
+            else
+                obj.rawMax = NaN;
+            end
+            if isfield(info, 'RawMin')
+                obj.rawMin = info.RawMin;
+            else
+                obj.rawMin = NaN;
+            end
         end
 
         %% Accessor methods
@@ -124,12 +138,27 @@ classdef Device
         end
 
         function lay = layout2D(obj)
-        % LAYOUT2D Cell array of subplot positions
+        % LAYOUT2D Cell array of subplot positions (standard channels only)
             if isfield(obj.probeInfo.Probe{1}, 'OptPos') && ...
                     ismember('subplot_layout', obj.probeInfo.Probe{1}.OptPos.Properties.VariableNames)
                 lay = obj.probeInfo.Probe{1}.OptPos.subplot_layout;
             else
                 lay = {};
+            end
+        end
+
+        function lay = layout2Dss(obj)
+        % LAYOUT2DSS Cell array of subplot positions including short-separation
+        %
+        % Returns subplot_layout_ss if available, which includes positions
+        % for both standard and short-separation channels. Falls back to
+        % layout2D() if the _ss variant is not present.
+            if isfield(obj.probeInfo.Probe{1}, 'OptPos') && ...
+                    istable(obj.probeInfo.Probe{1}.OptPos) && ...
+                    ismember('subplot_layout_ss', obj.probeInfo.Probe{1}.OptPos.Properties.VariableNames)
+                lay = obj.probeInfo.Probe{1}.OptPos.subplot_layout_ss;
+            else
+                lay = obj.layout2D();
             end
         end
 

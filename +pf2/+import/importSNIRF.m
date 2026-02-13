@@ -63,10 +63,23 @@ function [fNIR] = importSNIRF(filepath, channelCheck, varargin)
 %           pf2_base.external.jsnirfy.loadsnirf
 
 if nargin < 2
-   channelCheck = true; 
+   channelCheck = true;
    forceChannelCheck = false;
 else
-   forceChannelCheck = true; 
+   forceChannelCheck = true;
+end
+
+channelCheckVersion = 1;
+ccvIdx = [];
+for vi_ = 1:2:numel(varargin)
+    if ischar(varargin{vi_}) && strcmpi(varargin{vi_}, 'ChannelCheckVersion')
+        channelCheckVersion = varargin{vi_+1};
+        ccvIdx = [vi_, vi_+1]; %#ok<AGROW>
+    end
+end
+% Remove ChannelCheckVersion from varargin before passing to loadsnirf
+if ~isempty(ccvIdx)
+    varargin(ccvIdx) = [];
 end
 
 includeSSchannels = true;
@@ -742,7 +755,12 @@ end
 
 % Run channel quality check if requested
 if channelCheck
-    fNIR = probeCheckGUI(fNIR, filepath, forceChannelCheck);
+    if channelCheckVersion == 2
+        app = pf2.qc.ChannelCheck(fNIR, 'CalledFromImport', true, 'SkipConfirmation', true);
+        if isvalid(app), fNIR = app.OutputData; delete(app); end
+    else
+        fNIR = probeCheckGUI(fNIR, filepath, forceChannelCheck);
+    end
 else
     if ~isempty(fmask)
         fNIR.fchMask = fmask;

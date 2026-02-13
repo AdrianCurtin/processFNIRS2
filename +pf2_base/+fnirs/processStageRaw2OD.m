@@ -103,8 +103,6 @@ function [outDataOD,outDataRaw]=processStageRaw2OD(method,data,fs,time,rawMask,f
     showGUIerrors=false; 
  end
 
-global PF2
-
 outData=data;
 outDataRaw=data;
 OD_converted=false;
@@ -112,9 +110,9 @@ OD_converted=false;
 if(isstring(method)||ischar(method))
     % load method from string
 elseif(isempty(method)) % use loaded method
+    global PF2
     if(~isfield(PF2,'stageRawMethod'))
         disp('No current Filters enabled');
-        %outData(:,validChannels)=medfilt1(data(:,validChannels),10);
     else
         method=PF2.stageRawMethod;
     end

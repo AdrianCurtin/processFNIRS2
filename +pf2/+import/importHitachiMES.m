@@ -1,4 +1,4 @@
-function [fNIR] = importHitachiMES(file,pathname,channelCheck)
+function [fNIR] = importHitachiMES(file,pathname,channelCheck,varargin)
 % IMPORTHITACHIMES Import fNIRS data from Hitachi ETG-4000 MES files
 %
 % Reads fNIRS data from Hitachi ETG-4000 optical topography systems, which
@@ -70,6 +70,12 @@ function [fNIR] = importHitachiMES(file,pathname,channelCheck)
 % See also: pf2.import.importSNIRF, pf2.import.importNIRX, pf2.import.importNIR
 
 forceChannelCheck=false;
+channelCheckVersion=1;
+for vi_=1:2:numel(varargin)
+    if ischar(varargin{vi_}) && strcmpi(varargin{vi_},'ChannelCheckVersion')
+        channelCheckVersion=varargin{vi_+1};
+    end
+end
 
 if(nargin<3) % channel check is on by default with no file
     channelCheck=true;
@@ -332,9 +338,14 @@ end
 
 if(channelCheck)
         if(forceChannelCheck)
-            fNIR=probeCheckGUI(fNIR,filename,forceChannelCheck);
+            if channelCheckVersion == 2
+                app = pf2.qc.ChannelCheck(fNIR, 'CalledFromImport', true, 'SkipConfirmation', true);
+                if isvalid(app), fNIR = app.OutputData; delete(app); end
+            else
+                fNIR=probeCheckGUI(fNIR,filename,forceChannelCheck);
+            end
         else
-            fNIR=pf2_base.loadExistingMaskOrCheck(fNIR,filename); 
+            fNIR=pf2_base.loadExistingMaskOrCheck(fNIR,filename,channelCheckVersion);
         end
 else
    if(~isempty(fmask))

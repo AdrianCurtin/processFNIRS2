@@ -39,13 +39,11 @@ rawName = 'demo_TDDR';
 oxyName = 'demo_lpf';
 oxyNamePCA = 'demo_lpf_pca';
 
-global PF2
-if isempty(PF2) || ~isfield(PF2, 'myRawMethods')
-    pf2_base.pf2_initialize();
-end
+rawLib = pf2_base.resolveMethodsLib('raw');
+oxyLib = pf2_base.resolveMethodsLib('oxy');
 
 % --- Raw pipeline: OD conversion + TDDR motion correction ---
-if ~ismember(rawName, PF2.myRawMethods.cfg.Sections)
+if ~ismember(rawName, rawLib.cfg.Sections)
     rawFuncs = { ...
         struct('f', 'pf2_Intensity2OD', ...
                'args', {{'x'}}, ...
@@ -62,7 +60,7 @@ else
 end
 
 % --- Oxy pipeline: Low pass filter (0.1 Hz) + nanmean ROI ---
-if ~ismember(oxyName, PF2.myOxyMethods.cfg.Sections)
+if ~ismember(oxyName, oxyLib.cfg.Sections)
     oxyFuncs = { ...
         struct('f', 'pf2_lpf', ...
                'args', {{'x', 'filtType', 'fs', 'freq_cut', 'Nf'}}, ...
@@ -79,7 +77,7 @@ else
 end
 
 % --- Oxy pipeline: Low pass filter (0.1 Hz) + PCA ROI ---
-if ~ismember(oxyNamePCA, PF2.myOxyMethods.cfg.Sections)
+if ~ismember(oxyNamePCA, oxyLib.cfg.Sections)
     oxyFuncsPCA = { ...
         struct('f', 'pf2_lpf', ...
                'args', {{'x', 'filtType', 'fs', 'freq_cut', 'Nf'}}, ...

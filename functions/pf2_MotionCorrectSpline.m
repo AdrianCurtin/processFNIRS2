@@ -130,8 +130,15 @@ for ch = 1:nCh
         end
 
         % Subtract spline fit (remove drift from motion)
-        % Anchor to pre-artifact level
-        preLevel = signal(iStart);
+        % Anchor to pre-artifact boundary mean (up to 1 sec before)
+        preWin = max(1, iStart - max(1, round(sample_rate)));
+        preSamples = signal(preWin:iStart-1);
+        preSamples = preSamples(~isnan(preSamples));
+        if isempty(preSamples)
+            preLevel = signal(iStart);
+        else
+            preLevel = mean(preSamples);
+        end
         dodCorrected(iStart:iEnd, ch) = signal(iStart:iEnd) - splineFit + preLevel;
     end
 end

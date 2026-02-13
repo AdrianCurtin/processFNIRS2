@@ -1,4 +1,4 @@
-function delete(methodName)
+function delete(methodName, ctx)
 % DELETE Delete an entire raw processing method permanently
 %
 % Removes a raw processing method from the configuration file. This
@@ -14,6 +14,9 @@ function delete(methodName)
 %   % Delete a method
 %   pf2.methods.raw.delete('myMethod');
 %
+%   % Delete using a ProcessingContext
+%   pf2.methods.raw.delete('myMethod', ctx);
+%
 %   % Verify deletion
 %   pf2.methods.raw.list();
 %
@@ -23,33 +26,32 @@ function delete(methodName)
 % Validate inputs
 validateattributes(methodName, {'char', 'string'}, {'scalartext'});
 methodName = pf2_base.cleanNameForINI(methodName);
+if nargin < 2, ctx = []; end
 
 % Reject reserved name
 if strcmpi(methodName, 'None')
     error('pf2:ReservedName', '''None'' is a reserved method and cannot be deleted.');
 end
 
-% Initialize PF2 if needed
-global PF2
-if isempty(PF2) || ~isfield(PF2, 'myRawMethods')
-    pf2_base.pf2_initialize();
-end
+% Resolve methods library
+methodsLib = pf2_base.resolveMethodsLib('raw', ctx);
 
 % Check method exists
-if ~ismember(methodName, PF2.myRawMethods.cfg.Sections)
+if ~ismember(methodName, methodsLib.cfg.Sections)
     error('pf2:MethodNotFound', ...
         'Method ''%s'' not found. Use pf2.methods.raw.list() to see available methods.', ...
         methodName);
 end
 
 % Remove from config
-PF2.myRawMethods.cfg.remove(methodName);
+methodsLib.cfg.remove(methodName);
 
 % Save to disk
-PF2.myRawMethods.cfg.write();
+methodsLib.cfg.write();
 
 % Reload methods
-PF2.myRawMethods = unpackMethodsLocal(PF2.myRawMethods);
+methodsLib = unpackMethodsLocal(methodsLib);
+pf2_base.storeMethodsLib('raw', methodsLib, ctx);
 
 fprintf('Deleted raw method: %s\n', methodName);
 

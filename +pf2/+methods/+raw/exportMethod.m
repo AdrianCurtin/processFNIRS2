@@ -1,4 +1,4 @@
-function exportMethod(methodName, filePath)
+function exportMethod(methodName, filePath, ctx)
 % EXPORTMETHOD Export a raw processing method to a JSON file
 %
 % Saves a raw processing method as a portable JSON file that can be
@@ -21,22 +21,20 @@ function exportMethod(methodName, filePath)
 validateattributes(methodName, {'char', 'string'}, {'scalartext'});
 validateattributes(filePath, {'char', 'string'}, {'scalartext'});
 methodName = pf2_base.cleanNameForINI(methodName);
+if nargin < 3, ctx = []; end
 
-% Initialize PF2 if needed
-global PF2
-if isempty(PF2) || ~isfield(PF2, 'myRawMethods')
-    pf2_base.pf2_initialize();
-end
+% Resolve methods library
+methodsLib = pf2_base.resolveMethodsLib('raw', ctx);
 
 % Check method exists
-if ~ismember(methodName, PF2.myRawMethods.cfg.Sections)
+if ~ismember(methodName, methodsLib.cfg.Sections)
     error('pf2:MethodNotFound', ...
         'Method ''%s'' not found. Use pf2.methods.raw.list() to see available methods.', ...
         methodName);
 end
 
 % Get method
-method = PF2.myRawMethods.cfg.(methodName);
+method = methodsLib.cfg.(methodName);
 
 % Build JSON structure
 jsonStruct = struct();

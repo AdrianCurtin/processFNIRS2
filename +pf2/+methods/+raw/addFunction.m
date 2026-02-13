@@ -50,36 +50,35 @@ addOptional(p, 'args', {}, @iscell);
 addOptional(p, 'argvals', {}, @iscell);
 addParameter(p, 'Output', 'x', @(x) ischar(x) || isstring(x));
 addParameter(p, 'Position', 0, @(x) isnumeric(x) || strcmpi(x, 'end'));
+addParameter(p, 'Context', [], @(x) isempty(x) || isstruct(x) || isobject(x));
 parse(p, methodName, funcName, varargin{:});
 
 args = p.Results.args;
 argvals = p.Results.argvals;
 outputVar = p.Results.Output;
 position = p.Results.Position;
+ctx = p.Results.Context;
 
 % Handle 'end' position
 if ischar(position) && strcmpi(position, 'end')
     position = 0;
 end
 
-% Initialize PF2 if needed
-global PF2
-if isempty(PF2) || ~isfield(PF2, 'myRawMethods')
-    pf2_base.pf2_initialize();
-end
+% Resolve methods library
+methodsLib = pf2_base.resolveMethodsLib('raw', ctx);
 
 % Sanitize method name for INI lookup
 methodName = pf2_base.cleanNameForINI(methodName);
 
 % Check method exists
-if ~ismember(methodName, PF2.myRawMethods.cfg.Sections)
+if ~ismember(methodName, methodsLib.cfg.Sections)
     error('pf2:MethodNotFound', ...
         'Method ''%s'' not found. Use pf2.methods.raw.create() first.', ...
         methodName);
 end
 
 % Get current method
-method = PF2.myRawMethods.cfg.(methodName);
+method = methodsLib.cfg.(methodName);
 if ~isfield(method, 'F')
     method.F = {};
 end
@@ -108,14 +107,15 @@ for j = 1:length(method.F)
 end
 
 % Update config
-PF2.myRawMethods.cfg.remove(methodName);
-PF2.myRawMethods.cfg.add(methodName, packedMethod);
+methodsLib.cfg.remove(methodName);
+methodsLib.cfg.add(methodName, packedMethod);
 
 % Save to disk
-PF2.myRawMethods.cfg.write();
+methodsLib.cfg.write();
 
 % Reload methods
-PF2.myRawMethods = unpackMethodsLocal(PF2.myRawMethods);
+methodsLib = unpackMethodsLocal(methodsLib);
+pf2_base.storeMethodsLib('raw', methodsLib, ctx);
 
 fprintf('Added %s to %s at position %d\n', funcName, methodName, insertPos);
 

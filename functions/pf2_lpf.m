@@ -122,17 +122,3 @@ if Mini==1 %if the data is a row vector converts it to column vector
 end
 
 end
-
-function dataf=nantolerant_filtfilt(b,a,data)
-    datamask=isnan(data)|isinf(data);
-
-    data(datamask)=nanmedian(data(:));
-    for i=1:size(data,2)
-       data(datamask(:,i),i)=nanmedian(data(:,i));
-    end
-    data(isnan(data))=0;
-
-    dataf=filtfilt(b,a,data);
-
-    dataf(datamask)=nan;
-end

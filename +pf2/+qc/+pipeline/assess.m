@@ -12,19 +12,22 @@ function report = assess(data, varargin)
 %   3. LPF on Hb: Butterworth low-pass (default 0.1 Hz)
 %
 % Checks run (in order):
-%   sci      - Scalp coupling index via cardiac cross-correlation (raw)
-%   cardiac  - Cardiac peak presence in power spectrum (raw)
-%   cov      - Coefficient of variation of raw signal (raw)
-%   takizawa - 4-rule hemoglobin QC (filtered Hb)
+%   saturation - Raw intensity at floor (0) or ceiling (device max) (raw)
+%   sci        - Scalp coupling index via cardiac cross-correlation (raw)
+%   cardiac    - Cardiac peak presence in power spectrum (raw)
+%   cov        - Coefficient of variation of raw signal (raw)
+%   takizawa   - 4-rule hemoglobin QC (filtered Hb)
 %
 % Syntax:
 %   report = pf2.qc.pipeline.assess(data)
-%   report = pf2.qc.pipeline.assess(data, 'Checks', {'sci', 'cardiac'})
+%   report = pf2.qc.pipeline.assess(data, 'Checks', {'saturation', 'sci'})
 %   report = pf2.qc.pipeline.assess(data, 'SCIThreshold', 0.8)
 %
 % Name-Value Parameters:
 %   Checks         - Cell array of check names to run
-%                    (default: {'sci','cardiac','cov','takizawa'})
+%                    (default: {'saturation','sci','cardiac','cov','takizawa'})
+%   SaturationThreshold - Max fraction of saturated samples per channel
+%                    to pass (default: 0.1, i.e. 10%)
 %   SCIThreshold   - SCI pass threshold (default: 0.75)
 %   CardiacBand    - [1x2] cardiac frequency band in Hz (default: [0.5, 2.5])
 %   CardiacSNR     - Minimum cardiac peak SNR to pass (default: 3)
@@ -53,7 +56,8 @@ p = inputParser;
 p.FunctionName = 'pf2.qc.pipeline.assess';
 
 addRequired(p, 'data', @isstruct);
-addParameter(p, 'Checks', {'sci','cardiac','cov','takizawa'}, @iscell);
+addParameter(p, 'Checks', {'saturation','sci','cardiac','cov','takizawa'}, @iscell);
+addParameter(p, 'SaturationThreshold', 0.1, @(x) isnumeric(x) && isscalar(x));
 addParameter(p, 'SCIThreshold', 0.75, @(x) isnumeric(x) && isscalar(x));
 addParameter(p, 'CardiacBand', [0.5, 2.5], @(x) isnumeric(x) && numel(x) == 2);
 addParameter(p, 'CardiacSNR', 3, @(x) isnumeric(x) && isscalar(x));
@@ -77,18 +81,43 @@ assert(isfield(data, 'time'), 'pf2:qc:pipeline:noTime', ...
 fs = data.fs;
 nRawCols = size(data.raw, 2);
 
-%% Resolve wavelength info
-if isfield(data, 'info') && isfield(data.info, 'synthetic') ...
+%% Resolve channel layout from Device or fallback
+hasDev = isfield(data, 'device') && ~isempty(data.device);
+if hasDev
+    dev = data.device;
+    nChannels = dev.nChannels;
+    wavelengths = dev.wavelengthSet;
+    nWl = numel(wavelengths);
+    % Build per-channel column map from Device
+    chNums = dev.channelNumbers();
+    wlVec = dev.wavelengths();
+    chColMapWl = cell(1, nChannels); % columns per wavelength (excl dark)
+    for ch = 1:nChannels
+        wlCols = find(chNums == ch & wlVec > 0);
+        chColMapWl{ch} = wlCols;
+    end
+elseif isfield(data, 'info') && isfield(data.info, 'synthetic') ...
         && isfield(data.info.synthetic, 'wavelengths')
     wavelengths = data.info.synthetic.wavelengths;
+    nWl = numel(wavelengths);
+    nChannels = floor(nRawCols / nWl);
+    hasDev = false;
+    chColMapWl = cell(1, nChannels);
+    for ch = 1:nChannels
+        chColMapWl{ch} = (ch-1)*nWl + (1:nWl);
+    end
 else
     wavelengths = [730, 850];
+    nWl = numel(wavelengths);
+    nChannels = floor(nRawCols / nWl);
+    chColMapWl = cell(1, nChannels);
+    for ch = 1:nChannels
+        chColMapWl{ch} = (ch-1)*nWl + (1:nWl);
+    end
 end
-nWl = numel(wavelengths);
-nChannels = floor(nRawCols / nWl);
 
 %% Determine which checks to run
-validChecks = {'sci', 'cardiac', 'cov', 'takizawa'};
+validChecks = {'saturation', 'sci', 'cardiac', 'cov', 'takizawa'};
 checks = lower(opts.Checks);
 for i = 1:numel(checks)
     assert(ismember(checks{i}, validChecks), 'pf2:qc:pipeline:badCheck', ...
@@ -124,11 +153,10 @@ if needsHb
     L = 100;  % NoPathlength mode: L=100, output in mM*mm
 
     for ch = 1:nChannels
-        col1 = (ch-1)*nWl + 1;
-        col2 = (ch-1)*nWl + 2;
-        if col2 <= nRawCols
-            od1 = od(:, col1) / L;
-            od2 = od(:, col2) / L;
+        cols = chColMapWl{ch};
+        if numel(cols) >= 2 && cols(2) <= nRawCols
+            od1 = od(:, cols(1)) / L;
+            od2 = od(:, cols(2)) / L;
             HbO(:,ch) = (eHbR_2 * od1 - eHbR_1 * od2) / denom;
             HbR(:,ch) = (eHbO_1 * od2 - eHbO_2 * od1) / denom;
             HbTotal(:,ch) = HbO(:,ch) + HbR(:,ch);
@@ -178,28 +206,115 @@ passMatrix = true(numel(checks), nChannels);
 for ci = 1:numel(checks)
     switch checks{ci}
 
+        case 'saturation'
+            % Count samples at floor (<=rawMin) or ceiling (>=rawMax)
+            % per channel. Requires device RawMax to be known.
+            rawMaxVal = NaN;
+            rawMinVal = 0;
+            if hasDev
+                try rawMaxVal = dev.rawMax; catch, end
+                try rawMinVal = dev.rawMin; catch, end
+            elseif isfield(data, 'info') && isfield(data.info, 'probename')
+                % Try loading device just for bounds
+                try
+                    tmpDev = pf2.Device.load(data);
+                    rawMaxVal = tmpDev.rawMax;
+                    rawMinVal = tmpDev.rawMin;
+                catch
+                end
+            end
+            % Ensure scalar values
+            if ~isscalar(rawMinVal) || ~isnumeric(rawMinVal) || isnan(rawMinVal)
+                rawMinVal = 0;
+            end
+            if ~isscalar(rawMaxVal) || ~isnumeric(rawMaxVal)
+                rawMaxVal = NaN;
+            end
+
+            nT = size(data.raw, 1);
+            floorCount = zeros(1, nChannels);
+            ceilCount = zeros(1, nChannels);
+
+            for ch = 1:nChannels
+                chCols = chColMapWl{ch};
+                chCols = chCols(chCols <= nRawCols);
+                if isempty(chCols), continue; end
+
+                chRaw = data.raw(:, chCols);
+                % Floor: any wavelength column <= rawMin
+                atFloor = any(chRaw <= rawMinVal, 2);
+                floorCount(ch) = sum(atFloor);
+
+                % Ceiling: any wavelength column >= rawMax (only if known)
+                if ~isnan(rawMaxVal)
+                    atCeil = any(chRaw >= rawMaxVal, 2);
+                    ceilCount(ch) = sum(atCeil);
+                end
+            end
+
+            totalBad = floorCount + ceilCount;
+            badPct = totalBad / nT;
+
+            report.saturation.floorCount = floorCount;
+            report.saturation.ceilCount = ceilCount;
+            report.saturation.floorPct = floorCount / nT;
+            report.saturation.ceilPct = ceilCount / nT;
+            report.saturation.totalPct = badPct;
+            report.saturation.pass = badPct <= opts.SaturationThreshold;
+            report.saturation.threshold = opts.SaturationThreshold;
+            report.saturation.rawMax = rawMaxVal;
+            report.saturation.rawMin = rawMinVal;
+            report.saturation.skipped = false;
+
+            if isnan(rawMaxVal)
+                % Can still check floor, but ceiling is unknown
+                report.saturation.ceilCount = nan(1, nChannels);
+                report.saturation.ceilPct = nan(1, nChannels);
+                report.saturation.totalPct = floorCount / nT;
+                report.saturation.pass = (floorCount / nT) <= opts.SaturationThreshold;
+            end
+
+            passMatrix(ci, :) = report.saturation.pass;
+
         case 'sci'
             sciArgs = {'Threshold', opts.SCIThreshold, ...
                        'CardiacBand', opts.CardiacBand};
+            % Pass Device wavelength/channel layout to SCI
             if ~isempty(opts.Wavelengths)
                 sciArgs = [sciArgs, {'Wavelengths', opts.Wavelengths}]; %#ok<AGROW>
+            elseif hasDev
+                sciArgs = [sciArgs, {'Wavelengths', wlVec}]; %#ok<AGROW>
             end
             if ~isempty(opts.ChannelNumbers)
                 sciArgs = [sciArgs, {'ChannelNumbers', opts.ChannelNumbers}]; %#ok<AGROW>
+            elseif hasDev
+                sciArgs = [sciArgs, {'ChannelNumbers', chNums}]; %#ok<AGROW>
             end
 
             sciResult = pf2.qc.sci(data, sciArgs{:});
 
-            report.sci.values = sciResult.sci;
-            report.sci.pass = sciResult.isGood;
+            % Map SCI results to our channel count (may differ)
+            nSci = numel(sciResult.sci);
+            if nSci == nChannels
+                sciVals = sciResult.sci;
+                sciPass = sciResult.isGood;
+            else
+                sciVals = nan(1, nChannels);
+                sciPass = true(1, nChannels);
+                n = min(nSci, nChannels);
+                sciVals(1:n) = sciResult.sci(1:n);
+                sciPass(1:n) = sciResult.isGood(1:n);
+            end
+
+            report.sci.values = sciVals;
+            report.sci.pass = sciPass;
             report.sci.threshold = opts.SCIThreshold;
             report.sci.skipped = sciResult.skipped;
             if sciResult.skipped
                 report.sci.skipReason = sciResult.skipReason;
-                % Don't penalize channels when check is inapplicable
                 passMatrix(ci, :) = true;
             else
-                passMatrix(ci, :) = sciResult.isGood;
+                passMatrix(ci, :) = sciPass;
             end
 
         case 'cardiac'
@@ -252,7 +367,7 @@ for ci = 1:numel(checks)
         case 'cov'
             covValues = zeros(1, nChannels);
             for ch = 1:nChannels
-                chCols = (ch-1)*nWl + (1:nWl);
+                chCols = chColMapWl{ch};
                 chCols = chCols(chCols <= nRawCols);
                 if isempty(chCols)
                     covValues(ch) = Inf;

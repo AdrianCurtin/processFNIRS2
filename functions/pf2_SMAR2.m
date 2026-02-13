@@ -70,6 +70,12 @@ function [Xcorr, maskCV, MA_idx]=pf2_SMAR2(x,N,chNum,tauArtifact,tauClean,minSeg
 %   % Conservative settings (less rejection)
 %   [corrected, mask, idx] = pf2_SMAR2(odData, 10, [], 4, 2, 10);
 %
+% Notes:
+%   - The adaptive thresholding, two-threshold artifact expansion, and
+%     wavelength pairing are processFNIRS2 extensions of the original SMAR
+%     algorithm (Ayaz 2010). The original paper uses a single fixed CV
+%     threshold; this implementation derives thresholds from signal statistics.
+%
 % See also: pf2_SMAR, pf2_fnirs_MARA, pf2_MotionCorrectTDDR, calcLocalCV
 
 if nargin<1
@@ -96,13 +102,6 @@ end
 if(N<1)
     error('Invalid Window Length');
 end
-% 
-% global smar2
-% 
-% tauArtifact=smar2.tauArtifact;
-% N=smar2.N;
-% tauClean=smar2.tauClean;
-
 len=size(x,1);
 
 [CVx,dCVx]=calcLocalCV(x,N);
@@ -114,49 +113,18 @@ aCVx_lower=aCVx;
 aCVx_lower(aCVx_lower<(2.*repmat(CVx_median,[size(aCVx_lower,1),1])))=nan;
 lowerStd=nanstd(aCVx_lower);
 
+% Adaptive thresholds (pf2 extension of Ayaz 2010 SMAR)
+CVthreshold=CVx_median*2+lowerStd.*tauArtifact;
+CVthresholdClean=CVx_median*2+lowerStd.*tauClean;
 
-%CVthreshold=CVx_median.*tauArtifact;%CVx_median
-%CVthresholdClean=CVx_median.*tauClean;%CVx_median;%+tauUpMult*CVx_median/2;
-
-
-CVthreshold=CVx_median*2+lowerStd.*tauArtifact;%CVx_median
-CVthresholdClean=CVx_median*2+lowerStd.*tauClean;%CVx_median;%+tauUpMult*CVx_median/2;
-
-
-dCVthreshold=dCVx_median.*tauArtifact;%CVx_median
-dCVthresholdClean=dCVx_median.*tauClean;%CVx_median;%+tauUpMult*CVx_median/2;
-% 
-% figure(10);
-
-
-% 
-% figure(10);
-% subplot(1,2,1);
-% z=5;
-% plot(adCVx(:,z))
-% hold on
-% plot([0,size(adCVx,1)],dCVthreshold(z).*ones(1,2));
-% plot([0,size(adCVx,1)],dCVthresholdClean(z).*ones(1,2),'--');
-% hold off;
-% 
-% subplot(1,2,2);
-% plot(CVx(:,z))
-% hold on
-% plot([0,size(CVx,1)],CVthreshold(z).*ones(1,2));
-% plot([0,size(CVx,1)],CVthresholdClean(z).*ones(1,2),'--');
-% hold off;
-% % 
-% %   pause
-
+dCVthreshold=dCVx_median.*tauArtifact;
+dCVthresholdClean=dCVx_median.*tauClean;
 
 aCVxm=[zeros(1,size(x,2));aCVx;zeros(1,size(x,2))];
 adCVxm=[zeros(1,size(x,2));adCVx;zeros(1,size(x,2))];
 
-% maskCV=aCVxm>CVthreshold|isnan(aCVxm);%|aCVd>CVdthreshold;
-% maskCVclean=aCVxm>CVthresholdClean|isnan(aCVxm);%|aCVd>CVdthreshold;
-
-maskCV=adCVxm>dCVthreshold|isnan(adCVxm);%|aCVd>CVdthreshold;
-maskCVclean=adCVxm>dCVthresholdClean|isnan(adCVxm);%|aCVd>CVdthreshold;
+maskCV=adCVxm>dCVthreshold|isnan(adCVxm);
+maskCVclean=adCVxm>dCVthresholdClean|isnan(adCVxm);
 
 dMask=diff(maskCV);
 aMask=abs(dMask);
@@ -283,11 +251,5 @@ end
 
 dCVx=diff(CVx);
 dCVx=[zeros([1,size(CVx,2)]);dCVx];
-
-% 
-% figure(3);
-% plot(CVx(:,11));
-% pause;
-
 
 end

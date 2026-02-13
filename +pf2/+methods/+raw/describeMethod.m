@@ -1,4 +1,4 @@
-function [descrip,functions]=describeMethod(rawMethod)
+function [descrip,functions]=describeMethod(rawMethod, ctx)
 % DESCRIBEMETHOD Display detailed information about a raw processing method
 %
 % Shows the complete configuration of a raw processing method, including
@@ -44,11 +44,8 @@ function [descrip,functions]=describeMethod(rawMethod)
 % See also: pf2.methods.raw.list, pf2.methods.raw.setMethod,
 %           pf2.methods.oxy.describeMethod, pf2.methods.describeCurrentMethods
 
-global PF2
-
-if(isempty(PF2))
-   pf2_base.pf2_initialize(); 
-end
+if nargin < 2, ctx = []; end
+methodsLib = pf2_base.resolveMethodsLib('raw', ctx);
 
 if(nargin<1)
    rawMethod=pf2.methods.raw(true); 
@@ -60,8 +57,8 @@ else
 end
 
     
-if(pf2_base.isnestedfield(PF2,'myRawMethods.cfg.Sections')&&~isempty(PF2.myRawMethods.cfg.Sections))
-    rawMethods=PF2.myRawMethods.cfg.Sections;
+if(isfield(methodsLib,'cfg')&&isfield(methodsLib.cfg,'Sections')&&~isempty(methodsLib.cfg.Sections))
+    rawMethods=methodsLib.cfg.Sections;
     
     if(getByIndex)
         if(rawMethod>0&&rawMethod<=length(rawMethods))
@@ -71,8 +68,8 @@ if(pf2_base.isnestedfield(PF2,'myRawMethods.cfg.Sections')&&~isempty(PF2.myRawMe
         end
     end
     
-    if(ismember(rawMethod,rawMethods)&&~isempty(PF2.myRawMethods.cfg.(rawMethod)))
-        rawMethodCfg=PF2.myRawMethods.cfg.(rawMethod);
+    if(ismember(rawMethod,rawMethods)&&~isempty(methodsLib.cfg.(rawMethod)))
+        rawMethodCfg=methodsLib.cfg.(rawMethod);
     else
        error('Unable to find current Raw Method name %s',rawMethod); 
     end

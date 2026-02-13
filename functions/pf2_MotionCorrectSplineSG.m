@@ -149,8 +149,15 @@ for ch = 1:nCh
 
         sgFit = sgolayfilt(yFill, effOrder, effFrame);
 
-        % Subtract SG fit and anchor to pre-artifact level
-        preLevel = signal(iStart);
+        % Subtract SG fit and anchor to pre-artifact boundary mean
+        preWin = max(1, iStart - max(1, round(sample_rate)));
+        preSamples = signal(preWin:iStart-1);
+        preSamples = preSamples(~isnan(preSamples));
+        if isempty(preSamples)
+            preLevel = signal(iStart);
+        else
+            preLevel = mean(preSamples);
+        end
         dodCorrected(iStart:iEnd, ch) = signal(iStart:iEnd) - sgFit + preLevel;
     end
 end

@@ -48,17 +48,25 @@ function y = detrend_3rd_order(x,fs)
 % See also: detrend, detrend_nan, pf2_hpf
 
 order = 3;
+y = zeros(size(x));
 for i = 1:size(x,2)
     signal = x(:,i);
+    kp = find(~isnan(signal));
+    if length(kp) < order + 1
+        % Not enough points to fit polynomial; return original
+        y(:,i) = signal;
+        continue;
+    end
     X=(1:length(signal))'/fs;
     XM=ones(length(X),order+1);
     for pn=1:order
         CX=X.^pn;
         XM(:,pn+1)=(CX-mean(CX))/std(CX);
     end
-    w=warning('off','all');
-    rem_trend = XM*(pinv(XM)*signal);
-    signal=signal-rem_trend;
+    % Fit only to non-NaN samples, evaluate trend at all time points
+    w=warning('off','MATLAB:rankDeficientMatrix');
+    coeffs = pinv(XM(kp,:))*signal(kp);
     warning(w);
-    y(:,i) = signal;%+x(1,i);
+    rem_trend = XM*coeffs;
+    y(:,i) = signal - rem_trend;
 end

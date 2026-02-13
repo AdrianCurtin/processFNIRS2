@@ -63,18 +63,18 @@ end
 [M,N]=size(data);
 
 %-----------------------------------------------------------------
-% Band-pass Filter design
+% Band-pass Filter design (ZPK -> SOS for numerical stability)
 %-----------------------------------------------------------------
 half_fs = fs/2;    %half of sampling freq. equal to pi
 
-[A,B,C,D] = butter(filtOrder,[lowF highF]/half_fs);
+[z,p,k] = butter(filtOrder,[lowF highF]/half_fs);
 minLen=filtOrder*6;
 
 if size(data,1)<=minLen
     warning('Data length (%i) must be at least 3 * filter order',size(data,1));
     dataf=nan(size(data));
 else
-    sos = ss2sos(A,B,C,D);
+    sos = zp2sos(z,p,k);
 
 	switch(NaN_mode)
 		case 'Interpolate'
@@ -109,18 +109,4 @@ else
     end
 end
 
-end
-
-function dataf=nantolerant_filtfilt(b,a,data)
-    datamask=isnan(data)|isinf(data);
-
-    data(datamask)=nanmedian(data(:));
-    for i=1:size(data,2)
-       data(datamask(:,i),i)=nanmedian(data(:,i));
-    end
-    data(isnan(data))=0;
-
-    dataf=filtfilt(b,a,data);
-
-    dataf(datamask)=nan;
 end

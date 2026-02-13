@@ -1,4 +1,4 @@
-function removeFunction(methodName, position)
+function removeFunction(methodName, position, ctx)
 % REMOVEFUNCTION Remove a processing function from an oxy method by position
 %
 % Removes the function at the specified position from an existing oxy
@@ -27,21 +27,20 @@ validateattributes(methodName, {'char', 'string'}, {'scalartext'});
 validateattributes(position, {'numeric'}, {'scalar', 'positive', 'integer'});
 methodName = pf2_base.cleanNameForINI(methodName);
 
-% Initialize PF2 if needed
-global PF2
-if isempty(PF2) || ~isfield(PF2, 'myOxyMethods')
-    pf2_base.pf2_initialize();
-end
+if nargin < 3, ctx = []; end
+
+% Resolve methods library (uses Context if provided, otherwise global PF2)
+methodsLib = pf2_base.resolveMethodsLib('oxy', ctx);
 
 % Check method exists
-if ~ismember(methodName, PF2.myOxyMethods.cfg.Sections)
+if ~ismember(methodName, methodsLib.cfg.Sections)
     error('pf2:MethodNotFound', ...
         'Method ''%s'' not found. Use pf2.methods.oxy.list() to see available methods.', ...
         methodName);
 end
 
 % Get current method
-method = PF2.myOxyMethods.cfg.(methodName);
+method = methodsLib.cfg.(methodName);
 if ~isfield(method, 'F') || isempty(method.F)
     error('pf2:EmptyMethod', 'Method ''%s'' has no functions to remove.', methodName);
 end
@@ -68,14 +67,17 @@ for j = 1:length(method.F)
 end
 
 % Update config
-PF2.myOxyMethods.cfg.remove(methodName);
-PF2.myOxyMethods.cfg.add(methodName, packedMethod);
+methodsLib.cfg.remove(methodName);
+methodsLib.cfg.add(methodName, packedMethod);
 
 % Save to disk
-PF2.myOxyMethods.cfg.write();
+methodsLib.cfg.write();
 
 % Reload methods
-PF2.myOxyMethods = unpackMethodsLocal(PF2.myOxyMethods);
+methodsLib = unpackMethodsLocal(methodsLib);
+
+% Persist updated methods library back to context or global
+pf2_base.storeMethodsLib('oxy', methodsLib, ctx);
 
 fprintf('Removed %s from %s (was at position %d)\n', removedName, methodName, position);
 

@@ -1,23 +1,35 @@
 function [ dataf ] = pf2_bpf_fir( data,fs,lowF,highF,Nf,restoreMean,NaN_mode)
-
-% inputs ------------------------
-% data: data to be filtered
-% filtOrder: filter order
-% fs: sampling freq.
-% lowF: highpass cut-off frequency
-% highF: lowpass cutoff frequency
-% Nf: filter Length
-% restoreMean: add back in 0 frequency data
-% outputs -----------------------
-% dataf: filtered data
-%--------------------------------
-% Designs a bandpass FIR filter with the specified cut-off frequencies and
-% length. Filters the data columnwise.
+% PF2_BPF_FIR FIR band-pass filter for fNIRS signals
 %
-% References:
+% Designs and applies a zero-phase FIR band-pass filter using fir1 to
+% isolate a frequency band in fNIRS data. Removes both slow drifts (below
+% lowF) and high-frequency noise (above highF).
+%
+% Reference:
 %   Oppenheim, A. V. & Schafer, R. W. (2010). Discrete-Time Signal
 %   Processing, 3rd ed. Prentice Hall. ISBN: 978-0131988422
-%--------------------------------
+%
+% Syntax:
+%   dataf = pf2_bpf_fir(data, fs, lowF, highF, Nf)
+%   dataf = pf2_bpf_fir(data, fs, lowF, highF, Nf, restoreMean, NaN_mode)
+%
+% Inputs:
+%   data        - Input signal matrix [T x C] where T=samples, C=channels
+%   fs          - Sampling frequency in Hz
+%   lowF        - High-pass cutoff frequency in Hz (lower bound)
+%   highF       - Low-pass cutoff frequency in Hz (upper bound)
+%   Nf          - FIR filter length (typical: 20-100)
+%   restoreMean - Add mean back after filtering (default: false)
+%   NaN_mode    - NaN handling: 'Piecewise' (default), 'Interpolate', 'Leave'
+%
+% Outputs:
+%   dataf - Filtered signal matrix [T x C], same size as input
+%
+% Notes:
+%   - Data length must be at least 3*Nf samples; shorter data returns NaN
+%   - Uses zero-phase filtering (filtfilt) to avoid phase distortion
+%
+% See also: pf2_bpf_butter, pf2_lpf, pf2_hpf, fir1, filtfilt
 
 if(nargin<7)
    NaN_mode='Piecewise';

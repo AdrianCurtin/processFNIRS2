@@ -1,4 +1,4 @@
-function setMethod(oxy_method)
+function setMethod(oxy_method, ctx)
 % SETMETHOD Select the active oxy processing method for Stage 3 processing
 %
 % Sets the hemoglobin processing method used during Stage 3 of processFNIRS2.
@@ -37,6 +37,8 @@ function setMethod(oxy_method)
 %           pf2.methods.oxy.configureMethods, pf2.methods.raw.setMethod,
 %           processFNIRS2
 
+if nargin < 2, ctx = []; end
+
 if(nargin<1)
     fprintf(2,'No method provided, Please select a method\n');
 	pf2.methods.oxy();
@@ -45,13 +47,13 @@ if(nargin<1)
 end
 
 if(isnumeric(oxy_method)) % Lookup method based on index
-	global PF2
-	if(pf2_base.isnestedfield(PF2,'myOxyMethods.cfg.Sections'))
-        if(oxy_method<=length(PF2.myOxyMethods.cfg.Sections))
+	methodsLib = pf2_base.resolveMethodsLib('oxy', ctx);
+	if(isfield(methodsLib,'cfg')&&isfield(methodsLib.cfg,'Sections'))
+        if(oxy_method<=length(methodsLib.cfg.Sections))
             if(oxy_method==0)
                 oxy_method=1;
             end
-            oxy_method=PF2.myOxyMethods.cfg.Sections{oxy_method};
+            oxy_method=methodsLib.cfg.Sections{oxy_method};
         end
 	end
 	
