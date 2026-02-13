@@ -56,6 +56,7 @@ numBioM = length(bioM);
 
 % Plot
 cla(ax);
+pf2_base.gui.forceLightAxes(ax);
 
 for b = 1:numBioM
     if any(ismember(curConc, b))

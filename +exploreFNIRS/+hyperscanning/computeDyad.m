@@ -41,6 +41,17 @@ function result = computeDyad(dataA, dataB, varargin)
 %     .nSamples   - Number of time samples used
 %     .useROI     - Whether ROI mode was used
 %
+% References:
+%   Czeszumski, A., Ebers, S., Greshake Tzovaras, B., Gianotti, L. R. R.,
+%   Kosonogov, V., et al. (2020). Hyperscanning: A Valid Method to Study
+%   Neural Inter-brain Underpinnings of Social Interaction. Frontiers in
+%   Human Neuroscience, 14, 39. DOI: 10.3389/fnhum.2020.00039
+%
+%   Cui, X., Bryant, D. M. & Reiss, A. L. (2012). NIRS-based
+%   hyperscanning reveals increased interpersonal coherence in superior
+%   frontal cortex during cooperation. NeuroImage, 59(3), 2430-2437.
+%   DOI: 10.1016/j.neuroimage.2011.09.003
+%
 % See also: exploreFNIRS.hyperscanning.pairSubjects, exploreFNIRS.hyperscanning.computeGroup
 
     p = inputParser;

@@ -23,6 +23,13 @@ function applyLightTheme(fig)
     % --- Figure ---
     set(fig, 'Color', bgLight);
 
+    % --- Figure-level axes defaults (survive cla resets) ---
+    set(fig, 'defaultAxesColor',  bgWhite, ...
+             'defaultAxesXColor', fgBlack, ...
+             'defaultAxesYColor', fgBlack, ...
+             'defaultAxesZColor', fgBlack, ...
+             'defaultAxesColorOrder', get(groot, 'factoryAxesColorOrder'));
+
     % --- Panels ---
     panels = findall(fig, 'Type', 'uipanel');
     for i = 1:numel(panels)
@@ -68,5 +75,11 @@ function applyLightTheme(fig)
     for i = 1:numel(tables)
         set(tables(i), 'ForegroundColor', fgBlack, ...
                         'BackgroundColor', bgWhite);
+    end
+
+    % --- Axes (plot quadrants) ---
+    allAxes = findall(fig, 'Type', 'axes');
+    for i = 1:numel(allAxes)
+        pf2_base.gui.forceLightAxes(allAxes(i));
     end
 end

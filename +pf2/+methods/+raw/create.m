@@ -121,7 +121,7 @@ methodsLib.cfg.write();
 % The INI round-trip (cfg.write -> unpackMethodsLocal) loses nested struct
 % data in S1/S2/... fields. Calling unpackMethodsLocal also wipes F for
 % previously created methods whose S fields were already consumed.
-methodsLib.cfg.(methodName) = method;
+methodsLib.cfg.(methodName) = pf2_base.pf2_unpackMethod(method);
 
 % Write back to global/context
 pf2_base.storeMethodsLib('raw', methodsLib, ctx);

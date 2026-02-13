@@ -36,6 +36,12 @@ function pairs = pairSubjects(data, varargin)
 %   pairs = exploreFNIRS.hyperscanning.pairSubjects(data, ...
 %       'ManualPairs', {{1,2}, {3,4}, {5,6}});
 %
+% References:
+%   Czeszumski, A., Ebers, S., Greshake Tzovaras, B., Gianotti, L. R. R.,
+%   Kosonogov, V., et al. (2020). Hyperscanning: A Valid Method to Study
+%   Neural Inter-brain Underpinnings of Social Interaction. Frontiers in
+%   Human Neuroscience, 14, 39. DOI: 10.3389/fnhum.2020.00039
+%
 % See also: exploreFNIRS.hyperscanning.computeDyad, exploreFNIRS.hyperscanning.computeGroup
 
     p = inputParser;

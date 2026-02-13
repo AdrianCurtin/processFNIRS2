@@ -302,7 +302,7 @@ function fig = plotBar(groups, varargin)
                         % barweb positions categories at integer x values
                         si = plotByIdx(g);
                         xi = find(strcmp(uniqueWithin, withinLabels{g}), 1);
-                        xPos = xi;  % approximate center of group
+                        xPos = xi + bwHandles.bars(si).XOffset;
                     else
                         xPos = g;
                     end

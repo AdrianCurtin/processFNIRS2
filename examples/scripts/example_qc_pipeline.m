@@ -24,8 +24,9 @@
 % Requirements:
 %   - processFNIRS2 on path
 
-outDir = '/tmp/qc_pipeline_example';
-if ~exist(outDir, 'dir'), mkdir(outDir); end
+% Uncomment to save figures instead of displaying them:
+% outDir = '/tmp/qc_pipeline_example';
+% if ~exist(outDir, 'dir'), mkdir(outDir); end
 
 %% Section 1: Load sample data
 %
@@ -136,7 +137,7 @@ fprintf('  Mayer detected: %d/%d channels\n\n', ...
     sum(psdResult_1200.mayer.detected), numel(psdResult_1200.channels));
 
 % --- 3c. Visualize PSD comparison ---
-fig1 = figure('Visible', 'off', 'Position', [100, 100, 900, 400]);
+fig1 = figure('Position', [100, 100, 900, 400]);
 
 subplot(1,2,1);
 plot(psdResult_2000.freqs, 10*log10(psdResult_2000.psd(:,1)), 'b-', 'LineWidth', 1.2);
@@ -153,9 +154,8 @@ xline(0.5, '--r', 'Cardiac band', 'LabelOrientation', 'horizontal');
 xlim([0, 1]);
 
 sgtitle('PSD Comparison: 10 Hz vs 2 Hz Sampling');
-saveas(fig1, fullfile(outDir, 'psd_comparison.png'));
-close(fig1);
-fprintf('Saved PSD comparison to %s\n\n', fullfile(outDir, 'psd_comparison.png'));
+% saveas(fig1, fullfile(outDir, 'psd_comparison.png'));
+% close(fig1);
 
 %% Section 4: Coefficient of Variation (CoV)
 %
@@ -338,30 +338,32 @@ fprintf('Section 8: Visualization\n');
 fprintf('========================================\n\n');
 
 % --- 8a. Full dashboard — 10 Hz device ---
-fig2 = pf2.qc.pipeline.plotReport(report_2000, 'Visible', 'off', ...
-    'Title', 'fNIR 2000 (10 Hz)', ...
-    'SavePath', fullfile(outDir, 'qc_dashboard_10hz.png'));
-close(fig2);
-fprintf('Saved 10 Hz dashboard to %s\n', fullfile(outDir, 'qc_dashboard_10hz.png'));
+fig2 = pf2.qc.pipeline.plotReport(report_2000, ...
+    'Title', 'fNIR 2000 (10 Hz)');
+% fig2 = pf2.qc.pipeline.plotReport(report_2000, 'Visible', 'off', ...
+%     'Title', 'fNIR 2000 (10 Hz)', ...
+%     'SavePath', fullfile(outDir, 'qc_dashboard_10hz.png'));
+% close(fig2);
 
 % --- 8b. Full dashboard — 2 Hz device ---
-fig3 = pf2.qc.pipeline.plotReport(report_1200, 'Visible', 'off', ...
-    'Title', 'fNIR 1200 (2 Hz)', ...
-    'SavePath', fullfile(outDir, 'qc_dashboard_2hz.png'));
-close(fig3);
-fprintf('Saved 2 Hz dashboard to %s\n', fullfile(outDir, 'qc_dashboard_2hz.png'));
+fig3 = pf2.qc.pipeline.plotReport(report_1200, ...
+    'Title', 'fNIR 1200 (2 Hz)');
+% fig3 = pf2.qc.pipeline.plotReport(report_1200, 'Visible', 'off', ...
+%     'Title', 'fNIR 1200 (2 Hz)', ...
+%     'SavePath', fullfile(outDir, 'qc_dashboard_2hz.png'));
+% close(fig3);
 
 % --- 8c. Individual SCI bar chart ---
-fig4 = pf2.qc.plotQuality(data_2000, 'Type', 'sci', 'Visible', 'off');
-saveas(fig4, fullfile(outDir, 'sci_barchart.png'));
-close(fig4);
-fprintf('Saved SCI bar chart to %s\n', fullfile(outDir, 'sci_barchart.png'));
+fig4 = pf2.qc.plotQuality(data_2000, 'Type', 'sci');
+% fig4 = pf2.qc.plotQuality(data_2000, 'Type', 'sci', 'Visible', 'off');
+% saveas(fig4, fullfile(outDir, 'sci_barchart.png'));
+% close(fig4);
 
 % --- 8d. PSD overlay plot ---
-fig5 = pf2.qc.plotQuality(data_2000, 'Type', 'psd', 'Visible', 'off');
-saveas(fig5, fullfile(outDir, 'psd_overlay.png'));
-close(fig5);
-fprintf('Saved PSD overlay to %s\n', fullfile(outDir, 'psd_overlay.png'));
+fig5 = pf2.qc.plotQuality(data_2000, 'Type', 'psd');
+% fig5 = pf2.qc.plotQuality(data_2000, 'Type', 'psd', 'Visible', 'off');
+% saveas(fig5, fullfile(outDir, 'psd_overlay.png'));
+% close(fig5);
 
 %% Section 9: Customizing for Your Experiment
 %
@@ -439,4 +441,3 @@ fprintf('5. QC report stored: data.qcReport.checkNames = %s\n', ...
     strjoin(raw.qcReport.checkNames, ', '));
 
 fprintf('\n=== QC Pipeline Tutorial Complete ===\n');
-fprintf('Output saved to: %s\n', outDir);

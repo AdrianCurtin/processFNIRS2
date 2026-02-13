@@ -18,8 +18,9 @@
 %   - processFNIRS2 on path
 %   - Sample data available via pf2.import.sampleData.fNIR2000()
 
-outDir = '/tmp/glm_advanced';
-if ~exist(outDir, 'dir'), mkdir(outDir); end
+% Uncomment to save figures instead of displaying them:
+% outDir = '/tmp/glm_advanced';
+% if ~exist(outDir, 'dir'), mkdir(outDir); end
 
 %% Step 1: Generate synthetic continuous recordings
 %
@@ -155,24 +156,22 @@ ex.groupby({'Condition'});
 ex.aggregate();
 
 fig = ex.plotBar('Biomarker', 'HbO', 'Channels', 1:4, ...
-    'ShowIndividual', true, ...
-    'Visible', 'off', 'SavePath', fullfile(outDir, 'step5_manual_bar.png'));
-close(fig);
-fprintf('  Saved manual bar chart\n');
+    'ShowIndividual', true);
+% fig = ex.plotBar('Biomarker', 'HbO', 'Channels', 1:4, ...
+%     'ShowIndividual', true, ...
+%     'Visible', 'off', 'SavePath', fullfile(outDir, 'step5_manual_bar.png'));
+% close(fig);
 
 % Topographic LME: F-statistics on 3D brain surface
 [fig, topoResults] = ex.plotTopoLME('Biomarkers', {'HbO'}, ...
     'SigType', 'p', 'SigThreshold', 0.05, ...
-    'ShowIntercept', false, ...
-    'Visible', 'off', 'SavePath', fullfile(outDir, 'step5_topo_lme.png'));
-if ~isempty(fig), close(fig); end
-fprintf('  Saved topographic LME figure\n');
+    'ShowIntercept', false);
+% [fig, topoResults] = ex.plotTopoLME('Biomarkers', {'HbO'}, ...
+%     'SigType', 'p', 'SigThreshold', 0.05, ...
+%     'ShowIntercept', false, ...
+%     'Visible', 'off', 'SavePath', fullfile(outDir, 'step5_topo_lme.png'));
+% if ~isempty(fig), close(fig); end
 
 %% Summary
 
 fprintf('\n=== Advanced GLM tutorial complete ===\n');
-fprintf('Output files in: %s\n', outDir);
-d = dir(fullfile(outDir, 'step*'));
-for i = 1:length(d)
-    fprintf('  %s (%.1f KB)\n', d(i).name, d(i).bytes/1024);
-end

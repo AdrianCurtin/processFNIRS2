@@ -95,7 +95,7 @@ ex.settings.baseline     = [-5, 0];
 ex.settings.taskStart    = 0;
 ex.settings.taskEnd      = 30;
 ex.settings.resampleRate = 1;
-ex.settings.barBinSize   = 10;
+ex.settings.barBinSize   = 0;
 ex.settings.useBaseline  = true;
 ex.settings.avgMode      = 'hierarchy';
 
@@ -388,8 +388,13 @@ fprintf('  Created 5 heatmaps\n');
 %  ========================================================================
 %
 %  plotTopo shows spatial patterns of activation on a 2D probe layout.
+%  When called through the Experiment wrapper, the Device is auto-injected
+%  so channels are positioned according to the probe geometry and
+%  short-separation channels are excluded.
+%
 %  Key options:
 %
+%    Device        - pf2.Device for probe layout (auto-injected by Experiment)
 %    Time          - single time-point snapshot
 %    TimeWindow    - [start, end] to average over
 %    Layout        - 'single' (average all groups) or 'pergroup'
@@ -481,14 +486,12 @@ ex.aggregate();
 
 % --- 7e: 3D Brain topo of F-statistics ---
 [fig, results] = ex.plotTopoLME('Biomarkers', {'HbO'}, ...
-    'SigThreshold', 0.10, ...
-    'Title', '7e: Topo LME (F-statistic)');
+    'SigThreshold', 0.10);
 
 % --- 7f: Topo using -log10(p) instead of F ---
 [fig, results] = ex.plotTopoLME('Biomarkers', {'HbO'}, ...
     'PlotMetric', 'p', ...
-    'SigThreshold', 0.10, ...
-    'Title', '7f: Topo LME (-log10 p)');
+    'SigThreshold', 0.10);
 
 % --- 7g: Accessing the results struct ---
 % The results struct contains all the statistical details:
@@ -717,11 +720,12 @@ fprintf('  SortChannels = ''index'' | ''amplitude''      Channel order\n');
 fprintf('  Colormap     = ''RdBu'', ''viridis'', etc.    Color palette\n');
 fprintf('  CLim         = [min, max]                  Color limits\n\n');
 
-fprintf('plotTopo:\n');
+fprintf('plotTopo (auto-uses probe layout, excludes short-sep):\n');
 fprintf('  Time          = 15                         Time snapshot\n');
 fprintf('  TimeWindow    = [10, 25]                   Average window\n');
 fprintf('  Layout        = ''single'' | ''pergroup''     Group display\n');
-fprintf('  Interpolation = ''none'' | ''natural''        Smoothing\n\n');
+fprintf('  Interpolation = ''none'' | ''natural''        Smoothing\n');
+fprintf('  Device        = dev                        Probe layout (auto-injected)\n\n');
 
 fprintf('plotLME / plotTopoLME:\n');
 fprintf('  SigThreshold = 0.05                        Alpha level\n');

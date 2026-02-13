@@ -33,16 +33,6 @@ if isfield(pInfo, 'rawMethod') && ~isempty(pInfo.rawMethod) && ~strcmpi(pInfo.ra
     titleParts{end+1} = pInfo.rawMethod;
 end
 
-% DPF mode
-if isfield(pInfo, 'dpfMode')
-    if strcmpi(pInfo.dpfMode, 'Calc') && isfield(pInfo, 'subjectAge')
-        titleParts{end+1} = sprintf('DPF(age=%d)', pInfo.subjectAge);
-    elseif strcmpi(pInfo.dpfMode, 'Fixed') && isfield(pInfo, 'dpfValue')
-        titleParts{end+1} = sprintf('DPF=%.2f', pInfo.dpfValue);
-    elseif strcmpi(pInfo.dpfMode, 'None')
-        titleParts{end+1} = 'No DPF';
-    end
-end
 
 if ~isempty(titleParts)
     pf2_base.external.suptitle(fig, strjoin(titleParts, ' | '));

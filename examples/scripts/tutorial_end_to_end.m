@@ -20,8 +20,10 @@
 %   - Sample data: pf2.import.sampleData.fNIR2000()
 
 cd('/Users/adriancurtin/Documents/GitHub/processFNIRS2');
-outDir = fullfile(tempdir, 'pf2_tutorial');
-if ~exist(outDir, 'dir'), mkdir(outDir); end
+
+% Uncomment to save figures and exports to disk:
+% outDir = fullfile(tempdir, 'pf2_tutorial');
+% if ~exist(outDir, 'dir'), mkdir(outDir); end
 
 %% ========================================================================
 %  PART 1: IMPORT
@@ -218,18 +220,21 @@ ex.aggregate();
 
 % --- A2: Temporal plot ---
 fig = ex.plotTemporal('Biomarkers', {'HbO', 'HbR'}, 'Channels', 1:5, ...
-    'Title', 'TaskA vs TaskB: HbO & HbR', ...
-    'Visible', 'off', 'SavePath', fullfile(outDir, 'temporal.png'));
-close(fig);
-fprintf('  Saved temporal plot\n');
+    'Title', 'TaskA vs TaskB: HbO & HbR');
+% fig = ex.plotTemporal('Biomarkers', {'HbO', 'HbR'}, 'Channels', 1:5, ...
+%     'Title', 'TaskA vs TaskB: HbO & HbR', ...
+%     'Visible', 'off', 'SavePath', fullfile(outDir, 'temporal.png'));
+% close(fig);
 
 % --- A3: Bar chart ---
 fig = ex.plotBar('Biomarker', 'HbO', 'Channels', 1:5, ...
     'TimeWindow', [5, 25], 'ShowIndividual', true, ...
-    'Title', 'Mean HbO (5-25s)', ...
-    'Visible', 'off', 'SavePath', fullfile(outDir, 'bar.png'));
-close(fig);
-fprintf('  Saved bar chart\n');
+    'Title', 'Mean HbO (5-25s)');
+% fig = ex.plotBar('Biomarker', 'HbO', 'Channels', 1:5, ...
+%     'TimeWindow', [5, 25], 'ShowIndividual', true, ...
+%     'Title', 'Mean HbO (5-25s)', ...
+%     'Visible', 'off', 'SavePath', fullfile(outDir, 'bar.png'));
+% close(fig);
 
 % --- A4: LME statistics ---
 results = ex.statsFitLME('Biomarkers', {'HbO'}, 'Channels', 1:5);
@@ -250,10 +255,12 @@ ex.aggregate();
 
 fig = ex.plotBar('Biomarker', 'HbO', 'Channels', 1:5, ...
     'TimeWindow', [5, 25], 'ShowIndividual', true, ...
-    'Title', 'Group x Condition: HbO', ...
-    'Visible', 'off', 'SavePath', fullfile(outDir, 'bar_group_x_cond.png'));
-close(fig);
-fprintf('  Saved Group x Condition bar chart\n');
+    'Title', 'Group x Condition: HbO');
+% fig = ex.plotBar('Biomarker', 'HbO', 'Channels', 1:5, ...
+%     'TimeWindow', [5, 25], 'ShowIndividual', true, ...
+%     'Title', 'Group x Condition: HbO', ...
+%     'Visible', 'off', 'SavePath', fullfile(outDir, 'bar_group_x_cond.png'));
+% close(fig);
 
 %% ========================================================================
 %  PATH B: EXPORT DATA
@@ -268,16 +275,16 @@ ex.groupby({'Group', 'Condition'});
 ex.aggregate();
 
 % --- B1: Export to CSV (long format, for R / Python / SPSS) ---
-ex.writeCSV(fullfile(outDir, 'export_long.csv'), ...
-    'Format', 'long', ...
-    'Biomarkers', {'HbO', 'HbR'}, ...
-    'Channels', 1:10);
+% ex.writeCSV(fullfile(outDir, 'export_long.csv'), ...
+%     'Format', 'long', ...
+%     'Biomarkers', {'HbO', 'HbR'}, ...
+%     'Channels', 1:10);
 
 % --- B2: Export to CSV (wide format) ---
-ex.writeCSV(fullfile(outDir, 'export_wide.csv'), ...
-    'Format', 'wide', ...
-    'Biomarkers', {'HbO'}, ...
-    'Channels', 1:10);
+% ex.writeCSV(fullfile(outDir, 'export_wide.csv'), ...
+%     'Format', 'wide', ...
+%     'Biomarkers', {'HbO'}, ...
+%     'Channels', 1:10);
 
 % --- B3: Get as MATLAB table (for further scripting) ---
 T = ex.toLongTable({'HbO', 'HbR'}, 1:5);
@@ -285,17 +292,17 @@ fprintf('  MATLAB table: %d rows x %d columns\n', height(T), width(T));
 fprintf('  Columns: %s\n', strjoin(T.Properties.VariableNames, ', '));
 
 % --- B4: Save MATLAB table to .mat ---
-save(fullfile(outDir, 'results_table.mat'), 'T');
-fprintf('  Saved MATLAB table to results_table.mat\n');
+% save(fullfile(outDir, 'results_table.mat'), 'T');
+% fprintf('  Saved MATLAB table to results_table.mat\n');
 
 % --- B5: Batch export fNIRS structs to SNIRF files ---
 %  Use asSNIRF or asNIR with a cell array and a directory path.
 %  Dir1-Dir4 map .info field values to subdirectories (inverse of importDirectory).
 %  Prefix builds filenames from .info field values.
-snirfOutDir = fullfile(outDir, 'snirf_export');
-pf2.export.asSNIRF(allSegments, snirfOutDir, ...
-    'Dir1', 'Group', 'Prefix', {'SubjectID', 'Condition'});
-fprintf('  Batch exported %d segments to %s\n', length(allSegments), snirfOutDir);
+% snirfOutDir = fullfile(outDir, 'snirf_export');
+% pf2.export.asSNIRF(allSegments, snirfOutDir, ...
+%     'Dir1', 'Group', 'Prefix', {'SubjectID', 'Condition'});
+% fprintf('  Batch exported %d segments to %s\n', length(allSegments), snirfOutDir);
 
 %% ========================================================================
 %  PATH C: OPEN THE GUI
@@ -320,12 +327,6 @@ fprintf('  Settings will be pre-loaded from the Experiment object.\n');
 %  ========================================================================
 
 fprintf('\n=== Tutorial complete ===\n');
-fprintf('Output files in: %s\n', outDir);
-d = dir(fullfile(outDir, '*'));
-d = d(~[d.isdir]);
-for i = 1:length(d)
-    fprintf('  %s (%.1f KB)\n', d(i).name, d(i).bytes/1024);
-end
 
 fprintf('\nPipeline recap:\n');
 fprintf('  1. pf2.import.*()                    → raw fNIRS struct\n');

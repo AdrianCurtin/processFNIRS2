@@ -897,6 +897,10 @@ classdef Experiment < handle
         % Requires groupby() to have been called first.
         %
         % Name-Value Parameters:
+        %   Averaging      - 'hierarchy' (default), 'flat', or 'none'
+        %                    'hierarchy' averages within SubjectID first
+        %                    'flat' uses raw values directly
+        %                    'none' same as flat (raw block-level data)
         %   ErrorType      - 'SEM' (default), 'SD', or 'none'
         %   ShowIndividual - Show individual data points (default: true)
         %   Title          - Figure title (default: auto)
@@ -916,6 +920,7 @@ classdef Experiment < handle
 
             p = inputParser;
             addRequired(p, 'varName', @ischar);
+            addParameter(p, 'Averaging', 'hierarchy', @(x) ismember(lower(x), {'hierarchy','flat','none'}));
             addParameter(p, 'ErrorType', 'SEM', @ischar);
             addParameter(p, 'ShowIndividual', true, @islogical);
             addParameter(p, 'Title', '', @ischar);
@@ -978,7 +983,13 @@ classdef Experiment < handle
             individualData = cell(1, nGroups);
 
             for g = 1:nGroups
-                vals = obj.groups(g).gbyTables.(varName);
+                gTable = obj.groups(g).gbyTables;
+                vals = gTable.(varName);
+                if strcmpi(opts.Averaging, 'hierarchy') && ...
+                        ismember('SubjectID', gTable.Properties.VariableNames)
+                    vals = pf2_base.hierarchicalAverage(vals, ...
+                        gTable(:, 'SubjectID'), @nanmean);
+                end
                 vals = vals(~isnan(vals));
                 individualData{g} = vals;
                 groupN(g) = length(vals);
@@ -1098,6 +1109,10 @@ classdef Experiment < handle
         % called, points are colored by group. Does NOT require aggregate().
         %
         % Name-Value Parameters:
+        %   Averaging  - 'hierarchy' (default), 'flat', or 'none'
+        %                'hierarchy' averages within SubjectID first
+        %                'flat' uses raw values directly
+        %                'none' same as flat (raw block-level data)
         %   FitLine    - Add linear fit per group (default: false)
         %   Title      - Figure title (default: auto)
         %   XLabel     - X-axis label (default: xVar)
@@ -1114,6 +1129,7 @@ classdef Experiment < handle
             p = inputParser;
             addRequired(p, 'xVar', @ischar);
             addRequired(p, 'yVar', @ischar);
+            addParameter(p, 'Averaging', 'hierarchy', @(x) ismember(lower(x), {'hierarchy','flat','none'}));
             addParameter(p, 'FitLine', false, @islogical);
             addParameter(p, 'ErrorBand', false, @islogical);
             addParameter(p, 'Title', '', @ischar);
@@ -1175,9 +1191,10 @@ classdef Experiment < handle
             xData = selTable.(xVar);
             yData = selTable.(yVar);
 
-            fig = figure('Visible', opts.Visible, ...
-                'Position', [100, 100, opts.SaveWidth, opts.SaveHeight], ...
-                'Color', 'w');
+            fig = pf2_base.plot.createFigure('Visible', opts.Visible, ...
+                'Width', opts.SaveWidth, 'Height', opts.SaveHeight, ...
+                'SavePath', opts.SavePath);
+            sty = pf2_base.plot.PlotStyle.getDefault();
             ax = axes('Parent', fig);
             hold(ax, 'on');
 
@@ -1196,6 +1213,16 @@ classdef Experiment < handle
                     gTable = obj.groups(g).gbyTables;
                     gx = gTable.(xVar);
                     gy = gTable.(yVar);
+
+                    % Apply averaging
+                    if strcmpi(opts.Averaging, 'hierarchy') && ...
+                            ismember('SubjectID', gTable.Properties.VariableNames)
+                        gx = pf2_base.hierarchicalAverage(gx, ...
+                            gTable(:, 'SubjectID'), @nanmean);
+                        gy = pf2_base.hierarchicalAverage(gy, ...
+                            gTable(:, 'SubjectID'), @nanmean);
+                    end
+
                     valid = ~isnan(gx) & ~isnan(gy);
                     gx = gx(valid);
                     gy = gy(valid);
@@ -1223,10 +1250,7 @@ classdef Experiment < handle
                     end
                 end
 
-                lg = legend(ax, legendHandles, legendLabels, 'Location', 'best');
-                lg.TextColor = 'k';
-                lg.Color = 'w';
-                lg.EdgeColor = [0.5 0.5 0.5];
+                legend(ax, legendHandles, legendLabels, 'Location', 'best');
             else
                 % No grouping - single color
                 if isa(opts.Colors, 'exploreFNIRS.core.ColorScheme')
@@ -1234,13 +1258,24 @@ classdef Experiment < handle
                 else
                     singleColor = exploreFNIRS.core.getGroupColors(1, opts.Colors);
                 end
-                valid = ~isnan(xData) & ~isnan(yData);
-                scatter(ax, xData(valid), yData(valid), opts.MarkerSize, ...
+                % Apply averaging
+                xPlot = xData;
+                yPlot = yData;
+                if strcmpi(opts.Averaging, 'hierarchy') && ...
+                        ismember('SubjectID', selTable.Properties.VariableNames)
+                    xPlot = pf2_base.hierarchicalAverage(xData, ...
+                        selTable(:, 'SubjectID'), @nanmean);
+                    yPlot = pf2_base.hierarchicalAverage(yData, ...
+                        selTable(:, 'SubjectID'), @nanmean);
+                end
+
+                valid = ~isnan(xPlot) & ~isnan(yPlot);
+                scatter(ax, xPlot(valid), yPlot(valid), opts.MarkerSize, ...
                     singleColor, 'filled', 'MarkerFaceAlpha', 0.7);
 
                 if opts.FitLine && sum(valid) >= 2
-                    xv = xData(valid);
-                    yv = yData(valid);
+                    xv = xPlot(valid);
+                    yv = yPlot(valid);
                     coeffs = polyfit(xv, yv, 1);
                     xFit = linspace(min(xv), max(xv), 50);
                     yFit = polyval(coeffs, xFit);
@@ -1273,16 +1308,8 @@ classdef Experiment < handle
             box(ax, 'on');
             grid(ax, 'on');
 
-            if ~isempty(opts.SavePath)
-                if ~isempty(which('pf2_base.plot.saveFigure'))
-                    pf2_base.plot.saveFigure(fig, opts.SavePath, ...
-                        opts.SaveWidth, opts.SaveHeight, opts.SaveDPI);
-                else
-                    set(fig, 'PaperPositionMode', 'auto');
-                    print(fig, opts.SavePath, '-dpng', sprintf('-r%d', opts.SaveDPI));
-                end
-                fprintf('Saved: %s\n', opts.SavePath);
-            end
+            sty.applyToFigure(fig);
+            pf2_base.plot.handleSave(fig, opts);
         end
 
 
@@ -2092,6 +2119,13 @@ classdef Experiment < handle
                     'Call aggregate() before plotting');
             end
             varargin = obj.injectColorScheme(varargin);
+            % Inject Device from data if not explicitly provided
+            if ~any(strcmpi(varargin(1:2:end), 'Device'))
+                dev = obj.resolveDevice();
+                if ~isempty(dev)
+                    varargin = [varargin, {'Device', dev}];
+                end
+            end
             fig = exploreFNIRS.core.plotTopo(obj.groups, varargin{:});
         end
 
@@ -2126,6 +2160,18 @@ classdef Experiment < handle
             if ~obj.isAggregated
                 error('exploreFNIRS:core:Experiment:plotComposite', ...
                     'Call aggregate() before plotting');
+            end
+            % Inject Device into topo panels that don't already have one
+            dev = obj.resolveDevice();
+            if ~isempty(dev)
+                for pi = 1:length(panels)
+                    if strcmpi(panels{pi}.type, 'topo') && isfield(panels{pi}, 'args')
+                        pArgs = panels{pi}.args;
+                        if ~any(strcmpi(pArgs(1:2:end), 'Device'))
+                            panels{pi}.args = [pArgs, {'Device', dev}];
+                        end
+                    end
+                end
             end
             fig = exploreFNIRS.core.plotComposite(obj.groups, panels, varargin{:});
         end
@@ -2274,6 +2320,16 @@ classdef Experiment < handle
         function vars = getGroupByVars(obj)
         % GETGROUPBYVARS Return current groupby variable names
             vars = obj.groupByVars;
+        end
+
+
+        function dev = resolveDevice(obj)
+        % RESOLVEDEVICE Extract Device from first data element
+            dev = [];
+            if ~isempty(obj.data) && isfield(obj.data{1}, 'device') ...
+                    && isa(obj.data{1}.device, 'pf2.Device')
+                dev = obj.data{1}.device;
+            end
         end
 
 

@@ -18,6 +18,7 @@
 %   - processFNIRS2 on path
 %   - Sample data available via pf2.import.sampleData.fNIR2000()
 
+% outDir is needed for behavioral CSV creation (part of the workflow)
 outDir = '/tmp/import_blocks_example';
 if ~exist(outDir, 'dir'), mkdir(outDir); end
 
@@ -248,9 +249,10 @@ ex.settings.resampleRate = 1;
 ex.settings.useBaseline = true;
 
 % Visualize settings
-fig = ex.plotExperimentTimeline('Visible', 'off', ...
-    'SavePath', fullfile(outDir, 'timeline.png'));
-close(fig);
+fig = ex.plotExperimentTimeline();
+% fig = ex.plotExperimentTimeline('Visible', 'off', ...
+%     'SavePath', fullfile(outDir, 'timeline.png'));
+% close(fig);
 
 % Aggregate and plot
 ex.aggregate();
@@ -259,23 +261,32 @@ ex.summary();
 % Temporal plot
 fig = ex.plotTemporal('Biomarkers', {'HbO'}, 'Channels', 1:2, ...
     'ErrorType', 'SEM', ...
-    'Title', 'Group x Condition: HbO', ...
-    'Visible', 'off', 'SavePath', fullfile(outDir, 'temporal.png'));
-close(fig);
+    'Title', 'Group x Condition: HbO');
+% fig = ex.plotTemporal('Biomarkers', {'HbO'}, 'Channels', 1:2, ...
+%     'ErrorType', 'SEM', ...
+%     'Title', 'Group x Condition: HbO', ...
+%     'Visible', 'off', 'SavePath', fullfile(outDir, 'temporal.png'));
+% close(fig);
 
 % Bar chart
 fig = ex.plotBar('Biomarker', 'HbO', 'Channels', 1:2, ...
     'PlotBy', 'Condition', 'ShowIndividual', true, ...
-    'Title', 'Group x Condition: Mean HbO', ...
-    'Visible', 'off', 'SavePath', fullfile(outDir, 'bar.png'));
-close(fig);
+    'Title', 'Group x Condition: Mean HbO');
+% fig = ex.plotBar('Biomarker', 'HbO', 'Channels', 1:2, ...
+%     'PlotBy', 'Condition', 'ShowIndividual', true, ...
+%     'Title', 'Group x Condition: Mean HbO', ...
+%     'Visible', 'off', 'SavePath', fullfile(outDir, 'bar.png'));
+% close(fig);
 
 % Behavioral bar (no aggregate needed for info variables)
 fig = ex.plotInfoBar('reactionTime', ...
     'YLabel', 'RT (ms)', ...
-    'Title', 'Reaction Time by Group x Condition', ...
-    'Visible', 'off', 'SavePath', fullfile(outDir, 'rt_bar.png'));
-close(fig);
+    'Title', 'Reaction Time by Group x Condition');
+% fig = ex.plotInfoBar('reactionTime', ...
+%     'YLabel', 'RT (ms)', ...
+%     'Title', 'Reaction Time by Group x Condition', ...
+%     'Visible', 'off', 'SavePath', fullfile(outDir, 'rt_bar.png'));
+% close(fig);
 
 fprintf('\n');
 
@@ -288,21 +299,15 @@ fprintf('\n');
 fprintf('=== Step 7: Export ===\n');
 
 longT = ex.toLongTable({'HbO', 'HbR'}, 1:3);
-writetable(longT, fullfile(outDir, 'results_long.csv'));
 fprintf('Long table: %d rows x %d cols\n', height(longT), width(longT));
 fprintf('Columns: %s\n', strjoin(longT.Properties.VariableNames, ', '));
+% writetable(longT, fullfile(outDir, 'results_long.csv'));
 
 % Also export info table (behavioral data only)
 infoT = ex.infoTable();
-writetable(infoT, fullfile(outDir, 'info_table.csv'));
 fprintf('Info table: %d rows x %d cols\n', height(infoT), width(infoT));
+% writetable(infoT, fullfile(outDir, 'info_table.csv'));
 
 
 %% Summary
 fprintf('\n=== All steps complete ===\n');
-fprintf('Output files in: %s\n', outDir);
-d = dir(fullfile(outDir, '*'));
-d = d(~[d.isdir]);
-for i = 1:length(d)
-    fprintf('  %s (%.1f KB)\n', d(i).name, d(i).bytes/1024);
-end

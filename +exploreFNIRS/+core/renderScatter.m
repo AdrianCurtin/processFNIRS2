@@ -16,7 +16,7 @@ function [legendHandles, legendEntries, stats] = renderScatter(ax, groups, group
 %   biomarker - Biomarker field name (e.g., 'HbO')
 %   channels  - Channel indices to average over
 %   infoVar   - Name of the info variable for X-axis
-%   opts      - Struct with fields: FitLine, CorrType
+%   opts      - Struct with fields: FitLine, CorrType, Averaging
 %
 % Outputs:
 %   legendHandles - Array of scatter handles for legend
@@ -93,8 +93,11 @@ function [legendHandles, legendEntries, stats] = renderScatter(ax, groups, group
         if ~isnumeric(xData), xData = double(string(xData)); end
         xData(xData == -9999) = NaN;
 
-        % Average per subject
-        if ismember('SubjectID', curTable.Properties.VariableNames)
+        % Apply averaging to X values
+        avgMode = 'hierarchy';
+        if isfield(opts, 'Averaging'), avgMode = opts.Averaging; end
+        if strcmpi(avgMode, 'hierarchy') && ...
+                ismember('SubjectID', curTable.Properties.VariableNames)
             xVals = pf2_base.hierarchicalAverage(xData, curTable(:, 'SubjectID'), @nanmean);
         else
             xVals = xData;

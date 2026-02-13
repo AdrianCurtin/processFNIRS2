@@ -19,6 +19,9 @@ function [fig, stats] = plotAuxScatter(groups, auxField, varargin)
 % Name-Value Parameters:
 %   InfoVar        - (required) X-axis variable name from info fields
 %   AuxChannels    - Vector of Aux channel indices (default: all)
+%   Averaging      - 'hierarchy' (default), 'flat', or 'none'
+%                    'hierarchy' averages within SubjectID first
+%                    'flat'/'none' uses raw block-level data
 %   CorrType       - 'Pearson' (default) or 'Spearman'
 %   FitLine        - Show regression line (default: true)
 %   ErrorBand      - Show error band (default: false)
@@ -60,6 +63,7 @@ function [fig, stats] = plotAuxScatter(groups, auxField, varargin)
     addRequired(p, 'auxField', @ischar);
     addParameter(p, 'InfoVar', '', @ischar);
     addParameter(p, 'AuxChannels', [], @isnumeric);
+    addParameter(p, 'Averaging', 'hierarchy', @(x) ismember(lower(x), {'hierarchy','flat','none'}));
     addParameter(p, 'CorrType', 'Pearson', @ischar);
     addParameter(p, 'FitLine', true, @islogical);
     addParameter(p, 'ErrorBand', false, @islogical);
@@ -328,12 +332,13 @@ function curStats = plotGroupAuxScatter(ax, group, auxField, ch, tIdx, opts, clr
     yVals = permute(auxData.data(tIdx, ch, :), [3, 1, 2]);
 
     % Hierarchical averaging of Y values
-    if isfield(curGrand, 'info') && isfield(curGrand.info, 'Hierarchy')
+    if strcmpi(opts.Averaging, 'hierarchy') && ...
+            isfield(curGrand, 'info') && isfield(curGrand.info, 'Hierarchy')
         [yVals, ~] = pf2_base.hierarchicalAverage(yVals, ...
             curGrand.info.Hierarchy, @nanmean);
     end
 
-    % Extract X: info variable from table, with hierarchical averaging
+    % Extract X: info variable from table
     if ~ismember(opts.InfoVar, curTable.Properties.VariableNames)
         warning('Variable "%s" not found in group table', opts.InfoVar);
         curStats = emptyStats();
@@ -346,8 +351,9 @@ function curStats = plotGroupAuxScatter(ax, group, auxField, ch, tIdx, opts, clr
     end
     xData(xData == -9999) = NaN;
 
-    % Hierarchical averaging of X values
-    if ismember('SubjectID', curTable.Properties.VariableNames)
+    % Apply averaging to X values
+    if strcmpi(opts.Averaging, 'hierarchy') && ...
+            ismember('SubjectID', curTable.Properties.VariableNames)
         [xVals] = pf2_base.hierarchicalAverage(xData, ...
             curTable(:, 'SubjectID'), @nanmean);
     else

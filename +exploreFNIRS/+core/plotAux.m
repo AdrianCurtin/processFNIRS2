@@ -132,9 +132,10 @@ function fig = plotAux(groups, auxField, varargin)
         figH = opts.SaveHeight;
     end
 
-    fig = figure('Visible', opts.Visible, ...
-        'Position', [100, 100, figW, figH], ...
-        'Color', 'w');
+    fig = pf2_base.plot.createFigure('Visible', opts.Visible, ...
+        'Width', figW, 'Height', figH, ...
+        'SavePath', opts.SavePath);
+    sty = pf2_base.plot.PlotStyle.getDefault();
 
     if isa(opts.Colors, 'exploreFNIRS.core.ColorScheme')
         groupColors = opts.Colors.resolve(groups);
@@ -240,17 +241,8 @@ function fig = plotAux(groups, auxField, varargin)
         pf2_base.external.suptitle(fig, pf2_base.plot.escapeTeX(auxField));
     end
 
-    % Save
-    if ~isempty(opts.SavePath)
-        if ~isempty(which('pf2_base.plot.saveFigure'))
-            pf2_base.plot.saveFigure(fig, opts.SavePath, ...
-                opts.SaveWidth, opts.SaveHeight, opts.SaveDPI);
-        else
-            set(fig, 'PaperPositionMode', 'auto');
-            print(fig, opts.SavePath, '-dpng', sprintf('-r%d', opts.SaveDPI));
-        end
-        fprintf('Saved: %s\n', opts.SavePath);
-    end
+    sty.applyToFigure(fig);
+    pf2_base.plot.handleSave(fig, opts);
 end
 
 

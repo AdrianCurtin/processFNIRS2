@@ -261,7 +261,7 @@ cr = exploreFNIRS.stats.runContrasts(results, 'FDRMethod', 'twostep');
 ### Advanced Visualization — New in v1.0.0
 
 ```matlab
-% Topographic maps
+% Topographic maps (auto-uses probe geometry, excludes short-sep channels)
 fig = ex.plotTopo('Biomarker', 'HbO', 'Time', 15, 'SavePath', 'topo.png');
 fig = ex.plotTopo('Layout', 'pergroup', 'TimeWindow', [10, 20]);
 
@@ -349,7 +349,7 @@ The following functions can be used outside the GUI:
 | `+core` | `Experiment` | Main experiment container class |
 | `+core` | `plotTemporal` | Headless temporal plots with ROI support |
 | `+core` | `plotBar` | Headless bar charts with ROI support |
-| `+core` | `plotTopo` | Headless topographic maps (single/pergroup) |
+| `+core` | `plotTopo` | Headless topographic maps (probe-aware layout, excludes short-sep) |
 | `+core` | `plotHeatmap` | Channel × time heatmap |
 | `+core` | `plotComposite` | Multi-panel publication figures |
 | `+core` | `plotLME` | LME analysis with bar charts and topo F-maps |

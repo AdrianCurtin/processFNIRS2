@@ -54,6 +54,17 @@ function result = computeMatrix(data, varargin)
 %   result = exploreFNIRS.connectivity.computeMatrix(processed, ...
 %       'UseROI', true, 'Method', 'pearson');
 %
+% References:
+%   Rubinov, M. & Sporns, O. (2010). Complex network measures of brain
+%   connectivity: Uses and interpretations. NeuroImage, 52(3), 1059-1069.
+%   DOI: 10.1016/j.neuroimage.2009.10.003
+%
+%   Scholkmann, F., Holper, L., Wolf, U. & Wolf, M. (2013). A new
+%   methodical approach in neuroscience: assessing inter-personal brain
+%   coupling using functional near-infrared imaging (fNIRI) hyperscanning.
+%   Frontiers in Human Neuroscience, 7, 813.
+%   DOI: 10.3389/fnhum.2013.00813
+%
 % See also: exploreFNIRS.coupling.pearson, exploreFNIRS.connectivity.plotMatrix,
 %   pf2.probe.roi.defineROI, pf2_build_nanmean_ROI
 

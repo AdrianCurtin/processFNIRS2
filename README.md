@@ -325,7 +325,7 @@ fig = ex.plotBar('Biomarker', 'HbO', 'ShowIndividual', true);
 % ROI-based plotting
 fig = ex.plotTemporal('Biomarkers', {'HbO'}, 'ROIs', 'all');
 
-% Advanced visualization
+% Advanced visualization (auto-uses probe geometry, excludes short-sep)
 fig = ex.plotTopo('Biomarker', 'HbO', 'Time', 15);
 fig = ex.plotHeatmap('Biomarker', 'HbO');
 fig = ex.plotComposite(panels, 'Layout', [1, 3]);

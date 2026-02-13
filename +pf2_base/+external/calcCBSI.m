@@ -1,41 +1,36 @@
-% This script is available for download to academic researchers for
-% internal research use only. All commercial use requires a license 
-% from Stanford's OTL. Please contact imelda.oropeza@stanford.edu for 
-% more details.
+function cOxy = calcCBSI(oxy, deoxy)
+% CALCCBSI Correlation-based signal improvement (CBSI) for fNIRS
 %
-% -------------------------------------------------------------------
+% Exploits the expected negative correlation between HbO and HbR to
+% suppress systemic and motion artifacts. The corrected signal is:
 %
-% assume the original signal is oxy and deoxy, and the corrected signal is
-% oxy0.
+%   CBSI = (HbO - alpha * HbR) / 2
 %
-% Xu Cui
-% Stanford University
-% 2009/09/28
+% where alpha = std(HbO) / std(HbR) per channel.
+%
+% Inputs:
+%   oxy   - [T x C] oxygenated hemoglobin (HbO)
+%   deoxy - [T x C] deoxygenated hemoglobin (HbR)
+%
+% Outputs:
+%   cOxy  - [T x C] corrected signal
+%
+% References:
+%   Cui, X., Bray, S. & Reiss, A. L. (2010). Functional near infrared
+%   spectroscopy (NIRS) signal improvement based on negative correlation
+%   between oxygenated and deoxygenated hemoglobin dynamics. NeuroImage,
+%   49(4), 3039-3046. DOI: 10.1016/j.neuroimage.2009.11.050
 
-% offline version (post-experiment data analysis)
-
-function cOxy=calcCBSI(oxy,deoxy)
-
-if(~isempty(oxy)&&size(oxy,1)==size(deoxy,1)&&size(oxy,2)==size(deoxy,2))
-
-    alpha = nanstd(oxy)./nanstd(deoxy);
-    oxy0=zeros(size(oxy));
-    for i=1:length(alpha)
-       oxy0(:,i)=oxy(:,i)-alpha(i)*deoxy(:,i); 
+    if isempty(oxy)
+        cOxy = [];
+        warning('CBSI error: Oxy arrays and Deoxy arrays are empty');
+        return;
     end
-    %oxy0 = oxy - alpha .* deoxy;
-    cOxy= real(oxy0 / 2);
 
-elseif(isempty(oxy))
-    cOxy=[];
-    warning('CBSI error: Oxy arrays and Deoxy arrays are empty');
-else
-    error('Oxy and Deoxy size mismatch');
+    if ~isequal(size(oxy), size(deoxy))
+        error('Oxy and Deoxy size mismatch');
+    end
+
+    alpha = std(oxy, 0, 1, 'omitnan') ./ std(deoxy, 0, 1, 'omitnan');
+    cOxy = (oxy - alpha .* deoxy) / 2;
 end
-
-%% online version (real time)
-%windowSize = 100;
-%for kk=2:N % as time goes, more and more data is coming
-%    alpha = std(oxy(max(1,kk-windowSize*10):kk,:)) ./ std(deoxy(max(1,kk-windowSize*10):kk,:));
-%    oxy0(kk) = ( oxy(kk) - alpha .* deoxy(kk) ) / 2;
-%nd

@@ -144,6 +144,15 @@ for aIdx = 1:length(allAnnot)
     end
 end
 
+% ErrorBars: convert white/light colors to black
+allEB = findobj(fig, 'Type', 'ErrorBar');
+for eIdx = 1:length(allEB)
+    curColor = get(allEB(eIdx), 'Color');
+    if isnumeric(curColor) && mean(curColor) > 0.85
+        set(allEB(eIdx), 'Color', 'k');
+    end
+end
+
 % Save based on format
 switch ext
     case '.fig'

@@ -131,10 +131,9 @@ timeChMask=ones(size(data));
 for i=1:length(method.F)
     pf=method.F{i};
 
-    % Convert legacy structs inline if they slip through
+    % Silent fallback: convert legacy structs if they slip through
     if ~isa(pf, 'pf2_base.PipelineFunction')
         if isstruct(pf) && isfield(pf, 'f')
-            warning('pf2:legacyStruct', 'Converting legacy struct to PipelineFunction for %s', pf(1).f);
             pf = pf2_base.PipelineFunction.fromStruct(pf);
         else
             continue

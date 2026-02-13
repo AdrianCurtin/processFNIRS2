@@ -30,8 +30,9 @@
 %   - processFNIRS2 on path
 %   - Sample data available via pf2.import.sampleData.fNIR2000()
 
-outDir = '/tmp/glm_examples';
-if ~exist(outDir, 'dir'), mkdir(outDir); end
+% Uncomment to save figures instead of displaying them:
+% outDir = '/tmp/glm_examples';
+% if ~exist(outDir, 'dir'), mkdir(outDir); end
 
 %% Step 1: Generate synthetic continuous recordings
 %
@@ -104,10 +105,10 @@ fprintf('  Sub01 mean R2 (HbO): %.3f\n', mean(r1.results.HbO.R2));
 fprintf('  Regressors: %s\n', strjoin(r1.regressorNames, ', '));
 
 % Visualize design matrix
-fig = gx.plotDesignMatrix(1, 'Visible', 'off', ...
-    'SavePath', fullfile(outDir, 'step3_design_matrix.png'));
-close(fig);
-fprintf('  Saved design matrix figure\n');
+fig = gx.plotDesignMatrix(1);
+% fig = gx.plotDesignMatrix(1, 'Visible', 'off', ...
+%     'SavePath', fullfile(outDir, 'step3_design_matrix.png'));
+% close(fig);
 
 % Behavioral data flows through from blocks
 fprintf('  Sub01 Easy RT: %.1f ms\n', gx.data{1}.info.reactionTime);
@@ -128,37 +129,42 @@ gx.summary();
 % 4a. Bar chart of betas
 fig = gx.plotBar('Biomarker', 'HbO', 'Channels', 1:4, ...
     'ShowIndividual', true, ...
-    'Title', 'GLM Beta Weights: Easy vs Hard (HbO)', ...
-    'Visible', 'off', 'SavePath', fullfile(outDir, 'step4a_beta_bar.png'));
-close(fig);
-fprintf('  Saved beta bar chart\n');
+    'Title', 'GLM Beta Weights: Easy vs Hard (HbO)');
+% fig = gx.plotBar('Biomarker', 'HbO', 'Channels', 1:4, ...
+%     'ShowIndividual', true, ...
+%     'Title', 'GLM Beta Weights: Easy vs Hard (HbO)', ...
+%     'Visible', 'off', 'SavePath', fullfile(outDir, 'step4a_beta_bar.png'));
+% close(fig);
 
 % 4b. LME on betas
-[fig, lmeResults] = gx.plotLME('Biomarkers', {'HbO'}, 'Channels', 1:4, ...
-    'Visible', 'off', 'SavePath', fullfile(outDir, 'step4b_beta_lme.png'));
-if ~isempty(fig), close(fig); end
+[fig, lmeResults] = gx.plotLME('Biomarkers', {'HbO'}, 'Channels', 1:4);
+% [fig, lmeResults] = gx.plotLME('Biomarkers', {'HbO'}, 'Channels', 1:4, ...
+%     'Visible', 'off', 'SavePath', fullfile(outDir, 'step4b_beta_lme.png'));
+% if ~isempty(fig), close(fig); end
 fprintf('  LME formula: %s\n', lmeResults.formula);
 fprintf('  LME ANOVA p-values:\n');
 disp(lmeResults.anova_pval);
 
 % 4c. Aux GLM: heart rate betas by condition
-fig = gx.plotAuxBar('heartRate', ...
-    'Visible', 'off', 'SavePath', fullfile(outDir, 'step4c_aux_bar.png'));
-close(fig);
-fprintf('  Saved aux bar chart\n');
+fig = gx.plotAuxBar('heartRate');
+% fig = gx.plotAuxBar('heartRate', ...
+%     'Visible', 'off', 'SavePath', fullfile(outDir, 'step4c_aux_bar.png'));
+% close(fig);
 
 % 4d. Topographic LME: F-statistics on 3D brain surface
 [fig, topoResults] = gx.plotTopoLME('Biomarkers', {'HbO'}, ...
     'SigType', 'p', 'SigThreshold', 0.05, ...
-    'ShowIntercept', false, ...
-    'Visible', 'off', 'SavePath', fullfile(outDir, 'step4d_topo_lme.png'));
-if ~isempty(fig), close(fig); end
-fprintf('  Saved topographic LME figure\n');
+    'ShowIntercept', false);
+% [fig, topoResults] = gx.plotTopoLME('Biomarkers', {'HbO'}, ...
+%     'SigType', 'p', 'SigThreshold', 0.05, ...
+%     'ShowIntercept', false, ...
+%     'Visible', 'off', 'SavePath', fullfile(outDir, 'step4d_topo_lme.png'));
+% if ~isempty(fig), close(fig); end
 
 % 4e. Export to long table
 longT = gx.toLongTable({'HbO', 'HbR'}, 1:4);
-writetable(longT, fullfile(outDir, 'step4e_beta_long.csv'));
-fprintf('  Exported long table: %d rows x %d cols\n', height(longT), width(longT));
+fprintf('  Long table: %d rows x %d cols\n', height(longT), width(longT));
+% writetable(longT, fullfile(outDir, 'step4e_beta_long.csv'));
 
 %% Step 5: Direct beta table export
 %
@@ -168,16 +174,11 @@ fprintf('  Exported long table: %d rows x %d cols\n', height(longT), width(longT
 fprintf('\n=== Step 5: Direct beta table export ===\n');
 
 T = gx.betaTable('Channels', 1:4, 'IncludeStats', true);
-writetable(T, fullfile(outDir, 'step5_beta_table.csv'));
 fprintf('  Beta table: %d rows x %d cols\n', height(T), width(T));
 fprintf('  Columns: %s\n', strjoin(T.Properties.VariableNames, ', '));
+% writetable(T, fullfile(outDir, 'step5_beta_table.csv'));
 
 %% Summary
 
 fprintf('\n=== GLM tutorial complete ===\n');
-fprintf('Output files in: %s\n', outDir);
-d = dir(fullfile(outDir, 'step*'));
-for i = 1:length(d)
-    fprintf('  %s (%.1f KB)\n', d(i).name, d(i).bytes/1024);
-end
 fprintf('\nFor the manual step-by-step pipeline, see example_glm_advanced.m\n');

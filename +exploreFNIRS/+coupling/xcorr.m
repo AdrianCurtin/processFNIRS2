@@ -30,6 +30,13 @@ function result = xcorr(x, y, fs, varargin)
 %     .method     - 'xcorr'
 %     .windowed   - true if sliding window was used
 %
+% Reference:
+%   Standard lagged cross-correlation. For its use in fNIRS hyperscanning
+%   to estimate inter-brain temporal delays see: Cui, X., Bryant, D. M. &
+%   Reiss, A. L. (2012). NIRS-based hyperscanning reveals increased
+%   interpersonal coherence in superior frontal cortex during cooperation.
+%   NeuroImage, 59(3), 2430-2437. DOI: 10.1016/j.neuroimage.2011.09.003
+%
 % See also: exploreFNIRS.coupling.pearson, exploreFNIRS.coupling.coherence
 
     p = inputParser;

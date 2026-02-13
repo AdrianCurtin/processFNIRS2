@@ -52,9 +52,19 @@ function x=pf2_unpackMethod(method)
        x=x{1}; 
     end
     
-    if(isfield(x,'F'))
-        %return;
+    if isfield(x,'F') && iscell(x.F)
+        % F is already a proper cell array — use as-is
+    elseif isfield(x,'F') && isstruct(x.F)
+        % Config loading produced a struct array — convert to cell
+        tmp = cell(1, numel(x.F));
+        for k = 1:numel(x.F)
+            tmp{k} = x.F(k);
+        end
+        x.F = tmp;
     else
+        % F is missing or corrupted (e.g. char from INI serialization)
+        % — fall through to S# field extraction
+        if isfield(x,'F'), x = rmfield(x,'F'); end
         if(iscell(x)&&~isstruct(x))
             t=x;
             x=cell(0);
@@ -81,13 +91,13 @@ function x=pf2_unpackMethod(method)
     for idx=1:length(x.F)
         Fidx=x.F{idx};
 
-        % Already a PipelineFunction — skip conversion
+        % Already a PipelineFunction — leave as-is
         if isa(Fidx, 'pf2_base.PipelineFunction')
             continue
         end
 
-        if(length(Fidx)>1) %This is a struct array for some reason?
-           %Change it back!
+        if isstruct(Fidx) && length(Fidx) > 1
+           %This is a struct array for some reason — change it back!
            F_noarray.f=Fidx(1).f;
            F_noarray.args=cell(0,0);
            F_noarray.argvals=cell(0,0);
@@ -108,11 +118,14 @@ function x=pf2_unpackMethod(method)
            else
                F_noarray.output = 'x';
            end
-           Fidx=F_noarray;
+           x.F{idx}=F_noarray;
+           Fidx=x.F{idx};
         end
 
-        % Convert struct to PipelineFunction
-        x.F{idx}=pf2_base.PipelineFunction.fromStruct(Fidx);
+        % Convert legacy struct → PipelineFunction at unpack time
+        if isstruct(Fidx) && isfield(Fidx, 'f')
+            x.F{idx} = pf2_base.PipelineFunction.fromStruct(Fidx);
+        end
     end
 
 

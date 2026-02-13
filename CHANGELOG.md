@@ -63,8 +63,8 @@
   - `params()` returns aggregate table of all tunable parameters
 - `pf2_base.RawPipeline` — Stage 1 specialization with `hasIntensity2OD()` helper
 - `pf2_base.OxyPipeline` — Stage 3 specialization with `hasROI()`, `swapROI()`, `removeROI()` helpers
-- `processStageRaw2OD` and `processStageFilterHb` now support both PipelineFunction objects (precomputed context dispatch) and legacy structs (backward-compatible path)
-- `pf2_unpackMethod` now converts legacy structs to PipelineFunction via `fromStruct()`
+- `pf2_unpackMethod` now eagerly converts legacy structs to PipelineFunction via `fromStruct()` at unpack time — all callers receive PipelineFunction objects
+- `processStageRaw2OD` and `processStageFilterHb` use PipelineFunction exclusively (silent fallback retained for safety)
 - Tutorials:
   - `examples/scripts/example_pipeline_basics.m` — Pipeline API tutorial
   - `examples/scripts/example_pipeline_custom_function.m` — Custom function tutorial
@@ -121,6 +121,7 @@
 - Fixed `plotHBICA` subplot layout — `subplot(nRows,1,1)` conflicted with `subplot(nRows,3,...)` destroying the GOF panel
 - Fixed `ChannelCheck` QC tooltip referencing non-existent `pctSaturated` field instead of `totalPct`
 - Fixed `ChannelCheck` ambient/marker/reference lines accumulating on mini-plots during repeated redraws
+- Eliminated repeated "Converting legacy struct to PipelineFunction" warnings during processing — `pf2_unpackMethod` now converts structs to PipelineFunction objects at unpack time (single canonical conversion point); `processStageRaw2OD` and `processStageFilterHb` retain silent fallback only as a safety net; `pf2.methods.raw.create` and `pf2.methods.oxy.create` pass methods through `pf2_unpackMethod` before memory storage
 
 ---
 
@@ -288,7 +289,7 @@ Scriptable Group Analysis, Connectivity, Hyperscanning, Statistics & Processing 
 - `accelerate` (`'auto'`, `'parfor'`, `'none'`): uses `parfor` when parallel pool is running and nChannels > 8
 
 **Advanced Visualization:**
-- `plotTopo` — Group-level 2D topographic maps (single or per-group layout)
+- `plotTopo` — Group-level 2D topographic maps (single or per-group layout); auto-uses probe geometry from Device and excludes short-separation channels
 - `plotHeatmap` — Channel × time heatmap with sortable channels, diverging colormap, and ROI support
 - `plotComposite` — Multi-panel publication figures with tiledlayout and auto panel labels
 - `plotScatter` — Scatter correlation of info/behavioral variables vs fNIRS biomarkers with per-channel subplots, ROI support, stacked annotations, and error bands

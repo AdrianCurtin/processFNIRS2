@@ -20,8 +20,9 @@
 % References:
 %   Luo et al. (2024). Biomedical Optics Express, 16(1). DOI: 10.1364/BOE.542554
 
-outDir = '/tmp/hbica_examples';
-if ~exist(outDir, 'dir'), mkdir(outDir); end
+% Uncomment to save figures instead of displaying them:
+% outDir = '/tmp/hbica_examples';
+% if ~exist(outDir, 'dir'), mkdir(outDir); end
 
 %% Step 1: Prepare paired data
 
@@ -81,21 +82,25 @@ fprintf('\n=== Step 4: Visualization ===\n');
 fig = exploreFNIRS.hyperscanning.plotHBICA(result, ...
     'ShowIntraBrain', true, ...
     'MaxComponents', 4, ...
-    'Title', 'HB-ICA: Dyad 1 (all components)', ...
-    'Visible', 'off', ...
-    'SavePath', fullfile(outDir, 'step4_hbica_all.png'));
-close(fig);
+    'Title', 'HB-ICA: Dyad 1 (all components)');
+% fig = exploreFNIRS.hyperscanning.plotHBICA(result, ...
+%     'ShowIntraBrain', true, ...
+%     'MaxComponents', 4, ...
+%     'Title', 'HB-ICA: Dyad 1 (all components)', ...
+%     'Visible', 'off', ...
+%     'SavePath', fullfile(outDir, 'step4_hbica_all.png'));
+% close(fig);
 
 % Show only inter-brain components
 if any(result.isInterBrain)
     fig = exploreFNIRS.hyperscanning.plotHBICA(result, ...
-        'Title', 'HB-ICA: Dyad 1 (inter-brain only)', ...
-        'Visible', 'off', ...
-        'SavePath', fullfile(outDir, 'step4_hbica_inter.png'));
-    close(fig);
+        'Title', 'HB-ICA: Dyad 1 (inter-brain only)');
+    % fig = exploreFNIRS.hyperscanning.plotHBICA(result, ...
+    %     'Title', 'HB-ICA: Dyad 1 (inter-brain only)', ...
+    %     'Visible', 'off', ...
+    %     'SavePath', fullfile(outDir, 'step4_hbica_inter.png'));
+    % close(fig);
 end
-
-fprintf('  Saved plots to %s\n', outDir);
 
 %% Step 5: Group-level HB-ICA via Experiment
 
@@ -155,8 +160,3 @@ fprintf('    - Subject-specific spatial maps via dual regression\n');
 %% Summary
 
 fprintf('\n=== HB-ICA tutorial complete ===\n');
-fprintf('Output files in: %s\n', outDir);
-d = dir(fullfile(outDir, 'step*'));
-for i = 1:length(d)
-    fprintf('  %s (%.1f KB)\n', d(i).name, d(i).bytes/1024);
-end

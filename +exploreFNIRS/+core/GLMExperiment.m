@@ -473,7 +473,8 @@ classdef GLMExperiment < exploreFNIRS.core.Experiment
             colormap(ax, parula);
             colorbar(ax);
             set(ax, 'XTick', 1:length(r.regressorNames), ...
-                'XTickLabel', r.regressorNames, 'XTickLabelRotation', 45);
+                'XTickLabel', r.regressorNames, 'XTickLabelRotation', 45, ...
+                'TickLabelInterpreter', 'none');
             xlabel(ax, 'Regressors');
             ylabel(ax, 'Time (samples)');
             title(ax, sprintf('Design Matrix: %s', r.subjectID));

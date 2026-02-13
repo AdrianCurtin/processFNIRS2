@@ -62,6 +62,7 @@ num2Plot = length(plotIdx);
 
 if num2Plot == 0
     cla(ax);
+    pf2_base.gui.forceLightAxes(ax);
     return;
 end
 
@@ -75,6 +76,7 @@ end
 
 % Plot
 cla(ax);
+pf2_base.gui.forceLightAxes(ax);
 for i = 1:num2Plot
     h = plot(ax, time(timeInd), data(timeInd, plotIdx(i)), 'color', cIndex(i, :));
     set(h, 'Tag', sprintf('Ch%i_%inm', curChSet(plotIdx(i)), curWvSet(plotIdx(i))));

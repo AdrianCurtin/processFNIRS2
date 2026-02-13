@@ -25,6 +25,15 @@ function result = spearman(x, y, fs, varargin)
 %     .windowed - true if sliding window was used
 %     .windowTimes - [W x 1] center times (windowed only)
 %
+% Reference:
+%   Standard Spearman rank-order correlation. Rank-based coupling is robust
+%   to outliers and nonlinear monotonic relationships in neuroimaging; see:
+%   Scholkmann, F., Holper, L., Wolf, U. & Wolf, M. (2013). A new
+%   methodical approach in neuroscience: assessing inter-personal brain
+%   coupling using functional near-infrared imaging (fNIRI) hyperscanning.
+%   Frontiers in Human Neuroscience, 7, 813.
+%   DOI: 10.3389/fnhum.2013.00813
+%
 % See also: exploreFNIRS.coupling.pearson, exploreFNIRS.coupling.xcorr
 
     p = inputParser;

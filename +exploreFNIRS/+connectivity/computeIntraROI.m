@@ -43,6 +43,11 @@ function result = computeIntraROI(data, varargin)
 %       'Method', 'pearson', 'Biomarker', 'HbO');
 %   disp(result.roiMetrics(1).meanCoupling);
 %
+% References:
+%   Rubinov, M. & Sporns, O. (2010). Complex network measures of brain
+%   connectivity: Uses and interpretations. NeuroImage, 52(3), 1059-1069.
+%   DOI: 10.1016/j.neuroimage.2009.10.003
+%
 % See also: exploreFNIRS.connectivity.computeMatrix,
 %   exploreFNIRS.connectivity.computeInterROI,
 %   exploreFNIRS.connectivity.plotIntraROI

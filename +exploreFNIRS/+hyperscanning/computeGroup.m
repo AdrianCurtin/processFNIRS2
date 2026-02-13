@@ -50,6 +50,15 @@ function result = computeGroup(data, pairs, varargin)
 %   fprintf('Mean coupling: %.3f (p = %.4f)\n', ...
 %       mean(result.Mean, 'omitnan'), mean(result.pvalue, 'omitnan'));
 %
+% References:
+%   Czeszumski, A., Ebers, S., Greshake Tzovaras, B., Gianotti, L. R. R.,
+%   Kosonogov, V., et al. (2020). Hyperscanning: A Valid Method to Study
+%   Neural Inter-brain Underpinnings of Social Interaction. Frontiers in
+%   Human Neuroscience, 14, 39. DOI: 10.3389/fnhum.2020.00039
+%
+%   Silver, D. L. (1998). Fisher z-transformation. In Encyclopedia of
+%   Biostatistics (pp. 1544-1545). Wiley.
+%
 % See also: exploreFNIRS.hyperscanning.pairSubjects,
 %   exploreFNIRS.hyperscanning.computeDyad,
 %   exploreFNIRS.connectivity.alignMatrices

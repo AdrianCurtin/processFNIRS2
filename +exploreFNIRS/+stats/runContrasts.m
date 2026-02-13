@@ -37,6 +37,19 @@ function contrastResults = runContrasts(lmeResults, varargin)
 %   fprintf('Significant contrasts (FDR corrected):\n');
 %   disp(cr.contrastNames(any(cr.significantMatrix(:,:), 2)));
 %
+% References:
+%   Benjamini, Y. & Hochberg, Y. (1995). Controlling the false discovery
+%   rate: a practical and powerful approach to multiple testing. Journal of
+%   the Royal Statistical Society, Series B, 57(1), 289-300.
+%
+%   Benjamini, Y., Krieger, A. M. & Yekutieli, D. (2006). Adaptive linear
+%   step-up procedures that control the false discovery rate. Biometrika,
+%   93(3), 491-507. DOI: 10.1093/biomet/93.3.491
+%
+%   Searle, S. R., Speed, F. M. & Milliken, G. A. (1980). Population
+%   marginal means in the linear model: An alternative to least squares
+%   means. The American Statistician, 34(4), 216-221.
+%
 % See also: exploreFNIRS.stats.fitLME, exploreFNIRS.fx.autoContrast,
 %           exploreFNIRS.fx.performFDR
 

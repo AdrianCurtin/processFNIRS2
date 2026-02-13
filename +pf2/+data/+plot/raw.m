@@ -249,7 +249,7 @@ for optIdx = 1:length(channels)
     optNum = channels(optIdx);
     if plotArranged
         % Use helper for position calculation
-        optPos = pf2_base.plot.getOptodePosition(optLayout, optNum, [0.65, 0.9], [0.03, 0]);
+        optPos = pf2_base.plot.getOptodePosition(optLayout, optNum, [0.65, 0.7], [0.03, 0.075]);
         if isempty(optPos)
             continue;
         end

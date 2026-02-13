@@ -50,10 +50,12 @@
 cd('/Users/adriancurtin/Documents/GitHub/processFNIRS2');
 
 studyRoot = fullfile(tempdir, 'SpeechFNIRS');
-outDir    = fullfile(tempdir, 'SpeechFNIRS_output');
 if isfolder(studyRoot), rmdir(studyRoot, 's'); end
-if isfolder(outDir), rmdir(outDir, 's'); end
-mkdir(outDir);
+
+% Uncomment to save figures and exports to disk:
+% outDir = fullfile(tempdir, 'SpeechFNIRS_output');
+% if isfolder(outDir), rmdir(outDir, 's'); end
+% mkdir(outDir);
 
 
 %% ========================================================================
@@ -274,18 +276,22 @@ fprintf('\n=== Part 7: Analysis ===\n');
 % --- Temporal plot: HbO across conditions ---
 fig = ex.plotTemporal('Biomarkers', {'HbO', 'HbR'}, 'Channels', 1:4, ...
     'PlotBy', 'Condition', ...
-    'Title', 'Speech Processing: Group x Condition', ...
-    'Visible', 'off', 'SavePath', fullfile(outDir, 'temporal_speech.png'));
-close(fig);
-fprintf('  Saved temporal plot\n');
+    'Title', 'Speech Processing: Group x Condition');
+% fig = ex.plotTemporal('Biomarkers', {'HbO', 'HbR'}, 'Channels', 1:4, ...
+%     'PlotBy', 'Condition', ...
+%     'Title', 'Speech Processing: Group x Condition', ...
+%     'Visible', 'off', 'SavePath', fullfile(outDir, 'temporal_speech.png'));
+% close(fig);
 
 % --- Bar chart ---
 fig = ex.plotBar('Biomarker', 'HbO', 'Channels', 1:4, ...
     'PlotBy', 'Condition', 'ShowIndividual', true, ...
-    'Title', 'Mean HbO: Group x Condition', ...
-    'Visible', 'off', 'SavePath', fullfile(outDir, 'bar_speech.png'));
-close(fig);
-fprintf('  Saved bar chart\n');
+    'Title', 'Mean HbO: Group x Condition');
+% fig = ex.plotBar('Biomarker', 'HbO', 'Channels', 1:4, ...
+%     'PlotBy', 'Condition', 'ShowIndividual', true, ...
+%     'Title', 'Mean HbO: Group x Condition', ...
+%     'Visible', 'off', 'SavePath', fullfile(outDir, 'bar_speech.png'));
+% close(fig);
 
 % --- LME statistics ---
 results = ex.statsFitLME('Biomarkers', {'HbO'}, 'Channels', 1:4);
@@ -309,9 +315,9 @@ fprintf('=== Part 8: Export ===\n');
 
 % --- A: Tabular export for external stats ---
 longT = ex.toLongTable({'HbO', 'HbR'}, 1:4);
-writetable(longT, fullfile(outDir, 'speech_results_long.csv'));
-fprintf('  Wrote CSV: %d rows x %d cols\n', height(longT), width(longT));
+fprintf('  Long table: %d rows x %d cols\n', height(longT), width(longT));
 fprintf('  Columns: %s\n', strjoin(longT.Properties.VariableNames, ', '));
+% writetable(longT, fullfile(outDir, 'speech_results_long.csv'));
 
 % --- B: Batch export processed SNIRF files ---
 %
@@ -324,20 +330,20 @@ fprintf('  Columns: %s\n', strjoin(longT.Properties.VariableNames, ', '));
 %    output/snirf/Older/SP04.snirf
 %    ...
 
-pf2.export.asSNIRF(allProcessed, fullfile(outDir, 'snirf'), ...
-    'Dir1', 'Group', ...
-    'Prefix', {'SubjectID'});
-fprintf('  Batch exported %d SNIRF files\n', numel(allProcessed));
+% pf2.export.asSNIRF(allProcessed, fullfile(outDir, 'snirf'), ...
+%     'Dir1', 'Group', ...
+%     'Prefix', {'SubjectID'});
+% fprintf('  Batch exported %d SNIRF files\n', numel(allProcessed));
 
 % --- C: Batch export segments with richer naming ---
 %
 %  Export each segment with Group subdirectory and a filename built from
 %  SubjectID + Condition. Useful for sharing individual epochs.
 
-pf2.export.asSNIRF(allSegments, fullfile(outDir, 'segments'), ...
-    'Dir1', 'Group', ...
-    'Prefix', {'SubjectID', 'Condition'});
-fprintf('  Batch exported %d segment SNIRF files\n', numel(allSegments));
+% pf2.export.asSNIRF(allSegments, fullfile(outDir, 'segments'), ...
+%     'Dir1', 'Group', ...
+%     'Prefix', {'SubjectID', 'Condition'});
+% fprintf('  Batch exported %d segment SNIRF files\n', numel(allSegments));
 
 
 %% ========================================================================
@@ -346,10 +352,6 @@ fprintf('  Batch exported %d segment SNIRF files\n', numel(allSegments));
 
 fprintf('\n=== Tutorial complete ===\n');
 fprintf('Study root:  %s\n', studyRoot);
-fprintf('Output:      %s\n', outDir);
-
-fprintf('\nOutput directory contents:\n');
-listDir(outDir, outDir);
 
 fprintf('\nWorkflow recap:\n');
 fprintf('  1. pf2.import.importDirectory(dir, pat, ''Dir1'', ''Group'', ...)\n');
