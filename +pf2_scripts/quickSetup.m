@@ -805,9 +805,10 @@ function lines = methodCheckBlock(methodName, stage, funcsDef, legacyAlias)
         fd = funcsDef{k};
         argsStr = cellToStr(fd.args);
         argvalsStr = cellToStr(fd.argvals);
-        trail = '};';
         if k < numel(funcsDef)
-            trail = '}; ...';
+            trail = '}, ...';
+        else
+            trail = '}';
         end
         lines{end+1} = sprintf('        struct(''f'', ''%s'', ''args'', {{%s}}, ''argvals'', {{%s}}, ''output'', ''%s'')%s', ...
             fd.f, argsStr, argvalsStr, fd.output, trail); %#ok<AGROW>
@@ -1313,13 +1314,20 @@ end
 function levels = analyzeDirectoryLevels(files, rootPath)
 % ANALYZEDIRECTORYLEVELS Extract unique directory names at each depth level.
 
-    % Resolve to absolute path so strrep matches dir() output (always absolute)
-    rootPath = char(java.io.File(rootPath).getCanonicalPath());
+    % Make both rootPath and file folders absolute so strrep always matches.
+    % Use MATLAB's pwd (not Java's working dir, which can diverge from pwd).
+    if ~java.io.File(rootPath).isAbsolute()
+        rootPath = fullfile(pwd, rootPath);
+    end
 
     allParts = {};
     for k = 1:numel(files)
-        rel = strrep(files(k).folder, [rootPath filesep], '');
-        if strcmp(rel, files(k).folder) || isempty(rel)
+        folder = files(k).folder;
+        if ~java.io.File(folder).isAbsolute()
+            folder = fullfile(pwd, folder);
+        end
+        rel = strrep(folder, [rootPath filesep], '');
+        if strcmp(rel, folder) || isempty(rel)
             continue;
         end
         parts = strsplit(rel, filesep);
