@@ -93,7 +93,9 @@ function renderBar(ax, groups, groupIdx, xVar, colorVar, biomarker, channels, op
                 barwebArgs = [barwebArgs, {'DataPoints', indivData}];
             end
 
-            pf2_base.external.barweb(meanMatrix, errInput, 1, uniqueX, barwebArgs{:});
+            sty = pf2_base.plot.PlotStyle.getDefault();
+            pf2_base.external.barweb(meanMatrix, errInput, 1, uniqueX, barwebArgs{:}, ...
+                'ErrorColor', sty.ForegroundColor);
             hold(ax, 'on');
         end
 

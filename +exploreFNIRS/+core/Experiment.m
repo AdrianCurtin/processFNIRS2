@@ -85,6 +85,10 @@ classdef Experiment < handle
 
         % Transient state snapshot (used by PlotProxy for save/restore)
         stateSnapshot
+
+        % Preserved order from select() for each variable
+        % struct with field names = variable names, values = ordered cell arrays
+        selectOrder_
     end
 
     properties (Dependent, SetAccess = private)
@@ -252,6 +256,11 @@ classdef Experiment < handle
 
             idx = obj.selectedIdx;
 
+            % Initialize selectOrder_ if needed
+            if isempty(obj.selectOrder_)
+                obj.selectOrder_ = struct();
+            end
+
             for i = 1:2:length(varargin)
                 varName = varargin{i};
                 varVal  = varargin{i+1};
@@ -276,8 +285,13 @@ classdef Experiment < handle
                     else
                         idx = idx & ismember(col, varVal);
                     end
+                    % Store the user-specified order for this variable
+                    obj.selectOrder_.(varName) = cellstr(varVal);
                 elseif isnumeric(varVal)
                     idx = idx & ismember(col, varVal);
+                    if numel(varVal) > 1
+                        obj.selectOrder_.(varName) = varVal;
+                    end
                 else
                     error('exploreFNIRS:core:Experiment:select', ...
                         'Unsupported value type for "%s"', varName);
@@ -349,6 +363,27 @@ classdef Experiment < handle
 
             [groupRows, ~, gbyIdx] = unique(selTable(:, vars), 'rows');
             nGroups = max(gbyIdx);
+
+            % Reorder groups to match select() order when available
+            if ~isempty(obj.selectOrder_) && length(vars) == 1 && ...
+                    isfield(obj.selectOrder_, vars{1})
+                desiredOrder = obj.selectOrder_.(vars{1});
+                if iscell(desiredOrder)
+                    currentOrder = cellstr(string(groupRows.(vars{1})));
+                    [~, newIdx] = ismember(desiredOrder, currentOrder);
+                    newIdx = newIdx(newIdx > 0);
+                    % Append any groups not in the desired order
+                    remaining = setdiff(1:nGroups, newIdx, 'stable');
+                    newIdx = [newIdx, remaining];
+                    if length(newIdx) == nGroups
+                        % Remap gbyIdx to new order
+                        invMap = zeros(1, nGroups);
+                        invMap(newIdx) = 1:nGroups;
+                        gbyIdx = invMap(gbyIdx)';
+                        groupRows = groupRows(newIdx, :);
+                    end
+                end
+            end
 
             obj.groups = [];
             for g = 1:nGroups
@@ -1047,7 +1082,7 @@ classdef Experiment < handle
             end
 
             bwHandles = pf2_base.external.barweb(meanMatrix, errInput, ...
-                1, groupLabels, barwebArgs{:});
+                1, groupLabels, barwebArgs{:}, 'ErrorColor', sty.ForegroundColor);
             hold(ax, 'on');
 
             % Color each bar individually

@@ -42,6 +42,7 @@ addParameter(p, 'ErrorIsY', false, @islogical);
 addParameter(p, 'HideBar', false, @islogical);
 addParameter(p, 'NegativeToInfinity', false, @islogical);
 addParameter(p, 'Axes', [], @(x) isempty(x) || isgraphics(x));
+addParameter(p, 'ErrorColor', [], @(x) isempty(x) || (isnumeric(x) && length(x)==3));
 
 parse(p, barvalues, errors, varargin{:});
 
@@ -108,11 +109,15 @@ else
 end
 
 % Detect dark mode: use white borders/errorbars when background is dark
-axColor = get(ax, 'Color');
-if isnumeric(axColor) && mean(axColor) < 0.5
-    edgeClr = [1 1 1];
+if ~isempty(p.Results.ErrorColor)
+    edgeClr = p.Results.ErrorColor;
 else
-    edgeClr = [0 0 0];
+    axColor = get(ax, 'Color');
+    if isnumeric(axColor) && mean(axColor) < 0.5
+        edgeClr = [1 1 1];
+    else
+        edgeClr = [0 0 0];
+    end
 end
 
 % Get function arguments

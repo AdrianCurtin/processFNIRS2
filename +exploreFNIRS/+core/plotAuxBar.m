@@ -208,7 +208,7 @@ function fig = plotAuxBar(groups, auxField, varargin)
             end
 
             bwHandles = pf2_base.external.barweb(meanMatrix, errInput, 1, pf2_base.plot.escapeTeX(uniqueWithin), ...
-                barwebArgs{:});
+                barwebArgs{:}, 'ErrorColor', sty.ForegroundColor);
             hold(ax, 'on');
 
             % Style legend if barweb created one
@@ -257,7 +257,7 @@ function fig = plotAuxBar(groups, auxField, varargin)
             end
 
             bwHandles = pf2_base.external.barweb(meanMatrix, errInput, 1, pf2_base.plot.escapeTeX(groupLabels), ...
-                barwebArgs{:});
+                barwebArgs{:}, 'ErrorColor', sty.ForegroundColor);
             hold(ax, 'on');
 
             % Color each bar individually
