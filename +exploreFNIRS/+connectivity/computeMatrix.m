@@ -133,6 +133,7 @@ function result = computeMatrix(data, varargin)
     methodLower = lower(opts.Method);
     isDirected = ismember(methodLower, {'granger', 'transferentropy'});
     isBatchable = ismember(methodLower, {'pearson', 'spearman'});
+    isBatchWcoh = strcmp(methodLower, 'wcoherence');
 
     % Determine acceleration strategy
     if nCh > 1
@@ -182,6 +183,10 @@ function result = computeMatrix(data, varargin)
     if isBatchable && ~isDirected
         % Batch matrix path for pearson/spearman (vectorized, works on CPU or GPU)
         [matrix, pmatrix] = computeBatchCorrelation(signal, channels, nCh, nSamples, methodLower, useGPU);
+    elseif isBatchWcoh
+        % Batch CWT path for wcoherence: pre-compute CWT once per channel,
+        % then derive pairwise coherence from pre-computed transforms
+        [matrix, pmatrix] = computeBatchWcoherence(signal, channels, nCh, fs, opts);
     elseif useParfor
         [matrix, pmatrix] = computeParfor(signal, channels, nCh, fs, opts, isDirected);
     else
@@ -203,6 +208,144 @@ function result = computeMatrix(data, varargin)
         result.labels = arrayfun(@(c) sprintf('Ch%d', c), channels, ...
             'UniformOutput', false);
     end
+end
+
+
+function [matrix, pmatrix] = computeBatchWcoherence(signal, channels, nCh, fs, opts)
+% COMPUTEBATCHWCOHERENCE Batch wavelet coherence via pre-computed CWT
+%
+% Pre-computes the CWT for all channels once, pre-computes smoothed
+% auto-spectra S(|Wxx|^2) once per channel, then derives pairwise
+% coherence needing only one cross-spectrum + smooth per pair.
+% For N channels this computes N CWTs + N auto-smooths instead of
+% N*(N-1)/2 pairs * (2 CWTs + 2 auto-smooths) each.
+
+    S = signal(:, channels);
+
+    % Parse CouplingArgs for wcoherence-specific parameters
+    couplingArgs = opts.CouplingArgs;
+    wcohOpts = {};
+    if ~isempty(couplingArgs)
+        wcohOpts = couplingArgs;
+    end
+
+    % Extract VoicesPerOctave from coupling args if present
+    vpo = 10;  % default
+    for k = 1:2:length(wcohOpts)
+        if ischar(wcohOpts{k}) && strcmpi(wcohOpts{k}, 'VoicesPerOctave')
+            vpo = wcohOpts{k+1};
+        end
+    end
+
+    % Pre-compute CWT for all channels at once (single precision for speed)
+    cwtResult = pf2_base.wavelet.cwt(S, fs, 'VoicesPerOctave', vpo, 'Precision', 'single');
+    % cwtResult.coeffs is [F x T x nCh]
+
+    matrix = nan(nCh);
+    pmatrix = nan(nCh);
+
+    freqs = cwtResult.freqs;
+    scales = cwtResult.scales;
+    coi = cwtResult.coi;
+
+    % Extract smoothFactor from coupling args (default 1)
+    smoothFactor = 1;
+    for k = 1:2:length(wcohOpts)
+        if ischar(wcohOpts{k}) && strcmpi(wcohOpts{k}, 'SmoothFactor')
+            smoothFactor = wcohOpts{k+1};
+        end
+    end
+
+    % Pre-compute smoothed auto-spectra for ALL channels
+    % This is the key optimization: S(|Wxx|^2) is computed once per channel
+    % instead of once per pair involving that channel.
+    smoothedAuto = cell(nCh, 1);
+    for i = 1:nCh
+        Wi = cwtResult.coeffs(:, :, i);  % [F x T]
+        smoothedAuto{i} = smoothCWTLocal(abs(Wi).^2, scales, fs, smoothFactor);
+    end
+
+    % Build individual CWT structs for wcoherence (share metadata)
+    baseCwt = struct('freqs', freqs, 'scales', scales, ...
+                     'coi', coi, 'fs', cwtResult.fs, ...
+                     'omega0', cwtResult.omega0);
+
+    for i = 1:nCh
+        matrix(i, i) = 1;
+        pmatrix(i, i) = 0;
+
+        cwtI = baseCwt;
+        cwtI.coeffs = cwtResult.coeffs(:, :, i);
+
+        for j = (i+1):nCh
+            if all(isnan(S(:, i))) || all(isnan(S(:, j)))
+                continue;
+            end
+
+            cwtJ = baseCwt;
+            cwtJ.coeffs = cwtResult.coeffs(:, :, j);
+
+            % Pass pre-computed smoothed auto-spectra to skip redundant smoothing
+            res = pf2_base.wavelet.wcoherence(S(:, i), S(:, j), fs, ...
+                'CwtX', cwtI, 'CwtY', cwtJ, ...
+                'SmoothedAutoX', smoothedAuto{i}, ...
+                'SmoothedAutoY', smoothedAuto{j}, ...
+                wcohOpts{:});
+
+            matrix(i, j) = res.value;
+            matrix(j, i) = res.value;
+            pmatrix(i, j) = res.pvalue;
+            pmatrix(j, i) = res.pvalue;
+        end
+    end
+end
+
+
+function S = smoothCWTLocal(W, scales, fs, smoothFactor)
+% Local copy of CWT smoothing for pre-computing auto-spectra.
+% Time: FFT-based Gaussian convolution. Scale: 0.6-octave boxcar.
+
+    [nF, T] = size(W);
+    dt = 1 / fs;
+    isRealW = isreal(W);
+
+    nfftSmooth = 2^nextpow2(T + max(ceil(3 * smoothFactor * scales / dt)));
+    Wf = fft(W, nfftSmooth, 2);
+
+    S = zeros(nF, T, 'like', W);
+    for fi = 1:nF
+        sigma_t = smoothFactor * scales(fi) / dt;
+        halfWidth = ceil(3 * sigma_t);
+        if halfWidth < 1
+            S(fi, :) = W(fi, 1:T);
+            continue;
+        end
+        halfWidth = min(halfWidth, floor(T/2));
+
+        kernel = zeros(1, nfftSmooth, 'like', real(W(1)));
+        kernel(1:halfWidth+1) = exp(-(0:halfWidth).^2 / (2 * sigma_t^2));
+        kernel(end-halfWidth+1:end) = kernel(halfWidth+1:-1:2);
+        kernel = kernel / sum(kernel);
+        kernelF = fft(kernel, nfftSmooth);
+
+        smoothed = ifft(Wf(fi, :) .* kernelF, nfftSmooth);
+        if isRealW
+            S(fi, :) = real(smoothed(1:T));
+        else
+            S(fi, :) = smoothed(1:T);
+        end
+    end
+
+    scaleSmooth = 0.6;
+    log2scales = log2(scales);
+    Sout = S;
+    for fi = 1:nF
+        mask = abs(log2scales - log2scales(fi)) <= scaleSmooth / 2;
+        if sum(mask) > 1
+            Sout(fi, :) = mean(S(mask, :), 1);
+        end
+    end
+    S = Sout;
 end
 
 

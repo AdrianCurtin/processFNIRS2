@@ -23,6 +23,10 @@ function result = wcoherence(x, y, fs, varargin)
 %   ApplyCOI        - Exclude cone-of-influence region from scalar value
 %                     (default: true)
 %   PhaseOutput     - Return phase angles from cross-spectrum (default: false)
+%   CwtX            - Pre-computed CWT struct for x (from pf2_base.wavelet.cwt).
+%                     Skips CWT computation for x when provided.
+%   CwtY            - Pre-computed CWT struct for y (from pf2_base.wavelet.cwt).
+%                     Skips CWT computation for y when provided.
 %
 % Outputs:
 %   result - Struct with fields:
@@ -38,8 +42,8 @@ function result = wcoherence(x, y, fs, varargin)
 %     .phase     - [F x T] phase angles in radians (if PhaseOutput=true)
 %
 % Notes:
-%   Requires MATLAB Wavelet Toolbox. Uses str2func('wcoherence') to avoid
-%   shadowing the builtin function.
+%   No Wavelet Toolbox required. Delegates to pf2_base.wavelet.wcoherence
+%   which uses an FFT-based Morlet CWT.
 %
 %   The cone of influence marks the region where edge effects are
 %   significant. By default, these regions are excluded from the scalar
@@ -51,93 +55,8 @@ function result = wcoherence(x, y, fs, varargin)
 %   series. Nonlinear Processes in Geophysics, 11, 561-566.
 %
 % See also: exploreFNIRS.coupling.coherence, exploreFNIRS.coupling.pearson,
-%   exploreFNIRS.coupling.plotWcoherence
+%   exploreFNIRS.coupling.plotWcoherence, pf2_base.wavelet.wcoherence
 
-    p = inputParser;
-    addRequired(p, 'x', @(v) isnumeric(v) && isvector(v));
-    addRequired(p, 'y', @(v) isnumeric(v) && isvector(v));
-    addRequired(p, 'fs', @(v) isnumeric(v) && isscalar(v) && v > 0);
-    addParameter(p, 'FreqRange', [], @(v) isempty(v) || (isnumeric(v) && numel(v) == 2));
-    addParameter(p, 'VoicesPerOctave', 10, @(v) isnumeric(v) && isscalar(v) && v >= 1 && v <= 48);
-    addParameter(p, 'ApplyCOI', true, @islogical);
-    addParameter(p, 'PhaseOutput', false, @islogical);
-    parse(p, x, y, fs, varargin{:});
-    opts = p.Results;
+    result = pf2_base.wavelet.wcoherence(x, y, fs, varargin{:});
 
-    x = x(:);
-    y = y(:);
-    if length(x) ~= length(y)
-        error('exploreFNIRS:coupling:wcoherence', 'x and y must have equal length');
-    end
-
-    T = length(x);
-
-    % Default frequency range
-    if isempty(opts.FreqRange)
-        freqRange = [0.01, fs / 2];
-    else
-        freqRange = opts.FreqRange;
-    end
-    fLow = max(freqRange(1), 1 / (T / fs));
-    fHigh = min(freqRange(2), fs / 2);
-
-    % NaN handling: linear interpolation
-    x = fillNaN(x);
-    y = fillNaN(y);
-
-    % Call MATLAB's wcoherence via str2func to avoid shadowing
-    wcoherenceFn = str2func('wcoherence');
-    [wcoh, wcs, freqs, coi] = wcoherenceFn(x, y, fs, ...
-        'VoicesPerOctave', opts.VoicesPerOctave);
-
-    % Build time vector
-    times = (0:T-1)' / fs;
-
-    % Ensure coi is a row vector for broadcasting
-    coi = coi(:)';
-
-    % Frequency band mask
-    freqMask = freqs >= fLow & freqs <= fHigh;
-
-    % Build validity mask: freq in range AND inside cone of influence
-    % COI convention: freqs < coi(t) are edge-affected (outside cone)
-    if opts.ApplyCOI
-        coiMask = bsxfun(@ge, freqs(:), coi);  % freqs >= coi(t) → valid
-    else
-        coiMask = true(size(wcoh));
-    end
-
-    validMask = bsxfun(@and, freqMask(:), true(1, T)) & coiMask;
-
-    % Scalar value: mean coherence in valid region
-    if any(validMask(:))
-        result.value = mean(wcoh(validMask), 'omitnan');
-    else
-        result.value = NaN;
-    end
-
-    % No analytic p-value for WCT
-    result.pvalue = NaN;
-    result.method = 'wcoherence';
-    result.windowed = false;
-    result.wcoh = wcoh;
-    result.freqs = freqs;
-    result.times = times;
-    result.coi = coi(:);
-    result.freqRange = [fLow, fHigh];
-
-    if opts.PhaseOutput
-        result.phase = angle(wcs);
-    end
-
-end
-
-
-function v = fillNaN(v)
-% Linear interpolation of NaN values
-    nanIdx = isnan(v);
-    if ~any(nanIdx), return; end
-    if all(nanIdx), v(:) = 0; return; end
-    t = (1:length(v))';
-    v(nanIdx) = interp1(t(~nanIdx), v(~nanIdx), t(nanIdx), 'linear', 'extrap');
 end

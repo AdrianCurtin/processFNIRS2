@@ -1,9 +1,10 @@
 function [qmf, wavename, desc] = resolveWavelet(name)
-% RESOLVEWAVELET Map user-friendly wavelet name to WaveLab filter and MATLAB wavename
+% RESOLVEWAVELET Map user-friendly wavelet name to WaveLab QMF filter
 %
 % Converts shorthand wavelet names (e.g. 'db2', 'sym4', 'coif3') into
-% the corresponding WaveLab850 QMF filter via MakeONFilter and the
-% MATLAB Wavelet Toolbox wavelet name for dwt/idwt.
+% the corresponding WaveLab850 QMF filter via MakeONFilter. The wavename
+% output provides the equivalent MATLAB Wavelet Toolbox name (informational
+% only — not required for processing, which uses WaveLab exclusively).
 %
 % Syntax:
 %   [qmf, wavename, desc] = pf2_base.wavelet.resolveWavelet(name)
@@ -20,8 +21,9 @@ function [qmf, wavename, desc] = resolveWavelet(name)
 %
 % Outputs:
 %   qmf      - QMF filter vector from MakeONFilter [1 x N double]
-%   wavename - MATLAB Wavelet Toolbox name for dwt/idwt (string).
-%              Empty for wavelets without a MATLAB Toolbox equivalent.
+%   wavename - Equivalent MATLAB Wavelet Toolbox name (informational).
+%              Empty for wavelets without a Toolbox equivalent
+%              (beylkin, vaidyanathan, battle).
 %   desc     - Human-readable description string for logging
 %
 % Example:
