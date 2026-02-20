@@ -43,8 +43,9 @@ function [fig, stats] = plotNeuralEfficiencyCore(plotGroups, varargin)
 % Outputs:
 %   fig   - Figure handle
 %   stats - Struct array [nItems x 1]:
-%           .r, .p, .rho, .pval, .N, .zX, .zY, .centroid,
-%           .semX, .semY, .stdX, .stdY, .label
+%           .r, .p, .rho, .pval, .N, .zX, .zY, .NE, .centroid,
+%           .semX, .semY, .stdX, .stdY, .meanNE, .label
+%           NE = zY - zX (positive = above identity line = efficient)
 %
 % See also: plotNeuralEfficiency, plotNeuralEfficiencyFromTable
 
@@ -199,11 +200,15 @@ function [fig, stats] = plotNeuralEfficiencyCore(plotGroups, varargin)
         stdXval = std(xZ, 'omitnan');
         stdYval = std(yZ, 'omitnan');
 
+        % Neural efficiency: NE = zY - zX (positive = above identity line)
+        neVals = yZ - xZ;
+
         s = struct('r', NaN, 'p', NaN, 'rho', NaN, 'pval', NaN, ...
-            'N', N, 'zX', xZ, 'zY', yZ, ...
+            'N', N, 'zX', xZ, 'zY', yZ, 'NE', neVals, ...
             'centroid', [cx, cy], ...
             'semX', semXval, 'semY', semYval, ...
             'stdX', stdXval, 'stdY', stdYval, ...
+            'meanNE', mean(neVals, 'omitnan'), ...
             'label', lbl);
         if N >= 3
             [s.r, s.p] = corr(xZ, yZ, 'Type', 'Pearson');

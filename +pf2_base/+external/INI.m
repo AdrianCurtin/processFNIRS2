@@ -99,7 +99,7 @@ classdef INI < hgsetget & dynamicprops
     properties
        File        = 'INI.ini'; % Default file
        CommentChar = '%';       % Comment character when reading
-       NewLineChar = '\r\n';    % New line characters when writing
+       NewLineChar = '\n';      % New line characters when writing
        Sections    = {};        % Sections names
     end
     
@@ -351,6 +351,10 @@ classdef INI < hgsetget & dynamicprops
             % Function 'Write value' (struct, cell, char or numeric)
             function Write_value(ID,Value)
                 
+                if isstring(Value)
+                    Value = char(Value);
+                end
+
                 switch class(Value)
                     case 'struct'
                         Symbols = {'struct(',')'};
@@ -358,9 +362,9 @@ classdef INI < hgsetget & dynamicprops
                         Symbols = {'{','}'};
                     case 'char'
                         if(Value(1)==''''&&Value(end)=='''')||(Value(1)=='"'&&Value(end)=='"')
-                            Symbols = {'',''};           
+                            Symbols = {'',''};
                         else
-                            Symbols = {'''',''''};  
+                            Symbols = {'''',''''};
                         end
                     otherwise
                         if isscalar(Value)
@@ -372,9 +376,7 @@ classdef INI < hgsetget & dynamicprops
                 
                 fprintf(ID,Symbols{1});
                 
-                if isstring(Value)
-                    Class = 'char';
-                elseif isobject(Value)
+                if isobject(Value)
                     Class = 'struct';
                 else
                     Class = class(Value);
@@ -401,12 +403,14 @@ classdef INI < hgsetget & dynamicprops
                                         Write_value(ID,Value{n,m});
                                         if m < size(Value,2)
                                             fprintf(ID,',');
-                                        end     
-                                    otherwise
-                                        if(islogical(Value))
-                                           Value=double(Value); 
                                         end
-                                        fprintf(ID,Format(Value(n,m)),Value(n,m));
+                                    case 'logical'
+                                        fprintf(ID,'%d',double(Value(n,m)));
+                                        if m < size(Value,2)
+                                            fprintf(ID,',');
+                                        end
+                                    otherwise
+                                        fprintf(ID,getFormatStr(Value(n,m)),Value(n,m));
                                         if m < size(Value,2)
                                             fprintf(ID,',');
                                         end
@@ -417,24 +421,26 @@ classdef INI < hgsetget & dynamicprops
                             end
                         end
                 end
-                
+
                 fprintf(ID,Symbols{2});
-                
-                function Format = Format(Data)
-                    
+
+                function fmt = getFormatStr(Data)
+
                     switch class(Data)
                         case {'uint8','uint16','uint32','uint64'}
-                            Format = '%u';
+                            fmt = '%u';
                         case {'int8','int16','int32','int64'}
-                            Format = '%d';
+                            fmt = '%d';
                         case {'single','double'}
-                            Format = '%G';
+                            fmt = '%G';
                         case 'char'
-                            Format = '%s';
+                            fmt = '''%s''';
+                        case 'logical'
+                            fmt = '%d';
                         otherwise
                             error('Type "%s" not supported.',class(Data));
                     end
-                    
+
                 end
                 
             end
@@ -525,32 +531,32 @@ for n = 1:length(Name)
         case Numbers
         case LowerCases
         case UpperCases
-        case {'À','Á','Â','Ã','Ä','Å'},     Character = 'A';
-        case 'Æ',                           Character = 'AE';
-        case 'Ç',                           Character = 'C';
-        case {'È','É','Ê','Ë'},             Character = 'E';
-        case {'Ì','Í','Î','Ï'},             Character = 'I';
-        case 'Ñ',                           Character = 'N';
-        case {'Ò','Ó','Ô','Õ','Ö'},         Character = 'O';
-        case {'Ù','Ú','Û','Ü'},             Character = 'U';
-        case 'Ý',                           Character = 'Y';
-        case '²',                           Character = '2';
-        case '³',                           Character = '3';
-        case '¼',                           Character = '1_4';
-        case '½',                           Character = '1_2';
-        case '¾',                           Character = '3_4';
-        case {'à','á','â','ã','ä','å'},     Character = 'a';
-        case 'æ',                           Character = 'ae';
-        case 'ç',                           Character = 'c';
-        case {'è','é','ê','ë'},             Character = 'e';
-        case {'ì','í','î','ï'},             Character = 'i';
-        case 'ñ',                           Character = 'n';
-        case {'ò','ó','ô','õ','ö'},         Character = 'o';
-        case {'ù','ú','û','ü','µ'},         Character = 'u';
-        case {'ý','ÿ'},                     Character = 'y';
+        case {'ï¿½','ï¿½','ï¿½','ï¿½','ï¿½','ï¿½'},     Character = 'A';
+        case 'ï¿½',                           Character = 'AE';
+        case 'ï¿½',                           Character = 'C';
+        case {'ï¿½','ï¿½','ï¿½','ï¿½'},             Character = 'E';
+        case {'ï¿½','ï¿½','ï¿½','ï¿½'},             Character = 'I';
+        case 'ï¿½',                           Character = 'N';
+        case {'ï¿½','ï¿½','ï¿½','ï¿½','ï¿½'},         Character = 'O';
+        case {'ï¿½','ï¿½','ï¿½','ï¿½'},             Character = 'U';
+        case 'ï¿½',                           Character = 'Y';
+        case 'ï¿½',                           Character = '2';
+        case 'ï¿½',                           Character = '3';
+        case 'ï¿½',                           Character = '1_4';
+        case 'ï¿½',                           Character = '1_2';
+        case 'ï¿½',                           Character = '3_4';
+        case {'ï¿½','ï¿½','ï¿½','ï¿½','ï¿½','ï¿½'},     Character = 'a';
+        case 'ï¿½',                           Character = 'ae';
+        case 'ï¿½',                           Character = 'c';
+        case {'ï¿½','ï¿½','ï¿½','ï¿½'},             Character = 'e';
+        case {'ï¿½','ï¿½','ï¿½','ï¿½'},             Character = 'i';
+        case 'ï¿½',                           Character = 'n';
+        case {'ï¿½','ï¿½','ï¿½','ï¿½','ï¿½'},         Character = 'o';
+        case {'ï¿½','ï¿½','ï¿½','ï¿½','ï¿½'},         Character = 'u';
+        case {'ï¿½','ï¿½'},                     Character = 'y';
         case {' ','''', '-', '_',...
                 '(','[','/','\'},         	Character = '_';
-        case {'°'},                         Character = 'deg';
+        case {'ï¿½'},                         Character = 'deg';
         otherwise,                          Character = '' ;
     end
     Name2 = [Name2, Character]; %#ok<AGROW>

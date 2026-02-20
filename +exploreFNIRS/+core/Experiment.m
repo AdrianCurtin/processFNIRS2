@@ -1371,17 +1371,18 @@ classdef Experiment < handle
         end
 
 
-        function [fig, stats] = plotNeuralEfficiency(obj, infoVar, varargin)
+        function [fig, stats, neTable] = plotNeuralEfficiency(obj, infoVar, varargin)
         % PLOTNEURALEFFICIENCY Neural efficiency scatter plot
         %
         %   [fig, stats] = ex.plotNeuralEfficiency('accuracy')
-        %   [fig, stats] = ex.plotNeuralEfficiency('RT', 'InvertX', true, ...
+        %   [fig, stats, neTable] = ex.plotNeuralEfficiency('RT', ...
         %       'Channels', 1:5, 'FitLine', true)
         %   [fig, stats] = ex.plotNeuralEfficiency('accuracy', ...
         %       'ZScoreMode', 'pergroup')
         %
-        % Z-scored behavioral variable (X) vs z-scored brain activation (Y).
-        % The y=x identity line separates efficient from inefficient subjects.
+        % Activation (X) vs performance (Y), z-scored. Identity line
+        % separates efficient (above) from inefficient (below).
+        % Third output neTable has per-point zX, zY, NE values.
         % Requires aggregate() first.
         %
         % See also: exploreFNIRS.core.plotNeuralEfficiency
@@ -1391,8 +1392,8 @@ classdef Experiment < handle
                     'Call aggregate() before plotNeuralEfficiency()');
             end
             varargin = obj.injectColorScheme(varargin);
-            [fig, stats] = exploreFNIRS.core.plotNeuralEfficiency(obj.groups, ...
-                'InfoVar', infoVar, varargin{:});
+            [fig, stats, neTable] = exploreFNIRS.core.plotNeuralEfficiency( ...
+                obj.groups, 'InfoVar', infoVar, varargin{:});
         end
 
 

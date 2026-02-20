@@ -1,4 +1,4 @@
-function [fig, stats] = plotNeuralEfficiencyFromTable(T, varargin)
+function [fig, stats, neTable] = plotNeuralEfficiencyFromTable(T, varargin)
 % PLOTNEURALEFFICIENCYFROMTABLE Neural efficiency plot from a table
 %
 % Creates a neural efficiency scatter plot from a MATLAB table with
@@ -50,9 +50,12 @@ function [fig, stats] = plotNeuralEfficiencyFromTable(T, varargin)
 %   SaveDPI) are passed through to plotNeuralEfficiencyCore.
 %
 % Outputs:
-%   fig   - Figure handle
-%   stats - Struct array [nItems x 1] with per-scatter-cloud statistics:
-%           .r, .p, .rho, .pval, .N, .zX, .zY, .centroid, .label
+%   fig     - Figure handle
+%   stats   - Struct array [nItems x 1] with per-scatter-cloud statistics:
+%             .r, .p, .rho, .pval, .N, .zX, .zY, .NE, .centroid,
+%             .semX, .semY, .stdX, .stdY, .meanNE, .label
+%   neTable - Input table T with columns appended: zX, zY, NE
+%             NE = zY - zX (positive = above identity line = efficient)
 %
 % Example:
 %   % Table with diagnosis groups and difficulty levels
@@ -113,6 +116,7 @@ function [fig, stats] = plotNeuralEfficiencyFromTable(T, varargin)
     yAll = T.(opts.YVar);
     if ~isnumeric(xAll), xAll = double(string(xAll)); end
     if ~isnumeric(yAll), yAll = double(string(yAll)); end
+    allRowIdx = (1:height(T))';
 
     % Extract grouping columns
     hasGroup = ~isempty(opts.GroupVar);
@@ -138,6 +142,7 @@ function [fig, stats] = plotNeuralEfficiencyFromTable(T, varargin)
 
     % --- Build plotGroups ---
     useGradient = strcmpi(opts.SubgroupShading, 'gradient');
+    rowMap = {};  % cell array parallel to plotGroups, tracks original row indices
 
     if hasGroup && hasSub
         % One plotGroup per (Group, Subgroup) combo
@@ -160,6 +165,7 @@ function [fig, stats] = plotNeuralEfficiencyFromTable(T, varargin)
         pgTemplate = struct('x', [], 'y', [], 'label', '', ...
             'color', [], 'subjectIDs', {{}}, 'arrowChain', NaN);
         plotGroups = repmat(pgTemplate, 1, nItems);
+        rowMap = cell(1, nItems);
 
         idx = 0;
         for gi = 1:nGrp
@@ -170,6 +176,7 @@ function [fig, stats] = plotNeuralEfficiencyFromTable(T, varargin)
                 plotGroups(idx).x = xAll(mask);
                 plotGroups(idx).y = yAll(mask);
                 plotGroups(idx).arrowChain = gi;
+                rowMap{idx} = allRowIdx(mask);
                 if hasSubject
                     plotGroups(idx).subjectIDs = sidCol(mask);
                 end
@@ -192,6 +199,7 @@ function [fig, stats] = plotNeuralEfficiencyFromTable(T, varargin)
         % Remove empty combos
         empty = arrayfun(@(pg) isempty(pg.x), plotGroups);
         plotGroups(empty) = [];
+        rowMap(empty) = [];
 
     elseif hasGroup
         % One plotGroup per Group
@@ -202,9 +210,11 @@ function [fig, stats] = plotNeuralEfficiencyFromTable(T, varargin)
         pgTemplate = struct('x', [], 'y', [], 'label', '', ...
             'color', [], 'subjectIDs', {{}}, 'arrowChain', 1);
         plotGroups = repmat(pgTemplate, 1, nGrp);
+        rowMap = cell(1, nGrp);
 
         for gi = 1:nGrp
             mask = strcmp(grpCol, uniqueGroups{gi});
+            rowMap{gi} = allRowIdx(mask);
             plotGroups(gi).x = xAll(mask);
             plotGroups(gi).y = yAll(mask);
             plotGroups(gi).label = uniqueGroups{gi};
@@ -229,9 +239,11 @@ function [fig, stats] = plotNeuralEfficiencyFromTable(T, varargin)
         pgTemplate = struct('x', [], 'y', [], 'label', '', ...
             'color', [], 'subjectIDs', {{}}, 'arrowChain', 1);
         plotGroups = repmat(pgTemplate, 1, nSub);
+        rowMap = cell(1, nSub);
 
         for si = 1:nSub
             mask = strcmp(subCol, uniqueSubs{si});
+            rowMap{si} = allRowIdx(mask);
             plotGroups(si).x = xAll(mask);
             plotGroups(si).y = yAll(mask);
             plotGroups(si).label = uniqueSubs{si};
@@ -251,6 +263,7 @@ function [fig, stats] = plotNeuralEfficiencyFromTable(T, varargin)
         colors = exploreFNIRS.core.getGroupColors(1, opts.Colors);
         plotGroups = struct('x', xAll, 'y', yAll, 'label', 'All', ...
             'color', colors(1,:), 'subjectIDs', {{}}, 'arrowChain', NaN);
+        rowMap = {allRowIdx};
         if hasSubject
             plotGroups.subjectIDs = sidCol;
         end
@@ -282,6 +295,24 @@ function [fig, stats] = plotNeuralEfficiencyFromTable(T, varargin)
         'YLabel', opts.YLabel, ...
         'Title', opts.Title, ...
         passthrough{:});
+
+    % --- Build neTable: input table + zX, zY, NE columns ---
+    if nargout >= 3
+        nRows = height(T);
+        zXcol = nan(nRows, 1);
+        zYcol = nan(nRows, 1);
+        NEcol = nan(nRows, 1);
+        for k = 1:length(stats)
+            rows = rowMap{k};
+            zXcol(rows) = stats(k).zX;
+            zYcol(rows) = stats(k).zY;
+            NEcol(rows) = stats(k).NE;
+        end
+        neTable = T;
+        neTable.zX = zXcol;
+        neTable.zY = zYcol;
+        neTable.NE = NEcol;
+    end
 end
 
 

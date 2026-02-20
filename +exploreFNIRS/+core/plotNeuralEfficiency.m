@@ -1,4 +1,4 @@
-function [fig, stats] = plotNeuralEfficiency(groups, varargin)
+function [fig, stats, neTable] = plotNeuralEfficiency(groups, varargin)
 % PLOTNEURALEFFICIENCY Neural efficiency scatter plot (Experiment groups)
 %
 % Visualizes the relationship between brain activation (X-axis) and
@@ -43,14 +43,18 @@ function [fig, stats] = plotNeuralEfficiency(groups, varargin)
 %   SaveDPI) are passed through to plotNeuralEfficiencyCore.
 %
 % Outputs:
-%   fig   - Figure handle
-%   stats - Struct array [nGroups x 1] with per-group statistics:
-%           .r, .p      - Pearson correlation (on z-scored data)
-%           .rho, .pval - Spearman correlation
-%           .N          - Sample size
-%           .zX, .zY    - Z-scored values per subject
-%           .centroid   - [meanX, meanY] of z-scored values
-%           .label      - Group label
+%   fig     - Figure handle
+%   stats   - Struct array [nGroups x 1] with per-group statistics:
+%             .r, .p      - Pearson correlation (on z-scored data)
+%             .rho, .pval - Spearman correlation
+%             .N          - Sample size
+%             .zX, .zY    - Z-scored values per subject
+%             .NE         - Neural efficiency per subject (zY - zX)
+%             .centroid   - [meanX, meanY] of z-scored values
+%             .meanNE     - Mean neural efficiency
+%             .label      - Group label
+%   neTable - Table with columns: Group, zX, zY, NE
+%             One row per data point across all groups
 %
 % Example:
 %   ex = exploreFNIRS.core.Experiment(allData);
@@ -265,6 +269,23 @@ function [fig, stats] = plotNeuralEfficiency(groups, varargin)
         'YLabel', opts.YLabel, ...
         'Title', opts.Title, ...
         passthrough{:});
+
+    % --- Build neTable: per-data-point NE values ---
+    if nargout >= 3
+        grpLabels = {};
+        allZX = [];
+        allZY = [];
+        allNE = [];
+        for k = 1:length(stats)
+            n = stats(k).N;
+            grpLabels = [grpLabels; repmat({stats(k).label}, n, 1)]; %#ok<AGROW>
+            allZX = [allZX; stats(k).zX]; %#ok<AGROW>
+            allZY = [allZY; stats(k).zY]; %#ok<AGROW>
+            allNE = [allNE; stats(k).NE]; %#ok<AGROW>
+        end
+        neTable = table(grpLabels, allZX, allZY, allNE, ...
+            'VariableNames', {'Group', 'zX', 'zY', 'NE'});
+    end
 end
 
 
