@@ -185,6 +185,10 @@ classdef PlotStyle
                 if isprop(allCb(i), 'Label')
                     set(allCb(i).Label, 'Color', obj.ForegroundColor);
                 end
+                % Handle colorbar title (set via title(colorbar, ...))
+                if isprop(allCb(i), 'Title') && ~isempty(allCb(i).Title)
+                    set(allCb(i).Title, 'Color', obj.ForegroundColor);
+                end
             end
         end
 

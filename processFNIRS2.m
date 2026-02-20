@@ -28,9 +28,53 @@ if ~isempty(varargin) && iscell(varargin{1})
     cellData = varargin{1};
     extraArgs = varargin(2:end);
     results = cell(size(cellData));
-    for ci = 1:numel(cellData)
-        results{ci} = processFNIRS2(cellData{ci}, extraArgs{:});
+
+    % Determine if parallel processing is appropriate
+    nItems = numel(cellData);
+    useParfor = false;
+    if nItems > 2
+        % Check if user explicitly disabled acceleration
+        accelDisabled = false;
+        for ai = 1:2:length(extraArgs)-1
+            if ischar(extraArgs{ai}) && strcmpi(extraArgs{ai}, 'Accelerate') && ...
+                    ischar(extraArgs{ai+1}) && strcmpi(extraArgs{ai+1}, 'none')
+                accelDisabled = true;
+                break;
+            end
+        end
+
+        if ~accelDisabled
+            [canUse, poolRunning] = pf2_base.accel.canParfor();
+            useParfor = canUse && poolRunning;
+        end
     end
+
+    if useParfor
+        % Snapshot global state for workers
+        pf2_base.pf2_initialize();
+        ctx = pf2_base.ProcessingContext.fromGlobals();
+
+        % Check if Context is already in extraArgs
+        hasContext = false;
+        for ai = 1:2:length(extraArgs)-1
+            if ischar(extraArgs{ai}) && strcmpi(extraArgs{ai}, 'Context')
+                hasContext = true;
+                break;
+            end
+        end
+        if ~hasContext
+            extraArgs = [extraArgs, {'Context', ctx}];
+        end
+
+        parfor ci = 1:nItems
+            results{ci} = processFNIRS2(cellData{ci}, extraArgs{:});
+        end
+    else
+        for ci = 1:nItems
+            results{ci} = processFNIRS2(cellData{ci}, extraArgs{:});
+        end
+    end
+
     if nargout > 0
         varargout{1} = results;
     end

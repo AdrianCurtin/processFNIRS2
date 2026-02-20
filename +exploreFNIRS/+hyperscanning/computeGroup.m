@@ -87,20 +87,55 @@ function result = computeGroup(data, pairs, varargin)
     dyadIDs = cell(nPairs, 1);
     validDyads = true(nPairs, 1);
 
-    fprintf('Computing %d dyads...\n', nPairs);
     for d = 1:nPairs
-        idx = pairs(d).indices;
         dyadIDs{d} = pairs(d).dyadID;
+    end
 
-        try
-            dyadResults{d} = exploreFNIRS.hyperscanning.computeDyad( ...
-                data{idx(1)}, data{idx(2)}, dyadArgs{:});
-            fprintf('  [%d/%d] %s: mean r = %.3f\n', d, nPairs, dyadIDs{d}, ...
-                mean(dyadResults{d}.values(:), 'omitnan'));
-        catch ME
-            warning('exploreFNIRS:hyperscanning:computeGroup', ...
-                'Dyad "%s" failed: %s', dyadIDs{d}, ME.message);
-            validDyads(d) = false;
+    % Determine whether to use parfor
+    useParfor = false;
+    if nPairs > 2
+        [canUse, poolRunning] = pf2_base.accel.canParfor();
+        useParfor = canUse && poolRunning;
+    end
+
+    % Pre-extract indices for parfor compatibility
+    pairIndices = zeros(nPairs, 2);
+    for d = 1:nPairs
+        pairIndices(d, :) = pairs(d).indices;
+    end
+
+    if useParfor
+        fprintf('Computing %d dyads (parallel)...\n', nPairs);
+        parfor d = 1:nPairs
+            try
+                dyadResults{d} = exploreFNIRS.hyperscanning.computeDyad( ...
+                    data{pairIndices(d,1)}, data{pairIndices(d,2)}, dyadArgs{:});
+            catch
+                validDyads(d) = false;
+            end
+        end
+        % Print summary after parallel completion
+        for d = 1:nPairs
+            if validDyads(d)
+                fprintf('  [%d/%d] %s: mean r = %.3f\n', d, nPairs, dyadIDs{d}, ...
+                    mean(dyadResults{d}.values(:), 'omitnan'));
+            else
+                fprintf('  [%d/%d] %s: FAILED\n', d, nPairs, dyadIDs{d});
+            end
+        end
+    else
+        fprintf('Computing %d dyads...\n', nPairs);
+        for d = 1:nPairs
+            try
+                dyadResults{d} = exploreFNIRS.hyperscanning.computeDyad( ...
+                    data{pairIndices(d,1)}, data{pairIndices(d,2)}, dyadArgs{:});
+                fprintf('  [%d/%d] %s: mean r = %.3f\n', d, nPairs, dyadIDs{d}, ...
+                    mean(dyadResults{d}.values(:), 'omitnan'));
+            catch ME
+                warning('exploreFNIRS:hyperscanning:computeGroup', ...
+                    'Dyad "%s" failed: %s', dyadIDs{d}, ME.message);
+                validDyads(d) = false;
+            end
         end
     end
 

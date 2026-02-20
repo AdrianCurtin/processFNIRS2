@@ -43,6 +43,7 @@ function barchart(handles,exSettings,exGby,gbyVars, showBarChart,showTopo)
 %   (No direct outputs - creates figures and populates ExFNIRS global)
 %
 % Global Variables Modified:
+%   ExFNIRS.curChartLMEResults    - Full fitLME results struct
 %   ExFNIRS.curChartModels        - Cell array of fitted LME models
 %   ExFNIRS.curChartModelsAIC     - AIC values for model comparison
 %   ExFNIRS.curChartModelsANOVA   - ANOVA tables for each model
@@ -50,7 +51,7 @@ function barchart(handles,exSettings,exGby,gbyVars, showBarChart,showTopo)
 %   ExFNIRS.curChartModelsCoefficents_tstat - t-statistics table
 %   ExFNIRS.curChartModelsANOVACoefficents_pval - ANOVA p-values
 %   ExFNIRS.curChartModelsANOVACoefficents_Fstat - F-statistics
-%   ExFNIRS.curMdlFits            - Model fit p-values
+%   ExFNIRS.curMdlFits            - Model fit test results
 %
 % Error Bar Options:
 %   'SEM'          - Standard error of the mean
@@ -118,7 +119,7 @@ if(strcmp(exSettings.ChannelMode,'Aux'))
     for sI=1:length(selOpt)
         selectedOpt(sI)=auxTable{selectedBioM,selectedOptStr{sI}};
     end
-    
+
 else
     selectedOpt=selOpt;
 end
@@ -279,35 +280,35 @@ for chIdx=1:numOpt
         barChartData{1}=nan(numCurInfoG,1,5);
         barChartDataPoints{1}=cell(numCurInfoG,1);
     end
-    
-    
-    
+
+
+
     chartGby=cell(size(subplotHandles));
-    
+
     %barChartTimes=times;
-    
+
     gAStrs=cell(num2Plot,1);
     gAerrStrs=cell(num2Plot,1);
-    
+
     for b=1:numBioM
         bioM=selectedBioM(b);
         if(iscell(bioM))
             bioM=bioM{1};
         end
-        
-        
+
+
         if(numUgroups>1)
             curChart=b;
         else
             curChart=1;
         end
-        
+
         for g=1:numGroups
-            
+
             curFNIRS=exGby(g).gbyFNIRS_blk;
             curGrand=exGby(g).gbyGrandBar;
-            
-            
+
+
             if(isfield(chartGby{curChart},'gby'))
                 chartGby{curChart}.gby(end+1)=exGby(g);
             else
@@ -319,8 +320,8 @@ for chIdx=1:numOpt
                     chartGby{curChart}.curBioM=selectedBioM(b);
                 end
             end
-            
-            
+
+
             if(useCurInfoGroup)
                 curGroupInfoIdx=uCurIdx(g);
                 curGroupIdxOffset=(curGroupInfoIdx-1)*numChartTimes;
@@ -330,28 +331,28 @@ for chIdx=1:numOpt
                 curGroupIdxOffset=0;
                 curUgroupIdx=g;
             end
-            
+
             if(isempty(curGrand))
                 if(plotGroupByBioM)
                     barChartData{curChart}(:,b,1:3)=nan;
-                    
+
                 else
                     barChartData{curChart}(:,curUgroupIdx,1:3)=nan;
                 end
-                
+
                 if(numUgroups>1||numBioM==1)
                     gAStrs{curUgroupIdx,curChart}=sprintf('%s',gbyStrs{g});
                 elseif(numBioM>1&&~multiPlot)
                     gAStrs{b,curChart}=sprintf('%s',selectedBioM{b});
                 end
-                
+
                 continue;
             end
-            
+
             %if(exSettings.plot_bar_ga)
             [timeIdx,timeIdxRev]=ismember(round(curGrand.time),barChartTimes);
             timeIdxRev=timeIdxRev(timeIdxRev>0);
-            
+
             switch(exSettings.ChannelMode)
                 case 'fNIR'
                     data2plot=curGrand.(bioM);
@@ -359,14 +360,14 @@ for chIdx=1:numOpt
                     if(~pf2_base.isnestedfield(curGrand,'ROI.HbO.data'))
                         error('ROI data must be calculated using a build ROI step');
                     end
-                    
+
                     data2plot=curGrand.ROI.(bioM);
                 case 'Aux'
                     data2plot=curGrand.Aux.(bioM);
             end
-            
+
             plottingDataPoints=plotPoints;
-            
+
             if(plotGroupByBioM)
                 if(exSettings.plot_bar_ga)
                     barChartData{curChart}(timeIdxRev+curGroupIdxOffset,b,1)=data2plot.(plotFeature)(timeIdx,ch);
@@ -380,27 +381,27 @@ for chIdx=1:numOpt
                 else
                     barChartData{curChart}(timeIdxRev+curGroupIdxOffset,curUgroupIdx,1)=nan(size(data2plot.(plotFeature)(timeIdx,ch)));
                 end
-                
+
                 %barChartDataPoints{curChart}{timeIdxRev+curGroupIdxOffset,curUgroupIdx}=[];
             end
-            
+
             if(plotGroupByBioM&&(plotPoints||strcmp(errorFeature,'Violin')))
                 barChartDataPoints{curChart}(timeIdxRev+curGroupIdxOffset,b)={data2plot.data(timeIdx,ch,:)};
             elseif(plotPoints||strcmp(errorFeature,'Violin'))
                 barChartDataPoints{curChart}(timeIdxRev+curGroupIdxOffset,curUgroupIdx)={data2plot.data(timeIdx,ch,:)};
             end
-            
+
             if(numUgroups>1||numBioM==1)
                 gAStrs{curUgroupIdx,curChart}=sprintf('%s',gbyStrs{g});
             elseif(numBioM>1)
                 gAStrs{b,curChart}=sprintf('%s',selectedBioM{b});
             end
             %else
-            
+
             %end
-            
+
             if(exSettings.plot_bar_err&&~plotCount)
-                
+
                 errMultiply=exSettings.plot_bar_err_mult;
                 [timeIdx,timeIdxRev]=ismember(round(curGrand.time),barChartTimes);
                 timeIdxRev=timeIdxRev(timeIdxRev>0);
@@ -408,77 +409,77 @@ for chIdx=1:numOpt
                 numErrFeatures=1;
                 if(strcmp(errorFeature,'MaxMin'))
                     numErrFeatures=2; %min and max)
-                    
+
                     if(plotGroupByBioM)
                         barChartData{curChart}(timeIdxRev+curGroupIdxOffset,b,2)=ga2plot.Min(timeIdx,ch);
                         barChartData{curChart}(timeIdxRev+curGroupIdxOffset,b,3)=ga2plot.Max(timeIdx,ch);
-                        
+
                     else
                         barChartData{curChart}(timeIdxRev+curGroupIdxOffset,curUgroupIdx,2)=ga2plot.Min(timeIdx,ch);
                         barChartData{curChart}(timeIdxRev+curGroupIdxOffset,curUgroupIdx,3)=ga2plot.Max(timeIdx,ch);
                     end
-                    
-                    
+
+
                 elseif(strcmp(errorFeature,'IQR')||strcmp(errorFeature,'IQR-NoOutliers')||strcmp(errorFeature,'Violin'))
                     numErrFeatures=5; %min and max) and median
                     gaQuant=quantile(ga2plot.data(timeIdx,ch,:),3);
                     iqr=gaQuant(end)-gaQuant(1);
-                    
+
                     gaPlotMin=min(ga2plot.Min(timeIdx,ch));
                     gaPlotMax=max(ga2plot.Max(timeIdx,ch));
-                    
+
                     if(contains(errorFeature,'IQR'))
                         outlierMax=gaQuant(end)+errMultiply*iqr;
                         outlierMin=gaQuant(1)-errMultiply*iqr;
-                        
-                        
+
+
                         iqrPlotErrMin=max([gaPlotMin,outlierMin]);
                         iqrPlotErrMax=min([gaPlotMax,outlierMax]);
-                        
+
                         dataPlotMin_barchart=iqrPlotErrMin;
                         dataPlotMax_barchart=iqrPlotErrMax;
-                        
+
                     else
                         numErrFeatures=4;
                         dataPlotMin_barchart=gaPlotMin;
                         dataPlotMax_barchart=gaPlotMax;
                     end
-                    
-                    
+
+
                     if(plotGroupByBioM)
                         barChartData{curChart}(timeIdxRev+curGroupIdxOffset,b,2)=dataPlotMin_barchart;
                         barChartData{curChart}(timeIdxRev+curGroupIdxOffset,b,3)=dataPlotMax_barchart;
-                        
+
                         barChartData{curChart}(timeIdxRev+curGroupIdxOffset,b,4)=gaQuant(1);
                         barChartData{curChart}(timeIdxRev+curGroupIdxOffset,b,5)=gaQuant(end);
-                        
+
                         barChartData{curChart}(timeIdxRev+curGroupIdxOffset,b,6)=gaQuant(2);
-                        
+
                         if(strcmp(errorFeature,'IQR'))
                             dataPointsIdx=(ga2plot.data(timeIdx,ch,:)>iqrPlotErrMax|ga2plot.data(timeIdx,ch,:)<iqrPlotErrMin);
-                            
+
                             barChartDataPoints{curChart}(timeIdxRev+curGroupIdxOffset,b)={ga2plot.data(timeIdx,ch,dataPointsIdx)};
-                            
+
                             plottingDataPoints=true;
                         end
                     else
                         barChartData{curChart}(timeIdxRev+curGroupIdxOffset,curUgroupIdx,2)=dataPlotMin_barchart;
                         barChartData{curChart}(timeIdxRev+curGroupIdxOffset,curUgroupIdx,3)=dataPlotMax_barchart;
-                        
+
                         barChartData{curChart}(timeIdxRev+curGroupIdxOffset,curUgroupIdx,4)=gaQuant(1);
                         barChartData{curChart}(timeIdxRev+curGroupIdxOffset,curUgroupIdx,5)=gaQuant(end);
-                        
+
                         barChartData{curChart}(timeIdxRev+curGroupIdxOffset,curUgroupIdx,6)=gaQuant(2);
-                        
+
                         if(strcmp(errorFeature,'IQR'))
                             dataPointsIdx=(ga2plot.data(timeIdx,ch,:)>iqrPlotErrMax|ga2plot.data(timeIdx,ch,:)<iqrPlotErrMin);
-                            
+
                             barChartDataPoints{curChart}(timeIdxRev+curGroupIdxOffset,curUgroupIdx)={ga2plot.data(timeIdx,ch,dataPointsIdx)};
-                            
+
                             plottingDataPoints=true;
                         end
                     end
-                    
+
                 else
                     if(plotGroupByBioM)
                         barChartData{curChart}(timeIdxRev+curGroupIdxOffset,b,2)=ga2plot.(errorFeature)(timeIdx,ch)*errMultiply;
@@ -501,11 +502,11 @@ for chIdx=1:numOpt
                 end
             end
         end
-        
+
     end
-    
-    
-    
+
+
+
     for curChart=1:length(barChartData)
         if(isempty(barChartData{curChart}))
             warning('All data is missing');
@@ -518,11 +519,11 @@ for chIdx=1:numOpt
             lastPlotNum=numBioM*numOpt;
             if(numOpt>1)
                 curSubplotIdx=chIdx+(numOpt*(curChart-1));
-                
+
                 numX=numBioM;
                 numY=numOpt;
                 subplotGby{curSubplotIdx}=chartGby{curChart};
-                
+
             else
                 curSubplotIdx=chIdx+(numOpt*(curChart-1));
                 numX=1;
@@ -539,11 +540,11 @@ for chIdx=1:numOpt
         if(~showBarChart)
             continue;
         end
-        
+
         subplotHandles{curSubplotIdx}=subplot(numX,numY,curSubplotIdx);
         subplotGby{curSubplotIdx}.barChartData=barChartData{curChart};
         subplotGby{curSubplotIdx}.gAStrs=gAStrs(:,1);
-        
+
         if(useCurInfoGroup&&numChartTimes>1)
             xBarLabels=cell(numChartTimes*numCurInfoG,1);
             timeStrs=num2str(round(barChartTimes));
@@ -560,18 +561,18 @@ for chIdx=1:numOpt
         else
             xBarLabels=barChartTimeStrings;
         end
-        
-        
+
+
         subplotGby{curSubplotIdx}.xBarLabels=xBarLabels;
-        
-        
+
+
         if(exSettings.plot_bar_err&&~plotCount)
             pf2_base.external.barweb(barChartData{curChart}(:,:,1),barChartData{curChart}(:,:,2:1+numErrFeatures),1,xBarLabels, 'ColorMap', cIndex,'Legend',gAStrs,'LegendType','hide','DataPoints',barChartDataPoints{curChart},'PlotViolin',strcmp(errorFeature,'Violin'));
-            
-            
+
+
             if(plottingDataPoints||strcmp(errorFeature,'MaxMin')||strcmp(errorFeature,'IQR')||strcmp(errorFeature,'Violin'))
                 [jSz,kSz]=size(barChartDataPoints{curChart});
-                
+
                 for j=1:jSz
                     for k=1:kSz
                         if(~isempty(barChartDataPoints{curChart}{j,k}))
@@ -580,38 +581,38 @@ for chIdx=1:numOpt
                         end
                     end
                 end
-                
-                
+
+
             elseif(strcmp(errorFeature,'IQR-NoOutliers'))
                 minValFromBarChart=min(min(min(barChartData{curChart}(:,:,2))));
                 maxValFromBarChart=max(max(max(barChartData{curChart}(:,:,3))));
-                
-                
+
+
             else
                 maxValFromBarChart=max(max(max(barChartData{curChart}(:,:,1)+barChartData{curChart}(:,:,2))));
                 minValFromBarChart=min(min(min(barChartData{curChart}(:,:,1)-barChartData{curChart}(:,:,2))));
             end
-            
-            
-            
-            
+
+
+
+
             ylimLower=minValFromBarChart;
             ylimUpper=maxValFromBarChart;
             yrange=ylimUpper-ylimLower;
-            
-            
+
+
         else
             maxValFromBarChart=max(max(barChartData{curChart}(:,:,1)));
             minValFromBarChart=min(min(barChartData{curChart}(:,:,1)));
-            
+
             pf2_base.external.barweb(barChartData{curChart}(:,:,1),[],1,xBarLabels, 'ColorMap', cIndex,'Legend',gAStrs,'LegendType','hide', 'DataPoints',barChartDataPoints{curChart});
-            
+
             ylimLower=minValFromBarChart;
             ylimUpper=maxValFromBarChart;
             yrange=ylimUpper-ylimLower;
-            
+
         end
-        
+
         if(exSettings.ylim_fixed)
             %ylim([min(ylimLower-0.05*yrange,0),max(ylimUpper+0.05*yrange,0)]);
             if(yrange==0)
@@ -626,7 +627,7 @@ for chIdx=1:numOpt
         else
             ylim([ylimLower-0.1*yrange,ylimUpper+0.1*yrange]);
         end
-        
+
         switch exSettings.ChannelMode
             case 'fNIR'
                 chNamePart=sprintf('Opt. %s',selectedOptStr{chIdx});
@@ -638,14 +639,14 @@ for chIdx=1:numOpt
                 chNamePart=selectedOptStr{chIdx};
                 chNamePartLong=sprintf('Aux: %s %s',selectedOptStr{chIdx},bioM);
         end
-        
+
         if(numBioM==1||numUgroups>1)
             if(numBioM==1)
                 bioM=selectedBioM(curChart);
                 if(iscell(bioM))
                     bioM=bioM{1};
                 end
-                
+
                 if(plotCount)
                     ylabel_with_space(sprintf('%s [%s]',plotFeature,bioM));
                 elseif(strcmp(exSettings.ChannelMode,'Aux'))
@@ -681,7 +682,7 @@ for chIdx=1:numOpt
                         ylabel_with_space(sprintf('%s %s %s +/- %dx(%s)',plotFeature,bioM,chNamePart,errMultiply,errorFeature));
                     end
                 end
-                
+
             end
         elseif(numBioM==b)
             if(plotCount)
@@ -692,8 +693,8 @@ for chIdx=1:numOpt
                 ylabel_with_space(sprintf('%s \\Delta[%s] (\\muM)  +/- (%s)',plotFeature,'X',errorFeature));
             end
         end
-        
-        
+
+
         switch exSettings.ChannelMode
             case 'fNIR'
                 title_with_space(sprintf('Optode %s',optStrs{ch}));
@@ -702,7 +703,7 @@ for chIdx=1:numOpt
             case 'Aux'
                 title_with_space(chNamePartLong);
         end
-        
+
         if(useCurInfoGroup&&numChartTimes==1)
             xlabel_with_space(sprintf('%s (t=%s)',curInfoGroup,barChartTimeStrings{1}));
         elseif(useCurInfoGroup)
@@ -710,7 +711,7 @@ for chIdx=1:numOpt
         else
             xlabel_with_space('Time (s)');
         end
-        
+
         if((numBioM>1||numUgroups>1)&&(exSettings.plot_legend_mode==3||(exSettings.plot_legend_mode==2&&curSubplotIdx==lastPlotNum)))
             for i=1:size(gAStrs,1)
                 if(isnumeric(gAStrs{i,curChart}))
@@ -729,35 +730,104 @@ if(plotCount)
 end
 
 
+% --- LME Statistical Analysis ---
+% Delegates to exploreFNIRS.stats.fitLME instead of fitting inline
+
+lmeResults = [];
+curChartLME = cell(1, length(subplotHandles));
+
 if(exSettings.LME_enable)
     fprintf('Generating Models...\nAccessed at ExFNIRS.curChartModels\n')
-    
+
     global ExFNIRS
-    
-    ExFNIRS.curChartModels=cell(0);
-    ExFNIRS.curChartModelsAIC=[];
-    ExFNIRS.curChartModelsCoefficents=cell(0);
-    ExFNIRS.curChartModelsCoefficents_pval=table();
-    ExFNIRS.curChartModelsCoefficents_tstat=table();
-    ExFNIRS.curChartModelsCoefficents_df=table();
-    ExFNIRS.curChartModelsANOVA=cell(0);
-    ExFNIRS.curChartModelsANOVACoefficents_pval=table();
-    ExFNIRS.curChartModelsANOVACoefficents_Fstat=table();
-    ExFNIRS.curChartModelsANOVACoefficents_df1=table();
-    ExFNIRS.curChartModelsANOVACoefficents_df2=table();
-    ExFNIRS.curMdlFits=table();
-    
-    
+
+    % Build fitLME arguments from GUI settings
+    lmeArgs = { ...
+        'UseIntercept', exSettings.LME_use_intercept, ...
+        'AllInteractions', exSettings.LME_all_interactions, ...
+        'RandomEffects', exSettings.LME_randomFxStr, ...
+        'Biomarkers', selectedBioM(:)', ...
+        'Channels', selectedOpt, ...
+        'Verbose', true, ...
+        'DiscreteTime', exSettings.LME_use_discreteTime, ...
+        'SkipContrasts', showTopo, ...
+        'ModelFitTest', true, ...
+        'ExcludeShortSeparation', false};
+    if(exSettings.LME_info_covariate)
+        lmeArgs = [lmeArgs, {'InfoCovariate', exSettings.curInfoStr}];
+    end
+    if(exSettings.LME_use_customStr && ~isempty(exSettings.LME_customStr))
+        lmeArgs = [lmeArgs, {'CustomFormula', exSettings.LME_customStr}];
+    end
+
+    switch exSettings.ChannelMode
+        case 'fNIR'
+            lmeArgs = [lmeArgs, {'DataType', 'fNIRS'}];
+        case 'ROI'
+            lmeArgs = [lmeArgs, {'DataType', 'ROI'}];
+        case 'Aux'
+            lmeArgs = [lmeArgs, {'DataType', 'Aux', 'AuxField', selectedBioM{1}}];
+    end
+
+    lmeResults = exploreFNIRS.stats.fitLME(exGby, gbyVars_original, lmeArgs{:});
+
+    % Store consolidated results
+    ExFNIRS.curChartLMEResults = lmeResults;
+
+    % Legacy globals for backward compat
+    ExFNIRS.curChartModels = lmeResults.models;
+    ExFNIRS.curChartModelsAIC = lmeResults.AIC;
+    ExFNIRS.curChartModelsANOVA = lmeResults.anova;
+    ExFNIRS.curChartModelsANOVACoefficents_pval = lmeResults.anova_pval;
+    ExFNIRS.curChartModelsANOVACoefficents_Fstat = lmeResults.anova_Fstat;
+    ExFNIRS.curChartModelsANOVACoefficents_df1 = lmeResults.anova_df1;
+    ExFNIRS.curChartModelsANOVACoefficents_df2 = lmeResults.anova_df2;
+    ExFNIRS.curChartModelsCoefficents = lmeResults.coefficients;
+    ExFNIRS.curChartModelsCoefficents_pval = lmeResults.coef_pval;
+    ExFNIRS.curChartModelsCoefficents_tstat = lmeResults.coef_tstat;
+    ExFNIRS.curChartModelsCoefficents_df = lmeResults.coef_df;
+
+    % Build legacy curMdlFits table: rows=biomarker, cols=channel, values=p
+    % Old format: ExFNIRS.curMdlFits{bioM, mdlChName} = p-value
+    legacyMdlFits = table();
+    if ~isempty(lmeResults.modelFit) && height(lmeResults.modelFit) > 0 && ...
+            ismember('p', lmeResults.modelFit.Properties.VariableNames)
+        mfRows = lmeResults.modelFit.Properties.RowNames;
+        for mfI = 1:length(mfRows)
+            parts = strsplit(mfRows{mfI}, '_');
+            if length(parts) >= 2
+                mfBio = parts{end};
+                mfCh = strjoin(parts(1:end-1), '_');
+            else
+                mfBio = parts{1};
+                mfCh = parts{1};
+            end
+            legacyMdlFits{mfBio, mfCh} = lmeResults.modelFit{mfI, 'p'};
+        end
+    end
+    ExFNIRS.curMdlFits = legacyMdlFits;
+
+    % Build curChartLME cell array for topo section compat
+    for sH = 1:length(subplotHandles)
+        if(~isfield(subplotGby{sH}, 'gby')), continue; end
+        [bIdx, chI] = mapSubplotToResults(subplotGby{sH}, lmeResults, plotGroupByBioM);
+        if(~isempty(bIdx) && ~isempty(chI) && bIdx <= size(lmeResults.models,1) && chI <= size(lmeResults.models,2))
+            curChartLME{sH} = lmeResults.models{bIdx, chI};
+        end
+    end
 end
 
 
 LME_topo_mode='anova';
 
 lmeString='None~';
+if(~isempty(lmeResults))
+    lmeString = lmeResults.formula;
+end
 
 
 for sH=1:length(subplotHandles)
-    
+
     fprintf('\nInfo Table Values\n');
     curData=subplotGby{sH};
     if(isfield(curData,'gAStrs'))
@@ -765,247 +835,78 @@ for sH=1:length(subplotHandles)
             for j=1:size(curData.xBarLabels,1)
                 fprintf('%s:%s\tMean %.2f\tError: %.2f\n',curData.gAStrs{i},curData.xBarLabels{j},curData.barChartData(j,i,1),curData.barChartData(j,i,2));
             end
-            
+
         end
     end
     fprintf('\n');
-    
-    
-    
-    if(exSettings.LME_enable&&isfield(subplotGby{sH},'gby'))
-        switch (exSettings.ChannelMode)
-            case 'fNIR'
-                mergedTables{sH}=exploreFNIRS.export.mergeGbyTablesLong(subplotGby{sH}.gby,subplotGby{sH}.curBioM,subplotGby{sH}.curCh,barChartTimes,false,false,optStrs(subplotGby{sH}.curCh));
-                varNameStart='Opt';
-                
-            case 'ROI'
-                mergedTables{sH}=exploreFNIRS.export.mergeGbyTablesLong(subplotGby{sH}.gby,subplotGby{sH}.curBioM,subplotGby{sH}.curCh,barChartTimes,false,true);
-                varNameStart='ROI';
-                
-            case 'Aux'
-                mergedTables{sH}=exploreFNIRS.export.mergeGbyTablesLong(subplotGby{sH}.gby,subplotGby{sH}.curBioM,subplotGby{sH}.curCh,barChartTimes,true,false);
-                varNameStart='aux';
-        end
-        x=gbyVars_original;
-        curLMEGbyString='';
-        mdlPrtString='';
-        
-        useAllInteractions=exSettings.LME_all_interactions;
-        
-        basicMdlStrings=cell(0);
-        
-        
-        if(exSettings.LME_info_covariate)
-            basicMdlStrings{length(basicMdlStrings)+1}=exSettings.curInfoStr;
-        end
-        %         if(plotGroupByBioM&&numBioM>1)
-        %             %basicMdlStrings{length(basicMdlStrings)+1}='BioM';
-        %             warning('GroupBy Biomarker Plots not supported yet\n Only using first biomarker');
-        %         end
-        
-        for z=1:length(basicMdlStrings)
-            if(z==1)
-                mdlPrtString=basicMdlStrings{z};
-            else
-                mdlPrtString=sprintf('%s*%s',mdlPrtString,basicMdlStrings{z});
-            end
-        end
-        
-        if(isempty(mdlPrtString))
-            mdlPrtString='1';
-        end
-        
-        
-        if(useAllInteractions)
-            curLMEGbyString=mdlPrtString;
-            for i=1:length(x)
-                curLMEGbyString=sprintf('%s*%s',curLMEGbyString,x{i});
-            end
-        else
-            for i=1:length(x)
-                curLMEGbyString=sprintf('%s+%s*%s',curLMEGbyString,mdlPrtString,x{i});
-            end
-            if(~isempty(curLMEGbyString))
-                curLMEGbyString(1)=[];
-            end
-            
-            
-        end
-        
-        if(numChartTimes>1)
-            curLMEGbyString=sprintf('%s+Time',curLMEGbyString);
-        end
-        
-        dummyCodeStr='reference';
-        
-        if(strcmp(exSettings.ChannelMode,'Aux'))
-            varName=sprintf('%s_%s_%s',varNameStart,subplotGby{sH}.curBioM{1},selectedOptStr{(selectedOpt==subplotGby{sH}.curCh)});
-        elseif(strcmp(exSettings.ChannelMode,'ROI'))
-            varName=sprintf('%s%i_%s_%s',varNameStart,subplotGby{sH}.curCh,selectedOptStr{(selectedOpt==subplotGby{sH}.curCh)},subplotGby{sH}.curBioM{1});
-        else
-            varName=sprintf('%s%s_%s',varNameStart,selectedOptStr{(selectedOpt==subplotGby{sH}.curCh)},subplotGby{sH}.curBioM{1});
-        end
-        
-        if(exSettings.LME_use_customStr&&~isempty(exSettings.LME_customStr))
-            lmeString=sprintf('%s~%s',varName,exSettings.LME_customStr);
-            if(contains(lmeString,'-1+')||contains(lmeString,'~-1'))
-                dummyCodeStr='full';
-                lmeString(lmeString=='*')=':';
-            end
-        elseif(exSettings.LME_use_intercept)
-            lmeString=sprintf('%s~%s+(%s)',varName,curLMEGbyString,exSettings.LME_randomFxStr);
-            if(isempty(curLMEGbyString))
-                lmeString=sprintf('%s~1+(%s)',varName,exSettings.LME_randomFxStr);
-            end
-            
-        else
-            lmeString=sprintf('%s~-1+%s+(%s)',varName,curLMEGbyString,exSettings.LME_randomFxStr);
-            dummyCodeStr='full';
-            lmeString(lmeString=='*')=':';
-        end
-        
-        try
-            if((~exSettings.LME_use_discreteTime||strcmp(LME_topo_mode,'anova'))&&numChartTimes>1)
-                mergedTables{sH}.Time=str2double(mergedTables{sH}.Time);
-            end
-            
-            
-            rng(2019);
-            curChartLME{sH}=fitlme(mergedTables{sH},lmeString,'FitMethod','REML','CheckHessian',true,'DummyVarCoding',dummyCodeStr);
-            %   curChartLME_emm{sH}= pf2_base.external.emmeans(curChartLME{sH}, {'orig'}, 'effects');
-            %             h = emmip(curChartLME_emm{sH},'orig');
-            nullMdlstring=sprintf('%s~1+(1|SubjectID)',varName);
-            curChartLME_ML=fitlme(mergedTables{sH},lmeString,'FitMethod','ML','CheckHessian',true,'DummyVarCoding',dummyCodeStr);
-            nullChartLME=fitlme(mergedTables{sH},nullMdlstring,'FitMethod','ML','CheckHessian',true,'DummyVarCoding',dummyCodeStr);
-            nullCompare{sH}=compare(nullChartLME,curChartLME_ML);
-            pVal=nullCompare{sH}.pValue(end);
-            if(pVal<0.05 && ~isnan(pVal))
-                nullCompareStr{sH}='Model is significantly better than naive model';
-            elseif(~isnan(pVal))
-                nullCompareStr{sH}='Model is not significantly better than naive model';
-            else
-                nullCompareStr{sH}='Model comparison inconclusive';
-            end
-            
+
+
+
+    if(exSettings.LME_enable && isfield(subplotGby{sH},'gby') && ~isempty(lmeResults))
+        [bIdx, chI] = mapSubplotToResults(subplotGby{sH}, lmeResults, plotGroupByBioM);
+
+        if(~isempty(bIdx) && ~isempty(chI) && bIdx <= size(lmeResults.models,1) && chI <= size(lmeResults.models,2) && ~isempty(lmeResults.models{bIdx, chI}))
+            mdl = lmeResults.models{bIdx, chI};
+
             switch (exSettings.ChannelMode)
                 case 'fNIR'
                     chName=sprintf('Opt%s',optStrs{subplotGby{sH}.curCh});
-                    mdlChName=chName;
                 case 'ROI'
                     chName=sprintf('ROI%i_%s',subplotGby{sH}.curCh,optStrs{subplotGby{sH}.curCh});
-                    mdlChName=sprintf('ROI%i',subplotGby{sH}.curCh);
                 case 'Aux'
                     chName=sprintf('%s',subplotGby{sH}.curBioM{1});
-                    mdlChName=chName;
             end
-            
-            
+
             fprintf('Chart %i LME model: %s',sH,chName);
             if(~plotGroupByBioM)
                 fprintf(' [%s]',subplotGby{sH}.curBioM{1});
             end
-            if(useAllInteractions)
+            if(exSettings.LME_all_interactions)
                 fprintf(' - All Interactions\n');
             else
                 fprintf(' - No Interactions\n');
             end
-            ExFNIRS.curChartModels{sH}=curChartLME{sH};
-            ExFNIRS.curChartModelsAIC(sH)=curChartLME{sH}.ModelCriterion.AIC;
-            [~,~,ExFNIRS.curChartModelsCoefficents{sH}]=randomEffects(curChartLME{sH},'DFMethod','satterthwaite');
-            ExFNIRS.curChartModelsANOVA{sH}=anova(curChartLME{sH},'DFMethod','satterthwaite');
-            
-            anovaNames=curChartLME{sH}.anova.Term;
-            
-            for a=1:length(anovaNames)
-                str=anovaNames{a};
-                str(str=='('|str==')')=''; % replace shitty characters
-                str(str==':'|str=='_')=''; % replace shitty characters
-                str(str==' '|str=='-')=''; % replace shitty characters
-                anovaNames{a}=str;
-            end
-            
-            varNames=ExFNIRS.curChartModelsCoefficents{sH}.Name;
-            for v=1:length(varNames)
-                str=varNames{v};
-                str(str=='('|str==')')=''; % replace shitty characters
-                str(str==':'|str=='_')=''; % replace shitty characters
-                str(str==' '|str=='-')=''; % replace shitty characters
-                varNames{v}=str;
-            end
-            
-            if(true)%~plotGroupByBioM)
-                curBioM=subplotGby{sH}.curBioM{1};
-                curRowName=sprintf('%s_%s',chName,curBioM);
-                
-                
-                
-                
-                ExFNIRS.curChartModelsANOVACoefficents_pval{curRowName,anovaNames}= ExFNIRS.curChartModelsANOVA{sH}.pValue(:)';
-                ExFNIRS.curChartModelsANOVACoefficents_Fstat{curRowName,anovaNames}=ExFNIRS.curChartModelsANOVA{sH}.FStat(:)';
-                if(ismember('DF2',properties(ExFNIRS.curChartModelsANOVA{sH})))
-                    ExFNIRS.curChartModelsANOVACoefficents_df2{curRowName,anovaNames}=ExFNIRS.curChartModelsANOVA{sH}.DF2(:)';
-                    ExFNIRS.curChartModelsANOVACoefficents_df1{curRowName,anovaNames}=ExFNIRS.curChartModelsANOVA{sH}.DF1(:)';
+
+            disp(mdl);
+            displayLME(mdl);
+
+            % Null comparison
+            if(~isempty(lmeResults.nullComparison{bIdx, chI}))
+                nc = lmeResults.nullComparison{bIdx, chI};
+                pVal = nc.pValue(end);
+                if(pVal < 0.05 && ~isnan(pVal))
+                    fprintf(2,'\nModel is significantly better than naive model\n');
+                elseif(~isnan(pVal))
+                    fprintf(2,'\nModel is not significantly better than naive model\n');
                 else
-                    ExFNIRS.curChartModelsANOVACoefficents_df1{curRowName,anovaNames}=ExFNIRS.curChartModelsANOVA{sH}.DF(:)';
-                    ExFNIRS.curChartModelsANOVACoefficents_df2{curRowName,anovaNames}=zeros(size(ExFNIRS.curChartModelsANOVA{sH}.DF(:)'));
+                    fprintf(2,'\nModel comparison inconclusive\n');
                 end
-
-
-
-
-
-                ExFNIRS.curChartModelsCoefficents_pval{curRowName,varNames}=ExFNIRS.curChartModelsCoefficents{sH}.pValue(:)';
-                ExFNIRS.curChartModelsCoefficents_tstat{curRowName,varNames}=ExFNIRS.curChartModelsCoefficents{sH}.tStat(:)';
-                ExFNIRS.curChartModelsCoefficents_df{curRowName,varNames}=ExFNIRS.curChartModelsCoefficents{sH}.DF(:)';
-                ExFNIRS.curChartModels_ch(sH)=subplotGby{sH}.curCh;
-            else
-                curBioM=subplotGby{sH}.curBioM{1};
-                curRowName=sprintf('%s_%s',chName,curBioM);
-                ExFNIRS.curChartModelsCoefficents_pval{curRowName,varNames}=ExFNIRS.curChartModelsCoefficents{sH}.pValue(:)';
-                ExFNIRS.curChartModelsCoefficents_tstat{curRowName,varNames}=ExFNIRS.curChartModelsCoefficents{sH}.tStat(:)';
-                ExFNIRS.curChartModelsCoefficents_df{curRowName,varNames}=ExFNIRS.curChartModelsCoefficents{sH}.DF(:)';
-
-
-                ExFNIRS.curChartModelsANOVACoefficents_pval{curRowName,anovaNames}=ExFNIRS.curChartModelsANOVA{sH}.pValue(:)';
-                ExFNIRS.curChartModelsANOVACoefficents_Fstat{curRowName,anovaNames}=ExFNIRS.curChartModelsANOVA{sH}.FStat(:)';
-                if(ismember('DF2',properties(ExFNIRS.curChartModelsANOVA{sH})))
-                    ExFNIRS.curChartModelsANOVACoefficents_df2{curRowName,anovaNames}=ExFNIRS.curChartModelsANOVA{sH}.DF2(:)';
-                    ExFNIRS.curChartModelsANOVACoefficents_df1{curRowName,anovaNames}=ExFNIRS.curChartModelsANOVA{sH}.DF1(:)';
-                else
-                    ExFNIRS.curChartModelsANOVACoefficents_df1{curRowName,anovaNames}=ExFNIRS.curChartModelsANOVA{sH}.DF(:)';
-                    ExFNIRS.curChartModelsANOVACoefficents_df2{curRowName,anovaNames}=zeros(size(ExFNIRS.curChartModelsANOVA{sH}.DF(:)'));
-                end
-                
-                ExFNIRS.curChartModels_ch(sH)=subplotGby{sH}.curCh;
+                disp(nc);
             end
-            disp(curChartLME{sH});
-            displayLME(curChartLME{sH});
-            fprintf(2,'\n%s\n',nullCompareStr{sH});
-            disp(nullCompare{sH});
-            
-            mdlTest=eye(length(curChartLME{sH}.Coefficients.Name));
-            if(exSettings.LME_use_intercept)
-                mdlTest=mdlTest(2:end,:);
-            end
-            [curMdlFit{1:4}]=coefTest(curChartLME{sH},mdlTest,zeros(size(mdlTest,1),1),'DFMethod','satterthwaite');
-            fprintf('\nModel Fit (H0: All F=0): p=%.5f\tF=%.2f\tdf1=%i\tdf2=%i\n\n',curMdlFit{1},curMdlFit{2},curMdlFit{3},curMdlFit{4});
-            if(~showTopo)
-                curChartContrast=exploreFNIRS.fx.autoContrast(curChartLME{sH});
-                if(~isempty(curChartContrast))
-                    disp(curChartContrast);
+
+            % Model fit test
+            if(~isempty(lmeResults.modelFit) && height(lmeResults.modelFit) > 0)
+                rowNames = lmeResults.modelFit.Properties.RowNames;
+                curBioM = subplotGby{sH}.curBioM;
+                if(iscell(curBioM)), curBioM = curBioM{1}; end
+                matchRow = find(contains(rowNames, chName) & contains(rowNames, curBioM), 1);
+                if(~isempty(matchRow))
+                    mfVals = lmeResults.modelFit{matchRow, :};
+                    fprintf('\nModel Fit (H0: All F=0): p=%.5f\tF=%.2f\tdf1=%i\tdf2=%i\n\n', ...
+                        mfVals(1), mfVals(2), mfVals(3), mfVals(4));
                 end
             end
-            ExFNIRS.curMdlFits{curBioM,mdlChName}=curMdlFit{1};
-            %curChartLME{sH}.contrastTable=exploreFNIRS.fx.autoContrast(curChartLME{sH},0.5);
-        catch ME
+
+            % Contrasts (not in topo mode)
+            if(~showTopo && ~isempty(lmeResults.contrasts{bIdx, chI}))
+                disp(lmeResults.contrasts{bIdx, chI});
+            end
+        else
             fprintf(2,'Could not generate model for figure %i\n',sH);
-            fprintf(2,'\nLME: %s\n',lmeString);
-            fprintf(2,ME.message);
-            fprintf(2,'\n');
         end
     end
-    
-    
+
+
     if(showBarChart&&exSettings.ylim_fixed)
         set(subplotHandles{sH},'YLim',[exSettings.ylim_fixed_min, exSettings.ylim_fixed_max]);
     end
@@ -1018,22 +919,22 @@ if(showTopo)
     if(~exSettings.LME_enable)
         warning('LME must be enabled');
     else
-        
+
         topoH=figure(2000);
         clf(topoH);
         lmeString=strsplit(lmeString,'~');
         lmeString=sprintf('[X]~%s',lmeString{2});
         addDebugAnnotation(topoH,lmeString);
-        
+
         chNames=ExFNIRS.curChartModelsCoefficents_tstat.Properties.RowNames;
         coefNames=ExFNIRS.curChartModelsCoefficents_tstat.Properties.VariableNames;
         numCoeff=size(ExFNIRS.curChartModelsCoefficents_tstat,2);
-        
+
         numANOVA=size(ExFNIRS.curChartModelsANOVACoefficents_Fstat,2);
         anovaNames=ExFNIRS.curChartModelsANOVACoefficents_Fstat.Properties.VariableNames;
-        
+
         chArr=1:length(chNames);
-        
+
         for z=1:length(chNames)
             temp=strsplit(chNames{z},'_');
             switch (exSettings.ChannelMode)
@@ -1043,13 +944,13 @@ if(showTopo)
                     %chArr(z)=sscanf(temp{1},'ROI%i');
                 case 'Aux'
             end
-            
+
             bioMarr(z)=temp(end);
         end
         bioMLabel=cell(0,0);
-        
-        
-        
+
+
+
         if(true&&~isempty(chNames))%~plotGroupByBioM)
             for b=1:numBioM
                 bioM=selectedBioM(b);
@@ -1057,7 +958,7 @@ if(showTopo)
                 fprintf('\n <strong>Significant Models [%s]: </strong>',bioM{1});
                 [curMdlQ,curMdlK]=exploreFNIRS.fx.performFDR(curMdlP,exSettings.topoSigThrehold{2});
                 [curMdlQ_rev,curMdlK_rev]=exploreFNIRS.fx.performFDR_twostep(curMdlP,exSettings.topoSigThrehold{2});
-                
+
                 for i=1:size(curMdlP,2)
                     varName=curMdlP.Properties.VariableNames{i};
                     if((curMdlP{1,i}<exSettings.topoSigThrehold{2}&&strcmp(exSettings.topoSigThrehold{1},'p'))||...
@@ -1066,7 +967,7 @@ if(showTopo)
                         if(curMdlP{1,i}<exSettings.topoSigThrehold{2}&&strcmp(exSettings.topoSigThrehold{1},'p'))
                             fprintf('<strong>* </strong>');
                         end
-                        
+
                         if(strcmp(exSettings.topoSigThrehold{1},'q'))
                             fprintf(', q=%.4f',curMdlQ(i));
                         end
@@ -1080,19 +981,19 @@ if(showTopo)
                             fprintf('<strong>* </strong>');
                         end
                     end
-                    
+
                 end
-                
+
                 fprintf('\n');
-                
+
                 mdlPresent = ones(size(curChartLME));
                 nMdls=length(curChartLME);
                 for sHidx=1:nMdls
                     mdlPresent(sHidx)=~isempty(curChartLME{sHidx});
                 end
-                
+
                 curMdlIdx = 0;
-                
+
                 switch(LME_topo_mode)
                     case 'coef'
                         for c=1:numCoeff
@@ -1107,37 +1008,37 @@ if(showTopo)
                             fNIR_df{b,a}=nan(1,nMdls);
                             fNIR_df2{b,a}=nan(1,nMdls);
                         end
-                        
+
                 end
             end
-            
-            
-            
+
+
+
             for coefIdx=1:size(ExFNIRS.curChartModelsCoefficents_tstat,1)
-                
+
                 curMdlIdx=curMdlIdx+1;
                 while(curMdlIdx<length(curChartLME) && isempty(curChartLME{curMdlIdx}))
                     curMdlIdx=curMdlIdx+1;
                 end
-                
+
                 %curCh= chArr(coefIdx);
-                
+
                 curChName=chNames(coefIdx);
-                
+
                 b_idx=strcmp(bioMarr{coefIdx},selectedBioM);
                 bioMLabel(b)=selectedBioM(b_idx);
                 switch(LME_topo_mode)
                     case 'coef'
-                        
+
                         for c=1:numCoeff
-                            
+
                             fNIR_t{b_idx,c}(curMdlIdx)=ExFNIRS.curChartModelsCoefficents_tstat{curChName,coefNames(c)};
                             fNIR_p{b_idx,c}(curMdlIdx)=ExFNIRS.curChartModelsCoefficents_pval{curChName,coefNames(c)};
                             fNIR_df{b_idx,c}(curMdlIdx)=ExFNIRS.curChartModelsCoefficents_df{curChName,coefNames(c)};
                         end
                     case 'anova'
                         for a=1:numANOVA
-                            
+
                             fNIR_f{b_idx,a}(curMdlIdx)=ExFNIRS.curChartModelsANOVACoefficents_Fstat{curChName,anovaNames(a)};
                             fNIR_p{b_idx,a}(curMdlIdx)=ExFNIRS.curChartModelsANOVACoefficents_pval{curChName,anovaNames(a)};
                             fNIR_df{b_idx,a}(curMdlIdx)=ExFNIRS.curChartModelsANOVACoefficents_df1{curChName,anovaNames(a)};
@@ -1145,7 +1046,7 @@ if(showTopo)
                         end
                 end
             end
-            
+
             for b=1:numBioM
                 if(b==1)
                     sigStr=sprintf('Thresholded at %s=%.2f',exSettings.topoSigThrehold{1},exSettings.topoSigThrehold{2});
@@ -1158,29 +1059,29 @@ if(showTopo)
                             curT=fNIR_t{b,c};
                             curP=fNIR_p{b,c};
                             curDf=fNIR_df{b,c};
-                            
-                            
-                            
+
+
+
                             curQ=exploreFNIRS.fx.performFDR(curP);
-                            
+
                             if(any(curQ<0.05))
                                 FDRfound=true;
                                 %FDR RESULTS FOUND
                             end
-                            
+
                             global setF
-                            
+
                             switch(setF.device.Info.CfgName)
                                 case 'fNIR_Devices_fNIR1000'
                                     curT=nan(2,8);
                                     curP=nan(2,8);
                                     curDf=nan(2,8);
-                                    
+
                                     curT(:)=fNIR_t{b,c};
                                     curP(:)=fNIR_p{b,c};
                                     curDf(:)=fNIR_df{b,c};
-                                    
-                                    
+
+
                                     switch(exSettings.ChannelMode)
                                         case 'fNIR'
                                             interpolateNIR(curT,'Mode','tstat','fontSize',12,'transparent',true,'pValueMask',curP,'TitleText',coefNames{c},'ChannelLabels',true)%,7,11,2,1,false,'[Hb-Oxy] Natural High Vs. Low',12,'hot',true)
@@ -1225,50 +1126,50 @@ if(showTopo)
                             m=length(curP(:));
                             [curQ,curK]=exploreFNIRS.fx.performFDR(curP,exSettings.topoSigThrehold{2});
                             [curQ_rev,curK_rev]=exploreFNIRS.fx.performFDR_twostep(curP,exSettings.topoSigThrehold{2});
-                            
+
                             estimateFPval=finv(ones(size(curF(:)))*(1-exSettings.topoSigThrehold{2}), curDf1(:), curDf2(:));
                             estimateFPval_q=finv(ones(size(curF(:)))*(1-exSettings.topoSigThrehold{2}*curK/m), curDf1(:), curDf2(:));
                             estimateFPval_qrev=finv(ones(size(curF(:)))*(1-exSettings.topoSigThrehold{2}*curK_rev/m), curDf1(:), curDf2(:));
-                            
+
                             switch(exSettings.topoSigThrehold{1})
                                 case 'p'
-                                    
+
                                 case 'q'
                                     estimateFPval=estimateFPval_q;
                                 case 'q-twostep'
                                     estimateFPval=estimateFPval_qrev;
                             end
-                            
+
                             estimatedPval_min=nanmin(estimateFPval);
-                            
+
                             if(any(curF(:)>=estimatedPval_min))
-                                
+
                                 titleSTR=anovaNames{a};
-                                
+
                                 if(any(curQ<0.05))
                                     FDRfound=true;
                                     titleSTR=sprintf('%s*',anovaNames{a});
                                     %FDR RESULTS FOUND
                                 end
-                                
+
                                 global setF
-                                
+
                                 switch(setF.device.Info.CfgName)
                                     case 'fNIR_Devices_fNIR1000'
                                         curF=nan(2,8);
                                         curP=nan(2,8);
                                         curDf1=nan(2,8);
                                         curDf2=nan(2,8);
-                                        
+
                                         len=length(fNIR_f{b,a});
                                         curF(1:len)=fNIR_f{b,a};
                                         curP(1:len)=fNIR_p{b,a};
                                         curDf1(1:len)=fNIR_df{b,a};
                                         curDf2(1:len)=fNIR_df2{b,a};
-                                        
-                                        
-                                        
-                                        
+
+
+
+
                                         switch(exSettings.ChannelMode)
                                             case 'fNIR'
                                                 interpolateNIR(curF,'Mode','fstat','fontSize',12,'transparent',true,'lowerThreshold',estimatedPval_min,'TitleText',titleSTR,'ChannelLabels',true)%,7,11,2,1,false,'[Hb-Oxy] Natural High Vs. Low',12,'hot',true)
@@ -1277,7 +1178,7 @@ if(showTopo)
                                                 interpolateNIR(mapROIvaluesToCh(roiInfo,curF),'Mode','fstat','fontSize',12,'transparent',true,'lowerThreshold',estimatedPval_min,'TitleText',titleSTR,'ChannelLabels',true)%,7,11,2,1,false,'[Hb-Oxy] Natural High Vs. Low',12,'hot',true)
                                         end
                                     otherwise
-                                        
+
                                         switch(exSettings.ChannelMode)
                                             case 'fNIR'
                                                 pf2.probe.plot.interpolateValues3D(curF,[],estimatedPval_min,[],titleSTR,'F-val','bufferDistance',1);%InterpolateValues(fNIR,data2plot,minVal,maxVal,bufferMult,titleString,clrBarTitle
@@ -1286,8 +1187,8 @@ if(showTopo)
                                                 pf2.probe.plot.interpolateROIvalues(mapROIvaluesToCh(roiInfo,curF),[],'ROIinfo',roiInfo,'minVal',estimatedPval_min,'maxVal',[],'bufferMult',1,'titleString',titleSTR,'clrBarTitle','F-val');%,7,11,2,1,false,'[Hb-Oxy] Natural High Vs. Low',12,'hot',true)
                                         end
                                 end
-                                
-                                
+
+
                                 if(a==1) % first column
                                     curAxes=gca;
                                     axesPos=curAxes.OuterPosition;
@@ -1304,17 +1205,17 @@ if(showTopo)
                                 end
                             end
                         end
-                        
+
                 end
             end
         end
-        
+
         if(doublePlotWithFDR&&FDRfound)
             topoHfdr=figure(2001);
             clf(topoHfdr);
             addDebugAnnotation(topoHfdr);
-            
-            
+
+
             for b=1:numBioM
                 switch(LME_topo_mode)
                     case 'coef'
@@ -1323,7 +1224,7 @@ if(showTopo)
                             curT=fNIR_t{b,c};
                             curP=fNIR_p{b,c};
                             curQ=exploreFNIRS.fx.performFDR(curP);
-                            
+
                             switch(exSettings.ChannelMode)
                                 case 'fNIR'
                                     interpolateNIR(curT,'Mode','tstat','fontSize',12,'transparent',true,'pValueMask',curQ,'TitleText',coefNames{c},'ChannelLabels',true)%,7,11,2,1,false,'[Hb-Oxy] Natural High Vs. Low',12,'hot',true)
@@ -1351,7 +1252,7 @@ if(showTopo)
                             curT=fNIR_f{b,a};
                             curP=fNIR_p{b,a};
                             curQ=exploreFNIRS.fx.performFDR(curP);
-                            
+
                             switch(exSettings.ChannelMode)
                                 case 'fNIR'
                                     interpolateNIR(curT,'Mode','tstat','fontSize',12,'transparent',true,'pValueMask',curQ,'TitleText',numANOVA{a},'ChannelLabels',true)%,7,11,2,1,false,'[Hb-Oxy] Natural High Vs. Low',12,'hot',true)
@@ -1373,17 +1274,42 @@ if(showTopo)
                                 ylabel_with_space(selectedBioM(b));
                             end
                         end
-                        
+
                 end
             end
             suptitle_with_space('FDR Edition');
         end
-        
+
     end
 end
 end
 
 
+function [bIdx, chI] = mapSubplotToResults(spGby, lmeResults, plotGroupByBioM)
+% MAPSUBPLOTTORESULTS Map subplot gby struct to (biomarker, channel) indices in results
+    bIdx = [];
+    chI = [];
+
+    curCh = spGby.curCh;
+    curBioM = spGby.curBioM;
+    if iscell(curBioM)
+        curBioM = curBioM{1};
+    end
+
+    % Find channel index
+    chI = find(lmeResults.channels == curCh, 1);
+    if isempty(chI), return; end
+
+    % Find biomarker index
+    if plotGroupByBioM
+        % When grouped by biomarker, fitLME gets all biomarkers, bIdx=1 maps to first
+        bIdx = find(strcmp(curBioM, lmeResults.biomarkers), 1);
+        if isempty(bIdx), bIdx = 1; end
+    else
+        bIdx = find(strcmp(curBioM, lmeResults.biomarkers), 1);
+        if isempty(bIdx), bIdx = 1; end
+    end
+end
 
 
 function possibleStr=num2strOrNot(possibleStr)
@@ -1498,7 +1424,7 @@ function h=suptitle_with_space(axHandle,labelstring)
 
 if(nargin<2)
     labelstring=axHandle;
-    
+
     if(~isempty(labelstring))
         labelstring(labelstring=='_')=' ';
     end

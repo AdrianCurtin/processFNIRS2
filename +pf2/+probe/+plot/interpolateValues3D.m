@@ -58,6 +58,11 @@ function [ h, imgOut ] = interpolateValues3D(varargin)
 %   'bufferDistance'    - Buffer around optodes in mm (default: auto)
 %   'includeSS'         - Include short separation channels (default: varies)
 %   'useTalairach'      - Use Talairach coordinates (default: false, uses MNI)
+%   'transformToMNI'    - Transform non-MNI coordinates to MNI space (default: 'auto')
+%                         'auto': Transform if coordinate system is not MNI and
+%                                 landmarks (10-20 electrode positions) are available
+%                         true: Always transform (error if no landmarks)
+%                         false: Never transform, use original coordinates
 %   'BrodmannAreas'     - Highlight Brodmann areas (default: false)
 %                         Set true for all areas, or [9,10,46] for specific areas.
 %   'showScattering'    - Show light scattering paths (default: false)
@@ -193,6 +198,7 @@ centerCamPos=[0,-20,0];
 addParameter(p, 'camTarget', centerCamPos, validCamPosition); % Target Camera location
 addParameter(p, 'camUp', [0,0,1] , validCamPosition); % Target Camera location
 addParameter(p, 'animated', false, @islogical); % Optimizes for animation (By not redrawing certain things when possible)
+addParameter(p, 'transformToMNI', 'auto', @(x) islogical(x) || (ischar(x) && strcmpi(x, 'auto'))); % Transform non-MNI coords to MNI
 addParameter(p, 'savePath', '', @(x) ischar(x) || isstring(x));
 addParameter(p, 'saveWidth', [], @(x) isempty(x) || isnumeric(x));
 addParameter(p, 'saveHeight', [], @(x) isempty(x) || isnumeric(x));
@@ -645,6 +651,88 @@ end
 if(p.Results.useEEG && ~isempty(probeDraw))
     tempProbe = probeInfo;
     probeInfo =  probeDraw;
+end
+
+% Apply MNI transformation if needed
+transformOpt = p.Results.transformToMNI;
+if isfield(probeInfo, 'TableOpt') && ~p.Results.useEEG
+    doTransform = false;
+    fNIR_orig = p.Results.fNIR;
+    if iscell(fNIR_orig) && ~isempty(fNIR_orig)
+        fNIR_orig = fNIR_orig{1};
+    end
+
+    if ischar(transformOpt) && strcmpi(transformOpt, 'auto')
+        % Auto: transform if coordinate system is not MNI and landmarks exist
+        if isstruct(fNIR_orig) && isfield(fNIR_orig, 'device')
+            dev = fNIR_orig.device;
+            if isa(dev, 'pf2.Device')
+                coordSys = dev.CoordinateSystem;
+                hasLandmarks = ~isempty(dev.Landmarks);
+            elseif isstruct(dev)
+                coordSys = '';
+                if isfield(dev, 'CoordinateSystem')
+                    coordSys = dev.CoordinateSystem;
+                end
+                hasLandmarks = isfield(dev, 'Landmarks') && ~isempty(dev.Landmarks);
+            else
+                coordSys = '';
+                hasLandmarks = false;
+            end
+            % Transform if not already in MNI and landmarks available
+            if hasLandmarks && ~strcmpi(coordSys, 'MNI') && ~isempty(coordSys) && ~strcmpi(coordSys, 'Unknown')
+                doTransform = true;
+            end
+        end
+    elseif islogical(transformOpt) && transformOpt
+        % Explicit true: always transform
+        doTransform = true;
+    end
+
+    if doTransform
+        % Get all coordinates to transform
+        optCoords = [probeInfo.TableOpt.Pos3D_x, probeInfo.TableOpt.Pos3D_y, probeInfo.TableOpt.Pos3D_z];
+        srcCoords = [probeInfo.TableSD.Pos3D_x(probeInfo.TableSD.Type == 'Src'), ...
+                     probeInfo.TableSD.Pos3D_y(probeInfo.TableSD.Type == 'Src'), ...
+                     probeInfo.TableSD.Pos3D_z(probeInfo.TableSD.Type == 'Src')];
+        detCoords = [probeInfo.TableSD.Pos3D_x(probeInfo.TableSD.Type ~= 'Src'), ...
+                     probeInfo.TableSD.Pos3D_y(probeInfo.TableSD.Type ~= 'Src'), ...
+                     probeInfo.TableSD.Pos3D_z(probeInfo.TableSD.Type ~= 'Src')];
+
+        try
+            % Transform all coordinate sets using the same transformation
+            [optMNI, T] = pf2.probe.transformToMNI(optCoords, fNIR_orig);
+            srcMNI = T.s * (srcCoords * T.R) + T.t;
+            detMNI = T.s * (detCoords * T.R) + T.t;
+
+            % Update probeInfo with transformed coordinates
+            probeInfo.TableOpt.Pos3D_x = optMNI(:, 1);
+            probeInfo.TableOpt.Pos3D_y = optMNI(:, 2);
+            probeInfo.TableOpt.Pos3D_z = optMNI(:, 3);
+            probeInfo.OptPos.x = optMNI(:, 1);
+            probeInfo.OptPos.y = optMNI(:, 2);
+            probeInfo.OptPos.z = optMNI(:, 3);
+
+            srcIdx = probeInfo.TableSD.Type == 'Src';
+            probeInfo.TableSD.Pos3D_x(srcIdx) = srcMNI(:, 1);
+            probeInfo.TableSD.Pos3D_y(srcIdx) = srcMNI(:, 2);
+            probeInfo.TableSD.Pos3D_z(srcIdx) = srcMNI(:, 3);
+            probeInfo.TableSD.Pos3D_x(~srcIdx) = detMNI(:, 1);
+            probeInfo.TableSD.Pos3D_y(~srcIdx) = detMNI(:, 2);
+            probeInfo.TableSD.Pos3D_z(~srcIdx) = detMNI(:, 3);
+
+            % Update mean position
+            probeInfo.OptPos3D_mean = mean(optMNI, 1, 'omitnan');
+
+        catch ME
+            if islogical(transformOpt) && transformOpt
+                % Explicit request to transform but failed
+                error('pf2:probe:plot:interpolateValues3D:transformFailed', ...
+                    'Failed to transform coordinates to MNI: %s', ME.message);
+            end
+            % Auto mode: silently fall back to original coordinates
+        end
+    end
 end
 
 if(isfield(probeInfo, 'TableOpt'))
@@ -1718,8 +1806,16 @@ if p.Results.showColorbar && ~all(dataEmpty) && isempty(itemsToSkipPlot)
     if twosided
         % Two-sided colorbar
         if hasUpperData || hasLowerData
-            cbHeight = curAxPosition(4)/3;
             cbWidth = 0.01;
+            cbGap = curAxPosition(4) * 0.03;  % Small gap between bars
+            cbX = curAxPosition(1) + curAxPosition(3);
+
+            if hasUpperData && hasLowerData
+                cbHeight = (curAxPosition(4) - cbGap) / 2;
+            else
+                cbHeight = curAxPosition(4);
+            end
+
             % Create upper colorbar
             if hasUpperData
                 chPos = colorbar(ax1, 'Location', 'eastoutside');
@@ -1731,11 +1827,14 @@ if p.Results.showColorbar && ~all(dataEmpty) && isempty(itemsToSkipPlot)
                 colormap(ax1, cmap_high(nColorsMaxBar));
                 caxis(ax1, cbarUpper_minmax);
 
-                % Adjust position of upper colorbar
-
-                chPos.Position = [curAxPosition(1)+curAxPosition(3), curAxPosition(2)+cbHeight, cbWidth, cbHeight];
+                % Position upper colorbar in top half (or full height if no lower)
+                if hasLowerData
+                    chPos.Position = [cbX, curAxPosition(2) + cbHeight + cbGap, cbWidth, cbHeight];
+                else
+                    chPos.Position = [cbX, curAxPosition(2), cbWidth, cbHeight];
+                end
             end
-            
+
             % Create lower colorbar if needed
             if hasLowerData
                 ax2 = axes('Position', ax1.Position, 'Visible', 'off');
@@ -1746,13 +1845,14 @@ if p.Results.showColorbar && ~all(dataEmpty) && isempty(itemsToSkipPlot)
                 if(~hasUpperData)
                     title(chNeg, clrBarTitle, 'Color', textClr);
                 end
-                
+
                 % Set colormap for lower colorbar
                 colormap(ax2, cmap_low(nColorsMaxBar));
                 caxis(ax2, cbarLower_minmax);
-                
-                chNeg.Position = [curAxPosition(1)+curAxPosition(3), curAxPosition(2)-cbHeight/5, cbWidth, cbHeight];
-                
+
+                % Position lower colorbar in bottom half (or full height if no upper)
+                chNeg.Position = [cbX, curAxPosition(2), cbWidth, cbHeight];
+
                 % Link properties of both axes
                 linkprop([ax1, ax2], {'CameraUpVector', 'CameraPosition', 'CameraTarget', 'XLim', 'YLim', 'ZLim'});
             end

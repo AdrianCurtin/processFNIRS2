@@ -120,12 +120,16 @@ for lIdx = 1:length(allLeg)
     set(allLeg(lIdx), 'EdgeColor', [0.5 0.5 0.5]);
 end
 
-% Colorbars: black text and labels
+% Colorbars: black text, labels, and titles
 allCb = findobj(fig, 'Type', 'Colorbar');
 for cIdx = 1:length(allCb)
     set(allCb(cIdx), 'Color', 'k');
     if isprop(allCb(cIdx), 'Label')
         set(allCb(cIdx).Label, 'Color', 'k');
+    end
+    % Handle colorbar title (set via title(colorbar, ...))
+    if isprop(allCb(cIdx), 'Title') && ~isempty(allCb(cIdx).Title)
+        set(allCb(cIdx).Title, 'Color', 'k');
     end
 end
 

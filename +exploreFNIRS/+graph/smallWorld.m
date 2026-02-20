@@ -89,19 +89,33 @@ function result = smallWorld(G, varargin)
     C_rands = zeros(1, nRand);
     L_rands = zeros(1, nRand);
 
-    for r = 1:nRand
-        Wrand = maslovSneppen(G.W, G.directed);
+    useParfor = false;
+    if nRand > 10
+        [canUse, poolRunning] = pf2_base.accel.canParfor();
+        useParfor = canUse && poolRunning;
+    end
 
-        Grand.W = Wrand;
-        Grand.A = double(Wrand > 0);
-        Grand.N = N;
-        Grand.directed = G.directed;
+    Wref = G.W;
+    isDir = G.directed;
 
-        ccRand = exploreFNIRS.graph.clusteringCoefficient(Grand);
-        plRand = exploreFNIRS.graph.charPathLength(Grand);
-
-        C_rands(r) = ccRand.meanC;
-        L_rands(r) = plRand.lambda;
+    if useParfor
+        parfor r = 1:nRand
+            Wrand = maslovSneppen(Wref, isDir);
+            Grand = struct('W', Wrand, 'A', double(Wrand > 0), 'N', N, 'directed', isDir);
+            ccRand = exploreFNIRS.graph.clusteringCoefficient(Grand);
+            plRand = exploreFNIRS.graph.charPathLength(Grand);
+            C_rands(r) = ccRand.meanC;
+            L_rands(r) = plRand.lambda;
+        end
+    else
+        for r = 1:nRand
+            Wrand = maslovSneppen(Wref, isDir);
+            Grand = struct('W', Wrand, 'A', double(Wrand > 0), 'N', N, 'directed', isDir);
+            ccRand = exploreFNIRS.graph.clusteringCoefficient(Grand);
+            plRand = exploreFNIRS.graph.charPathLength(Grand);
+            C_rands(r) = ccRand.meanC;
+            L_rands(r) = plRand.lambda;
+        end
     end
 
     C_rand = mean(C_rands);

@@ -30,6 +30,10 @@ function results = fitLME(groups, groupByVars, varargin)
 %   ExcludeShortSeparation - Skip short separation channels (default: true)
 %   DataType          - 'fNIRS' (default), 'Aux', or 'ROI'
 %   AuxField          - Aux field name (required when DataType='Aux')
+%   DiscreteTime      - Convert Time to categorical (default: true). When false,
+%                        Time remains numeric for continuous regression.
+%   ModelFitTest      - Run joint coefficient test H0:all betas=0 (default: true)
+%   SkipContrasts     - Skip auto-contrast generation (default: false)
 %
 % Outputs:
 %   results - Struct with fields:
@@ -48,6 +52,10 @@ function results = fitLME(groups, groupByVars, varargin)
 %     .biomarkers      - Cell array of biomarker names used
 %     .channels        - Channel indices used
 %     .groupByVars     - Grouping variables used
+%     .coef_pval       - Table of coefficient p-values [channels x coefficients]
+%     .coef_tstat      - Table of coefficient t-statistics [channels x coefficients]
+%     .coef_df         - Table of coefficient degrees of freedom [channels x coefficients]
+%     .modelFit        - Table of joint coefficient test results [channels x {p,F,df1,df2}]
 %
 % Example:
 %   ex = exploreFNIRS.core.Experiment(data);
@@ -87,6 +95,9 @@ function results = fitLME(groups, groupByVars, varargin)
     addParameter(p, 'AuxField', '', @ischar);
     addParameter(p, 'ExcludeShortSeparation', true, @islogical);
     addParameter(p, 'SkipTimeFactor', false, @islogical);
+    addParameter(p, 'DiscreteTime', true, @islogical);
+    addParameter(p, 'ModelFitTest', true, @islogical);
+    addParameter(p, 'SkipContrasts', false, @islogical);
     parse(p, groups, groupByVars, varargin{:});
     opts = p.Results;
 
@@ -157,7 +168,7 @@ function results = fitLME(groups, groupByVars, varargin)
             if iscell(mergedTable.Time) || isstring(mergedTable.Time)
                 mergedTable.Time = str2double(mergedTable.Time);
             end
-            if hasMultipleTimeBins
+            if hasMultipleTimeBins && opts.DiscreteTime
                 mergedTable.Time = categorical(mergedTable.Time);
             end
         end
@@ -267,7 +278,7 @@ function results = fitLME(groups, groupByVars, varargin)
                     if iscell(mergedTable.Time) || isstring(mergedTable.Time)
                         mergedTable.Time = str2double(mergedTable.Time);
                     end
-                    if hasMultipleTimeBins
+                    if hasMultipleTimeBins && opts.DiscreteTime
                         mergedTable.Time = categorical(mergedTable.Time);
                     end
                 end
@@ -328,56 +339,139 @@ function results = fitLME(groups, groupByVars, varargin)
         % Initialize results
         results = initResults(nBioM, nCh, opts.Biomarkers, channels, groupByVars);
 
-        % Process each biomarker x channel combination
-        for bIdx = 1:nBioM
-            bioM = opts.Biomarkers{bIdx};
+        % Determine whether to use parfor for channel loop
+        nTotal = nBioM * nCh;
+        useParfor = false;
+        if nTotal > 4
+            [canUse, poolRunning] = pf2_base.accel.canParfor();
+            useParfor = canUse && poolRunning;
+        end
 
-            for chI = 1:nCh
+        if useParfor && nBioM == 1
+            % Single-biomarker parallel path: parfor over channels
+            bioM = opts.Biomarkers{1};
+            parResults = cell(nCh, 1);
+            firstTable = [];
+
+            parfor chI = 1:nCh
                 ch = channels(chI);
-
-                % Build merged long-format table
-                mergedTable = exploreFNIRS.export.mergeGbyTablesLong( ...
+                mTable = exploreFNIRS.export.mergeGbyTablesLong( ...
                     groups, {bioM}, ch, barTimes, false, false, chLabels(chI));
-
-                if isempty(mergedTable) || height(mergedTable) == 0
-                    if opts.Verbose
-                        warning('No data for %s channel %d, skipping', bioM, ch);
-                    end
+                if isempty(mTable) || height(mTable) == 0
                     continue;
                 end
-
-                % Convert Time to categorical for use as factor
-                if ismember('Time', mergedTable.Properties.VariableNames)
-                    if iscell(mergedTable.Time) || isstring(mergedTable.Time)
-                        mergedTable.Time = str2double(mergedTable.Time);
+                if ismember('Time', mTable.Properties.VariableNames)
+                    if iscell(mTable.Time) || isstring(mTable.Time)
+                        mTable.Time = str2double(mTable.Time);
                     end
-                    if hasMultipleTimeBins
-                        mergedTable.Time = categorical(mergedTable.Time);
+                    if hasMultipleTimeBins && opts.DiscreteTime
+                        mTable.Time = categorical(mTable.Time);
                     end
                 end
-
-                % Build variable name (response)
                 varName = sprintf('Opt%s_%s', chLabels{chI}, bioM);
-
-                if ~ismember(varName, mergedTable.Properties.VariableNames)
-                    if opts.Verbose
-                        warning('Variable %s not found in merged table, skipping', varName);
-                    end
+                if ~ismember(varName, mTable.Properties.VariableNames)
                     continue;
                 end
-
                 chRowName = sprintf('Opt%s_%s', chLabels{chI}, bioM);
+                tmpRes = initResults(1, 1, {bioM}, ch, groupByVars);
+                tmpRes = fitOneModel(tmpRes, mTable, varName, chRowName, ...
+                    1, 1, groupByVars, opts);
+                parResults{chI} = struct('tmpRes', tmpRes, 'mTable', mTable, ...
+                    'chRowName', chRowName);
+            end
 
-                if bIdx == 1 && chI == 1
-                    results.mergedTable = mergedTable;
+            % Merge parallel results back
+            for chI = 1:nCh
+                if isempty(parResults{chI}), continue; end
+                pr = parResults{chI};
+                results.models{1, chI} = pr.tmpRes.models{1, 1};
+                results.anova{1, chI} = pr.tmpRes.anova{1, 1};
+                results.contrasts{1, chI} = pr.tmpRes.contrasts{1, 1};
+                results.coefficients{1, chI} = pr.tmpRes.coefficients{1, 1};
+                results.nullComparison{1, chI} = pr.tmpRes.nullComparison{1, 1};
+                results.AIC(1, chI) = pr.tmpRes.AIC(1, 1);
+                if ~isempty(pr.tmpRes.anova_pval) && height(pr.tmpRes.anova_pval) > 0
+                    aCols = pr.tmpRes.anova_pval.Properties.VariableNames;
+                    results.anova_pval{pr.chRowName, aCols} = pr.tmpRes.anova_pval{1, :};
+                    results.anova_Fstat{pr.chRowName, aCols} = pr.tmpRes.anova_Fstat{1, :};
+                    if height(pr.tmpRes.anova_df1) > 0
+                        results.anova_df1{pr.chRowName, aCols} = pr.tmpRes.anova_df1{1, :};
+                        results.anova_df2{pr.chRowName, aCols} = pr.tmpRes.anova_df2{1, :};
+                    end
                 end
+                if ~isempty(pr.tmpRes.coef_pval) && height(pr.tmpRes.coef_pval) > 0
+                    cCols = pr.tmpRes.coef_pval.Properties.VariableNames;
+                    results.coef_pval{pr.chRowName, cCols} = pr.tmpRes.coef_pval{1, :};
+                    results.coef_tstat{pr.chRowName, cCols} = pr.tmpRes.coef_tstat{1, :};
+                    results.coef_df{pr.chRowName, cCols} = pr.tmpRes.coef_df{1, :};
+                end
+                if ~isempty(pr.tmpRes.modelFit) && height(pr.tmpRes.modelFit) > 0
+                    results.modelFit{pr.chRowName, pr.tmpRes.modelFit.Properties.VariableNames} = ...
+                        pr.tmpRes.modelFit{1, :};
+                end
+                if isempty(firstTable)
+                    firstTable = pr.mTable;
+                end
+                if opts.Verbose && ~isnan(results.AIC(1, chI))
+                    fprintf('LME [%s Ch %d]: AIC=%.1f\n', bioM, channels(chI), ...
+                        results.AIC(1, chI));
+                end
+            end
+            if ~isempty(firstTable)
+                results.mergedTable = firstTable;
+            end
+        else
+            % Serial path (or multi-biomarker)
+            for bIdx = 1:nBioM
+                bioM = opts.Biomarkers{bIdx};
 
-                results = fitOneModel(results, mergedTable, varName, chRowName, ...
-                    bIdx, chI, groupByVars, opts);
+                for chI = 1:nCh
+                    ch = channels(chI);
 
-                if opts.Verbose && ~isnan(results.AIC(bIdx, chI))
-                    fprintf('LME [%s Ch %d]: AIC=%.1f\n', bioM, ch, ...
-                        results.AIC(bIdx, chI));
+                    % Build merged long-format table
+                    mergedTable = exploreFNIRS.export.mergeGbyTablesLong( ...
+                        groups, {bioM}, ch, barTimes, false, false, chLabels(chI));
+
+                    if isempty(mergedTable) || height(mergedTable) == 0
+                        if opts.Verbose
+                            warning('No data for %s channel %d, skipping', bioM, ch);
+                        end
+                        continue;
+                    end
+
+                    % Convert Time to categorical for use as factor
+                    if ismember('Time', mergedTable.Properties.VariableNames)
+                        if iscell(mergedTable.Time) || isstring(mergedTable.Time)
+                            mergedTable.Time = str2double(mergedTable.Time);
+                        end
+                        if hasMultipleTimeBins && opts.DiscreteTime
+                            mergedTable.Time = categorical(mergedTable.Time);
+                        end
+                    end
+
+                    % Build variable name (response)
+                    varName = sprintf('Opt%s_%s', chLabels{chI}, bioM);
+
+                    if ~ismember(varName, mergedTable.Properties.VariableNames)
+                        if opts.Verbose
+                            warning('Variable %s not found in merged table, skipping', varName);
+                        end
+                        continue;
+                    end
+
+                    chRowName = sprintf('Opt%s_%s', chLabels{chI}, bioM);
+
+                    if bIdx == 1 && chI == 1
+                        results.mergedTable = mergedTable;
+                    end
+
+                    results = fitOneModel(results, mergedTable, varName, chRowName, ...
+                        bIdx, chI, groupByVars, opts);
+
+                    if opts.Verbose && ~isnan(results.AIC(bIdx, chI))
+                        fprintf('LME [%s Ch %d]: AIC=%.1f\n', bioM, ch, ...
+                            results.AIC(bIdx, chI));
+                    end
                 end
             end
         end
@@ -471,6 +565,10 @@ function results = initResults(nBioM, nCh, biomarkers, channels, groupByVars)
     results.anova_df2 = table();
     results.coefficients = cell(nBioM, nCh);
     results.nullComparison = cell(nBioM, nCh);
+    results.coef_pval = table();
+    results.coef_tstat = table();
+    results.coef_df = table();
+    results.modelFit = table();
     results.biomarkers = biomarkers;
     results.channels = channels;
     results.groupByVars = groupByVars;
@@ -525,19 +623,43 @@ function results = fitOneModel(results, mergedTable, varName, chRowName, ...
         end
 
         % Auto contrasts
-        try
-            cTable = exploreFNIRS.fx.autoContrast(mdl, opts.ContrastThreshold);
-            results.contrasts{bIdx, chI} = cTable;
-        catch
-            results.contrasts{bIdx, chI} = table();
+        if ~opts.SkipContrasts
+            try
+                cTable = exploreFNIRS.fx.autoContrast(mdl, opts.ContrastThreshold);
+                results.contrasts{bIdx, chI} = cTable;
+            catch
+                results.contrasts{bIdx, chI} = table();
+            end
         end
 
         % Random effects coefficients
         try
-            [~, ~, results.coefficients{bIdx, chI}] = ...
-                randomEffects(mdl, 'DFMethod', 'satterthwaite');
+            [~, ~, reCoefs] = randomEffects(mdl, 'DFMethod', 'satterthwaite');
+            results.coefficients{bIdx, chI} = reCoefs;
+
+            % Store coefficient summary tables
+            coefNames = reCoefs.Name;
+            cleanCoefNames = sanitizeNames(coefNames);
+            results.coef_pval{chRowName, cleanCoefNames} = reCoefs.pValue(:)';
+            results.coef_tstat{chRowName, cleanCoefNames} = reCoefs.tStat(:)';
+            results.coef_df{chRowName, cleanCoefNames} = reCoefs.DF(:)';
         catch
             results.coefficients{bIdx, chI} = [];
+        end
+
+        % Model fit test (joint H0: all fixed-effect betas = 0)
+        if opts.ModelFitTest
+            try
+                mdlTest = eye(length(mdl.Coefficients.Name));
+                if opts.UseIntercept
+                    mdlTest = mdlTest(2:end,:);
+                end
+                [mfP, mfF, mfDF1, mfDF2] = coefTest(mdl, mdlTest, ...
+                    zeros(size(mdlTest,1),1), 'DFMethod', 'satterthwaite');
+                results.modelFit{chRowName, {'p','F','df1','df2'}} = ...
+                    [mfP, mfF, mfDF1, mfDF2];
+            catch
+            end
         end
 
         % Null model comparison (ML required for LRT)

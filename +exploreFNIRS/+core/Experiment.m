@@ -1371,6 +1371,31 @@ classdef Experiment < handle
         end
 
 
+        function [fig, stats] = plotNeuralEfficiency(obj, infoVar, varargin)
+        % PLOTNEURALEFFICIENCY Neural efficiency scatter plot
+        %
+        %   [fig, stats] = ex.plotNeuralEfficiency('accuracy')
+        %   [fig, stats] = ex.plotNeuralEfficiency('RT', 'InvertX', true, ...
+        %       'Channels', 1:5, 'FitLine', true)
+        %   [fig, stats] = ex.plotNeuralEfficiency('accuracy', ...
+        %       'ZScoreMode', 'pergroup')
+        %
+        % Z-scored behavioral variable (X) vs z-scored brain activation (Y).
+        % The y=x identity line separates efficient from inefficient subjects.
+        % Requires aggregate() first.
+        %
+        % See also: exploreFNIRS.core.plotNeuralEfficiency
+
+            if ~obj.isAggregated
+                error('exploreFNIRS:core:Experiment:plotNeuralEfficiency', ...
+                    'Call aggregate() before plotNeuralEfficiency()');
+            end
+            varargin = obj.injectColorScheme(varargin);
+            [fig, stats] = exploreFNIRS.core.plotNeuralEfficiency(obj.groups, ...
+                'InfoVar', infoVar, varargin{:});
+        end
+
+
         function [fig, results] = plotLME(obj, varargin)
         % PLOTLME Linear Mixed Effects analysis with bar chart and topo
         %
@@ -2239,9 +2264,21 @@ classdef Experiment < handle
                     g, obj.groups(g).label, nSubjects);
 
                 subResults = cell(nSubjects, 1);
-                for s = 1:nSubjects
-                    subResults{s} = exploreFNIRS.connectivity.computeIntraROI( ...
-                        curData{s}, varargin{:});
+                useParfor = false;
+                if nSubjects > 2
+                    [canUse, poolRunning] = pf2_base.accel.canParfor();
+                    useParfor = canUse && poolRunning;
+                end
+                if useParfor
+                    parfor s = 1:nSubjects
+                        subResults{s} = exploreFNIRS.connectivity.computeIntraROI( ...
+                            curData{s}, varargin{:});
+                    end
+                else
+                    for s = 1:nSubjects
+                        subResults{s} = exploreFNIRS.connectivity.computeIntraROI( ...
+                            curData{s}, varargin{:});
+                    end
                 end
 
                 result(g).subjectResults = subResults;
@@ -2653,8 +2690,19 @@ for g = 1:nGroups
         g, groups(g).label, nSubjects);
 
     subResults = cell(nSubjects, 1);
-    for s = 1:nSubjects
-        subResults{s} = exploreFNIRS.connectivity.computeMatrix(curData{s}, args{:});
+    useParfor = false;
+    if nSubjects > 2
+        [canUse, poolRunning] = pf2_base.accel.canParfor();
+        useParfor = canUse && poolRunning;
+    end
+    if useParfor
+        parfor s = 1:nSubjects
+            subResults{s} = exploreFNIRS.connectivity.computeMatrix(curData{s}, args{:});
+        end
+    else
+        for s = 1:nSubjects
+            subResults{s} = exploreFNIRS.connectivity.computeMatrix(curData{s}, args{:});
+        end
     end
 
     % Align and aggregate using channel-identity-aware stacking

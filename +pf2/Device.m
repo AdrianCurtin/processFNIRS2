@@ -34,16 +34,25 @@ classdef Device
         rawMax          % Raw intensity saturation ceiling (device-specific)
         rawMin          % Raw intensity floor (device-specific)
         probeInfo       % Full legacy probeInfo struct (backward compat)
+        CoordinateSystem % Coordinate system name (e.g., 'MNI', 'Head', 'MCAspace')
+        CoordinateSystemDescription % Detailed description of coordinate system
+        CoordinateUnits % Units for coordinates (e.g., 'mm', 'cm', 'm')
+        Landmarks       % Table of landmark positions (e.g., fiducials, 10-20 electrodes)
     end
 
     methods
 
-        function obj = Device(probeInfo, name)
+        function obj = Device(probeInfo, name, varargin)
         % DEVICE Construct from probeInfo struct and config name
         %
         % Inputs:
         %   probeInfo - Full probeInfo struct with .Info and .Probe{1}
         %   name      - Config name string
+        %   varargin  - Optional name-value pairs:
+        %               CoordinateSystem - Coordinate system name
+        %               CoordinateSystemDescription - System description
+        %               CoordinateUnits - Units (mm, cm, m, etc.)
+        %               Landmarks - Landmark table
 
             obj.probeInfo = probeInfo;
             obj.name = name;
@@ -91,6 +100,19 @@ classdef Device
             else
                 obj.rawMin = NaN;
             end
+
+            % Parse optional coordinate system and landmarks
+            p = inputParser;
+            addParameter(p, 'CoordinateSystem', '', @ischar);
+            addParameter(p, 'CoordinateSystemDescription', '', @ischar);
+            addParameter(p, 'CoordinateUnits', '', @ischar);
+            addParameter(p, 'Landmarks', [], @(x) istable(x) || isempty(x));
+            parse(p, varargin{:});
+
+            obj.CoordinateSystem = p.Results.CoordinateSystem;
+            obj.CoordinateSystemDescription = p.Results.CoordinateSystemDescription;
+            obj.CoordinateUnits = p.Results.CoordinateUnits;
+            obj.Landmarks = p.Results.Landmarks;
         end
 
         %% Accessor methods
@@ -237,7 +259,7 @@ classdef Device
             cache(cfgName) = dev;
         end
 
-        function dev = fromProbeInfo(probeInfo, name)
+        function dev = fromProbeInfo(probeInfo, name, varargin)
         % FROMPROBEINFO Create Device from an already-loaded probeInfo struct
         %
         % For SNIRF/NIRX imports where probeInfo is built in-memory.
@@ -245,10 +267,12 @@ classdef Device
         % Syntax:
         %   dev = pf2.Device.fromProbeInfo(probeInfo, 'myDevice')
         %   dev = pf2.Device.fromProbeInfo(probeInfo)
+        %   dev = pf2.Device.fromProbeInfo(probeInfo, name, 'CoordinateSystem', 'MNI', 'Landmarks', tbl)
         %
         % Inputs:
         %   probeInfo - Full probeInfo struct with .Info and .Probe{1}
         %   name      - Optional config name (default: from Info.CfgName)
+        %   varargin  - Optional name-value pairs for CoordinateSystem, etc.
 
             if nargin < 2 || isempty(name)
                 if isfield(probeInfo, 'Info') && isfield(probeInfo.Info, 'CfgName')
@@ -257,7 +281,7 @@ classdef Device
                     name = 'custom';
                 end
             end
-            dev = pf2.Device(probeInfo, name);
+            dev = pf2.Device(probeInfo, name, varargin{:});
         end
 
         function clearCache()

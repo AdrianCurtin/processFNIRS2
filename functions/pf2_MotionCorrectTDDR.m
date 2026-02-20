@@ -1,4 +1,4 @@
-function [dodTDDR] = pf2_MotionCorrectTDDR(dod,sample_rate)
+function [dodTDDR] = pf2_MotionCorrectTDDR(dod, sample_rate, accelerate)
 % PF2_MOTIONCORRECTTDDR Temporal Derivative Distribution Repair for motion artifacts
 %
 % Corrects motion artifacts by computing the temporal derivative of the
@@ -18,12 +18,17 @@ function [dodTDDR] = pf2_MotionCorrectTDDR(dod,sample_rate)
 %
 % Syntax:
 %   dodTDDR = pf2_MotionCorrectTDDR(dod, sample_rate)
+%   dodTDDR = pf2_MotionCorrectTDDR(dod, sample_rate, accelerate)
 %
 % Inputs:
 %   dod         - Optical density signal [T x C double]
 %                 T = time samples, C = channels
 %                 May contain NaN values (handled piecewise).
 %   sample_rate - Sampling rate in Hz (scalar)
+%   accelerate  - Parallel acceleration mode (optional, string, default: 'auto')
+%                 'auto'   - use parfor if pool running and nChannels > 8
+%                 'parfor' - use parfor if available
+%                 'none'   - serial processing
 %
 % Outputs:
 %   dodTDDR - Motion-corrected optical density [T x C double]
@@ -44,29 +49,55 @@ function [dodTDDR] = pf2_MotionCorrectTDDR(dod,sample_rate)
 %
 % See also: pf2_SMAR, pf2_MotionCorrectWavelet, pf2_fnirs_MARA
 
-mlAct = ones(size(dod,2),1);
+if ~exist('accelerate','var') || isempty(accelerate)
+    accelerate = 'auto';
+end
 
-lstAct = find(mlAct==1);
+nChannels = size(dod, 2);
 dodTDDR = dod;
 
 minSegment = 10; % Minimum samples for TDDR correction
 
-for ii=1:length(lstAct)
+% Determine whether to use parfor
+useParfor = false;
+if ~strcmp(accelerate, 'none')
+    [canUse, poolRunning] = pf2_base.accel.canParfor();
+    if strcmp(accelerate, 'parfor')
+        useParfor = canUse;
+    elseif strcmp(accelerate, 'auto')
+        useParfor = canUse && poolRunning && nChannels > 8;
+    end
+end
 
-    idx_ch = lstAct(ii);
-    chData = dod(:, idx_ch);
+if useParfor
+    parfor ii = 1:nChannels
+        dodTDDR(:, ii) = processChannel(dod(:, ii), sample_rate, minSegment);
+    end
+else
+    for ii = 1:nChannels
+        dodTDDR(:, ii) = processChannel(dod(:, ii), sample_rate, minSegment);
+    end
+end
+
+end
+
+
+function chOut = processChannel(chData, sample_rate, minSegment)
+% PROCESSCHANNEL Apply TDDR to a single channel, handling NaN piecewise.
+
+    chOut = chData;
 
     % Skip dead channels (all NaN from zero raw intensity)
     if all(~isfinite(chData))
-        continue;
+        return;
     end
 
     nanMask = isnan(chData);
 
     if ~any(nanMask)
         % No NaN — process whole channel directly
-        dodTDDR(:, idx_ch) = tddr_core(chData, sample_rate);
-        continue;
+        chOut = tddr_core(chData, sample_rate);
+        return;
     end
 
     % Piecewise: find contiguous non-NaN segments
@@ -77,12 +108,10 @@ for ii=1:length(lstAct)
     for jj = 1:length(segStarts)
         idx = segStarts(jj):segEnds(jj);
         if length(idx) >= minSegment
-            dodTDDR(idx, idx_ch) = tddr_core(chData(idx), sample_rate);
+            chOut(idx) = tddr_core(chData(idx), sample_rate);
         end
         % Short segments: left as original OD values (uncorrected but valid)
     end
-
-end
 
 end
 

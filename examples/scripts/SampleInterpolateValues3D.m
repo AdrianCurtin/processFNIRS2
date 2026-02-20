@@ -24,6 +24,7 @@
 %  32-35.  Advanced visualization
 %  36-37.  ROI definition and plotting
 %  38-42.  Misc features
+%  43-45.  Coordinate transformation (CapTrak/subject-space to MNI)
 %
 % See also: SampleInterpolateValues3D_Animation
 
@@ -488,3 +489,111 @@ pf2.probe.plot.interpolateValues3D(fnirData, {'fNIR_Devices_fNIR1000.cfg'}, ...
     'ChannelLabels', false, 'SDLabels', false, ...
     'showColorbar', false);
 title('Low-res mesh');
+
+%% ========================================================================
+%  COORDINATE TRANSFORMATION (CapTrak/Subject-Space to MNI)
+%  ========================================================================
+% SNIRF files may contain probe coordinates in subject-specific coordinate
+% systems (e.g., CapTrak based on LPA/RPA/Nasion landmarks) rather than
+% standard MNI space. When landmarks (10-20 electrode positions) are
+% available in the SNIRF file, interpolateValues3D can automatically
+% transform coordinates to MNI for proper alignment with the brain template.
+%
+% The 'transformToMNI' parameter controls this behavior:
+%   'auto' (default) - Transform if coordinate system is not MNI and
+%                      landmarks are available in the data
+%   true             - Always transform (error if no landmarks available)
+%   false            - Never transform, use original coordinates as-is
+
+%% 43. Automatic MNI transformation — SNIRF with CapTrak coordinates
+% When importing SNIRF files with subject-specific coordinates (e.g., CapTrak),
+% the transformation happens automatically if landmarks are present.
+% This example uses a SNIRF file from the FRESH dataset (OpenNeuro).
+
+% Note: Update path to your SNIRF file location
+snirfPath = fullfile(pf2_base.pf2_defaultRootPath(), ...
+    'tests', 'benchmarks', 'data', 'dataset_I_auditory', ...
+    'sub-01', 'ses-01', 'nirs', 'sub-01_ses-01_task-FRESHAUDIO_nirs.snirf');
+
+if isfile(snirfPath)
+    % Import SNIRF with landmarks (CapTrak coordinate system)
+    data = pf2.import.importSNIRF(snirfPath, false);
+    processed = processFNIRS2(data);
+
+    % Check what coordinate system was detected
+    fprintf('Coordinate system: %s\n', data.device.CoordinateSystem);
+    fprintf('Landmarks available: %d\n', height(data.device.Landmarks));
+
+    % Get HbO at a single timepoint
+    t_idx = round(size(processed.HbO, 1) / 2);
+    hboVals = processed.HbO(t_idx, :);
+
+    % Plot with auto transformation (default) — coordinates transformed to MNI
+    figure;
+    pf2.probe.plot.interpolateValues3D(hboVals, processed, ...
+        'initCamPosition', 'front', ...
+        'colorbarStr', 'HbO (\muM\cdotmm)', ...
+        'ChannelLabels', true, 'SDLabels', false);
+    title(sprintf('Auto MNI Transform (t=%.1fs)', processed.time(t_idx)));
+else
+    fprintf('SNIRF file not found at: %s\n', snirfPath);
+    fprintf('Download FRESH dataset from OpenNeuro or update the path.\n');
+end
+
+%% 44. Compare transformed vs original coordinates
+% Side-by-side comparison showing the effect of MNI transformation.
+% Without transformation, CapTrak coordinates may not align with the brain.
+
+if isfile(snirfPath)
+    figure;
+
+    % With transformation (properly aligned)
+    subplot(1, 2, 1);
+    pf2.probe.plot.interpolateValues3D(hboVals, processed, ...
+        'transformToMNI', true, ...
+        'initCamPosition', 'front', ...
+        'ChannelLabels', false, 'SDLabels', false, ...
+        'showColorbar', false);
+    title('transformToMNI = true');
+
+    % Without transformation (may be misaligned)
+    subplot(1, 2, 2);
+    pf2.probe.plot.interpolateValues3D(hboVals, processed, ...
+        'transformToMNI', false, ...
+        'initCamPosition', 'front', ...
+        'ChannelLabels', false, 'SDLabels', false, ...
+        'showColorbar', false);
+    title('transformToMNI = false (original coords)');
+end
+
+%% 45. Direct use of pf2.probe.transformToMNI
+% You can also use the transformation function directly to transform
+% arbitrary coordinates using the landmarks from an fNIRS struct.
+
+if isfile(snirfPath)
+    % Get original probe coordinates
+    origCoords = [processed.device.Probe{1}.OptPos.x, ...
+                  processed.device.Probe{1}.OptPos.y, ...
+                  processed.device.Probe{1}.OptPos.z];
+
+    % Transform to MNI space
+    [mniCoords, T, matchInfo] = pf2.probe.transformToMNI(origCoords, processed, ...
+        'Verbose', true);
+
+    % Display transformation results
+    fprintf('\nTransformation summary:\n');
+    fprintf('  Matched landmarks: %d\n', matchInfo.nMatched);
+    fprintf('  Scale factor: %.4f\n', T.s);
+    fprintf('  RMS error: %.2f mm\n', T.error);
+
+    % Compare coordinate ranges
+    fprintf('\nOriginal coordinate ranges (mm):\n');
+    fprintf('  X: [%.1f, %.1f]\n', min(origCoords(:,1)), max(origCoords(:,1)));
+    fprintf('  Y: [%.1f, %.1f]\n', min(origCoords(:,2)), max(origCoords(:,2)));
+    fprintf('  Z: [%.1f, %.1f]\n', min(origCoords(:,3)), max(origCoords(:,3)));
+
+    fprintf('\nMNI coordinate ranges (mm):\n');
+    fprintf('  X: [%.1f, %.1f]\n', min(mniCoords(:,1)), max(mniCoords(:,1)));
+    fprintf('  Y: [%.1f, %.1f]\n', min(mniCoords(:,2)), max(mniCoords(:,2)));
+    fprintf('  Z: [%.1f, %.1f]\n', min(mniCoords(:,3)), max(mniCoords(:,3)));
+end

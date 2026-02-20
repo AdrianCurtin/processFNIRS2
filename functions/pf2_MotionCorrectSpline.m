@@ -1,4 +1,4 @@
-function [dodCorrected] = pf2_MotionCorrectSpline(dod, sample_rate, p, tMotion, tMask, STDEVthresh, AMPthresh)
+function [dodCorrected] = pf2_MotionCorrectSpline(dod, sample_rate, p, tMotion, tMask, STDEVthresh, AMPthresh, accelerate)
 % PF2_MOTIONCORRECTSPLINE Spline interpolation motion artifact correction
 %
 % Detects motion artifacts using amplitude and derivative thresholds, then
@@ -21,6 +21,7 @@ function [dodCorrected] = pf2_MotionCorrectSpline(dod, sample_rate, p, tMotion, 
 %   dodCorrected = pf2_MotionCorrectSpline(dod, sample_rate)
 %   dodCorrected = pf2_MotionCorrectSpline(dod, sample_rate, p)
 %   dodCorrected = pf2_MotionCorrectSpline(dod, sample_rate, p, tMotion, tMask, STDEVthresh, AMPthresh)
+%   dodCorrected = pf2_MotionCorrectSpline(dod, sample_rate, p, tMotion, tMask, STDEVthresh, AMPthresh, accelerate)
 %
 % Inputs:
 %   dod          - Optical density signal [T x C] where T=samples, C=channels
@@ -33,6 +34,10 @@ function [dodCorrected] = pf2_MotionCorrectSpline(dod, sample_rate, p, tMotion, 
 %                  standard deviation. Larger = less sensitive. (default: 10)
 %   AMPthresh    - Threshold for signal derivative change in OD units.
 %                  Larger = less sensitive. (default: 0.5)
+%   accelerate   - Parallel acceleration mode (optional, string, default: 'auto')
+%                  'auto'   - use parfor if pool running and nChannels > 8
+%                  'parfor' - use parfor if available
+%                  'none'   - serial processing
 %
 % Outputs:
 %   dodCorrected - Motion-corrected optical density [T x C]
@@ -61,20 +66,48 @@ function [dodCorrected] = pf2_MotionCorrectSpline(dod, sample_rate, p, tMotion, 
 % See also: pf2_MotionCorrectTDDR, pf2_MotionCorrectWavelet, pf2_SMAR, csaps
 
 %% Defaults
-if nargin < 7, AMPthresh = 0.5; end
-if nargin < 6, STDEVthresh = 10; end
-if nargin < 5, tMask = 1; end
-if nargin < 4, tMotion = 0.5; end
-if nargin < 3, p = 0.99; end
+if nargin < 8 || isempty(accelerate), accelerate = 'auto'; end
+if nargin < 7 || isempty(AMPthresh), AMPthresh = 0.5; end
+if nargin < 6 || isempty(STDEVthresh), STDEVthresh = 10; end
+if nargin < 5 || isempty(tMask), tMask = 1; end
+if nargin < 4 || isempty(tMotion), tMotion = 0.5; end
+if nargin < 3 || isempty(p), p = 0.99; end
 
 [T, nCh] = size(dod);
 dodCorrected = dod;
 
 nMotion = max(1, round(tMotion * sample_rate));
 nMask = round(tMask * sample_rate);
+hasCsaps = exist('csaps', 'file') > 0;
 
-for ch = 1:nCh
-    signal = dod(:, ch);
+% Determine whether to use parfor
+useParfor = false;
+if ~strcmp(accelerate, 'none')
+    [canUse, poolRunning] = pf2_base.accel.canParfor();
+    if strcmp(accelerate, 'parfor')
+        useParfor = canUse;
+    elseif strcmp(accelerate, 'auto')
+        useParfor = canUse && poolRunning && nCh > 8;
+    end
+end
+
+if useParfor
+    parfor ch = 1:nCh
+        dodCorrected(:, ch) = processChannel(dod(:, ch), T, nMotion, nMask, STDEVthresh, AMPthresh, p, sample_rate, hasCsaps);
+    end
+else
+    for ch = 1:nCh
+        dodCorrected(:, ch) = processChannel(dod(:, ch), T, nMotion, nMask, STDEVthresh, AMPthresh, p, sample_rate, hasCsaps);
+    end
+end
+
+end
+
+
+function chOut = processChannel(signal, T, nMotion, nMask, STDEVthresh, AMPthresh, p, sample_rate, hasCsaps)
+% PROCESSCHANNEL Detect and correct motion artifacts for a single channel.
+
+    chOut = signal;
 
     %% Step 1: Detect motion artifacts
     artifactMask = detectMotionArtifacts(signal, nMotion, STDEVthresh, AMPthresh);
@@ -92,11 +125,10 @@ for ch = 1:nCh
     end
 
     if ~any(artifactMask)
-        continue;  % No artifacts detected
+        return;  % No artifacts detected
     end
 
     %% Step 3: Correct each contiguous artifact segment
-    % Find contiguous runs of artifacts
     segments = findContiguousSegments(artifactMask);
 
     for s = 1:size(segments, 1)
@@ -108,29 +140,23 @@ for ch = 1:nCh
             continue;
         end
 
-        % Fit smoothing spline to the artifact segment
         tSeg = (1:segLen)';
         ySeg = signal(iStart:iEnd);
 
-        % Handle NaN in segment
         validIdx = ~isnan(ySeg);
         if sum(validIdx) < 2
             continue;
         end
 
-        % Use csaps for cubic smoothing spline
-        if exist('csaps', 'file')
+        if hasCsaps
             pp = csaps(tSeg(validIdx), ySeg(validIdx), p);
             splineFit = fnval(pp, tSeg);
         else
-            % Fallback: polyfit with high-order polynomial
             polyOrd = min(5, sum(validIdx) - 1);
             coeffs = polyfit(tSeg(validIdx), ySeg(validIdx), polyOrd);
             splineFit = polyval(coeffs, tSeg);
         end
 
-        % Subtract spline fit (remove drift from motion)
-        % Anchor to pre-artifact boundary mean (up to 1 sec before)
         preWin = max(1, iStart - max(1, round(sample_rate)));
         preSamples = signal(preWin:iStart-1);
         preSamples = preSamples(~isnan(preSamples));
@@ -139,9 +165,8 @@ for ch = 1:nCh
         else
             preLevel = mean(preSamples);
         end
-        dodCorrected(iStart:iEnd, ch) = signal(iStart:iEnd) - splineFit + preLevel;
+        chOut(iStart:iEnd) = signal(iStart:iEnd) - splineFit + preLevel;
     end
-end
 
 end
 

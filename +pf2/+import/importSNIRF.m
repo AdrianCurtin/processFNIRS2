@@ -245,23 +245,39 @@ device.Info.TimeIsSampleCount = 0;
 probeInfo = nirs.probe;
 
 % Handle length unit conversion if needed (convert to mm internally)
+scaleFactor = 1;
 if isfield(metaDataTags, 'LengthUnit')
-    switch lower(metaDataTags.LengthUnit)
-        case 'm'
-            scaleFactor = 1000;
-        case 'cm'
-            scaleFactor = 10;
-        case 'mm'
-            scaleFactor = 1;
-        otherwise
-            scaleFactor = 1;
+    % Special case: CapTrak stores in microns (μm) despite metadata saying 'm'
+    coordSystem = '';
+    if isfield(metaDataTags, 'CoordinateSystem')
+        coordSystem = metaDataTags.CoordinateSystem;
     end
-    if scaleFactor ~= 1
-        probeInfo.detectorPos3D = probeInfo.detectorPos3D * scaleFactor;
-        probeInfo.sourcePos3D = probeInfo.sourcePos3D * scaleFactor;
-        if isfield(probeInfo, 'landmarkPos3D')
-            probeInfo.landmarkPos3D = probeInfo.landmarkPos3D * scaleFactor;
+
+    if strcmpi(coordSystem, 'CapTrak')
+        % CapTrak: coordinates are in microns, convert to mm
+        scaleFactor = 0.001;  % μm to mm: divide by 1000
+    else
+        % Standard handling based on declared LengthUnit
+        switch lower(metaDataTags.LengthUnit)
+            case 'm'
+                scaleFactor = 1000;
+            case 'cm'
+                scaleFactor = 10;
+            case 'mm'
+                scaleFactor = 1;
+            case 'um'
+                scaleFactor = 0.001;  % micrometers to mm
+            otherwise
+                scaleFactor = 1;
         end
+    end
+end
+
+if scaleFactor ~= 1
+    probeInfo.detectorPos3D = probeInfo.detectorPos3D * scaleFactor;
+    probeInfo.sourcePos3D = probeInfo.sourcePos3D * scaleFactor;
+    if isfield(probeInfo, 'landmarkPos3D')
+        probeInfo.landmarkPos3D = probeInfo.landmarkPos3D * scaleFactor;
     end
 end
 
@@ -684,6 +700,63 @@ for p = 1:1 % Just one probe for now
     end
 end
 
+% Collect coordinate system information for Device object
+coordSys = '';
+coordSysDesc = '';
+coordUnits = '';
+landmarks = [];
+
+% Check SNIRF probe for coordinate system info
+if isfield(probeInfo, 'coordinateSystem')
+    coordSys = probeInfo.coordinateSystem;
+end
+
+if isempty(coordSys)
+    % Try to read from BIDS sidecar (coordsystem.json)
+    coordSysInfo = loadBIDScoordSystem(filepath);
+    if ~isempty(coordSysInfo)
+        coordSys = coordSysInfo.system;
+        coordSysDesc = coordSysInfo.description;
+        coordUnits = coordSysInfo.units;
+    else
+        coordSys = 'Unknown';
+    end
+end
+
+if isfield(probeInfo, 'coordinateSystemDescription')
+    coordSysDesc = probeInfo.coordinateSystemDescription;
+end
+
+% Collect landmarks (fiducials, 10-20 electrodes, head points) for registration
+% Note: scaling has already been applied to probeInfo.landmarkPos3D above
+if isfield(probeInfo, 'landmarkPos3D') && isfield(probeInfo, 'landmarkLabels')
+    landmarkPos = probeInfo.landmarkPos3D;
+    landmarkLabels = probeInfo.landmarkLabels;
+
+    % Create landmarks table
+    nLandmarks = size(landmarkPos, 1);
+    if nLandmarks == length(landmarkLabels)
+        landmarks = table();
+        landmarks.Label = landmarkLabels(:);
+        landmarks.X = landmarkPos(:, 1);
+        landmarks.Y = landmarkPos(:, 2);
+        landmarks.Z = landmarkPos(:, 3);
+
+        % Classify landmark types
+        landmarkType = repmat("electrode", nLandmarks, 1);
+        fiducialLabels = {'LPA', 'RPA', 'NASION', 'NAS', 'Nz', 'Iz', 'INION'};
+        for li = 1:nLandmarks
+            lbl = landmarks.Label{li};
+            if any(strcmpi(lbl, fiducialLabels))
+                landmarkType(li) = "fiducial";
+            elseif startsWith(lbl, 'HP_') || startsWith(lbl, 'HP')
+                landmarkType(li) = "headpoint";
+            end
+        end
+        landmarks.Type = categorical(landmarkType);
+    end
+end
+
 % Import auxiliary data if available
 if isfield(nirs, 'aux') && ~isempty(nirs.aux)
     fNIR.Aux = struct();
@@ -734,7 +807,20 @@ else
 end
 
 % Attach Device object for self-describing data
-fNIR.device = pf2.Device.fromProbeInfo(device);
+deviceArgs = {};
+if ~isempty(coordSys)
+    deviceArgs = [deviceArgs, {'CoordinateSystem', coordSys}];
+end
+if ~isempty(coordSysDesc)
+    deviceArgs = [deviceArgs, {'CoordinateSystemDescription', coordSysDesc}];
+end
+if ~isempty(coordUnits)
+    deviceArgs = [deviceArgs, {'CoordinateUnits', coordUnits}];
+end
+if ~isempty(landmarks)
+    deviceArgs = [deviceArgs, {'Landmarks', landmarks}];
+end
+fNIR.device = pf2.Device.fromProbeInfo(device, '', deviceArgs{:});
 
 
 % Load existing channel mask if available and not checking
@@ -924,6 +1010,66 @@ try
 
 catch e
     fprintf('Warning: failed to load BIDS events from %s: %s\n', eventsFile, e.message);
+end
+
+end
+
+function coordSysInfo = loadBIDScoordSystem(snirfPath)
+% LOADBIDSCOORDSYSTEM Load coordinate system info from BIDS coordsystem.json
+%
+% Looks for a companion _coordsystem.json file alongside the SNIRF file
+% following BIDS naming conventions. Parses NIRSCoordinateSystem,
+% NIRSCoordinateSystemDescription, and NIRSCoordinateUnits.
+%
+% Inputs:
+%   snirfPath - Full path to the SNIRF file
+%
+% Outputs:
+%   coordSysInfo - Struct with fields: system, description, units
+%                  Empty [] if file not found or parse error
+
+coordSysInfo = [];
+
+[parentDir, baseName, ~] = fileparts(snirfPath);
+
+% BIDS convention: replace _nirs.snirf or _task-XXX_nirs.snirf with _coordsystem.json
+% First try: sub-XX_ses-XX_coordsystem.json (session-level)
+coordName = regexprep(baseName, '_task-[^_]+_nirs$', '_coordsystem.json');
+coordFile = fullfile(parentDir, coordName);
+
+if ~isfile(coordFile)
+    % Try with subject-session prefix only
+    tokens = regexp(baseName, '^(sub-[^_]+(?:_ses-[^_]+)?)_', 'tokens');
+    if ~isempty(tokens)
+        coordFile = fullfile(parentDir, [tokens{1}{1} '_coordsystem.json']);
+    end
+end
+
+if ~isfile(coordFile)
+    return;
+end
+
+try
+    coordJson = jsondecode(fileread(coordFile));
+
+    coordSysInfo = struct();
+    coordSysInfo.system = '';
+    coordSysInfo.description = '';
+    coordSysInfo.units = 'mm';
+
+    if isfield(coordJson, 'NIRSCoordinateSystem')
+        coordSysInfo.system = coordJson.NIRSCoordinateSystem;
+    end
+    if isfield(coordJson, 'NIRSCoordinateSystemDescription')
+        coordSysInfo.description = coordJson.NIRSCoordinateSystemDescription;
+    end
+    if isfield(coordJson, 'NIRSCoordinateUnits')
+        coordSysInfo.units = coordJson.NIRSCoordinateUnits;
+    end
+
+catch e
+    fprintf('Warning: failed to load BIDS coordsystem from %s: %s\n', coordFile, e.message);
+    coordSysInfo = [];
 end
 
 end

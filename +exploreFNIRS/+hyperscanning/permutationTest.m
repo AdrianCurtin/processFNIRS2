@@ -119,32 +119,49 @@ function result = permutationTest(data, pairs, varargin)
     % Permutation loop
     nullDist = nan(nPerms, nElements);
 
-    fprintf('Permutation test: ');
-    for perm = 1:nPerms
-        % Shuffle B members across dyads
-        shuffledB = roleB(randperm(nPairs));
-
-        % Build shuffled pairs
-        shuffledPairs = pairs;
-        for d = 1:nPairs
-            shuffledPairs(d).indices = [roleA(d), shuffledB(d)];
-        end
-
-        % Compute group coupling with shuffled pairs
-        try
-            shuffResult = exploreFNIRS.hyperscanning.computeGroup( ...
-                data, shuffledPairs, alignArgs{:}, dyadArgs{:});
-            nullDist(perm, :) = shuffResult.Mean(:);
-        catch
-            % Skip failed permutations
-        end
-
-        % Progress
-        if mod(perm, max(1, round(nPerms/10))) == 0
-            fprintf('%d%% ', round(perm/nPerms*100));
-        end
+    % Determine whether to use parfor
+    useParfor = false;
+    [canUse, poolRunning] = pf2_base.accel.canParfor();
+    if canUse && poolRunning && nPerms > 10
+        useParfor = true;
     end
-    fprintf('done.\n');
+
+    if useParfor
+        fprintf('Permutation test (%d permutations, parallel)...\n', nPerms);
+        parfor perm = 1:nPerms
+            shuffledB = roleB(randperm(nPairs));
+            shuffledPairs = pairs;
+            for d = 1:nPairs
+                shuffledPairs(d).indices = [roleA(d), shuffledB(d)];
+            end
+            try
+                shuffResult = exploreFNIRS.hyperscanning.computeGroup( ...
+                    data, shuffledPairs, alignArgs{:}, dyadArgs{:});
+                nullDist(perm, :) = shuffResult.Mean(:);
+            catch
+            end
+        end
+        fprintf('done.\n');
+    else
+        fprintf('Permutation test: ');
+        for perm = 1:nPerms
+            shuffledB = roleB(randperm(nPairs));
+            shuffledPairs = pairs;
+            for d = 1:nPairs
+                shuffledPairs(d).indices = [roleA(d), shuffledB(d)];
+            end
+            try
+                shuffResult = exploreFNIRS.hyperscanning.computeGroup( ...
+                    data, shuffledPairs, alignArgs{:}, dyadArgs{:});
+                nullDist(perm, :) = shuffResult.Mean(:);
+            catch
+            end
+            if mod(perm, max(1, round(nPerms/10))) == 0
+                fprintf('%d%% ', round(perm/nPerms*100));
+            end
+        end
+        fprintf('done.\n');
+    end
 
     % Remove failed permutations
     validPerms = ~all(isnan(nullDist), 2);
