@@ -25,6 +25,7 @@ function outFNIR = concatenateHorizontal(fNIR_objs, varargin)
 %               .time - Merged and sorted time vector [T_total x 1]
 %               .markers - Merged and sorted event markers
 %               .fchMask - Combined mask (channel valid only if valid in all)
+%               .Aux - Merged auxiliary data (if present)
 %               .t0 - Reference time from earliest segment
 %
 % Algorithm:
@@ -40,6 +41,8 @@ function outFNIR = concatenateHorizontal(fNIR_objs, varargin)
 %   - Does NOT concatenate processed fields (HbO, HbR, etc.)
 %   - Use before processing, not after
 %   - Channel mask uses AND logic (valid only if valid in ALL segments)
+%   - Aux signals are concatenated and sorted by their own time vectors
+%   - Aux fields present in any segment are included; missing segments skipped
 %
 % Example:
 %   % Merge two recording segments from same session
@@ -104,6 +107,31 @@ for i=1:length(fNIR_objs) %use Slowest fNIR file as reference
     
     
     outFNIR.fchMask=outFNIR.fchMask.*appendFNIR.fchMask;
+
+    % Merge Aux signals
+    if isfield(appendFNIR, 'Aux') && isstruct(appendFNIR.Aux)
+        if ~isfield(outFNIR, 'Aux') || ~isstruct(outFNIR.Aux)
+            outFNIR.Aux = struct();
+        end
+        auxNames = fieldnames(appendFNIR.Aux);
+        for a = 1:length(auxNames)
+            name = auxNames{a};
+            appAux = appendFNIR.Aux.(name);
+            if ~isstruct(appAux); continue; end
+            if ~isfield(outFNIR.Aux, name)
+                % First time seeing this Aux field — copy as-is
+                outFNIR.Aux.(name) = appAux;
+            else
+                % Concatenate .data and .time vertically
+                if isfield(appAux, 'data') && isfield(outFNIR.Aux.(name), 'data')
+                    outFNIR.Aux.(name).data = [outFNIR.Aux.(name).data; appAux.data];
+                end
+                if isfield(appAux, 'time') && isfield(outFNIR.Aux.(name), 'time')
+                    outFNIR.Aux.(name).time = [outFNIR.Aux.(name).time; appAux.time];
+                end
+            end
+        end
+    end
 end
 
 % order data
@@ -114,9 +142,17 @@ if(isfield(outFNIR,'datetime'))
 end
 outFNIR.raw=outFNIR.raw(b,:);
 
-
-
-
+% Sort Aux signals by their own time vectors
+if isfield(outFNIR, 'Aux') && isstruct(outFNIR.Aux)
+    auxNames = fieldnames(outFNIR.Aux);
+    for a = 1:length(auxNames)
+        s = outFNIR.Aux.(auxNames{a});
+        if isstruct(s) && isfield(s, 'time') && isfield(s, 'data')
+            [outFNIR.Aux.(auxNames{a}).time, si] = sort(s.time);
+            outFNIR.Aux.(auxNames{a}).data = s.data(si, :);
+        end
+    end
+end
 
 
 

@@ -16,7 +16,8 @@ function result = computeDyad(dataA, dataB, varargin)
 %
 % Name-Value Parameters:
 %   Method          - Coupling method: 'pearson' (default), 'spearman', 'xcorr',
-%                     'coherence', 'wcoherence', 'granger', 'transferentropy'
+%                     'coherence', 'wcoherence', 'granger', 'transferentropy',
+%                     'partialcorr', 'mutualinfo'
 %   Biomarker       - 'HbO' (default), 'HbR', 'HbTotal', 'HbDiff', 'CBSI'
 %   ChannelPairing  - How to pair channels/ROIs across subjects:
 %                     'same' (default) - same index (Ca=Cb)
@@ -411,9 +412,13 @@ function fn = getCouplingFn(method)
             fn = @exploreFNIRS.coupling.transferEntropy;
         case 'hbica'
             fn = @exploreFNIRS.coupling.hbica;
+        case 'partialcorr'
+            fn = @exploreFNIRS.coupling.partialCorr;
+        case 'mutualinfo'
+            fn = @exploreFNIRS.coupling.mutualInfo;
         otherwise
             error('exploreFNIRS:hyperscanning:computeDyad', ...
-                'Unknown coupling method "%s". Use: pearson, spearman, xcorr, coherence, wcoherence, granger, transferentropy, hbica', method);
+                'Unknown coupling method "%s". Use: pearson, spearman, xcorr, coherence, wcoherence, granger, transferentropy, hbica, partialcorr, mutualinfo', method);
     end
 end
 

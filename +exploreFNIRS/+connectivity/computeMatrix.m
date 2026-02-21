@@ -18,7 +18,8 @@ function result = computeMatrix(data, varargin)
 %
 % Name-Value Parameters:
 %   Method     - Coupling method: 'pearson' (default), 'spearman', 'xcorr',
-%                'coherence', 'wcoherence', 'granger', 'transferentropy'
+%                'coherence', 'wcoherence', 'granger', 'transferentropy',
+%                'partialcorr', 'mutualinfo'
 %   Biomarker  - Biomarker to use: 'HbO' (default), 'HbR', 'HbTotal', 'HbDiff', 'CBSI'
 %   Channels   - Channel/ROI indices to include (default: all good channels or all ROIs)
 %   TimeWindow - [start, end] in seconds to restrict analysis (default: full range)
@@ -134,6 +135,7 @@ function result = computeMatrix(data, varargin)
     isDirected = ismember(methodLower, {'granger', 'transferentropy'});
     isBatchable = ismember(methodLower, {'pearson', 'spearman'});
     isBatchWcoh = strcmp(methodLower, 'wcoherence');
+    isBatchPartialCorr = strcmp(methodLower, 'partialcorr');
 
     % Determine acceleration strategy
     if nCh > 1
@@ -180,7 +182,10 @@ function result = computeMatrix(data, varargin)
     end
 
     % Compute pairwise coupling
-    if isBatchable && ~isDirected
+    if isBatchPartialCorr
+        % Batch precision-matrix path for partial correlation
+        [matrix, pmatrix] = computeBatchPartialCorr(signal, channels, nCh, nSamples);
+    elseif isBatchable && ~isDirected
         % Batch matrix path for pearson/spearman (vectorized, works on CPU or GPU)
         [matrix, pmatrix] = computeBatchCorrelation(signal, channels, nCh, nSamples, methodLower, useGPU);
     elseif isBatchWcoh
@@ -420,6 +425,77 @@ function [matrix, pmatrix] = computeBatchCorrelation(signal, channels, nCh, nSam
 end
 
 
+function [matrix, pmatrix] = computeBatchPartialCorr(signal, channels, nCh, nSamples)
+% COMPUTEBATCHPARTIALCORR Partial correlation via precision matrix inversion
+%
+% Computes partial correlations for all channel pairs simultaneously by
+% inverting the covariance matrix. The partial correlation between channels
+% i and j is: r_ij = -P(i,j) / sqrt(P(i,i) * P(j,j)) where P = inv(C).
+
+    S = signal(:, channels);
+
+    % Remove NaN rows (listwise deletion)
+    validRows = ~any(isnan(S), 2);
+    Sv = S(validRows, :);
+    n = size(Sv, 1);
+
+    matrix = nan(nCh, nCh);
+    pmatrix = nan(nCh, nCh);
+
+    if n < nCh + 2
+        % Not enough observations for precision matrix
+        return;
+    end
+
+    % Covariance matrix
+    C = cov(Sv);
+
+    % Regularize if near-singular (Ledoit-Wolf shrinkage)
+    condNum = cond(C);
+    if condNum > 1e10 || any(eig(C) < eps)
+        % Shrinkage: C_reg = (1 - alpha)*C + alpha*diag(diag(C))
+        alpha = 0.01;
+        C = (1 - alpha) * C + alpha * diag(diag(C));
+    end
+
+    % Precision matrix
+    P = inv(C); %#ok<MINV>  - intentional; inversion is the algorithm
+
+    % Partial correlation: r_ij = -P(i,j) / sqrt(P(i,i) * P(j,j))
+    d = sqrt(diag(P));
+    pcorr = -P ./ (d * d');
+
+    % Diagonal = 1 by definition
+    pcorr(logical(eye(nCh))) = 1;
+
+    % Clamp to [-1, 1]
+    pcorr = max(min(pcorr, 1), -1);
+
+    matrix = pcorr;
+
+    % p-values via t-distribution: df = n - nCh (not n-2)
+    df = n - nCh;
+    if df > 0
+        tStat = pcorr .* sqrt(df ./ (1 - pcorr.^2 + eps));
+        pmatrix = 2 * (1 - tcdf(abs(tStat), df));
+        pmatrix(logical(eye(nCh))) = 0;
+    else
+        pmatrix = nan(nCh, nCh);
+        pmatrix(logical(eye(nCh))) = 0;
+    end
+
+    % NaN out channels that were all-NaN in original
+    for ch = 1:nCh
+        if all(isnan(signal(:, channels(ch))))
+            matrix(ch, :) = NaN;
+            matrix(:, ch) = NaN;
+            pmatrix(ch, :) = NaN;
+            pmatrix(:, ch) = NaN;
+        end
+    end
+end
+
+
 function [matrix, pmatrix] = computeParfor(signal, channels, nCh, fs, opts, isDirected)
 % COMPUTEPARFOR Parallel pairwise coupling via parfor
 
@@ -610,9 +686,13 @@ function fn = getCouplingFn(method)
             fn = @exploreFNIRS.coupling.transferEntropy;
         case 'hbica'
             fn = @exploreFNIRS.coupling.hbica;
+        case 'partialcorr'
+            fn = @exploreFNIRS.coupling.partialCorr;
+        case 'mutualinfo'
+            fn = @exploreFNIRS.coupling.mutualInfo;
         otherwise
             error('exploreFNIRS:connectivity:computeMatrix', ...
-                'Unknown coupling method "%s". Use: pearson, spearman, xcorr, coherence, wcoherence, granger, transferentropy, hbica', method);
+                'Unknown coupling method "%s". Use: pearson, spearman, xcorr, coherence, wcoherence, granger, transferentropy, hbica, partialcorr, mutualinfo', method);
     end
 end
 

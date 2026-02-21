@@ -4,6 +4,53 @@
 
 ### New Features
 
+**New Coupling Methods:**
+- `exploreFNIRS.coupling.partialCorr()` — partial correlation controlling for confound signals
+  - Standalone: pass `'Confounds', Z` to regress out signals (QR decomposition)
+  - Via `computeMatrix`: uses precision-matrix batch path (inverts covariance, no pairwise regression)
+  - Ledoit-Wolf shrinkage regularization for near-singular covariance matrices
+  - Supports sliding window mode; p-values via t-distribution
+- `exploreFNIRS.coupling.mutualInfo()` — histogram-based mutual information
+  - Captures both linear and nonlinear dependencies
+  - Auto bin selection via Freedman-Diaconis rule, or fixed bin count
+  - Normalized MI (NMI = MI / sqrt(H(x)*H(y))) to [0,1] by default
+  - Block-shuffle surrogate p-values
+  - Supports sliding window mode
+- Both methods registered in `computeMatrix` and `computeDyad` dispatch
+
+**Neural Efficiency Analysis:**
+- `exploreFNIRS.core.plotNeuralEfficiency()` — scatter plot of brain activation vs behavioral performance
+  - Both axes z-scored; identity line separates "efficient" from "inefficient" subjects
+  - Per-group regression lines, Pearson/Spearman statistics, arrow annotations
+  - Flexible axis mapping: FlipXY, InvertX, ZScoreMode (global/pergroup)
+- `exploreFNIRS.core.plotNeuralEfficiencyFromTable()` — same plot from a pre-built table (for custom data)
+- `exploreFNIRS.core.plotNeuralEfficiencyCore()` — shared rendering engine
+- `Experiment.plotNeuralEfficiency()` — wrapper returning fig, stats, and per-point neTable
+- `examples/scripts/example_neural_efficiency.m` — tutorial script
+
+**FFT-Based Wavelet Transform:**
+- `pf2_base.wavelet.cwt()` — batch FFT-based continuous wavelet transform (Morlet)
+  - Single precision by default for faster FFTs; GPU-aware
+  - Power-of-2 padding; vectorized scale computation (all Morlet kernels as [nfft x nScales] matrix)
+  - No Wavelet Toolbox dependency
+- `pf2_base.wavelet.wcoherence()` — license-free wavelet coherence using pre-computed CWTs
+  - SmoothedAutoX/SmoothedAutoY params for batch mode (skip redundant auto-spectra smoothing)
+  - FFT-based smoothing (not per-row convolution)
+- `exploreFNIRS.coupling.wcoherence()` now delegates to `pf2_base.wavelet.wcoherence`
+- `exploreFNIRS.connectivity.computeMatrix()` batch CWT path for wcoherence method: pre-computes smoothed auto-spectra once per channel, eliminating N-1 redundant smoothings
+- `exploreFNIRS.hyperscanning.computeDyad()` batch CWT path with same optimization
+
+**Parallel Acceleration:**
+- `pf2_base.accel.canParfor()` pattern: returns [canUse, poolRunning] for auto mode
+- `pf2_MotionCorrectTDDR` — parfor over channels (threshold: >8)
+- `pf2_MotionCorrectSpline` — parfor over channels (threshold: >8)
+- `processFNIRS2` cell array mode — parfor with ProcessingContext snapshot (threshold: >2 items)
+- `exploreFNIRS.stats.fitLME` — parfor over channels (single-biomarker path, threshold: >4)
+- `exploreFNIRS.hyperscanning.permutationTest` — parfor over permutations (threshold: >10)
+- `exploreFNIRS.hyperscanning.computeGroup` — parfor over dyad computations (threshold: >2)
+- `exploreFNIRS.graph.smallWorld` — parfor over random network rewirings (threshold: >10)
+- `exploreFNIRS.core.Experiment` — parfor over subjects in `connectivity()` and `intraROI()` (threshold: >2)
+
 **HB-ICA (Hyper-Brain Independent Component Analysis):**
 - `exploreFNIRS.hyperscanning.hbica()` — component-based inter-brain network detection for hyperscanning data using TDSEP ICA and Goodness-of-Fit classification (Luo et al. 2024)
   - Concatenates dual-subject channel data, decomposes via TDSEP, classifies components as inter-brain or intra-brain using GOF index
@@ -109,6 +156,13 @@
 - `processFNIR_GUI` inlined raw and filter-Hb wrappers — processing calls now use explicit parameters instead of reading globals inside wrapper functions
 - `GUIContext` sync wired up via `syncContextFromGUI()` at the start of each processing cycle
 - GUI processing calls now pass `showGUIerrors=true` so pipeline errors show as dialog boxes instead of crashing
+
+### Improvements
+- `Experiment.select()` now preserves the user-specified order of subjects/elements instead of sorting by index
+- Bar charts support `ErrorColor` parameter for custom error bar coloring
+- `pf2_MotionCorrectWavelet` uses WaveLab `FWT_TI`/`IWT_TI`/`DownDyadLo` instead of `dwt`/`idwt` (no Signal Processing Toolbox dependency)
+- `calcCBSI` refactored with literature references (Cui et al. 2010)
+- INI writer fix: correctly handles numeric array values in method config files
 
 ### Bug Fixes
 - Fixed AR-IRLS contrast p-values being anti-conservative — contrasts now use prewhitened X and residuals instead of original-space quantities

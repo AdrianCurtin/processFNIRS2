@@ -2,7 +2,8 @@ classdef ConnectivityTest < matlab.unittest.TestCase
     % CONNECTIVITYTEST Unit tests for connectivity and hyperscanning modules
     %
     %   Tests cover:
-    %     - Coupling functions: pearson, spearman, xcorr, coherence, wcoherence
+    %     - Coupling functions: pearson, spearman, xcorr, coherence, wcoherence,
+    %       partialCorr, mutualInfo
     %     - Connectivity matrix computation
     %     - Subject pairing for hyperscanning
     %     - Dyad and group computation
@@ -126,6 +127,188 @@ classdef ConnectivityTest < matlab.unittest.TestCase
             y = randn(50, 1);
             testCase.verifyError(@() exploreFNIRS.coupling.pearson(x, y, 10), ...
                 'exploreFNIRS:coupling:pearson');
+        end
+
+        function testPartialCorrNoConfounds(testCase)
+            % Without confounds, partialCorr should match Pearson
+            rng(42);
+            target_r = 0.7;
+            [x, y] = generateCorrelatedPair(testCase.T, target_r);
+            resultPC = exploreFNIRS.coupling.partialCorr(x, y, testCase.fs);
+            resultP = exploreFNIRS.coupling.pearson(x, y, testCase.fs);
+
+            testCase.verifyEqual(resultPC.method, 'partialCorr');
+            testCase.verifyFalse(resultPC.windowed);
+            testCase.verifyEqual(resultPC.nConfounds, 0);
+            testCase.verifyEqual(resultPC.value, resultP.value, 'AbsTol', 1e-10);
+        end
+
+        function testPartialCorrWithConfounds(testCase)
+            % Controlling for confound should reduce spurious correlation
+            rng(42);
+            T = testCase.T;
+            confound = randn(T, 1);
+            x = confound * 0.8 + randn(T, 1) * 0.3;
+            y = confound * 0.8 + randn(T, 1) * 0.3;
+
+            % Without confound: high correlation (driven by shared confound)
+            rPlain = exploreFNIRS.coupling.pearson(x, y, testCase.fs);
+
+            % With confound: correlation should drop
+            rPartial = exploreFNIRS.coupling.partialCorr(x, y, testCase.fs, ...
+                'Confounds', confound);
+
+            testCase.verifyGreaterThan(abs(rPlain.value), abs(rPartial.value));
+            testCase.verifyEqual(rPartial.nConfounds, 1);
+        end
+
+        function testPartialCorrWindowed(testCase)
+            rng(42);
+            T = testCase.T;
+            [x, y] = generateCorrelatedPair(T, 0.6);
+            result = exploreFNIRS.coupling.partialCorr(x, y, testCase.fs, ...
+                'WindowSize', 10);
+
+            testCase.verifyTrue(result.windowed);
+            testCase.verifyGreaterThan(length(result.value), 1);
+            testCase.verifyTrue(isfield(result, 'windowTimes'));
+        end
+
+        function testPartialCorrLengthMismatch(testCase)
+            x = randn(100, 1);
+            y = randn(50, 1);
+            testCase.verifyError(@() exploreFNIRS.coupling.partialCorr(x, y, 10), ...
+                'exploreFNIRS:coupling:partialCorr');
+        end
+
+        function testPartialCorrConfoundSizeMismatch(testCase)
+            x = randn(100, 1);
+            y = randn(100, 1);
+            Z = randn(50, 1);
+            testCase.verifyError(@() exploreFNIRS.coupling.partialCorr(x, y, 10, ...
+                'Confounds', Z), 'exploreFNIRS:coupling:partialCorr');
+        end
+
+        function testMutualInfoCorrelatedSignals(testCase)
+            % Correlated signals should have high MI
+            rng(42);
+            [x, y] = generateCorrelatedPair(testCase.T, 0.8);
+            result = exploreFNIRS.coupling.mutualInfo(x, y, testCase.fs);
+
+            testCase.verifyEqual(result.method, 'mutualInfo');
+            testCase.verifyFalse(result.windowed);
+            testCase.verifyTrue(result.normalized);
+            testCase.verifyGreaterThan(result.value, 0.2);
+            testCase.verifyLessThan(result.pvalue, 0.05);
+        end
+
+        function testMutualInfoUncorrelatedSignals(testCase)
+            % Independent signals should have low MI
+            rng(42);
+            x = randn(testCase.T, 1);
+            y = randn(testCase.T, 1);
+            result = exploreFNIRS.coupling.mutualInfo(x, y, testCase.fs);
+
+            testCase.verifyLessThan(result.value, 0.15);
+        end
+
+        function testMutualInfoNonlinear(testCase)
+            % MI should detect nonlinear dependencies that Pearson misses
+            rng(42);
+            T = testCase.T;
+            x = randn(T, 1);
+            y = x.^2 + randn(T, 1) * 0.3;  % Nonlinear dependency
+
+            rPearson = exploreFNIRS.coupling.pearson(x, y, testCase.fs);
+            rMI = exploreFNIRS.coupling.mutualInfo(x, y, testCase.fs, ...
+                'Normalize', false);
+
+            % Pearson should be near zero (symmetric nonlinear relationship)
+            testCase.verifyLessThan(abs(rPearson.value), 0.15);
+            % MI should detect the dependency
+            testCase.verifyGreaterThan(rMI.value, 0);
+            testCase.verifyLessThan(rMI.pvalue, 0.05);
+        end
+
+        function testMutualInfoWindowed(testCase)
+            rng(42);
+            T = testCase.T;
+            [x, y] = generateCorrelatedPair(T, 0.6);
+            result = exploreFNIRS.coupling.mutualInfo(x, y, testCase.fs, ...
+                'WindowSize', 20);
+
+            testCase.verifyTrue(result.windowed);
+            testCase.verifyGreaterThan(length(result.value), 1);
+            testCase.verifyTrue(isfield(result, 'windowTimes'));
+        end
+
+        function testMutualInfoAutoBins(testCase)
+            rng(42);
+            x = randn(testCase.T, 1);
+            y = randn(testCase.T, 1);
+            result = exploreFNIRS.coupling.mutualInfo(x, y, testCase.fs, ...
+                'NBins', 'auto');
+
+            testCase.verifyGreaterThan(result.nBinsUsed, 2);
+        end
+
+        function testMutualInfoFixedBins(testCase)
+            rng(42);
+            x = randn(testCase.T, 1);
+            y = randn(testCase.T, 1);
+            result = exploreFNIRS.coupling.mutualInfo(x, y, testCase.fs, ...
+                'NBins', 8);
+
+            testCase.verifyEqual(result.nBinsUsed, 8);
+        end
+
+        function testMutualInfoLengthMismatch(testCase)
+            x = randn(100, 1);
+            y = randn(50, 1);
+            testCase.verifyError(@() exploreFNIRS.coupling.mutualInfo(x, y, 10), ...
+                'exploreFNIRS:coupling:mutualInfo');
+        end
+
+    end
+
+
+    %% Connectivity Matrix with Partial Corr and MI
+    methods (Test)
+
+        function testComputeMatrixPartialCorr(testCase)
+            % Partial correlation via computeMatrix uses precision matrix
+            rng(42);
+            data = createSyntheticSubject(testCase, 'correlated');
+
+            result = exploreFNIRS.connectivity.computeMatrix(data, ...
+                'Method', 'partialcorr', 'Biomarker', 'HbO');
+
+            nCh = length(result.channels);
+            testCase.verifySize(result.matrix, [nCh, nCh]);
+            testCase.verifySize(result.pmatrix, [nCh, nCh]);
+
+            % Diagonal should be 1
+            for i = 1:nCh
+                testCase.verifyEqual(result.matrix(i, i), 1, 'AbsTol', 1e-10);
+            end
+
+            % Should be symmetric
+            testCase.verifyEqual(result.matrix, result.matrix', 'AbsTol', 1e-10);
+        end
+
+        function testComputeMatrixMutualInfo(testCase)
+            rng(42);
+            data = createSyntheticSubject(testCase, 'correlated');
+
+            result = exploreFNIRS.connectivity.computeMatrix(data, ...
+                'Method', 'mutualinfo', 'Biomarker', 'HbO');
+
+            nCh = length(result.channels);
+            testCase.verifySize(result.matrix, [nCh, nCh]);
+
+            % MI should be non-negative
+            offDiag = result.matrix(~eye(nCh));
+            testCase.verifyGreaterThanOrEqual(min(offDiag(~isnan(offDiag))), 0);
         end
 
     end
