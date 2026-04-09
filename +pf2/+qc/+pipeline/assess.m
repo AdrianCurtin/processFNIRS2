@@ -169,9 +169,9 @@ if needsHb
     if lpfCutoff < nyq && nT > 20
         filterOrder = min(3, floor(nT/10));
         if filterOrder >= 1
-            HbO_filt = lpf(HbO, 3, fs, lpfCutoff, filterOrder);
-            HbR_filt = lpf(HbR, 3, fs, lpfCutoff, filterOrder);
-            HbTotal_filt = lpf(HbTotal, 3, fs, lpfCutoff, filterOrder);
+            HbO_filt = pf2_base.signal.lpf(HbO, 3, fs, lpfCutoff, filterOrder);
+            HbR_filt = pf2_base.signal.lpf(HbR, 3, fs, lpfCutoff, filterOrder);
+            HbTotal_filt = pf2_base.signal.lpf(HbTotal, 3, fs, lpfCutoff, filterOrder);
         else
             HbO_filt = HbO;
             HbR_filt = HbR;

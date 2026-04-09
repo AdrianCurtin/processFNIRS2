@@ -152,8 +152,8 @@ for ch = 1:nChannels
     end
 
     % Bandpass filter to cardiac band
-    wl1_filt = bpf(wl1, opts.FilterOrder, fs, cardiacBand(1), cardiacBand(2));
-    wl2_filt = bpf(wl2, opts.FilterOrder, fs, cardiacBand(1), cardiacBand(2));
+    wl1_filt = pf2_base.signal.bpf(wl1, opts.FilterOrder, fs, cardiacBand(1), cardiacBand(2));
+    wl2_filt = pf2_base.signal.bpf(wl2, opts.FilterOrder, fs, cardiacBand(1), cardiacBand(2));
 
     % Remove NaN positions (bpf returns NaN for non-finite input spans)
     validMask = ~isnan(wl1_filt) & ~isnan(wl2_filt);
