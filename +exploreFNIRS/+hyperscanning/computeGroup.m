@@ -120,7 +120,8 @@ function result = computeGroup(data, pairs, varargin)
                 fprintf('  [%d/%d] %s: mean r = %.3f\n', d, nPairs, dyadIDs{d}, ...
                     mean(dyadResults{d}.values(:), 'omitnan'));
             else
-                fprintf('  [%d/%d] %s: FAILED\n', d, nPairs, dyadIDs{d});
+                warning('pf2:hyperscanning:dyadFailed', ...
+                    'Dyad [%d/%d] %s: FAILED', d, nPairs, dyadIDs{d});
             end
         end
     else

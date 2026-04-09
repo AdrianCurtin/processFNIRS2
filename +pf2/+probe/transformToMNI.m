@@ -200,8 +200,8 @@ errors = sqrt(sum((registeredLandmarks - matchedMNI).^2, 2));
 rmsError = sqrt(mean(errors.^2));
 
 if verbose
-    fprintf('Registration RMS error: %.2f mm\n', rmsError);
-    fprintf('Scale factor: %.4f\n', s);
+    warning('pf2:probe:transformToMNI:info', ...
+        'Registration RMS error: %.2f mm, scale factor: %.4f', rmsError, s);
     if rmsError > 10
         warning('pf2:probe:transformToMNI:highError', ...
             'Registration error is high (%.1f mm). Check landmark quality.', rmsError);

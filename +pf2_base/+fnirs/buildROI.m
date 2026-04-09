@@ -177,7 +177,8 @@ function out=mergeAndRun(func_handle,x_roi,removeNanChannels,varg)
         x_roi=x_roi(~nnz_x,:);
         
         if(rm_ch>0)
-            fprintf('Removed %i channels from ROI\n',rm_ch);
+            warning('pf2:buildROI:removedChannels', ...
+                'Removed %i channels from ROI', rm_ch);
         end
         
     end
@@ -189,7 +190,8 @@ function out=mergeAndRun(func_handle,x_roi,removeNanChannels,varg)
     end
 
     if(size(x_roi,1)==1)
-       warning('Only single channel present in ROI, returning just the one channel');
+       warning('pf2:buildROI:singleChannel', ...
+           'Only single channel present in ROI, returning just the one channel');
        out=x_roi; 
        return;
     end

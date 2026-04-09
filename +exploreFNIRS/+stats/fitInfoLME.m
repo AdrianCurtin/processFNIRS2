@@ -93,7 +93,8 @@ function results = fitInfoLME(dataTable, infoVar, groupByVars, varargin)
     end
 
     if opts.Verbose
-        fprintf('fitInfoLME: %d valid observations (removed %d NaN)\n', ...
+        warning('pf2:stats:fitInfoNaN', ...
+            'fitInfoLME: %d valid observations (removed %d NaN)', ...
             height(fitTable), sum(~validRows));
     end
 
@@ -199,7 +200,8 @@ function results = fitInfoLME(dataTable, infoVar, groupByVars, varargin)
 
     catch ME
         if opts.Verbose
-            fprintf(2, 'LME failed for %s: %s\n', infoVar, ME.message);
+            warning('pf2:stats:lmeFailed', ...
+                'LME failed for %s: %s', infoVar, ME.message);
         end
     end
 end

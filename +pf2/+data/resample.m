@@ -229,7 +229,8 @@ if(blLength>0) % if baseline is present
         blRejectedCount=sum(~blNanCheck);
         
         if(blRejectedCount>1)
-            warning('Baseline Period in %i channels was invalid',blRejectedCount); 
+            warning('pf2:resample:invalidBaseline', ...
+                'Baseline Period in %i channels was invalid', blRejectedCount);
         end
         
         validCh=find(blNanCheck==1);
@@ -577,7 +578,8 @@ function [outAuxStruct] = recursiveAuxResample(aux_in,flattenAux,segLength,cente
         end
 
         if(isempty(curField))
-            fprintf('Unable to average signal .Aux.%s, no data present\n',curFieldName);
+            warning('pf2:resample:emptyAux', ...
+                'Unable to average signal .Aux.%s, no data present', curFieldName);
             auxFieldIsEmpty(f)=true;
             outAuxStruct.(curFieldName)=curField;
             continue;

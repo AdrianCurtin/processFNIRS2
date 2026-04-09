@@ -1009,7 +1009,8 @@ try
     markers = pf2_base.normalizeMarkers([onsets, values, durations, ones(nEvents, 1)]);
 
 catch e
-    fprintf('Warning: failed to load BIDS events from %s: %s\n', eventsFile, e.message);
+    warning('pf2:import:bidsEventsFailed', ...
+        'Failed to load BIDS events from %s: %s', eventsFile, e.message);
 end
 
 end
@@ -1068,7 +1069,8 @@ try
     end
 
 catch e
-    fprintf('Warning: failed to load BIDS coordsystem from %s: %s\n', coordFile, e.message);
+    warning('pf2:import:bidsCoordFailed', ...
+        'Failed to load BIDS coordsystem from %s: %s', coordFile, e.message);
     coordSysInfo = [];
 end
 

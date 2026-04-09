@@ -311,7 +311,8 @@ end
 
 
 if(isempty(PF2.GUIPF2.data.info.Age))
-   warning('fData.info.Age is empty\nDPF calculations will be performed using an age of %i years old\nPlease assign subject age for accurate chromophore calculations',PF2.curDPF_age);
+   warning('pf2:processFNIRS2:noAge', ...
+       'fData.info.Age is empty. DPF calculations will use age=%i. Assign subject age for accurate chromophore calculations.', PF2.curDPF_age);
 
 end
 

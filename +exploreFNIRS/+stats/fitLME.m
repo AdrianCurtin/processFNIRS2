@@ -678,7 +678,8 @@ function results = fitOneModel(results, mergedTable, varName, chRowName, ...
 
     catch ME
         if opts.Verbose
-            fprintf(2, 'LME failed for %s: %s\n', varName, ME.message);
+            warning('pf2:stats:lmeFailed', ...
+                'LME failed for %s: %s', varName, ME.message);
         end
     end
 end

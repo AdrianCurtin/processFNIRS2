@@ -103,7 +103,8 @@ if(~isfield(PF2,'myRawMethods')||~isfield(PF2,'baseline'))
    PF2.curDPF_fixed=5.93;   %Default differential pathlength for adult human head (van der Zee 1992)
    PF2.dpf_mode='Calc';   %Default age to calculate differential pathlength factor from.
    PF2.curDPF_age=25;   %Default age to calculate differential pathlength factor from.
-   fprintf('Initializing default age for DPF calculation to %.0f\n',PF2.curDPF_age);
+   warning('pf2:initialize:defaultAge', ...
+       'Initializing default age for DPF calculation to %.0f', PF2.curDPF_age);
    PF2.baseline=[];
    PF2.baseline.startTime=0; %or minimum time
    PF2.RejectLevel=0; % Reject channels when mask ==0
@@ -111,7 +112,8 @@ if(~isfield(PF2,'myRawMethods')||~isfield(PF2,'baseline'))
    PF2.baseline.useAbsoluteTime=false; %enable to force baseline from absolute time instead of relative time (non-GUI only)
    PF2.baseline.windowStartTime=0; % time from start of viewing window (GUI only)
    PF2.baseline.blLength=10; % time in seconds from start time
-   fprintf('Defaulting to %.1f second baseline from t=%.1f\n',PF2.baseline.blLength,PF2.baseline.startTime);
+   warning('pf2:initialize:defaultBaseline', ...
+       'Defaulting to %.1f second baseline from t=%.1f', PF2.baseline.blLength, PF2.baseline.startTime);
    %processFNIRS2_configureMethods() 
 end
 

@@ -316,7 +316,8 @@ else
 end
 
 if(pf2_base.isnestedfield(outData,'ROI.info')&&~isempty(outData.ROI.info)&&~isfield(outData.ROI,'HbO'))
-    fprintf(2,'No ROI build step was specified\nDefaulting to nanmean of valid channels\n');
+    warning('pf2:processStageFilterHb:noROIBuildStep', ...
+        'No ROI build step was specified. Defaulting to nanmean of valid channels.');
     outData=pf2_build_nanmean_ROI(outData);
     if(~isempty(outData.ROI)&&isfield(outData.ROI,'HbO'))
         validChannels_roi=true(1,size(outData.ROI.('HbO'),2));

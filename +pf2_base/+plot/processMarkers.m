@@ -104,7 +104,8 @@ if ~isempty(markerCodes)
     % Warn about too many markers (interactive prompt handled by caller)
     if any(numMarkers > tooManyThreshold) && ~isinf(tooManyThreshold)
         highIdx = find(numMarkers > tooManyThreshold, 1);
-        fprintf(2, 'Warning: %d markers for marker code %d (threshold: %d)\n', ...
+        warning('pf2:plot:tooManyMarkers', ...
+            '%d markers for marker code %d (threshold: %d)', ...
             numMarkers(highIdx), markerCodes(highIdx), tooManyThreshold);
     end
 end
