@@ -180,10 +180,12 @@ end
 
 
 function [probeXY, chMask, chNums] = resolveProbeLayout(dev)
-% Extract 2D probe positions and short-sep mask from Device
-%   probeXY - [nStd x 2] normalized (x,y) centers for standard channels
+% Extract 2D spatial positions and short-sep mask from Device
+%   probeXY - [nStd x 2] (x,y) positions for standard channels
 %   chMask  - [1 x nTotal] logical, true for standard channels
 %   chNums  - [1 x nStd] channel numbers for labels
+%
+% Priority: MNI 3D (projected to 2D) > optode Pos2D > subplot layout grid
 
     probeXY = [];
     chMask  = [];
@@ -196,31 +198,48 @@ function [probeXY, chMask, chNums] = resolveProbeLayout(dev)
     % Get short-sep mask
     ssMask = dev.isShortSep();
     chMask = ~ssMask;
+    stdIdx = find(chMask);
+    chNums = stdIdx(:)';
 
-    % Get layout positions (cell array of [x, y, w, h])
-    lay = dev.layout2D();
-    if isempty(lay)
-        chMask = [];
+    % Try MNI 3D positions first (project X,Z to 2D: X=left-right, Z=up-down)
+    if dev.hasMNI()
+        mni = dev.mniPositions();  % [nCh x 3]
+        probeXY = [mni(stdIdx, 1), mni(stdIdx, 3)];  % X, Z
         return;
     end
 
-    % Extract center positions for standard channels
-    stdIdx = find(chMask);
+    % Try 2D optode positions from config
+    tbl = dev.optodeTable();
+    if ismember('Pos2D_x', tbl.Properties.VariableNames) && ...
+            ismember('Pos2D_y', tbl.Properties.VariableNames)
+        px = tbl.Pos2D_x(stdIdx);
+        py = tbl.Pos2D_y(stdIdx);
+        if any(px ~= 0) || any(py ~= 0)
+            probeXY = [px(:), py(:)];
+            % Flip Y so top of head is at top of plot
+            probeXY(:, 2) = max(probeXY(:, 2)) - probeXY(:, 2) + min(probeXY(:, 2));
+            return;
+        end
+    end
+
+    % Fallback: subplot layout grid
+    lay = dev.layout2D();
+    if isempty(lay)
+        chMask = [];
+        chNums = [];
+        return;
+    end
+
     probeXY = zeros(length(stdIdx), 2);
-    chNums  = zeros(1, length(stdIdx));
     for i = 1:length(stdIdx)
         pos = lay{stdIdx(i)};
         if isempty(pos)
-            % Fallback: shouldn't happen for standard channels
             probeXY(i, :) = [i, 1];
         else
-            probeXY(i, 1) = pos(1) + pos(3) / 2;  % x center
-            probeXY(i, 2) = pos(2) + pos(4) / 2;  % y center
+            probeXY(i, 1) = pos(1) + pos(3) / 2;
+            probeXY(i, 2) = pos(2) + pos(4) / 2;
         end
-        chNums(i) = stdIdx(i);
     end
-
-    % Flip Y so top of head is at top of plot
     probeXY(:, 2) = 1 - probeXY(:, 2);
 end
 
