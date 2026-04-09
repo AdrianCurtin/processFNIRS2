@@ -77,6 +77,8 @@ function [fig, stats, neTable] = plotNeuralEfficiency(groups, varargin)
     addParameter(p, 'Biomarker', 'HbO', @ischar);
     addParameter(p, 'Channels', [], @isnumeric);
     addParameter(p, 'ROIs', [], @(x) isnumeric(x) || islogical(x) || ischar(x) || isstring(x) || iscell(x));
+    addParameter(p, 'Device', [], @(v) isempty(v) || isa(v, 'pf2.Device'));
+    addParameter(p, 'ExcludeShortSeparation', true, @islogical);
     addParameter(p, 'Averaging', 'hierarchy', @(x) ismember(lower(x), {'hierarchy','flat','none'}));
     addParameter(p, 'FlipXY', false, @islogical);
     addParameter(p, 'ShowLabels', false, @islogical);
@@ -123,6 +125,13 @@ function [fig, stats, neTable] = plotNeuralEfficiency(groups, varargin)
             allChannels = 1:nCh;
         else
             allChannels = opts.Channels;
+        end
+        % Exclude short-separation channels
+        if opts.ExcludeShortSeparation
+            ssIdx = getShortSeparationIdx(opts.Device, groups);
+            if ~isempty(ssIdx)
+                allChannels = allChannels(~ismember(allChannels, ssIdx));
+            end
         end
     end
 
@@ -321,4 +330,29 @@ function roiIdx = resolveROIs(groups, rois)
         roiIdx = rois;
     end
     roiIdx = roiIdx(roiIdx <= length(allNames));
+end
+
+
+function ssIdx = getShortSeparationIdx(dev, groups)
+% Get short-separation channel indices from Device or probe info
+    ssIdx = [];
+    if ~isempty(dev) && isa(dev, 'pf2.Device')
+        ssIdx = find(dev.isShortSep());
+        return;
+    end
+    for g = 1:length(groups)
+        ga = groups(g).gbyGrand;
+        if isfield(ga, 'probeInfo') && isstruct(ga.probeInfo)
+            pi = ga.probeInfo;
+            if isfield(pi, 'TableOpt') && istable(pi.TableOpt) ...
+                    && ismember('IsShortSeparation', pi.TableOpt.Properties.VariableNames)
+                ssIdx = find(pi.TableOpt.IsShortSeparation);
+                return;
+            end
+            if isfield(pi, 'SD') && isstruct(pi.SD) && isfield(pi.SD, 'distances')
+                ssIdx = find(pi.SD.distances < 2);
+                return;
+            end
+        end
+    end
 end

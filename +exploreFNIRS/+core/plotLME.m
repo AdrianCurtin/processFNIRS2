@@ -108,6 +108,7 @@ function [fig, results] = plotLME(groups, groupByVars, varargin)
     addParameter(p, 'ExcludeShortSeparation', true, @islogical);
     addParameter(p, 'DataType', 'fNIRS', @ischar);
     addParameter(p, 'SkipTimeFactor', false, @islogical);
+    addParameter(p, 'StatWindow', [], @isnumeric);
     addParameter(p, 'Colors', [], @(x) isempty(x) || isnumeric(x) || ischar(x) || isstring(x) || isa(x, 'function_handle') || isa(x, 'exploreFNIRS.core.ColorScheme'));
     parse(p, groups, groupByVars, varargin{:});
     opts = p.Results;
@@ -182,6 +183,9 @@ function [fig, results] = plotLME(groups, groupByVars, varargin)
         'DataType', opts.DataType};
     if isAuxMode
         statsArgs = [statsArgs, {'AuxField', opts.AuxField}];
+    end
+    if ~isempty(opts.StatWindow)
+        statsArgs = [statsArgs, {'StatWindow', opts.StatWindow}];
     end
     results = exploreFNIRS.stats.fitLME(groups, groupByVars, statsArgs{:});
 

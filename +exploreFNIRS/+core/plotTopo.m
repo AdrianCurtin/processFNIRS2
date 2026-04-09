@@ -225,8 +225,8 @@ function [probeXY, chMask, chNums] = resolveProbeLayout(dev)
     % Fallback: subplot layout grid
     lay = dev.layout2D();
     if isempty(lay)
-        chMask = [];
-        chNums = [];
+        % No positions — probeXY stays empty (triggers grid in plotTopoOnAxes)
+        % but keep chMask/chNums so short-sep channels are still excluded
         return;
     end
 
@@ -265,7 +265,11 @@ function plotTopoOnAxes(ax, vals, probeXY, chNums, opts, cLim)
             xPos(c) = col;
             yPos(c) = nRows - row + 1;
         end
-        labels = 1:nCh;
+        if ~isempty(chNums) && length(chNums) == nCh
+            labels = chNums;
+        else
+            labels = 1:nCh;
+        end
     end
 
     if strcmpi(opts.Interpolation, 'natural') && nCh > 3

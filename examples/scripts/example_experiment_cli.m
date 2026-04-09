@@ -13,6 +13,11 @@
 %  10. Behavioral LME (statsInfoLME - no aggregate needed)
 %  11. Auxiliary signal LME (statsAuxLME - heart rate, accelerometer)
 %  13. ROI-level analysis (define, aggregate, plot, LME, export)
+%  15. Non-parametric permutation test (statsPermTest - small-N)
+%  16. Effect size with bootstrap CIs (statsEffectSize)
+%  17. Custom contrast matrices (buildContrasts, manual spec)
+%  18. Declarative pipeline (Experiment.fromConfig)
+%  19. Stats formatting (console, LaTeX, APA for all result types)
 %
 % Requirements:
 %   - processFNIRS2 on path
@@ -790,6 +795,247 @@ fig = ex14.plotBar('Biomarker', 'HbO', 'Channels', 1:4, ...
 %     'Visible', 'off', 'SavePath', fullfile(outDir, 'ex14_override.png'));
 % close(fig);
 fprintf('  Bar with explicit Colors override\n');
+
+fprintf('\n');
+
+%% Example 15: Non-parametric permutation test (small-N)
+%
+% For small sample sizes (N=5-7), LME assumptions may not hold.
+% statsPermTest provides a sign-flip permutation test for paired
+% 2-condition comparisons with exact or Monte Carlo enumeration.
+
+fprintf('=== Example 15: Permutation Test ===\n');
+
+ex15 = exploreFNIRS.core.Experiment(allData);
+ex15.select('Condition', {'Easy', 'Hard'});
+ex15.groupby({'Condition'});
+ex15.settings.barBinSize = 0;
+ex15.settings.taskEnd = 30;
+ex15.aggregate();
+
+% Permutation test with 1000 random sign-flips
+permResults = ex15.statsPermTest('Biomarkers', {'HbO'}, ...
+    'NumPerm', 1000, 'Statistic', 'tstat');
+
+fprintf('  Channels tested: %d\n', length(permResults.channels));
+fprintf('  Exact enumeration: %s\n', string(permResults.isExact));
+fprintf('  Significant channels (FDR < 0.05): %d\n', ...
+    sum(permResults.significant(1,:)));
+
+% One-tailed test (Easy > Hard)
+permRight = ex15.statsPermTest('Biomarkers', {'HbO'}, ...
+    'NumPerm', 1000, 'Tail', 'right');
+fprintf('  Right-tail significant: %d\n', sum(permRight.significant(1,:)));
+
+fprintf('\n');
+
+%% Example 16: Effect size with bootstrap CIs
+%
+% Hedges' g (bias-corrected Cohen's d) with bootstrap confidence
+% intervals. Essential for reporting effect magnitudes alongside
+% p-values in small-N studies.
+
+fprintf('=== Example 16: Effect Size + Bootstrap CIs ===\n');
+
+% Reuse ex15 (already aggregated with 2 conditions)
+esResults = ex15.statsEffectSize('Biomarkers', {'HbO'}, ...
+    'Method', 'hedges_g', 'NumBoot', 2000);
+
+fprintf('  Method: %s\n', esResults.method);
+fprintf('  Channel 1: g = %.2f [%.2f, %.2f]\n', ...
+    esResults.observed(1,1), esResults.ci_lower(1,1), esResults.ci_upper(1,1));
+
+% Cohen's d (without bias correction)
+esCohen = ex15.statsEffectSize('Biomarkers', {'HbO'}, ...
+    'Method', 'cohens_d', 'NumBoot', 1000);
+fprintf('  Cohen''s d ch1: %.2f\n', esCohen.observed(1,1));
+
+fprintf('\n');
+
+%% Example 17: Custom contrast matrices
+%
+% Instead of auto-generated pairwise contrasts, specify planned
+% comparisons using buildContrasts() or manual contrast matrices.
+
+fprintf('=== Example 17: Custom Contrast Matrices ===\n');
+
+ex17 = exploreFNIRS.core.Experiment(allData);
+ex17.select('Condition', {'Easy', 'Hard'});
+ex17.groupby({'Condition'});
+ex17.settings.barBinSize = 0;
+ex17.settings.taskEnd = 30;
+ex17.aggregate();
+
+lmeResults = ex17.statsFitLME('Biomarkers', {'HbO'}, 'Channels', 1:3);
+
+% Build standard contrast types from fitted model
+mdl = lmeResults.models{1,1};
+specPairwise = exploreFNIRS.stats.buildContrasts(mdl, 'pairwise');
+fprintf('  Pairwise contrasts: %d\n', size(specPairwise.matrix, 1));
+
+% Run the contrasts with FDR correction across channels
+cr = ex17.statsRunContrasts(lmeResults, 'Contrasts', specPairwise);
+fprintf('  Contrast names: %s\n', strjoin(cr.contrastNames, ', '));
+
+% Manual contrast matrix: test Condition_Hard effect directly
+spec.matrix = [0, 1];
+spec.labels = {'Hard vs Easy'};
+crManual = ex17.statsRunContrasts(lmeResults, 'Contrasts', spec);
+fprintf('  Manual contrast p-value (ch1): %.4f\n', crManual.pvalueMatrix(1,1,1));
+
+fprintf('\n');
+
+%% Example 18: Experiment.fromConfig (declarative pipeline)
+%
+% fromConfig collapses import → process → blocks → Experiment into
+% a single call using a config struct. This eliminates boilerplate
+% and makes analysis scripts reproducible and shareable.
+
+fprintf('=== Example 18: Experiment.fromConfig ===\n');
+
+% Using pre-loaded data (simplest case)
+cfg.data = allData;
+cfg.experiment.baseline = [-5, 0];
+cfg.experiment.taskEnd = 30;
+cfg.experiment.barBinSize = 5;
+cfg.experiment.avgMode = 'hierarchy';
+cfg.experiment.statWindow = [5, 25];
+cfg.experiment.hierarchy = {'SubjectID', 'Condition'};
+
+ex18 = exploreFNIRS.core.Experiment.fromConfig(cfg);
+fprintf('  Created experiment with %d segments\n', length(ex18.data));
+fprintf('  StatWindow: [%.0f, %.0f]\n', ex18.settings.statWindow);
+
+% For file-based import (uncomment and adjust paths):
+% cfg2.import.dir = 'data/experiment1';
+% cfg2.import.pattern = '*.snirf';
+% cfg2.import.dirMapping = {'Dir1', 'Group', 'Dir2', 'SubjectID'};
+% cfg2.metadata.file = 'demographics.csv';
+% cfg2.metadata.key = 'SubjectID';
+% cfg2.process = struct();           % use default processing
+% cfg2.blocks.markerCodes = [10, 20];
+% cfg2.blocks.duration = 30;
+% cfg2.blocks.conditionMap = {'Easy', 'Hard'};
+% cfg2.experiment.baseline = [-5, 0];
+% cfg2.experiment.taskEnd = 30;
+% ex = exploreFNIRS.core.Experiment.fromConfig(cfg2);
+
+fprintf('\n');
+
+%% Example 19: Stats formatting for publication
+%
+% statsSummarize formats LME, contrast, and correlation results into
+% publication-ready tables. Four output formats are available:
+%   'table'   - Standard MATLAB table (default, for programmatic use)
+%   'console' - Clean aligned text printed to command window
+%   'latex'   - LaTeX tabular environment with booktabs (copy into paper)
+%   'apa'     - Adds APA-formatted string column (e.g., "F(1, 22) = 5.67, p = .012")
+%
+% All five Type options work with all four Format options:
+%   'anova', 'contrasts', 'coefficients', 'fit', 'correlations'
+
+fprintf('=== Example 19: Stats formatting for publication ===\n');
+
+% Reuse ex9 from Example 9 (LME on Easy vs Hard)
+lmeResults = ex9.statsFitLME('Biomarkers', {'HbO'}, 'Channels', 1:3);
+contrastResults = ex9.statsRunContrasts(lmeResults);
+
+% 19a. ANOVA — four output formats
+fprintf('--- 19a. ANOVA: console format ---\n');
+ex9.statsSummarize(lmeResults, 'Type', 'anova', 'Format', 'console');
+
+fprintf('--- 19a. ANOVA: APA format ---\n');
+T = ex9.statsSummarize(lmeResults, 'Type', 'anova', 'Format', 'apa');
+disp(T(:, {'Channel','Term','APA'}));
+
+fprintf('--- 19a. ANOVA: LaTeX format ---\n');
+ex9.statsSummarize(lmeResults, 'Type', 'anova', 'Format', 'latex');
+
+% 19b. Contrasts — console and LaTeX
+fprintf('--- 19b. Contrasts: console format ---\n');
+ex9.statsSummarize(contrastResults, 'Type', 'contrasts', 'Format', 'console');
+
+fprintf('--- 19b. Contrasts: LaTeX format ---\n');
+ex9.statsSummarize(contrastResults, 'Type', 'contrasts', 'Format', 'latex');
+
+% 19c. Fixed-effect coefficients
+fprintf('--- 19c. Coefficients: console format ---\n');
+ex9.statsSummarize(lmeResults, 'Type', 'coefficients', 'Format', 'console');
+
+% 19d. Model fit statistics
+fprintf('--- 19d. Model fit: console format ---\n');
+ex9.statsSummarize(lmeResults, 'Type', 'fit', 'Format', 'console');
+
+% 19e. Correlation stats (from plotScatter)
+fprintf('--- 19e. Correlations: console format ---\n');
+[~, corrStats] = ex9.plotScatter('reactionTime', ...
+    'Biomarkers', {'HbO'}, 'Channels', 1:3, 'Visible', 'off');
+ex9.statsSummarize(corrStats, 'Type', 'correlations', ...
+    'Format', 'console', ...
+    'Channels', 1:3, 'Biomarkers', {'HbO'});
+
+fprintf('--- 19e. Correlations: APA format (Spearman) ---\n');
+T = ex9.statsSummarize(corrStats, 'Type', 'correlations', ...
+    'Format', 'apa', 'CorrType', 'Spearman', ...
+    'Channels', 1:3, 'Biomarkers', {'HbO'});
+disp(T(:, {'Channel','APA'}));
+
+fprintf('--- 19e. Correlations: LaTeX format ---\n');
+ex9.statsSummarize(corrStats, 'Type', 'correlations', ...
+    'Format', 'latex', ...
+    'Channels', 1:3, 'Biomarkers', {'HbO'});
+
+% 19f. Export to file
+% Any table-format result can be saved to CSV or Excel:
+%   T = ex9.statsSummarize(lmeResults, 'Type', 'anova');
+%   writetable(T, 'anova_results.csv');
+%   writetable(T, 'anova_results.xlsx');
+
+fprintf('\n');
+
+%% Example 20: Demographics table (Table 1)
+%
+% Publication-style "Table 1" summarizing participant characteristics at the
+% subject level. Automatically deduplicates segments to count each subject
+% once. Between-subject grouping adds a statistics column; within-subject
+% grouping (e.g., Condition) omits it.
+%
+fprintf('=== Example 20: Demographics Table ===\n');
+
+% Use the full experiment data (all 24 segments, 4 subjects)
+ex20 = exploreFNIRS.core.Experiment(allData);
+
+% 20a. No grouping - simple summary
+fprintf('--- 20a. Overall demographics ---\n');
+T = ex20.demographicsTable('Variables', {'Age', 'Group'});
+disp(T);
+
+% 20b. Between-subject grouping with stats (Group is constant within subject)
+fprintf('--- 20b. By Group (between-subject, with stats) ---\n');
+ex20.demographicsTable('Variables', {'Age'}, ...
+    'GroupBy', 'Group', 'Format', 'console');
+
+% 20c. Within-subject grouping (Condition varies within subject, no stats)
+fprintf('--- 20c. By Condition (within-subject, no stats) ---\n');
+ex20.demographicsTable('Variables', {'Age', 'Group'}, ...
+    'GroupBy', 'Condition', 'Format', 'console');
+
+% 20d. Percentage-only format for categorical variables
+fprintf('--- 20d. Percent-only categorical display ---\n');
+ex20.demographicsTable('Variables', {'Age', 'Group'}, ...
+    'GroupBy', 'Condition', 'Format', 'console', ...
+    'CategoricalFormat', 'percent');
+
+% 20e. Custom display labels
+fprintf('--- 20e. Custom labels ---\n');
+ex20.demographicsTable('Variables', {'Age', 'Group'}, ...
+    'GroupBy', 'Group', 'Format', 'console', ...
+    'Labels', struct('Age', 'Age (years)', 'Group', 'Cohort'));
+
+% 20f. LaTeX output
+fprintf('--- 20f. LaTeX format ---\n');
+ex20.demographicsTable('Variables', {'Age', 'Group'}, ...
+    'GroupBy', 'Group', 'Format', 'latex');
 
 fprintf('\n');
 

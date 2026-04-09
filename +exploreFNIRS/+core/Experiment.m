@@ -145,7 +145,8 @@ classdef Experiment < handle
                 'useBaseline',  true, ...        % apply baseline correction
                 'avgMode',      'hierarchy', ... % 'hierarchy', 'flat', or 'none'
                 'rawMethod',    '', ...          % Raw processing method name ('' = no reprocessing)
-                'oxyMethod',    '' ...           % Oxy processing method name ('' = no reprocessing)
+                'oxyMethod',    '', ...          % Oxy processing method name ('' = no reprocessing)
+                'statWindow',   [] ...           % [start, end] for bar/LME stats ([] = full range)
             );
 
             % Copy settings from source Experiment
@@ -448,6 +449,14 @@ classdef Experiment < handle
                     'Call groupby() before aggregate()');
             end
 
+            % Clear prior aggregation results to allow safe re-aggregation
+            for g = 1:length(obj.groups)
+                obj.groups(g).gbyGrand = [];
+                obj.groups(g).gbyGrandBarFlat = [];
+                obj.groups(g).gbyFNIRS_pp = [];
+            end
+            obj.isAggregated = false;
+
             if nargin < 2
                 mode = obj.settings.avgMode;
             end
@@ -746,6 +755,13 @@ classdef Experiment < handle
                     'Call aggregate() before plotting');
             end
             varargin = obj.injectColorScheme(varargin);
+            % Inject Device from data if not explicitly provided
+            if ~any(strcmpi(varargin(1:2:end), 'Device'))
+                dev = obj.resolveDevice();
+                if ~isempty(dev)
+                    varargin = [varargin, {'Device', dev}];
+                end
+            end
             fig = exploreFNIRS.core.plotTemporal(obj.groups, varargin{:});
         end
 
@@ -767,6 +783,14 @@ classdef Experiment < handle
                     'Call aggregate() before plotting');
             end
             varargin = obj.injectColorScheme(varargin);
+            varargin = obj.injectStatWindow(varargin);
+            % Inject Device from data if not explicitly provided
+            if ~any(strcmpi(varargin(1:2:end), 'Device'))
+                dev = obj.resolveDevice();
+                if ~isempty(dev)
+                    varargin = [varargin, {'Device', dev}];
+                end
+            end
             fig = exploreFNIRS.core.plotBar(obj.groups, ...
                 'GroupByVars', obj.groupByVars, varargin{:});
         end
@@ -1366,6 +1390,13 @@ classdef Experiment < handle
                     'Call aggregate() before plotScatter()');
             end
             varargin = obj.injectColorScheme(varargin);
+            % Inject Device from data if not explicitly provided
+            if ~any(strcmpi(varargin(1:2:end), 'Device'))
+                dev = obj.resolveDevice();
+                if ~isempty(dev)
+                    varargin = [varargin, {'Device', dev}];
+                end
+            end
             [fig, stats] = exploreFNIRS.core.plotScatter(obj.groups, ...
                 'InfoVar', infoVar, varargin{:});
         end
@@ -1392,6 +1423,13 @@ classdef Experiment < handle
                     'Call aggregate() before plotNeuralEfficiency()');
             end
             varargin = obj.injectColorScheme(varargin);
+            % Inject Device from data if not explicitly provided
+            if ~any(strcmpi(varargin(1:2:end), 'Device'))
+                dev = obj.resolveDevice();
+                if ~isempty(dev)
+                    varargin = [varargin, {'Device', dev}];
+                end
+            end
             [fig, stats, neTable] = exploreFNIRS.core.plotNeuralEfficiency( ...
                 obj.groups, 'InfoVar', infoVar, varargin{:});
         end
@@ -1414,6 +1452,7 @@ classdef Experiment < handle
                     'Call aggregate() before plotLME()');
             end
             varargin = obj.injectColorScheme(varargin);
+            varargin = obj.injectStatWindow(varargin);
             [fig, results] = exploreFNIRS.core.plotLME(obj.groups, ...
                 obj.groupByVars, varargin{:});
         end
@@ -1525,6 +1564,7 @@ classdef Experiment < handle
                 error('exploreFNIRS:core:Experiment:statsFitLME', ...
                     'Call aggregate() before statsFitLME()');
             end
+            varargin = obj.injectStatWindow(varargin);
             results = exploreFNIRS.stats.fitLME(obj.groups, ...
                 obj.groupByVars, varargin{:});
         end
@@ -1573,6 +1613,7 @@ classdef Experiment < handle
                 error('exploreFNIRS:core:Experiment:statsAuxLME', ...
                     'Call aggregate() before statsAuxLME()');
             end
+            varargin = obj.injectStatWindow(varargin);
             results = exploreFNIRS.stats.fitLME(obj.groups, ...
                 obj.groupByVars, 'DataType', 'Aux', 'AuxField', auxField, ...
                 varargin{:});
@@ -1596,6 +1637,7 @@ classdef Experiment < handle
                 error('exploreFNIRS:core:Experiment:statsROILME', ...
                     'Call aggregate() before statsROILME()');
             end
+            varargin = obj.injectStatWindow(varargin);
             results = exploreFNIRS.stats.fitLME(obj.groups, ...
                 obj.groupByVars, 'DataType', 'ROI', varargin{:});
         end
@@ -1619,7 +1661,7 @@ classdef Experiment < handle
 
 
         function T = statsSummarize(obj, lmeResults, varargin) %#ok<INUSL>
-        % STATSSUMMARIZE Publication-ready summary table from LME results
+        % STATSSUMMARIZE Publication-ready summary table from results
         %
         %   results = ex.statsFitLME('Biomarkers', {'HbO'});
         %   T = ex.statsSummarize(results)
@@ -1627,9 +1669,13 @@ classdef Experiment < handle
         %   T = ex.statsSummarize(results, 'Type', 'contrasts')
         %   T = ex.statsSummarize(results, 'Type', 'fit')
         %
-        % Formats LME results into publication-ready tables.
+        %   % Correlation stats from plotScatter
+        %   [fig, stats] = ex.plotScatter('reactionTime', 'Biomarkers', {'HbO'});
+        %   T = ex.statsSummarize(stats, 'Type', 'correlations')
         %
-        % See also: exploreFNIRS.stats.summarize, statsFitLME
+        % Formats LME or correlation results into publication-ready tables.
+        %
+        % See also: exploreFNIRS.stats.summarize, statsFitLME, plotScatter
 
             T = exploreFNIRS.stats.summarize(lmeResults, varargin{:});
         end
@@ -1650,6 +1696,49 @@ classdef Experiment < handle
 
             results = exploreFNIRS.stats.clusterPermutation( ...
                 lmeResults, obj.data, varargin{:});
+        end
+
+
+        function results = statsPermTest(obj, varargin)
+        % STATSPERMTEST Non-parametric permutation test for paired comparisons
+        %
+        %   results = ex.statsPermTest()
+        %   results = ex.statsPermTest('Biomarkers', {'HbO'}, 'NumPerm', 1000)
+        %
+        % Performs sign-flip permutation testing for 2-condition
+        % within-subject comparisons. Requires aggregate() with exactly
+        % 2 groups.
+        %
+        % See also: exploreFNIRS.stats.permTest, statsFitLME
+
+            if ~obj.isAggregated
+                error('exploreFNIRS:core:Experiment:statsPermTest', ...
+                    'Call aggregate() before statsPermTest()');
+            end
+            varargin = obj.injectStatWindow(varargin);
+            results = exploreFNIRS.stats.permTest(obj.groups, ...
+                obj.groupByVars, varargin{:});
+        end
+
+
+        function results = statsEffectSize(obj, varargin)
+        % STATSEFFECTSIZE Effect size with bootstrap confidence intervals
+        %
+        %   results = ex.statsEffectSize()
+        %   results = ex.statsEffectSize('Method', 'hedges_g', 'NumBoot', 2000)
+        %
+        % Computes effect sizes between 2 conditions with bootstrap CIs.
+        % Requires aggregate() with exactly 2 groups.
+        %
+        % See also: exploreFNIRS.stats.effectSize, statsFitLME
+
+            if ~obj.isAggregated
+                error('exploreFNIRS:core:Experiment:statsEffectSize', ...
+                    'Call aggregate() before statsEffectSize()');
+            end
+            varargin = obj.injectStatWindow(varargin);
+            results = exploreFNIRS.stats.effectSize(obj.groups, ...
+                obj.groupByVars, varargin{:});
         end
 
 
@@ -1729,6 +1818,23 @@ classdef Experiment < handle
                 fprintf('Status: Ready (call select() and/or groupby())\n');
             end
             fprintf('\n');
+        end
+
+
+        function T = demographicsTable(obj, varargin)
+        % DEMOGRAPHICSTABLE Publication-style Table 1 demographics summary
+        %
+        %   T = ex.demographicsTable()
+        %   T = ex.demographicsTable('Variables', {'Age','Sex'})
+        %   T = ex.demographicsTable('GroupBy', 'Group')
+        %   T = ex.demographicsTable('GroupBy', 'Group', 'Format', 'console')
+        %
+        % Summarizes participant characteristics at the subject level.
+        % No preconditions — works on selected data at any stage.
+        %
+        % See also: exploreFNIRS.report.demographicsTable
+
+            T = exploreFNIRS.report.demographicsTable(obj, varargin{:});
         end
 
 
@@ -2205,6 +2311,13 @@ classdef Experiment < handle
                     'Call aggregate() before plotting');
             end
             varargin = obj.injectColorScheme(varargin);
+            % Inject Device from data if not explicitly provided
+            if ~any(strcmpi(varargin(1:2:end), 'Device'))
+                dev = obj.resolveDevice();
+                if ~isempty(dev)
+                    varargin = [varargin, {'Device', dev}];
+                end
+            end
             fig = exploreFNIRS.core.plotHeatmap(obj.groups, varargin{:});
         end
 
@@ -2331,6 +2444,207 @@ classdef Experiment < handle
 
     end
 
+    methods (Static)
+
+        function ex = fromConfig(cfg)
+        % FROMCONFIG Build an Experiment from a declarative config struct
+        %
+        % Collapses the import -> metadata -> process -> blocks ->
+        % Experiment pipeline into a single call. Each config section is
+        % optional except one of cfg.import or cfg.data.
+        %
+        % Syntax:
+        %   ex = exploreFNIRS.core.Experiment.fromConfig(cfg)
+        %
+        % Config Struct Sections:
+        %   cfg.import.dir         - Root directory for data files
+        %   cfg.import.pattern     - File pattern ('*.snirf', '*.nir', etc.)
+        %   cfg.import.dirMapping  - Cell array for importDirectory mapping
+        %                            e.g. {'Dir1','Group','Dir2','SubjectID'}
+        %
+        %   cfg.data               - Pre-loaded cell array (alternative to import)
+        %
+        %   cfg.metadata.file      - CSV/Excel path for metadata merge
+        %   cfg.metadata.key       - Key field(s) for matching
+        %
+        %   cfg.process.rawMethod  - Named raw processing method
+        %   cfg.process.oxyMethod  - Named oxy processing method
+        %   cfg.process.options    - Additional NV pairs for processFNIRS2
+        %
+        %   cfg.blocks.markerCodes - Marker code(s) for defineBlocks
+        %   cfg.blocks.duration    - Block duration in seconds
+        %   cfg.blocks.conditionMap - Cell array mapping codes to labels
+        %   cfg.blocks.preTime     - Time before first marker to keep (default: 120)
+        %   cfg.blocks.postTime    - Time after last marker to keep (default: 120)
+        %
+        %   cfg.experiment.baseline      - [start, end] baseline window
+        %   cfg.experiment.taskEnd       - Task end time
+        %   cfg.experiment.resampleRate  - Temporal resample rate
+        %   cfg.experiment.barBinSize    - Bar chart bin size
+        %   cfg.experiment.avgMode       - 'hierarchy', 'flat', or 'none'
+        %   cfg.experiment.statWindow    - [start, end] stat analysis window
+        %   cfg.experiment.hierarchy     - Cell array of hierarchy levels
+        %
+        % Example:
+        %   cfg.import.dir = 'data/';
+        %   cfg.import.pattern = '*.snirf';
+        %   cfg.import.dirMapping = {'Dir1','Group','Dir2','SubjectID'};
+        %   cfg.metadata.file = 'demographics.csv';
+        %   cfg.metadata.key = 'SubjectID';
+        %   cfg.blocks.markerCodes = [10, 20];
+        %   cfg.blocks.duration = 30;
+        %   cfg.blocks.conditionMap = {'Easy','Hard'};
+        %   cfg.experiment.baseline = [-5, 0];
+        %   cfg.experiment.taskEnd = 30;
+        %   cfg.experiment.hierarchy = {'SubjectID','Condition'};
+        %
+        %   ex = exploreFNIRS.core.Experiment.fromConfig(cfg);
+        %   ex.select('Condition', {'Easy','Hard'});
+        %   ex.groupby('Condition');
+        %   ex.aggregate();
+        %
+        % See also: exploreFNIRS.core.Experiment, pf2.import.importDirectory,
+        %           processFNIRS2, pf2.data.defineBlocks
+
+            % --- Validate ---
+            validateConfig(cfg);
+
+            % --- Stage 1: Import ---
+            if isfield(cfg, 'data') && ~isempty(cfg.data)
+                allData = cfg.data;
+                if ~iscell(allData)
+                    allData = {allData};
+                end
+                fprintf('fromConfig: Using %d pre-loaded data segments.\n', length(allData));
+            else
+                imp = cfg.import;
+                dirArgs = {};
+                if isfield(imp, 'dirMapping') && ~isempty(imp.dirMapping)
+                    dirArgs = imp.dirMapping;
+                end
+                try
+                    allData = pf2.import.importDirectory(imp.dir, imp.pattern, dirArgs{:});
+                catch ME
+                    error('exploreFNIRS:core:Experiment:fromConfig:importFailed', ...
+                        'Import failed: %s', ME.message);
+                end
+                fprintf('fromConfig: Imported %d files from %s\n', length(allData), imp.dir);
+            end
+
+            % --- Stage 2: Metadata ---
+            if isfield(cfg, 'metadata') && ~isempty(cfg.metadata)
+                meta = cfg.metadata;
+                if isfield(meta, 'file') && ~isempty(meta.file)
+                    key = 'SubjectID';
+                    if isfield(meta, 'key') && ~isempty(meta.key)
+                        key = meta.key;
+                    end
+                    try
+                        allData = pf2.data.importInfo(allData, meta.file, key);
+                    catch ME
+                        error('exploreFNIRS:core:Experiment:fromConfig:metadataFailed', ...
+                            'Metadata import failed: %s', ME.message);
+                    end
+                    fprintf('fromConfig: Merged metadata from %s\n', meta.file);
+                end
+            end
+
+            % --- Stage 3: Process ---
+            if isfield(cfg, 'process') && ~isempty(cfg.process)
+                proc = cfg.process;
+                rawMethod = '';
+                oxyMethod = '';
+                procOpts = {};
+                if isfield(proc, 'rawMethod'), rawMethod = proc.rawMethod; end
+                if isfield(proc, 'oxyMethod'), oxyMethod = proc.oxyMethod; end
+                if isfield(proc, 'options'), procOpts = proc.options; end
+
+                procArgs = {};
+                if ~isempty(rawMethod) || ~isempty(oxyMethod)
+                    procArgs = {rawMethod, oxyMethod};
+                end
+                try
+                    allData = processFNIRS2(allData, procArgs{:}, procOpts{:});
+                catch ME
+                    error('exploreFNIRS:core:Experiment:fromConfig:processFailed', ...
+                        'Processing failed: %s', ME.message);
+                end
+                fprintf('fromConfig: Processed %d datasets.\n', length(allData));
+            end
+
+            % --- Stage 4: Blocks ---
+            if isfield(cfg, 'blocks') && ~isempty(cfg.blocks)
+                blk = cfg.blocks;
+                if ~isfield(blk, 'markerCodes') || isempty(blk.markerCodes)
+                    error('exploreFNIRS:core:Experiment:fromConfig:noMarkerCodes', ...
+                        'cfg.blocks.markerCodes is required for block extraction.');
+                end
+
+                blockArgs = {};
+                if isfield(blk, 'conditionMap') && ~isempty(blk.conditionMap)
+                    blockArgs = [blockArgs, {'ConditionMap', blk.conditionMap}];
+                end
+                if isfield(blk, 'preTime')
+                    blockArgs = [blockArgs, {'PreTime', blk.preTime}];
+                end
+                if isfield(blk, 'postTime')
+                    blockArgs = [blockArgs, {'PostTime', blk.postTime}];
+                end
+
+                dur = 0;
+                if isfield(blk, 'duration'), dur = blk.duration; end
+
+                try
+                    allData = pf2.data.defineBlocks(allData, blk.markerCodes, dur, ...
+                        blockArgs{:}, 'Embed', true);
+                    allData = pf2.data.extractBlocks(allData);
+                catch ME
+                    error('exploreFNIRS:core:Experiment:fromConfig:blocksFailed', ...
+                        'Block extraction failed: %s', ME.message);
+                end
+                fprintf('fromConfig: Extracted blocks (%d marker codes, %.0fs duration).\n', ...
+                    length(blk.markerCodes), dur);
+            end
+
+            % --- Stage 5: Build Experiment ---
+            expArgs = {};
+            if isfield(cfg, 'experiment') && ~isempty(cfg.experiment)
+                expCfg = cfg.experiment;
+                if isfield(expCfg, 'hierarchy') && ~isempty(expCfg.hierarchy)
+                    expArgs = {'Hierarchy', expCfg.hierarchy};
+                end
+            end
+
+            ex = exploreFNIRS.core.Experiment(allData, expArgs{:});
+
+            % Apply experiment settings
+            if isfield(cfg, 'experiment') && ~isempty(cfg.experiment)
+                expCfg = cfg.experiment;
+                s = ex.settings;
+
+                if isfield(expCfg, 'baseline'),     s.baseline = expCfg.baseline; end
+                if isfield(expCfg, 'taskEnd'),       s.taskEnd = expCfg.taskEnd; end
+                if isfield(expCfg, 'resampleRate'),  s.resampleRate = expCfg.resampleRate; end
+                if isfield(expCfg, 'barBinSize'),    s.barBinSize = expCfg.barBinSize; end
+                if isfield(expCfg, 'avgMode'),       s.avgMode = expCfg.avgMode; end
+                if isfield(expCfg, 'statWindow')
+                    sw = expCfg.statWindow;
+                    if ~isnumeric(sw) || numel(sw) ~= 2
+                        error('exploreFNIRS:core:Experiment:fromConfig:invalidStatWindow', ...
+                            'statWindow must be a 2-element numeric vector [start, end].');
+                    end
+                    s.statWindow = sw;
+                end
+                if isfield(expCfg, 'taskStart'),     s.taskStart = expCfg.taskStart; end
+
+                ex.settings = s;
+            end
+
+            fprintf('fromConfig: Experiment created with %d segments.\n', length(allData));
+        end
+
+    end
+
     methods (Hidden)
         % These methods support PlotProxy's transactional state management.
         % They are Hidden so they don't clutter tab-completion, but are
@@ -2443,11 +2757,63 @@ classdef Experiment < handle
                 args = [args, {'Colors', obj.colorScheme}];
             end
         end
+
+
+        function args = injectStatWindow(obj, args)
+        % INJECTSTATWINDOW Auto-inject statWindow setting as StatWindow param
+            keys = args(1:2:end);
+            if ~any(strcmpi(keys, 'StatWindow')) && ~isempty(obj.settings.statWindow)
+                args = [args, {'StatWindow', obj.settings.statWindow}];
+            end
+        end
     end
 end
 
 
 %% Local helper functions
+
+function validateConfig(cfg)
+% VALIDATECONFIG Check cfg struct for required fields and valid paths
+
+    errors = {};
+
+    hasImport = isfield(cfg, 'import') && ~isempty(cfg.import);
+    hasData = isfield(cfg, 'data') && ~isempty(cfg.data);
+
+    if ~hasImport && ~hasData
+        errors{end+1} = 'Either cfg.import or cfg.data is required.';
+    end
+
+    if hasImport
+        if ~isfield(cfg.import, 'dir') || isempty(cfg.import.dir)
+            errors{end+1} = 'cfg.import.dir is required.';
+        elseif ~isfolder(cfg.import.dir)
+            errors{end+1} = sprintf('cfg.import.dir does not exist: %s', cfg.import.dir);
+        end
+        if ~isfield(cfg.import, 'pattern') || isempty(cfg.import.pattern)
+            errors{end+1} = 'cfg.import.pattern is required (e.g. ''*.snirf'').';
+        end
+    end
+
+    if isfield(cfg, 'metadata') && ~isempty(cfg.metadata)
+        if isfield(cfg.metadata, 'file') && ~isempty(cfg.metadata.file) ...
+                && ~isfile(cfg.metadata.file)
+            errors{end+1} = sprintf('cfg.metadata.file does not exist: %s', cfg.metadata.file);
+        end
+    end
+
+    if isfield(cfg, 'blocks') && ~isempty(cfg.blocks)
+        if ~isfield(cfg.blocks, 'markerCodes') || isempty(cfg.blocks.markerCodes)
+            errors{end+1} = 'cfg.blocks.markerCodes is required when cfg.blocks is set.';
+        end
+    end
+
+    if ~isempty(errors)
+        error('exploreFNIRS:core:Experiment:fromConfig:invalidConfig', ...
+            'Config validation failed:\n  - %s', strjoin(errors, '\n  - '));
+    end
+end
+
 
 function [ppData, barData] = preprocessGroup(curData, s, doResample, doBaseline)
 % PREPROCESSGROUP Preprocess segments: baseline extraction + resampling

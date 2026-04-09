@@ -5,18 +5,28 @@ function contrastResults = runContrasts(lmeResults, varargin)
 % contrast tables per channel, then applies FDR correction across channels
 % for each unique contrast name.
 %
+% Supports both automatic pairwise contrasts (default) and user-specified
+% custom contrast matrices for planned comparisons.
+%
 % Syntax:
 %   contrastResults = exploreFNIRS.stats.runContrasts(lmeResults)
 %   contrastResults = exploreFNIRS.stats.runContrasts(lmeResults, 'FDRThreshold', 0.05)
 %   contrastResults = exploreFNIRS.stats.runContrasts(lmeResults, 'FDRMethod', 'twostep')
+%   contrastResults = exploreFNIRS.stats.runContrasts(lmeResults, 'Contrasts', spec)
 %
 % Inputs:
 %   lmeResults - Struct from exploreFNIRS.stats.fitLME containing .models
 %
 % Name-Value Parameters:
 %   PThreshold   - ANOVA p-value threshold for eligible contrasts (default: 0.1)
+%                  Only used when Contrasts='auto'.
 %   FDRThreshold - FDR significance threshold (default: 0.05)
 %   FDRMethod    - 'bh' (Benjamini-Hochberg, default) or 'twostep' (adaptive)
+%   Contrasts    - 'auto' (default) for automatic pairwise contrasts, or a
+%                  struct with fields:
+%                    .matrix - [nContrasts x nCoefficients] contrast matrix
+%                    .labels - Cell array of contrast names
+%                  Each row of .matrix is a contrast vector tested via coefTest.
 %
 % Outputs:
 %   contrastResults - Struct with fields:
@@ -33,9 +43,18 @@ function contrastResults = runContrasts(lmeResults, varargin)
 %
 % Example:
 %   results = exploreFNIRS.stats.fitLME(groups, {'Group','Condition'});
+%
+%   % Auto contrasts (default)
 %   cr = exploreFNIRS.stats.runContrasts(results);
-%   fprintf('Significant contrasts (FDR corrected):\n');
-%   disp(cr.contrastNames(any(cr.significantMatrix(:,:), 2)));
+%
+%   % Custom planned comparisons
+%   spec.matrix = [-1 0 1; -1 2 -1];
+%   spec.labels = {'Linear', 'Quadratic'};
+%   cr = exploreFNIRS.stats.runContrasts(results, 'Contrasts', spec);
+%
+%   % Generate standard contrast types
+%   spec = exploreFNIRS.stats.buildContrasts(results.models{1,1}, 'polynomial');
+%   cr = exploreFNIRS.stats.runContrasts(results, 'Contrasts', spec);
 %
 % References:
 %   Benjamini, Y. & Hochberg, Y. (1995). Controlling the false discovery
@@ -50,14 +69,15 @@ function contrastResults = runContrasts(lmeResults, varargin)
 %   marginal means in the linear model: An alternative to least squares
 %   means. The American Statistician, 34(4), 216-221.
 %
-% See also: exploreFNIRS.stats.fitLME, exploreFNIRS.fx.autoContrast,
-%           exploreFNIRS.fx.performFDR
+% See also: exploreFNIRS.stats.fitLME, exploreFNIRS.stats.buildContrasts,
+%           exploreFNIRS.fx.autoContrast, exploreFNIRS.fx.performFDR
 
     p = inputParser;
     addRequired(p, 'lmeResults', @isstruct);
     addParameter(p, 'PThreshold', 0.1, @isnumeric);
     addParameter(p, 'FDRThreshold', 0.05, @isnumeric);
     addParameter(p, 'FDRMethod', 'bh', @ischar);
+    addParameter(p, 'Contrasts', 'auto', @(x) ischar(x) || isstruct(x));
     parse(p, lmeResults, varargin{:});
     opts = p.Results;
 
@@ -67,6 +87,20 @@ function contrastResults = runContrasts(lmeResults, varargin)
         error('exploreFNIRS:stats:runContrasts', ...
             'Unknown FDR method: ''%s''. Use ''bh'' or ''twostep''.', opts.FDRMethod);
     end
+
+    % Determine contrast mode
+    useCustom = isstruct(opts.Contrasts);
+
+    if useCustom
+        contrastResults = runCustomContrasts(lmeResults, opts);
+    else
+        contrastResults = runAutoContrasts(lmeResults, opts);
+    end
+end
+
+
+function contrastResults = runAutoContrasts(lmeResults, opts)
+% RUNAUTOCONTRASTS Original autoContrast-based pipeline
 
     [nBioM, nCh] = size(lmeResults.models);
 
@@ -131,7 +165,137 @@ function contrastResults = runContrasts(lmeResults, varargin)
     contrastResults.pvalueMatrix = pMatrix;
     contrastResults.effectSizeMatrix = eMatrix;
 
-    % FDR correction across channels for each contrast x biomarker
+    % FDR correction
+    [contrastResults.qvalueMatrix, contrastResults.significantMatrix] = ...
+        applyFDR(pMatrix, nContrasts, nBioM, opts);
+    contrastResults.fdrThreshold = opts.FDRThreshold;
+    contrastResults.fdrMethod = opts.FDRMethod;
+end
+
+
+function contrastResults = runCustomContrasts(lmeResults, opts)
+% RUNCUSTOMCONTRASTS User-specified contrast matrix pipeline
+
+    spec = opts.Contrasts;
+
+    % Validate contrast spec
+    if ~isfield(spec, 'matrix') || ~isfield(spec, 'labels')
+        error('exploreFNIRS:stats:runContrasts:invalidSpec', ...
+            'Contrasts struct must have .matrix and .labels fields.');
+    end
+    if size(spec.matrix, 1) ~= length(spec.labels)
+        error('exploreFNIRS:stats:runContrasts:sizeMismatch', ...
+            'Number of rows in .matrix (%d) must match length of .labels (%d).', ...
+            size(spec.matrix, 1), length(spec.labels));
+    end
+
+    [nBioM, nCh] = size(lmeResults.models);
+    nContrasts = size(spec.matrix, 1);
+
+    contrastResults = struct();
+    contrastResults.contrasts = cell(nBioM, nCh);
+    contrastResults.biomarkers = lmeResults.biomarkers;
+    contrastResults.channels = lmeResults.channels;
+    contrastResults.contrastNames = spec.labels(:)';
+
+    pMatrix = nan(nContrasts, nBioM, nCh);
+    eMatrix = nan(nContrasts, nBioM, nCh);
+
+    for bIdx = 1:nBioM
+        for chI = 1:nCh
+            mdl = lmeResults.models{bIdx, chI};
+            if isempty(mdl), continue; end
+
+            cTable = customContrast(mdl, spec);
+            contrastResults.contrasts{bIdx, chI} = cTable;
+
+            if ~isempty(cTable) && height(cTable) > 0
+                pMatrix(:, bIdx, chI) = cTable.pVal;
+                eMatrix(:, bIdx, chI) = cTable.deltaE;
+            end
+        end
+    end
+
+    contrastResults.pvalueMatrix = pMatrix;
+    contrastResults.effectSizeMatrix = eMatrix;
+
+    % FDR correction
+    [contrastResults.qvalueMatrix, contrastResults.significantMatrix] = ...
+        applyFDR(pMatrix, nContrasts, nBioM, opts);
+    contrastResults.fdrThreshold = opts.FDRThreshold;
+    contrastResults.fdrMethod = opts.FDRMethod;
+end
+
+
+function cTable = customContrast(mdl, spec)
+% CUSTOMCONTRAST Run user-specified contrasts against an LME model
+%
+% Validates matrix dimensions, runs coefTest per row, computes effect sizes.
+
+    nCoefs = length(mdl.CoefficientNames);
+    nContrasts = size(spec.matrix, 1);
+
+    if size(spec.matrix, 2) ~= nCoefs
+        error('exploreFNIRS:stats:runContrasts:coefMismatch', ...
+            'Contrast matrix has %d columns but model has %d coefficients (%s).', ...
+            size(spec.matrix, 2), nCoefs, strjoin(mdl.CoefficientNames, ', '));
+    end
+
+    [~, ~, mdlCoef] = fixedEffects(mdl, 'DFMethod', 'satterthwaite');
+
+    deltaE = nan(nContrasts, 1);
+    SD = nan(nContrasts, 1);
+    F = nan(nContrasts, 1);
+    df1 = nan(nContrasts, 1);
+    df2 = nan(nContrasts, 1);
+    pVal = nan(nContrasts, 1);
+    sig = strings(nContrasts, 1);
+
+    for c = 1:nContrasts
+        cRow = spec.matrix(c, :);
+
+        [pVal(c), F(c), df1(c), df2(c)] = coefTest(mdl, cRow, 0, ...
+            'DFMethod', 'satterthwaite');
+
+        % Effect size: contrast vector dot product with coefficients
+        deltaE(c) = cRow * mdlCoef.Estimate;
+
+        % SE of the contrast estimate: sqrt(L * CovBeta * L')
+        covBeta = mdl.CoefficientCovariance;
+        SD(c) = sqrt(cRow * covBeta * cRow');
+
+        % Significance stars
+        if pVal(c) < 0.001
+            sig(c) = " *** ";
+        elseif pVal(c) < 0.01
+            sig(c) = " **  ";
+        elseif pVal(c) < 0.05
+            sig(c) = " *   ";
+        elseif pVal(c) < 0.1
+            sig(c) = " +   ";
+        else
+            sig(c) = "     ";
+        end
+    end
+
+    % Bonferroni correction within custom contrast set
+    pVal_corr = min(pVal * nContrasts, 1);
+
+    cTable = table(deltaE, SD, F, df1, df2, pVal, pVal_corr, sig, ...
+        repmat({nan(1, nCoefs)}, nContrasts, 1), ...
+        'VariableNames', {'deltaE','SD','F','df1','df2','pVal','pVal_corr','sig','coefContrasts'}, ...
+        'RowNames', spec.labels(:));
+
+    % Store actual contrast rows
+    for c = 1:nContrasts
+        cTable.coefContrasts{c} = spec.matrix(c, :);
+    end
+end
+
+
+function [qMatrix, sigMatrix] = applyFDR(pMatrix, nContrasts, nBioM, opts)
+% APPLYFDR FDR correction across channels for each contrast x biomarker
+
     qMatrix = nan(size(pMatrix));
     sigMatrix = false(size(pMatrix));
 
@@ -147,18 +311,10 @@ function contrastResults = runContrasts(lmeResults, varargin)
                 case 'twostep'
                     [qVals, ~, sig] = exploreFNIRS.fx.performFDR_twostep( ...
                         pVals, opts.FDRThreshold);
-                otherwise
-                    error('exploreFNIRS:stats:runContrasts', ...
-                        'Unknown FDR method: %s. Use ''bh'' or ''twostep''.', opts.FDRMethod);
             end
 
             qMatrix(c, bIdx, :) = qVals;
             sigMatrix(c, bIdx, :) = sig;
         end
     end
-
-    contrastResults.qvalueMatrix = qMatrix;
-    contrastResults.significantMatrix = sigMatrix;
-    contrastResults.fdrThreshold = opts.FDRThreshold;
-    contrastResults.fdrMethod = opts.FDRMethod;
 end

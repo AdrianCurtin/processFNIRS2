@@ -10,6 +10,7 @@ function T = summarize(lmeResults, varargin)
 %   T = exploreFNIRS.stats.summarize(results, 'Type', 'anova')
 %   T = exploreFNIRS.stats.summarize(results, 'Type', 'contrasts', 'Format', 'apa')
 %   T = exploreFNIRS.stats.summarize(results, 'Type', 'fit')
+%   T = exploreFNIRS.stats.summarize(corrStats, 'Type', 'correlations')
 %
 % Inputs:
 %   lmeResults - Struct from exploreFNIRS.stats.fitLME
@@ -20,11 +21,19 @@ function T = summarize(lmeResults, varargin)
 %                  'contrasts'    - Post-hoc contrast tests
 %                  'coefficients' - Fixed-effect coefficient estimates
 %                  'fit'          - Model fit statistics (AIC, BIC, LRT)
+%                  'correlations' - Scatter/topo correlation results
 %   Format       - Output format (default: 'table'):
-%                  'table' - Standard MATLAB table
-%                  'apa'   - Adds APA-style formatted string column
+%                  'table'   - Standard MATLAB table
+%                  'console' - Prints clean formatted text to console
+%                  'latex'   - Prints LaTeX tabular environment to console
+%                  'apa'     - Adds APA-style formatted string column
 %   SigThreshold - Significance threshold for stars (default: 0.05)
 %   IncludeFDR   - Apply FDR correction to ANOVA p-values (default: false)
+%   Biomarkers   - Cell array of biomarker names (for 'correlations')
+%   Channels     - Numeric array of channel numbers (for 'correlations')
+%   Groups       - Cell array of group labels (for 'correlations')
+%   CorrType     - 'Pearson' (default) or 'Spearman' (for 'correlations')
+%   InfoVar      - Name of the info variable (for 'correlations')
 %
 % Outputs:
 %   T - Table with formatted results. Columns depend on Type:
@@ -36,6 +45,8 @@ function T = summarize(lmeResults, varargin)
 %                     pValue, Sig
 %     'fit':          Biomarker, Channel, AIC, BIC, LogLik, NullChi2,
 %                     NullPval, Formula
+%     'correlations': Channel, N, r, p_pearson, rho, p_spearman, Sig
+%                     (Group and Biomarker columns included when multiple)
 %
 %     When Format='apa', an additional 'APA' column is appended with
 %     formatted strings like "F(1, 23.4) = 5.67, p = .012".
@@ -65,6 +76,12 @@ function T = summarize(lmeResults, varargin)
     addParameter(p, 'Format', 'table', @ischar);
     addParameter(p, 'SigThreshold', 0.05, @isnumeric);
     addParameter(p, 'IncludeFDR', false, @islogical);
+    % Metadata for correlation stats (optional, used with Type='correlations')
+    addParameter(p, 'Biomarkers', {}, @iscell);
+    addParameter(p, 'Channels', [], @isnumeric);
+    addParameter(p, 'Groups', {}, @iscell);
+    addParameter(p, 'CorrType', 'Pearson', @ischar);
+    addParameter(p, 'InfoVar', '', @ischar);
     parse(p, lmeResults, varargin{:});
     opts = p.Results;
 
@@ -77,10 +94,22 @@ function T = summarize(lmeResults, varargin)
             T = summarizeCoefficients(lmeResults, opts);
         case 'fit'
             T = summarizeFit(lmeResults, opts);
+        case 'correlations'
+            T = summarizeCorrelations(lmeResults, opts);
         otherwise
             error('exploreFNIRS:stats:summarize', ...
-                'Unknown Type: ''%s''. Use ''anova'', ''contrasts'', ''coefficients'', or ''fit''.', ...
+                'Unknown Type: ''%s''. Use ''anova'', ''contrasts'', ''coefficients'', ''fit'', or ''correlations''.', ...
                 opts.Type);
+    end
+
+    % Console format: print formatted text and return the table
+    if strcmpi(opts.Format, 'console') && ~isempty(T)
+        printFormattedTable(T);
+    end
+
+    % LaTeX format: print tabular environment
+    if strcmpi(opts.Format, 'latex') && ~isempty(T)
+        printLatexTable(T, opts.Type);
     end
 end
 
@@ -137,7 +166,9 @@ function T = summarizeAnova(results, opts)
         end
     end
 
-    T = table(Channel, Biomarker, Term, FStat, df1, df2, pValue, Sig);
+    T = table(string(Channel), string(Biomarker), string(Term), ...
+        FStat, df1, df2, pValue, string(Sig), ...
+        'VariableNames', {'Channel','Biomarker','Term','FStat','df1','df2','pValue','Sig'});
 
     % FDR correction across all ANOVA p-values
     if opts.IncludeFDR
@@ -148,13 +179,13 @@ function T = summarizeAnova(results, opts)
 
     % APA format column
     if strcmpi(opts.Format, 'apa')
-        apaStr = cell(height(T), 1);
+        apaStr = strings(height(T), 1);
         for i = 1:height(T)
             if isnan(df2(i))
-                apaStr{i} = sprintf('F = %.2f, p %s', ...
+                apaStr(i) = sprintf('F = %.2f, p %s', ...
                     FStat(i), formatP(pValue(i)));
             else
-                apaStr{i} = sprintf('F(%d, %.1f) = %.2f, p %s', ...
+                apaStr(i) = sprintf('F(%d, %.1f) = %.2f, p %s', ...
                     round(df1(i)), df2(i), FStat(i), formatP(pValue(i)));
             end
         end
@@ -202,12 +233,13 @@ function T = summarizeContrasts(results, opts)
     end
 
     T = struct2table([allRows{:}]);
+    T = cellColumnsToString(T);
 
     if strcmpi(opts.Format, 'apa')
-        apaStr = cell(height(T), 1);
+        apaStr = strings(height(T), 1);
         for i = 1:height(T)
-            apaStr{i} = sprintf('%s: delta = %.3f, F(%d, %.1f) = %.2f, p %s', ...
-                T.Contrast{i}, T.DeltaE(i), ...
+            apaStr(i) = sprintf('%s: delta = %.3f, F(%d, %.1f) = %.2f, p %s', ...
+                T.Contrast(i), T.DeltaE(i), ...
                 round(T.df1(i)), T.df2(i), T.F(i), ...
                 formatP(T.pValue(i)));
         end
@@ -254,6 +286,7 @@ function T = summarizeCoefficients(results, opts)
     end
 
     T = struct2table([allRows{:}]);
+    T = cellColumnsToString(T);
 end
 
 
@@ -299,7 +332,206 @@ function T = summarizeFit(results, opts) %#ok<INUSD>
         return;
     end
 
-    T = table(Biomarker, Channel, AIC, BIC, LogLik, NullChi2, NullPval, Formula);
+    T = table(string(Biomarker), Channel, AIC, BIC, LogLik, NullChi2, NullPval, string(Formula), ...
+        'VariableNames', {'Biomarker','Channel','AIC','BIC','LogLik','NullChi2','NullPval','Formula'});
+end
+
+
+function T = summarizeCorrelations(stats, opts)
+% Build a tidy correlation summary table from plotScatter stats output
+%
+% Handles two formats:
+%   1. Struct array stats(nGroups, nBioM, nCh) — per-channel scatter
+%   2. Struct array stats(nGroups, nBioM) with vector fields — topo mode
+
+    isTopo = isfield(stats, 'r') && isvector(stats(1).r) && length(stats(1).r) > 1;
+
+    if isTopo
+        T = summarizeCorrelationsTopo(stats, opts);
+    else
+        T = summarizeCorrelationsPerChannel(stats, opts);
+    end
+end
+
+
+function T = summarizeCorrelationsPerChannel(stats, opts)
+% Per-channel scatter stats: stats(nGroups, nBioM, nCh)
+
+    sz = size(stats);
+    nGroups = sz(1);
+    nBioM = max(sz(2), 1);
+    nCh = max(1, prod(sz(3:end)));
+
+    bioNames = opts.Biomarkers;
+    chNums = opts.Channels;
+    groupNames = opts.Groups;
+
+    allRows = {};
+    for g = 1:nGroups
+        for bIdx = 1:nBioM
+            for chI = 1:nCh
+                s = stats(g, bIdx, chI);
+                if isnan(s.r) && s.N == 0, continue; end
+
+                row = struct();
+                if ~isempty(groupNames) && g <= length(groupNames)
+                    row.Group = groupNames{g};
+                elseif nGroups > 1
+                    row.Group = sprintf('Group %d', g);
+                end
+                if ~isempty(bioNames) && bIdx <= length(bioNames)
+                    row.Biomarker = bioNames{bIdx};
+                elseif nBioM > 1
+                    row.Biomarker = sprintf('Bio %d', bIdx);
+                end
+                if ~isempty(chNums) && chI <= length(chNums)
+                    row.Channel = chNums(chI);
+                else
+                    row.Channel = chI;
+                end
+                row.N = s.N;
+                row.r = s.r;
+                row.p_pearson = s.p;
+                row.rho = s.rho;
+                row.p_spearman = s.pval;
+                row.Sig = sigStars(selectP(s, opts.CorrType), opts.SigThreshold);
+                allRows{end+1} = row; %#ok<AGROW>
+            end
+        end
+    end
+
+    if isempty(allRows)
+        T = table();
+        return;
+    end
+
+    T = struct2table([allRows{:}]);
+    T = cellColumnsToString(T);
+
+    % Remove single-valued columns
+    if nGroups == 1 && ismember('Group', T.Properties.VariableNames)
+        T.Group = [];
+    end
+    if nBioM == 1 && ismember('Biomarker', T.Properties.VariableNames)
+        T.Biomarker = [];
+    end
+
+    if strcmpi(opts.Format, 'apa')
+        T.APA = buildCorrAPA(T, opts.CorrType);
+    end
+end
+
+
+function T = summarizeCorrelationsTopo(stats, opts)
+% Topo correlation stats: stats(nGroups, nBioM) with vector fields
+
+    sz = size(stats);
+    nGroups = sz(1);
+    nBioM = max(sz(2), 1);
+
+    bioNames = opts.Biomarkers;
+    chNums = opts.Channels;
+    groupNames = opts.Groups;
+
+    allRows = {};
+    for g = 1:nGroups
+        for bIdx = 1:nBioM
+            s = stats(g, bIdx);
+            nCh = length(s.r);
+
+            for chI = 1:nCh
+                if isnan(s.r(chI)), continue; end
+
+                row = struct();
+                if ~isempty(groupNames) && g <= length(groupNames)
+                    row.Group = groupNames{g};
+                elseif nGroups > 1
+                    row.Group = sprintf('Group %d', g);
+                end
+                if ~isempty(bioNames) && bIdx <= length(bioNames)
+                    row.Biomarker = bioNames{bIdx};
+                elseif nBioM > 1
+                    row.Biomarker = sprintf('Bio %d', bIdx);
+                end
+                if ~isempty(chNums) && chI <= length(chNums)
+                    row.Channel = chNums(chI);
+                else
+                    row.Channel = chI;
+                end
+                row.N = s.N(chI);
+                row.r = s.r(chI);
+                row.p_pearson = s.p(chI);
+                row.rho = s.rho(chI);
+                row.p_spearman = s.pval(chI);
+                if ~isempty(s.q) && chI <= length(s.q)
+                    row.q = s.q(chI);
+                end
+                row.Sig = sigStars(selectPScalar(s, chI, opts.CorrType), ...
+                    opts.SigThreshold);
+                allRows{end+1} = row; %#ok<AGROW>
+            end
+        end
+    end
+
+    if isempty(allRows)
+        T = table();
+        return;
+    end
+
+    T = struct2table([allRows{:}]);
+    T = cellColumnsToString(T);
+
+    % Remove single-valued columns
+    if nGroups == 1 && ismember('Group', T.Properties.VariableNames)
+        T.Group = [];
+    end
+    if nBioM == 1 && ismember('Biomarker', T.Properties.VariableNames)
+        T.Biomarker = [];
+    end
+
+    if strcmpi(opts.Format, 'apa')
+        T.APA = buildCorrAPA(T, opts.CorrType);
+    end
+end
+
+
+function pVal = selectP(s, corrType)
+% Select p-value based on correlation type
+    if strcmpi(corrType, 'Spearman')
+        pVal = s.pval;
+    else
+        pVal = s.p;
+    end
+end
+
+
+function pVal = selectPScalar(s, idx, corrType)
+% Select p-value from vector fields
+    if strcmpi(corrType, 'Spearman')
+        pVal = s.pval(idx);
+    else
+        pVal = s.p(idx);
+    end
+end
+
+
+function apaStr = buildCorrAPA(T, corrType)
+% Build APA-formatted correlation strings
+    apaStr = strings(height(T), 1);
+    for i = 1:height(T)
+        N = T.N(i);
+        df = N - 2;
+        if strcmpi(corrType, 'Spearman')
+            rVal = T.rho(i);
+            pVal = T.p_spearman(i);
+            sym = 'r_s';
+        else
+            rVal = T.r(i);
+            pVal = T.p_pearson(i);
+            sym = 'r';
+        end
+        apaStr(i) = sprintf('%s(%d) = %.3f, p %s', sym, df, rVal, formatP(pVal));
+    end
 end
 
 
@@ -325,5 +557,261 @@ function s = formatP(p)
         s = '< .001';
     else
         s = sprintf('= %.3f', p);
+    end
+end
+
+
+function T = cellColumnsToString(T)
+% Convert cell columns to string arrays for clean display
+    for v = 1:width(T)
+        if iscell(T{:, v})
+            T.(T.Properties.VariableNames{v}) = string(T{:, v});
+        end
+    end
+end
+
+
+function printFormattedTable(T)
+% Print a table with clean formatting (no quotes, no braces)
+    names = T.Properties.VariableNames;
+    nCols = width(T);
+    nRows = height(T);
+
+    % Format each column as strings
+    colStrs = cell(1, nCols);
+    for c = 1:nCols
+        col = T{:, c};
+        if isstring(col) || iscell(col)
+            colStrs{c} = string(col);
+        elseif isnumeric(col)
+            strs = strings(nRows, 1);
+            for r = 1:nRows
+                if isnan(col(r))
+                    strs(r) = "";
+                elseif col(r) == round(col(r)) && abs(col(r)) < 1e6
+                    strs(r) = sprintf('%d', col(r));
+                elseif abs(col(r)) < 0.001 && col(r) ~= 0
+                    strs(r) = sprintf('%.1e', col(r));
+                else
+                    strs(r) = sprintf('%.4f', col(r));
+                end
+            end
+            colStrs{c} = strs;
+        elseif islogical(col)
+            colStrs{c} = string(col);
+        else
+            colStrs{c} = string(col);
+        end
+    end
+
+    % Compute column widths
+    colWidths = zeros(1, nCols);
+    for c = 1:nCols
+        colWidths(c) = max(strlength(names{c}), max(strlength(colStrs{c})));
+    end
+
+    % Print header
+    headerParts = strings(1, nCols);
+    divParts = strings(1, nCols);
+    for c = 1:nCols
+        w = colWidths(c);
+        headerParts(c) = pad(names{c}, w);
+        divParts(c) = repmat('-', 1, w);
+    end
+    fprintf('  %s\n', join(headerParts, '   '));
+    fprintf('  %s\n', join(divParts, '   '));
+
+    % Print rows
+    for r = 1:nRows
+        parts = strings(1, nCols);
+        for c = 1:nCols
+            w = colWidths(c);
+            s = colStrs{c}(r);
+            % Right-align numbers, left-align text
+            col = T{r, c};
+            if isnumeric(col) || islogical(col)
+                parts(c) = pad(s, w, 'left');
+            else
+                parts(c) = pad(s, w);
+            end
+        end
+        fprintf('  %s\n', join(parts, '   '));
+    end
+    fprintf('\n');
+end
+
+
+function printLatexTable(T, tableType)
+% Print a LaTeX tabular environment for the table
+    names = T.Properties.VariableNames;
+    nCols = width(T);
+    nRows = height(T);
+
+    % Column alignment: l for text, r for numbers
+    alignStr = '';
+    for c = 1:nCols
+        col = T{:, c};
+        if isnumeric(col) || islogical(col)
+            alignStr = [alignStr, 'r']; %#ok<AGROW>
+        else
+            alignStr = [alignStr, 'l']; %#ok<AGROW>
+        end
+    end
+
+    % Map nice header names per table type
+    headerNames = latexHeaders(names, tableType);
+
+    fprintf('\\begin{table}[htbp]\n');
+    fprintf('\\centering\n');
+    fprintf('\\caption{%s}\n', latexCaption(tableType));
+    fprintf('\\begin{tabular}{%s}\n', alignStr);
+    fprintf('\\toprule\n');
+
+    % Header row
+    fprintf('%s', headerNames{1});
+    for c = 2:nCols
+        fprintf(' & %s', headerNames{c});
+    end
+    fprintf(' \\\\\n');
+    fprintf('\\midrule\n');
+
+    % Data rows
+    for r = 1:nRows
+        parts = strings(1, nCols);
+        for c = 1:nCols
+            col = T{r, c};
+            if isnumeric(col)
+                if isnan(col)
+                    parts(c) = "";
+                elseif col == round(col) && abs(col) < 1e6
+                    parts(c) = sprintf('%d', col);
+                elseif abs(col) < 0.001 && col ~= 0
+                    parts(c) = sprintf('$<$ .001');
+                else
+                    parts(c) = sprintf('%.3f', col);
+                end
+            elseif islogical(col)
+                if col
+                    parts(c) = "Yes";
+                else
+                    parts(c) = "";
+                end
+            elseif isstring(col) || iscell(col)
+                s = string(col);
+                % Escape underscores and add italic for significance stars
+                s = strrep(s, '_', '\_');
+                if s == "*" || s == "**" || s == "***" || s == "+"
+                    parts(c) = sprintf('$%s$', s);
+                else
+                    parts(c) = s;
+                end
+            else
+                parts(c) = string(col);
+            end
+        end
+        fprintf('%s', parts(1));
+        for c = 2:nCols
+            fprintf(' & %s', parts(c));
+        end
+        fprintf(' \\\\\n');
+    end
+
+    fprintf('\\bottomrule\n');
+    fprintf('\\end{tabular}\n');
+
+    % Notes
+    notes = latexNotes(tableType);
+    if ~isempty(notes)
+        fprintf('\\par\\smallskip\\footnotesize\\textit{Note.} %s\n', notes);
+    end
+
+    fprintf('\\end{table}\n');
+end
+
+
+function h = latexHeaders(names, tableType)
+% Map variable names to publication-style LaTeX headers
+    map = containers.Map('KeyType', 'char', 'ValueType', 'char');
+    map('Channel')    = 'Channel';
+    map('Biomarker')  = 'Biomarker';
+    map('Term')       = 'Term';
+    map('FStat')      = '$F$';
+    map('df1')        = '$df_1$';
+    map('df2')        = '$df_2$';
+    map('pValue')     = '$p$';
+    map('Sig')        = '';
+    map('qValue')     = '$q$';
+    map('FDR_Sig')    = 'FDR';
+    map('Contrast')   = 'Contrast';
+    map('DeltaE')     = '$\Delta$';
+    map('SD')         = 'SE';
+    map('F')          = '$F$';
+    map('pCorrected') = '$p_\mathrm{corr}$';
+    map('Name')       = 'Coefficient';
+    map('Estimate')   = '$\beta$';
+    map('SE')         = 'SE';
+    map('tStat')      = '$t$';
+    map('DF')         = '$df$';
+    map('AIC')        = 'AIC';
+    map('BIC')        = 'BIC';
+    map('LogLik')     = 'Log-Lik';
+    map('NullChi2')   = '$\chi^2$';
+    map('NullPval')   = '$p_\mathrm{null}$';
+    map('Formula')    = 'Formula';
+    map('APA')        = 'APA';
+    map('r')           = '$r$';
+    map('rho')         = '$\rho$';
+    map('p_pearson')   = '$p_\mathrm{Pearson}$';
+    map('p_spearman')  = '$p_\mathrm{Spearman}$';
+    map('N')           = '$N$';
+    map('q')           = '$q$';
+    map('Group')       = 'Group';
+
+    h = cell(1, length(names));
+    for i = 1:length(names)
+        if map.isKey(names{i})
+            h{i} = map(names{i});
+        else
+            h{i} = strrep(names{i}, '_', '\_');
+        end
+    end
+
+    % Suppress unused arg warning
+    if isempty(tableType), return; end
+end
+
+
+function c = latexCaption(tableType)
+% Default caption per table type
+    switch lower(tableType)
+        case 'anova'
+            c = 'ANOVA Results for Fixed Effects';
+        case 'contrasts'
+            c = 'Post-Hoc Contrast Tests';
+        case 'coefficients'
+            c = 'Fixed-Effect Coefficient Estimates';
+        case 'fit'
+            c = 'Model Fit Statistics';
+        case 'correlations'
+            c = 'Correlation Results';
+        otherwise
+            c = 'Summary';
+    end
+end
+
+
+function n = latexNotes(tableType)
+% Footnote text per table type
+    switch lower(tableType)
+        case 'anova'
+            n = '$^{*}p < .05$, $^{**}p < .01$, $^{***}p < .001$, $^{+}p < .10$.';
+        case 'contrasts'
+            n = '$p_\mathrm{corr}$ = FDR-corrected $p$-value. $^{*}p < .05$, $^{**}p < .01$, $^{***}p < .001$.';
+        case 'coefficients'
+            n = '$^{*}p < .05$, $^{**}p < .01$, $^{***}p < .001$.';
+        case 'correlations'
+            n = '$r$ = Pearson, $\rho$ = Spearman. $^{*}p < .05$, $^{**}p < .01$, $^{***}p < .001$.';
+        otherwise
+            n = '';
     end
 end

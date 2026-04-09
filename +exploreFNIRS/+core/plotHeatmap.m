@@ -16,6 +16,8 @@ function fig = plotHeatmap(groups, varargin)
 % Name-Value Parameters:
 %   Biomarker     - Biomarker to plot (default: 'HbO')
 %   Channels      - Channel indices to include (default: all)
+%   Device        - pf2.Device object for short-sep detection (default: [])
+%   ExcludeShortSeparation - Exclude short-sep channels (default: true)
 %   GroupIndex    - Which group to plot (default: 1)
 %   SortChannels  - Channel ordering: 'index' (default), 'amplitude'
 %   Colormap      - Colormap name or [N x 3] matrix (default: blue-white-red)
@@ -39,6 +41,8 @@ function fig = plotHeatmap(groups, varargin)
     addParameter(p, 'Biomarker', 'HbO', @ischar);
     addParameter(p, 'Channels', [], @isnumeric);
     addParameter(p, 'ROIs', [], @(x) isnumeric(x) || islogical(x) || ischar(x) || isstring(x) || iscell(x));
+    addParameter(p, 'Device', [], @(v) isempty(v) || isa(v, 'pf2.Device'));
+    addParameter(p, 'ExcludeShortSeparation', true, @islogical);
     addParameter(p, 'GroupIndex', 1, @(v) isnumeric(v) && isscalar(v));
     addParameter(p, 'SortChannels', 'index', @ischar);
     addParameter(p, 'Colormap', '', @(v) ischar(v) || isnumeric(v));
@@ -101,6 +105,13 @@ function fig = plotHeatmap(groups, varargin)
             channels = 1:size(meanData, 2);
         else
             channels = opts.Channels(opts.Channels <= size(meanData, 2));
+        end
+        % Exclude short-separation channels
+        if opts.ExcludeShortSeparation
+            ssIdx = getShortSeparationIdx(opts.Device, groups);
+            if ~isempty(ssIdx)
+                channels = channels(~ismember(channels, ssIdx));
+            end
         end
         chLabelsCustom = {};
     end
@@ -235,4 +246,34 @@ function [roiIdx, roiNames] = resolveROIs(groups, rois)
 
     roiIdx = roiIdx(roiIdx <= length(allNames));
     roiNames = allNames(roiIdx);
+end
+
+
+function ssIdx = getShortSeparationIdx(dev, groups)
+% Get short-separation channel indices from Device or probe info
+    ssIdx = [];
+
+    % Method 1: Device object
+    if ~isempty(dev) && isa(dev, 'pf2.Device')
+        ssMask = dev.isShortSep();
+        ssIdx = find(ssMask);
+        return;
+    end
+
+    % Method 2: Probe info in group data
+    for g = 1:length(groups)
+        ga = groups(g).gbyGrand;
+        if isfield(ga, 'probeInfo') && isstruct(ga.probeInfo)
+            pi = ga.probeInfo;
+            if isfield(pi, 'TableOpt') && istable(pi.TableOpt) ...
+                    && ismember('IsShortSeparation', pi.TableOpt.Properties.VariableNames)
+                ssIdx = find(pi.TableOpt.IsShortSeparation);
+                return;
+            end
+            if isfield(pi, 'SD') && isstruct(pi.SD) && isfield(pi.SD, 'distances')
+                ssIdx = find(pi.SD.distances < 2);
+                return;
+            end
+        end
+    end
 end

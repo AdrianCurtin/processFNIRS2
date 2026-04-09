@@ -98,6 +98,7 @@ function results = fitLME(groups, groupByVars, varargin)
     addParameter(p, 'DiscreteTime', true, @islogical);
     addParameter(p, 'ModelFitTest', true, @islogical);
     addParameter(p, 'SkipContrasts', false, @islogical);
+    addParameter(p, 'StatWindow', [], @isnumeric);
     parse(p, groups, groupByVars, varargin{:});
     opts = p.Results;
 
@@ -121,6 +122,27 @@ function results = fitLME(groups, groupByVars, varargin)
 
     % Get time bins from bar-flat data
     barTimes = groups(1).gbyGrandBarFlat.time;
+
+    % Filter time bins by StatWindow
+    if ~isempty(opts.StatWindow)
+        sw = opts.StatWindow;
+        if ~isnumeric(sw) || numel(sw) ~= 2
+            error('exploreFNIRS:stats:fitLME:invalidStatWindow', ...
+                'StatWindow must be a 2-element numeric vector [start, end].');
+        end
+        tMask = barTimes >= sw(1) & barTimes <= sw(2);
+        barTimes = barTimes(tMask);
+        if isempty(barTimes)
+            error('exploreFNIRS:stats:fitLME:emptyWindow', ...
+                'StatWindow [%.1f, %.1f] contains no time bins. Adjust barBinSize or StatWindow.', sw(1), sw(2));
+        end
+    end
+
+    if ~isempty(opts.StatWindow) && length(barTimes) == 1 && ...
+            length(groups(1).gbyGrandBarFlat.time) == 1
+        warning('pf2:stats:singleBin', ...
+            'StatWindow has no effect with a single time bin (barBinSize=0). Set barBinSize > 0 for time-resolved analysis.');
+    end
 
     % Auto-include Time as factor when multiple time bins exist
     % (skip for GLM betas where time bins are meaningless)
@@ -477,6 +499,8 @@ function results = fitLME(groups, groupByVars, varargin)
         end
     end
 
+    results.statWindow = opts.StatWindow;
+
     % Print ANOVA summary
     if opts.Verbose && ~isempty(results.anova_pval) && height(results.anova_pval) > 0
         fprintf('\n--- ANOVA p-values ---\n');
@@ -572,6 +596,7 @@ function results = initResults(nBioM, nCh, biomarkers, channels, groupByVars)
     results.biomarkers = biomarkers;
     results.channels = channels;
     results.groupByVars = groupByVars;
+    results.statWindow = [];
 end
 
 

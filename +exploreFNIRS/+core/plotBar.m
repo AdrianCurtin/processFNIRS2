@@ -63,7 +63,10 @@ function fig = plotBar(groups, varargin)
     addParameter(p, 'Biomarker', 'HbO', @ischar);
     addParameter(p, 'Channels', [], @isnumeric);
     addParameter(p, 'ROIs', [], @(x) isnumeric(x) || islogical(x) || ischar(x) || isstring(x) || iscell(x));
+    addParameter(p, 'Device', [], @(v) isempty(v) || isa(v, 'pf2.Device'));
+    addParameter(p, 'ExcludeShortSeparation', true, @islogical);
     addParameter(p, 'TimeWindow', [], @isnumeric);
+    addParameter(p, 'StatWindow', [], @isnumeric);
     addParameter(p, 'ErrorType', 'SEM', @ischar);
     addParameter(p, 'ShowIndividual', false, @islogical);
     addParameter(p, 'ShowN', true, @islogical);
@@ -81,6 +84,11 @@ function fig = plotBar(groups, varargin)
     addParameter(p, 'Colors', [], @(x) isempty(x) || isnumeric(x) || ischar(x) || isstring(x) || isa(x, 'function_handle') || isa(x, 'exploreFNIRS.core.ColorScheme'));
     parse(p, groups, varargin{:});
     opts = p.Results;
+
+    % StatWindow is an alias for TimeWindow (for API consistency)
+    if isempty(opts.TimeWindow) && ~isempty(opts.StatWindow)
+        opts.TimeWindow = opts.StatWindow;
+    end
 
     if ~isempty(opts.SavePath)
         opts.Visible = 'off';
@@ -125,6 +133,13 @@ function fig = plotBar(groups, varargin)
             plotItems = 1:nTotalCh;
         else
             plotItems = opts.Channels;
+        end
+        % Exclude short-separation channels
+        if opts.ExcludeShortSeparation
+            ssIdx = getShortSeparationIdx(opts.Device, groups);
+            if ~isempty(ssIdx)
+                plotItems = plotItems(~ismember(plotItems, ssIdx));
+            end
         end
         itemNames = arrayfun(@(c) sprintf('Ch %d', c), plotItems, ...
             'UniformOutput', false);
@@ -461,4 +476,29 @@ function [roiIdx, roiNames] = resolveROIs(groups, rois)
 
     roiIdx = roiIdx(roiIdx <= length(allNames));
     roiNames = allNames(roiIdx);
+end
+
+
+function ssIdx = getShortSeparationIdx(dev, groups)
+% Get short-separation channel indices from Device or probe info
+    ssIdx = [];
+    if ~isempty(dev) && isa(dev, 'pf2.Device')
+        ssIdx = find(dev.isShortSep());
+        return;
+    end
+    for g = 1:length(groups)
+        ga = groups(g).gbyGrand;
+        if isfield(ga, 'probeInfo') && isstruct(ga.probeInfo)
+            pi = ga.probeInfo;
+            if isfield(pi, 'TableOpt') && istable(pi.TableOpt) ...
+                    && ismember('IsShortSeparation', pi.TableOpt.Properties.VariableNames)
+                ssIdx = find(pi.TableOpt.IsShortSeparation);
+                return;
+            end
+            if isfield(pi, 'SD') && isstruct(pi.SD) && isfield(pi.SD, 'distances')
+                ssIdx = find(pi.SD.distances < 2);
+                return;
+            end
+        end
+    end
 end

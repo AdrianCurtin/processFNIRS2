@@ -356,6 +356,9 @@ classdef PlotProxy
             if ~isempty(plotOpts.TaskEnd)
                 ex.settings.taskEnd = plotOpts.TaskEnd;
             end
+            if ~isempty(plotOpts.StatWindow)
+                ex.settings.statWindow = plotOpts.StatWindow;
+            end
 
             % Apply filter if provided
             if ~isempty(filterObj) && ~filterObj.isEmpty()
@@ -458,8 +461,9 @@ function [dimMap, plotOpts, filterObj] = parseDimArgs(plotType, varargin)
     % Named color scheme (string name or ColorScheme object)
     addParameter(p, 'ColorScheme', [], @(x) isempty(x) || ischar(x) || isstring(x) || isa(x, 'exploreFNIRS.core.ColorScheme'));
 
-    % Bar-specific
+    % Bar/stats-specific
     addParameter(p, 'TimeWindow', [], @isnumeric);
+    addParameter(p, 'StatWindow', [], @isnumeric);
     addParameter(p, 'ShowIndividual', false, @islogical);
 
     % Temporal-specific
@@ -515,6 +519,7 @@ function [dimMap, plotOpts, filterObj] = parseDimArgs(plotType, varargin)
         'SaveHeight', r.SaveHeight, ...
         'SaveDPI', r.SaveDPI, ...
         'TimeWindow', r.TimeWindow, ...
+        'StatWindow', r.StatWindow, ...
         'ShowIndividual', r.ShowIndividual, ...
         'XLim', r.XLim, ...
         'YLim', r.YLim, ...

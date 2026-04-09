@@ -100,7 +100,8 @@ if ~isempty(oldtitle)
     delete(oldtitle);
 end
 axes('pos',[0 1 1 1],'visible','off','Tag','suptitle');
-ht=text(.5,titleypos-1,str);set(ht,'horizontalalignment','center','fontsize',fs);
+sty = pf2_base.plot.PlotStyle.getDefault();
+ht=text(.5,titleypos-1,str);set(ht,'horizontalalignment','center','fontsize',fs,'Color',sty.ForegroundColor);
 set(figH,'nextplot',np);
 axes(haold);
 if nargout
