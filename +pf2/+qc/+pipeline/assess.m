@@ -395,24 +395,17 @@ for ci = 1:numel(checks)
 
         case 'takizawa'
             % Build minimal struct for Takizawa
-            qcData = struct();
-            qcData.HbO = HbO_filt;
-            qcData.HbR = HbR_filt;
-            qcData.HbTotal = HbTotal_filt;
-            qcData.time = data.time;
-            qcData.units = 'mM*mm';
-            qcData.DPF_factor = [1, 1];
+            qcData = struct('HbO', HbO_filt, 'HbR', HbR_filt, ...
+                'HbTotal', HbTotal_filt, 'time', data.time, ...
+                'units', 'mM*mm', 'DPF_factor', [1, 1]);
 
-            tkMask = pf2_TakizawaRejection(qcData, opts.TakizawaStrict);
+            tkReport = pf2.qc.takizawa(qcData, 'Strict', opts.TakizawaStrict);
 
-            % Get rule-level detail
-            ruleNames = {'HighFreqNoise', 'LowFreqNoise', 'ZeroVariance', 'BodyMovement'};
-            ruleResults = extractTakizawaRules(qcData);
-
-            report.takizawa.rules = ruleResults;
-            report.takizawa.ruleNames = ruleNames;
-            report.takizawa.pass = logical(tkMask);
-            passMatrix(ci, :) = logical(tkMask);
+            report.takizawa.rules = tkReport.rules;
+            report.takizawa.ruleNames = tkReport.ruleNames;
+            report.takizawa.pass = tkReport.pass;
+            report.takizawa.skipped = tkReport.skipped;
+            passMatrix(ci, :) = tkReport.pass;
     end
 end
 
@@ -458,78 +451,5 @@ allHbR = coefTable(:, 3) * 1e-3;
 % to match bvoxy's internal convention
 eHbO = interp1(allWl, allHbO, lambdas, 'linear', 'extrap') / 1000;
 eHbR = interp1(allWl, allHbR, lambdas, 'linear', 'extrap') / 1000;
-
-end
-
-
-function ruleResults = extractTakizawaRules(qcData)
-% EXTRACTTAKIZAWARULES Extract per-rule pass/fail from Takizawa criteria
-%
-% Re-implements the 4-rule logic to get rule-level detail without
-% modifying pf2_TakizawaRejection.
-
-nCh = size(qcData.HbO, 2);
-ruleResults = true(4, nCh);  % 4 rules x C channels, true = pass
-
-Fs = 1 / median(diff(qcData.time), 'omitnan');
-timeLength = max(qcData.time) - min(qcData.time);
-
-if timeLength < 10
-    return;
-end
-
-fHbO = qcData.HbO;
-fHbR = qcData.HbR;
-fHbT = qcData.HbTotal;
-
-% Rule 1: High frequency noise
-hfWindowSize = 15 * Fs;
-k = ceil(hfWindowSize);
-fHbO_sd = movstd(fHbO, k);
-fHbR_sd = movstd(fHbR, k);
-fHbTotal_sd = movstd(fHbT, k);
-
-hfRatioO = fHbO_sd ./ fHbTotal_sd;
-hfRatioR = fHbR_sd ./ fHbTotal_sd;
-
-hfMaskO = hfRatioO > 4;
-hfMaskR = hfRatioR > 4;
-hfTimeMask = hfMaskO .* hfMaskR == 1;
-rule1Fail = (sum(hfTimeMask, 1) / size(hfTimeMask, 1)) > 0.5;
-ruleResults(1, :) = ~rule1Fail;
-
-% Rule 2: Low frequency noise (2014 criteria)
-LF = abs(1 - (std(fHbR, 0, 1, 'omitnan') ./ std(fHbO, 0, 1, 'omitnan')));
-r = zeros(1, nCh);
-for ch = 1:nCh
-    rr = corr(fHbO(:,ch), fHbR(:,ch), 'Rows', 'pairwise');
-    r(ch) = rr;
-end
-rule2Fail = (r < -0.9) & (LF < 0.3);
-ruleResults(2, :) = ~rule2Fail;
-
-% Rule 3: Zero variance
-stdO = std(fHbO, 1, 1, 'omitnan');
-stdR = std(fHbR, 1, 1, 'omitnan');
-rule3Fail = (stdO <= 0) & (stdR <= 0);
-ruleResults(3, :) = ~rule3Fail;
-
-% Rule 4: Body movement
-r4windowSize = ceil(2 * Fs);
-tSteps = size(fHbO, 1) - r4windowSize - 1;
-if tSteps > 0
-    blankHbO = zeros(tSteps, nCh);
-    blankHbT = zeros(tSteps, nCh);
-    for i = 1:tSteps
-        blankHbO(i,:) = fHbO(i+r4windowSize,:) - fHbO(i,:);
-        blankHbT(i,:) = fHbT(i+r4windowSize,:) - fHbT(i,:);
-    end
-    overBoth = (abs(blankHbO) > 0.15) & (abs(blankHbT) > 0.15);
-    maxBlocks = r4windowSize / (2 * timeLength / 90);
-    rule4Fail = sum(overBoth, 1) > maxBlocks;
-else
-    rule4Fail = false(1, nCh);
-end
-ruleResults(4, :) = ~rule4Fail;
 
 end
