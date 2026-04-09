@@ -41,6 +41,13 @@ function fig = plotTemporal(groups, varargin)
 %   Colors      - Group color palette override (default: [] = auto)
 %                 [N x 3] RGB matrix, colormap name (e.g. 'Set1', 'tab10'),
 %                 or function handle @(N) returning [N x 3].
+%   VLines      - Vertical annotation lines drawn on all subplots.
+%                 Numeric vector of time positions (default dashed gray), or
+%                 struct array with fields:
+%                   .time  - (required) scalar time position
+%                   .label - (optional) text label string
+%                   .color - (optional) color spec (default: [0.5 0.5 0.5])
+%                   .style - (optional) line style (default: '--')
 %
 % Layout:
 %   Each channel/ROI and biomarker combination gets its own subplot.
@@ -71,6 +78,14 @@ function fig = plotTemporal(groups, varargin)
 %   figs = exploreFNIRS.core.plotTemporal(ex.groups, ...
 %       'Biomarkers', {'HbO','HbR'}, 'PlotBy', 'Condition');
 %
+%   % Vertical annotation lines (numeric = dashed gray)
+%   fig = exploreFNIRS.core.plotTemporal(ex.groups, 'VLines', [0, 30]);
+%
+%   % Labeled VLines with custom colors and styles
+%   vl = struct('time', {0, 30}, 'label', {'Onset','Offset'}, ...
+%               'color', {'r','b'}, 'style', {'-','--'});
+%   fig = exploreFNIRS.core.plotTemporal(ex.groups, 'VLines', vl);
+%
 % See also: exploreFNIRS.core.Experiment, exploreFNIRS.core.plotBar
 
     p = inputParser;
@@ -91,6 +106,7 @@ function fig = plotTemporal(groups, varargin)
     addParameter(p, 'SaveHeight', 500, @isnumeric);
     addParameter(p, 'SaveDPI', 150, @isnumeric);
     addParameter(p, 'Colors', [], @(x) isempty(x) || isnumeric(x) || ischar(x) || isstring(x) || isa(x, 'function_handle') || isa(x, 'exploreFNIRS.core.ColorScheme'));
+    addParameter(p, 'VLines', [], @(x) isempty(x) || isnumeric(x) || isstruct(x));
     parse(p, groups, varargin{:});
     opts = p.Results;
 
@@ -341,6 +357,11 @@ function fig = plotTemporal(groups, varargin)
         if ~isempty(opts.YLim), arrayfun(@(a) ylim(a, opts.YLim), allAxes); end
         if ~isempty(opts.XLim), arrayfun(@(a) xlim(a, opts.XLim), allAxes); end
 
+        % Vertical annotation lines
+        if ~isempty(opts.VLines)
+            drawVLines(allAxes, opts.VLines);
+        end
+
         % Figure title
         if ~isempty(opts.Title)
             if nFigs > 1
@@ -471,6 +492,50 @@ function tf = showLegend(mode, idx, total)
         case 'all',   tf = true;
         case 'none',  tf = false;
         otherwise,    tf = (idx == total);
+    end
+end
+
+
+function drawVLines(allAxes, vlines)
+% Draw vertical annotation lines on all axes
+    if isnumeric(vlines)
+        % Simple numeric vector — convert to struct array
+        vlines = vlines(:);
+        tmp = struct('time', num2cell(vlines), ...
+            'label', repmat({''}, numel(vlines), 1), ...
+            'color', repmat({[0.5 0.5 0.5]}, numel(vlines), 1), ...
+            'style', repmat({'--'}, numel(vlines), 1));
+        vlines = tmp;
+    end
+
+    for vi = 1:numel(vlines)
+        v = vlines(vi);
+        xPos = v.time;
+
+        if isfield(v, 'color') && ~isempty(v.color)
+            clr = v.color;
+        else
+            clr = [0.5 0.5 0.5];
+        end
+
+        if isfield(v, 'style') && ~isempty(v.style)
+            sty = v.style;
+        else
+            sty = '--';
+        end
+
+        if isfield(v, 'label') && ~isempty(v.label)
+            lbl = {v.label};
+        else
+            lbl = {};
+        end
+
+        lineArgs = {'Color', clr, 'LineStyle', sty, 'LineWidth', 1};
+
+        for ai = 1:numel(allAxes)
+            ax = allAxes(ai);
+            pf2_base.external.vline(ax, xPos, lineArgs, lbl);
+        end
     end
 end
 
