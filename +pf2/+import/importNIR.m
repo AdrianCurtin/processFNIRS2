@@ -591,7 +591,22 @@ if(channelCheck)
     end
 else
    if(~isempty(fmask))
-       fNIR.fchMask=fmask; 
+       fNIR.fchMask=fmask;
+   elseif isempty(fNIR.fchMask)
+       % No saved mask and channel check skipped — default to all good.
+       % Use device nChannels (not raw column count which includes wavelengths).
+       if isfield(fNIR, 'device') && ~isempty(fNIR.device)
+           fNIR.fchMask=ones(1,fNIR.device.nChannels);
+       else
+           % Fallback: guess from probename config
+           try
+               dev = pf2.Device.load(fNIR);
+               fNIR.fchMask=ones(1,dev.nChannels);
+           catch
+               warning('pf2:import:unknownChannelCount', ...
+                   'Cannot determine channel count for default fchMask. Set manually.');
+           end
+       end
    end
 end
 

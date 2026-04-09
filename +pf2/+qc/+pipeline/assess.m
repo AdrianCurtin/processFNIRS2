@@ -200,6 +200,12 @@ report.timestamp = datetime('now');
 report.processing = procInfo;
 report.params = opts;
 
+% Pre-initialize all check fields so isfield() always works
+emptyCheck = struct('pass', true(1, nChannels), 'skipped', true);
+for vc = 1:numel(validChecks)
+    report.(validChecks{vc}) = emptyCheck;
+end
+
 %% Run checks
 passMatrix = true(numel(checks), nChannels);
 

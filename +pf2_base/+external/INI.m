@@ -353,6 +353,8 @@ classdef INI < hgsetget & dynamicprops
                 
                 if isstring(Value)
                     Value = char(Value);
+                elseif isa(Value, 'function_handle')
+                    Value = func2str(Value);
                 end
 
                 switch class(Value)
@@ -361,7 +363,9 @@ classdef INI < hgsetget & dynamicprops
                     case 'cell'
                         Symbols = {'{','}'};
                     case 'char'
-                        if(Value(1)==''''&&Value(end)=='''')||(Value(1)=='"'&&Value(end)=='"')
+                        if isempty(Value)
+                            Symbols = {'''',''''};
+                        elseif(Value(1)==''''&&Value(end)=='''')||(Value(1)=='"'&&Value(end)=='"')
                             Symbols = {'',''};
                         else
                             Symbols = {'''',''''};

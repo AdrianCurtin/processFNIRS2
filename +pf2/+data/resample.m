@@ -668,7 +668,7 @@ function [outAuxStruct] = recursiveAuxResample(aux_in,flattenAux,segLength,cente
             if(flattenAux)
                 nDataCols=nAuxChan-auxFieldHasTime(f);
                 % Use varNames from parent struct if available
-                if isfield(aux_in,'varNames') && iscell(aux_in.varNames) && length(aux_in.varNames)>=nDataCols
+                if isfield(aux_in,'varNames') && iscell(aux_in.varNames) && length(aux_in.varNames)==nDataCols
                     newVarNames=aux_in.varNames(1:nDataCols);
                 else
                     newVarNames={};
@@ -677,11 +677,26 @@ function [outAuxStruct] = recursiveAuxResample(aux_in,flattenAux,segLength,cente
                     end
                 end
 
+                % Guard: ensure name count matches column count
+                nResampleCols=size(auxDat_resample,2);
                 if(auxFieldHasTime(f))
+                    expectedCols=1+numel(newVarNames);
+                    if nResampleCols~=expectedCols
+                        newVarNames={};
+                        for nV=1:nResampleCols-1
+                            newVarNames{nV}=sprintf('val%i',nV);
+                        end
+                    end
                     newVarNames=['time',newVarNames(:)];
                     auxDat_rsTable=array2table(auxDat_resample,'VariableNames',newVarNames);
                     outAuxStruct.(curFieldName)=auxDat_rsTable;
                 else
+                    if numel(newVarNames)~=nResampleCols
+                        newVarNames={};
+                        for nV=1:nResampleCols
+                            newVarNames{nV}=sprintf('val%i',nV);
+                        end
+                    end
                     outAuxStruct.(curFieldName)=table(t_aux_resample,'VariableNames',{'time'});
                     auxDat_rsTable=array2table(auxDat_resample,'VariableNames',newVarNames);
                     outAuxStruct.(curFieldName)=[outAuxStruct.(curFieldName),auxDat_rsTable];

@@ -563,7 +563,10 @@ if(~isempty(data))
             if(length(fData.fchMask)==length(origNumOptodes))
                 fData.fchMask=fData.fchMask(ismember(origNumOptodes,curProbe.TableOpt.OptodeNum));
             else
-                error('Channel mask does not match number of optodes')
+                warning('pf2:fchMaskMismatch', ...
+                    'Channel mask length (%d) does not match optode count (%d). Resetting to all good.', ...
+                    length(fData.fchMask), numOptodes);
+                fData.fchMask=true(1,numOptodes);
             end
         end
     end
