@@ -117,47 +117,90 @@ function allData = importDirectory(dirPath, pattern, varargin)
         fprintf('Found %d %s file(s) in %s\n', nFiles, formatName, dirPath);
     end
 
-    % --- Import loop ---
-    allData = cell(1, nFiles);
-    nImported = 0;
-    nFailed = 0;
-
+    % --- Pre-compute paths for loop (required for parfor: no struct indexing) ---
+    fullPaths = cell(1, nFiles);
+    relParts = cell(1, nFiles);
     for i = 1:nFiles
-        fullPath = fullfile(matches(i).folder, matches(i).name);
-        relDisplay = strrep(fullPath, [dirPath filesep], '');
+        fullPaths{i} = fullfile(matches(i).folder, matches(i).name);
+        relParts{i} = getRelativeParts(matches(i).folder, dirPath);
+    end
 
+    % --- Import loop (parallel when pool available) ---
+    allData = cell(1, nFiles);
+    allErrors = cell(1, nFiles);
+
+    [canPar, poolOn] = pf2_base.accel.canParfor();
+    useParfor = canPar && poolOn && nFiles > 2;
+
+    if useParfor
         if opts.Verbose
-            fprintf('  Importing %d/%d: %s\n', i, nFiles, relDisplay);
+            fprintf('  Importing %d files in parallel...\n', nFiles);
         end
 
-        try
-            data = importFn(fullPath);
+        continueOnError = opts.ContinueOnError;
+        nDirFields = 4;
 
-            % Map directory levels to info fields
-            parts = getRelativeParts(matches(i).folder, dirPath);
-            for k = 1:min(numel(parts), 4)
-                data.info.(dirFieldNames{k}) = parts{k};
+        parfor i = 1:nFiles
+            try
+                data = importFn(fullPaths{i});
+                parts = relParts{i};
+                for k = 1:min(numel(parts), nDirFields)
+                    data.info.(dirFieldNames{k}) = parts{k};
+                end
+                data.info.sourcePath = fullPaths{i};
+                allData{i} = data;
+            catch ME
+                if ~continueOnError
+                    rethrow(ME);
+                end
+                allErrors{i} = ME.message;
             end
-
-            % Store source path
-            data.info.sourcePath = fullPath;
-
-            nImported = nImported + 1;
-            allData{nImported} = data;
-
-        catch ME
-            nFailed = nFailed + 1;
+        end
+    else
+        % Sequential fallback (keeps verbose progress output)
+        for i = 1:nFiles
             if opts.Verbose
-                fprintf('  ** Failed: %s (%s)\n', relDisplay, ME.message);
+                relDisplay = strrep(fullPaths{i}, [dirPath filesep], '');
+                fprintf('  Importing %d/%d: %s\n', i, nFiles, relDisplay);
             end
-            if ~opts.ContinueOnError
-                rethrow(ME);
+
+            try
+                data = importFn(fullPaths{i});
+
+                parts = relParts{i};
+                for k = 1:min(numel(parts), 4)
+                    data.info.(dirFieldNames{k}) = parts{k};
+                end
+                data.info.sourcePath = fullPaths{i};
+                allData{i} = data;
+
+            catch ME
+                if opts.Verbose
+                    relDisplay = strrep(fullPaths{i}, [dirPath filesep], '');
+                    fprintf('  ** Failed: %s (%s)\n', relDisplay, ME.message);
+                end
+                if ~opts.ContinueOnError
+                    rethrow(ME);
+                end
+                allErrors{i} = ME.message;
             end
         end
     end
 
-    % Trim cell array to actual imports
-    allData = allData(1:nImported);
+    % --- Filter out failed imports (empty cells) ---
+    emptyMask = cellfun(@isempty, allData);
+    nFailed = sum(emptyMask);
+    nImported = sum(~emptyMask);
+    allData = allData(~emptyMask);
+
+    % Print errors from parfor run
+    if useParfor && opts.Verbose
+        failIdx = find(~cellfun(@isempty, allErrors));
+        for k = 1:length(failIdx)
+            fprintf('  ** Failed: %s (%s)\n', ...
+                strrep(fullPaths{failIdx(k)}, [dirPath filesep], ''), allErrors{failIdx(k)});
+        end
+    end
 
     if opts.Verbose
         fprintf('Import complete: %d imported, %d failed, %d total\n', ...

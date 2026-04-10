@@ -233,10 +233,15 @@ classdef Experiment < handle
         end
 
 
-        function obj = select(obj, varargin)
+        function out = select(obj, varargin)
         % SELECT Filter data by metadata criteria
         %
-        %   ex.select('VarName', value, 'VarName2', value2, ...)
+        %   ex.select('VarName', value, ...)      % mutate in place
+        %   ex2 = ex.select('VarName', value, ...) % return independent copy
+        %
+        % When an output is captured, select() returns a NEW Experiment
+        % containing only the matching segments (the original is unchanged).
+        % When called without capturing an output, it filters in place.
         %
         % Values can be:
         %   - String/char:   exact match (e.g., 'Group', 'Control')
@@ -248,7 +253,8 @@ classdef Experiment < handle
         % Use reset() first to start fresh.
         %
         % Example:
-        %   ex.select('Group', 'Control', 'Condition', {'Task1','Task2'});
+        %   ex.select('Group', 'Control');                  % in-place
+        %   ex2 = ex.select('Condition', {'Task1','Task2'}); % new copy
 
             if mod(length(varargin), 2) ~= 0
                 error('exploreFNIRS:core:Experiment:select', ...
@@ -257,10 +263,7 @@ classdef Experiment < handle
 
             idx = obj.selectedIdx;
 
-            % Initialize selectOrder_ if needed
-            if isempty(obj.selectOrder_)
-                obj.selectOrder_ = struct();
-            end
+            selectOrder = struct();
 
             for i = 1:2:length(varargin)
                 varName = varargin{i};
@@ -287,11 +290,11 @@ classdef Experiment < handle
                         idx = idx & ismember(col, varVal);
                     end
                     % Store the user-specified order for this variable
-                    obj.selectOrder_.(varName) = cellstr(varVal);
+                    selectOrder.(varName) = cellstr(varVal);
                 elseif isnumeric(varVal)
                     idx = idx & ismember(col, varVal);
                     if numel(varVal) > 1
-                        obj.selectOrder_.(varName) = varVal;
+                        selectOrder.(varName) = varVal;
                     end
                 else
                     error('exploreFNIRS:core:Experiment:select', ...
@@ -299,14 +302,37 @@ classdef Experiment < handle
                 end
             end
 
-            obj.selectedIdx = idx;
-            obj.isGrouped = false;
-            obj.isAggregated = false;
-            obj.groups = [];
-
             nSel = sum(idx);
             nTot = length(idx);
-            fprintf('Selected %d of %d segments\n', nSel, nTot);
+
+            if nargout > 0
+                % Return a new independent Experiment with selected data
+                out = exploreFNIRS.core.Experiment(obj.data(idx), ...
+                    'Hierarchy', obj.hierarchy);
+                out.settings = obj.settings;
+                out.selectOrder_ = selectOrder;
+                if ~isempty(obj.colorScheme)
+                    out.colorScheme = obj.colorScheme;
+                end
+                out.colorSchemes = obj.colorSchemes;
+                fprintf('Selected %d of %d segments (new Experiment)\n', nSel, nTot);
+            else
+                % Mutate in place
+                obj.selectedIdx = idx;
+                obj.isGrouped = false;
+                obj.isAggregated = false;
+                obj.groups = [];
+                % Merge selectOrder into existing
+                if isempty(obj.selectOrder_)
+                    obj.selectOrder_ = selectOrder;
+                else
+                    fns = fieldnames(selectOrder);
+                    for fi = 1:numel(fns)
+                        obj.selectOrder_.(fns{fi}) = selectOrder.(fns{fi});
+                    end
+                end
+                fprintf('Selected %d of %d segments\n', nSel, nTot);
+            end
         end
 
 

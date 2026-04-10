@@ -1,40 +1,55 @@
-function data = import(filepath)
-% IMPORT Auto-detect and import fNIRS data from file
+function data = import(filepath, varargin)
+% IMPORT Auto-detect and import fNIRS data from a file or directory
 %
-% Automatically detects the file format from the extension and calls the
-% appropriate importer. If no filepath is provided, opens a file browser
-% dialog for interactive selection.
+% Automatically detects the input type and routes to the appropriate
+% importer. Accepts a single file, a directory (batch import), or no
+% argument (opens a file picker UI).
 %
 % Syntax:
-%   data = pf2.import.import(filepath)
-%   data = pf2.import.import()
+%   data = pf2.import.import()                        % File picker UI
+%   data = pf2.import.import(filepath)                % Single file
+%   data = pf2.import.import(dirpath)                 % Directory (batch)
+%   data = pf2.import.import(dirpath, Name, Value)    % Directory with options
 %
 % Inputs:
-%   filepath - (optional) Path to fNIRS data file. Supported formats:
-%              .nir     - fNIR Devices/Biopac format
-%              .snirf   - SNIRF standardized format
-%              .csv     - Hitachi ETG-4000 format
-%              .hdr     - NIRx format (header file)
-%              .wl1     - NIRx format (wavelength file)
-%              If omitted, opens file browser for selection.
+%   filepath - (optional) Path to an fNIRS data file or directory.
+%              File: auto-detects format from extension and imports.
+%                .nir     - fNIR Devices/Biopac format
+%                .snirf   - SNIRF standardized format
+%                .csv     - Hitachi ETG-4000 format
+%                .hdr     - NIRx format (header file)
+%                .wl1     - NIRx format (wavelength file)
+%              Directory: scans for supported files and batch-imports.
+%              Omitted: opens file browser dialog.
+%
+% Name-Value Parameters (directory mode only, passed to importDirectory):
+%   'Pattern'         - Glob pattern override (default: auto-detected)
+%   'Dir1'..'Dir4'    - Info field names for directory levels
+%   'ChannelCheck'    - Show channel quality GUI (default: false)
+%   'ContinueOnError' - Skip failed files (default: true)
+%   'Verbose'         - Print progress (default: true)
 %
 % Outputs:
-%   data     - fNIRS data structure with fields:
-%              .raw, .time, .fs, .fchMask, .markers, .info
+%   data - Single file: fNIRS data struct with .raw, .time, .fs, etc.
+%          Directory:   Cell array of fNIRS data structs {1 x N}
+%          Cancelled:   [] (empty)
 %
 % Example:
-%   % Auto-detect format from extension
-%   data = pf2.import('subject01.nir');
-%
 %   % Interactive file selection
-%   data = pf2.import();
+%   data = pf2.import.import();
 %
-%   % Explicit format (bypasses auto-detect)
-%   data = pf2.import.importNIR('subject01.nir');
+%   % Auto-detect format from extension
+%   data = pf2.import.import('subject01.snirf');
+%
+%   % Batch import directory
+%   allData = pf2.import.import('data/');
+%
+%   % Batch import with directory-to-info mapping
+%   allData = pf2.import.import('data/', 'Dir1', 'Group', 'Dir2', 'SubjectID');
 %
 % See also: pf2.import.importNIR, pf2.import.importSNIRF,
 %           pf2.import.importNIRX, pf2.import.importHitachiMES,
-%           pf2.import.sampleData
+%           pf2.import.importDirectory, pf2.import.sampleData
 
 if nargin < 1 || isempty(filepath)
     % No filepath provided: open file browser
@@ -48,7 +63,6 @@ if nargin < 1 || isempty(filepath)
         'Select fNIRS Data File');
 
     if isequal(file, 0)
-        % User cancelled
         data = [];
         return;
     end
@@ -56,36 +70,46 @@ if nargin < 1 || isempty(filepath)
     filepath = fullfile(path, file);
 end
 
-% Validate file exists
+filepath = char(filepath);
+
+% --- Directory: batch import ---
+if isfolder(filepath)
+    % Extract Pattern param if provided, otherwise auto-detect
+    patternIdx = find(strcmpi(varargin, 'Pattern'), 1);
+    if ~isempty(patternIdx) && patternIdx < numel(varargin)
+        pattern = varargin{patternIdx + 1};
+        passThrough = varargin([1:patternIdx-1, patternIdx+2:end]);
+    else
+        pattern = detectPattern(filepath);
+        passThrough = varargin;
+    end
+
+    data = pf2.import.importDirectory(filepath, pattern, passThrough{:});
+    return;
+end
+
+% --- Single file ---
 if ~exist(filepath, 'file')
     error('pf2:import:FileNotFound', 'File not found: %s', filepath);
 end
 
-% Get file extension
 [~, ~, ext] = fileparts(filepath);
 ext = lower(ext);
 
-% Route to appropriate importer based on extension
 switch ext
     case '.nir'
         data = pf2.import.importNIR(filepath);
-
     case '.snirf'
         data = pf2.import.importSNIRF(filepath);
-
     case '.csv'
         data = pf2.import.importHitachiMES(filepath);
-
     case {'.hdr', '.wl1', '.wl2'}
-        % NIRx files - use the header or wavelength file
         data = pf2.import.importNIRX(filepath);
-
     otherwise
         error('pf2:import:UnknownFormat', ...
             'Unknown file format: %s\nSupported formats: .nir, .snirf, .csv, .hdr, .wl1', ext);
 end
 
-% Display confirmation
 fprintf('Imported: %s\n', filepath);
 fprintf('  Format: %s\n', getFormatName(ext));
 fprintf('  Samples: %d\n', size(data.raw, 1));
@@ -93,6 +117,32 @@ fprintf('  Channels: %d\n', size(data.raw, 2));
 fprintf('  Duration: %.1f seconds\n', data.time(end) - data.time(1));
 
 end
+
+
+% =========================================================================
+% Local helper functions
+% =========================================================================
+
+function pattern = detectPattern(dirPath)
+% DETECTPATTERN Scan directory for supported fNIRS files and return a glob pattern
+%   Checks for each supported extension in priority order and returns the
+%   first pattern that has matching files.
+
+    extPriority = {'.snirf', '.nir', '.hdr', '.csv'};
+    for k = 1:numel(extPriority)
+        testPattern = ['*' extPriority{k}];
+        found = dir(fullfile(dirPath, '**', testPattern));
+        found = found(~[found.isdir]);
+        if ~isempty(found)
+            pattern = testPattern;
+            return;
+        end
+    end
+
+    error('pf2:import:NoSupportedFiles', ...
+        'No supported fNIRS files found in %s\nSupported: .snirf, .nir, .hdr, .csv', dirPath);
+end
+
 
 function name = getFormatName(ext)
 % Return human-readable format name

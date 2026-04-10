@@ -353,7 +353,7 @@ function fig = plotBar(groups, varargin)
     else
         tStr = bioM;
         if ~isempty(opts.TimeWindow)
-            tStr = sprintf('%s (%g-%gs)', tStr, opts.TimeWindow(1), opts.TimeWindow(2));
+            tStr = sprintf('%s (%g-%gs)', tStr, round(opts.TimeWindow(1), 4), round(opts.TimeWindow(2), 4));
         end
         pf2_base.external.suptitle(fig, tStr);
     end
