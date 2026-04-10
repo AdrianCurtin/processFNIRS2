@@ -53,43 +53,56 @@ sigAmp=0.05;
 temporalHeight=0.8;
 barchartHeight=0.6;
 
+% Dark mode color adaptation
+isDark = pf2_base.plot.PlotStyle.isDarkMode();
+if isDark
+    blockColor = [0.85 0.85 0.85];
+    plotColor = [0.4 0.6 1.0];
+    blColor = [1.0 0.4 0.4];
+    dimColor = [0.45 0.45 0.45];
+    blockDash = {'--', 'Color', blockColor, 'HandleVisibility', 'off'};
+    plotDash = {'--', 'Color', plotColor, 'HandleVisibility', 'off'};
+    blDash = {'--', 'Color', blColor, 'HandleVisibility', 'off'};
+else
+    blockColor = 'k';
+    plotColor = 'b';
+    blColor = 'r';
+    dimColor = [40,40,40]/255;
+    blockDash = {'--k', 'HandleVisibility', 'off'};
+    plotDash = {'--b', 'HandleVisibility', 'off'};
+    blDash = {'--r', 'HandleVisibility', 'off'};
+end
+
 yticks([sort([plotHeight,blHeight,blockHeight,temporalHeight,barchartHeight])]);
 
 
-plotHorizViewBar([blockStart,blockEnd],blockHeight,lineBarHeight,lineWeight,{'k'});
+plotHorizViewBar([blockStart,blockEnd],blockHeight,lineBarHeight,lineWeight,{'Color',blockColor});
 
 hold on;
 
-plotHorizViewBar([plotStart,plotEnd],plotHeight,lineBarHeight,lineWeight,{'b'});
+plotHorizViewBar([plotStart,plotEnd],plotHeight,lineBarHeight,lineWeight,{'Color',plotColor});
 if(blEnabled)
-    plotHorizViewBar([blStart,blEnd],blHeight,lineBarHeight,lineWeight,{'r'});
-    %text(mean([blStart,blEnd]),blHeight+0.05,'\downarrow Baseline Period');
+    plotHorizViewBar([blStart,blEnd],blHeight,lineBarHeight,lineWeight,{'Color',blColor});
 end
-
-%text(mean([plotStart,plotEnd]),plotHeight+0.05,'\downarrow Plot View');
-
-%text(mean([blockStart,blockEnd]),blockHeight+0.05,'\downarrow Task Block Period');
 
 ylim([0,1]);
 
-pf2_base.external.vline([ExFNIRS.settings.block_start,ExFNIRS.settings.block_end],{'--k','HandleVisibility','off'});
+pf2_base.external.vline([ExFNIRS.settings.block_start,ExFNIRS.settings.block_end],blockDash);
 
-
-pf2_base.external.vline([ExFNIRS.settings.plot_start,ExFNIRS.settings.plot_end],{'--b','HandleVisibility','off'});
+pf2_base.external.vline([ExFNIRS.settings.plot_start,ExFNIRS.settings.plot_end],plotDash);
 
 if(blEnabled)
-    pf2_base.external.vline([ExFNIRS.settings.baseline_start,ExFNIRS.settings.baseline_end],{'--r','HandleVisibility','off'});
-    
-end 
+    pf2_base.external.vline([ExFNIRS.settings.baseline_start,ExFNIRS.settings.baseline_end],blDash);
+end
 
 % Plot temporal signal
-plotPeriodicSample(minStart-grandavg_resample_size,maxEnd+grandavg_resample_size,blockStart,temporalHeight,sigAmp,grandavg_resample_size,sigWeight/4,{'Color',[40,40,40]/255});
+plotPeriodicSample(minStart-grandavg_resample_size,maxEnd+grandavg_resample_size,blockStart,temporalHeight,sigAmp,grandavg_resample_size,sigWeight/4,{'Color',dimColor});
 
 plotPeriodicSample(plotStart,plotEnd,blockStart,temporalHeight,sigAmp,grandavg_resample_size,sigWeight/2,{'Color',[50,200,78]/255});
 
 
 % Plot barchart/block signal
-plotPeriodicSample(minStart-blk_resample_size,maxEnd+blk_resample_size,blockStart,barchartHeight,sigAmp,blk_resample_size,sigWeight/4,{'lineStyle','--','Color',[40,40,40]/255});
+plotPeriodicSample(minStart-blk_resample_size,maxEnd+blk_resample_size,blockStart,barchartHeight,sigAmp,blk_resample_size,sigWeight/4,{'lineStyle','--','Color',dimColor});
 plotPeriodicSample(plotStart,plotEnd,blockStart,barchartHeight,sigAmp,blk_resample_size,sigWeight,{'Color',[150,30,178]/255});
 
 
@@ -104,7 +117,11 @@ xlabel('Time (s)');
 
 [ytickVals,srtIdx]=sort([plotHeight,blHeight,blockHeight,temporalHeight,barchartHeight]);
 yticks(ytickVals);
-ytLabels={'Plot View','Baseline Period','Task Block Period','Temporal Resample','Barchart Resample'};
+ytLabels={sprintf('Plot View [%.1f–%.1fs]', plotStart, plotEnd), ...
+    sprintf('Baseline [%.1f–%.1fs]', blStart, blEnd), ...
+    sprintf('Task Block [%.1f–%.1fs]', blockStart, blockEnd), ...
+    sprintf('Temporal (%.2fs, %.1fHz)', grandavg_resample_size, 1/grandavg_resample_size), ...
+    sprintf('Barchart (%.2fs)', blk_resample_size)};
 yticklabels(ytLabels(srtIdx));
 
 end
