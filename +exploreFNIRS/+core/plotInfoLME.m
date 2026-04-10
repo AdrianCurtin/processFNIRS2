@@ -78,6 +78,7 @@ function [fig, results] = plotInfoLME(dataTable, infoVar, groupByVars, varargin)
     addParameter(p, 'SaveWidth', 600, @isnumeric);
     addParameter(p, 'SaveHeight', 400, @isnumeric);
     addParameter(p, 'SaveDPI', 150, @isnumeric);
+    addParameter(p, 'Colors', [], @(x) true);  % Accepted for API consistency, unused
     parse(p, dataTable, infoVar, groupByVars, varargin{:});
     opts = p.Results;
 

@@ -1231,9 +1231,9 @@ classdef Experiment < handle
                     'EdgeColor', 'k', 'LineWidth', 2);
             end
             lg = legend(ax, lh, groupLabels, 'Location', 'best');
-            lg.TextColor = 'k';
-            lg.Color = 'w';
-            lg.EdgeColor = [0.5 0.5 0.5];
+            lg.TextColor = sty.LegendTextColor;
+            lg.Color = sty.LegendBgColor;
+            lg.EdgeColor = sty.LegendEdgeColor;
 
             % N labels
             for g = 1:nGroups

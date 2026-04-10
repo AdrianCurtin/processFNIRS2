@@ -53,6 +53,7 @@ function fig = plotTopo(groups, varargin)
     addParameter(p, 'SaveWidth', 600, @isnumeric);
     addParameter(p, 'SaveHeight', 500, @isnumeric);
     addParameter(p, 'SaveDPI', 150, @isnumeric);
+    addParameter(p, 'Colors', [], @(x) true);  % Accepted for API consistency, unused (topo uses Colormap)
     parse(p, groups, varargin{:});
     opts = p.Results;
 

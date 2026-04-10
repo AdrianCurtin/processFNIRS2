@@ -116,6 +116,7 @@ function [fig, results] = plotTopoLME(groups, groupByVars, varargin)
     addParameter(p, 'SaveHeight', 500, @isnumeric);
     addParameter(p, 'SaveDPI', 150, @isnumeric);
     addParameter(p, 'Colormap', '', @(v) ischar(v) || isnumeric(v));
+    addParameter(p, 'Colors', [], @(x) true);  % Accepted for API consistency, unused
     parse(p, groups, groupByVars, varargin{:});
     opts = p.Results;
 

@@ -262,7 +262,7 @@ if(blLength>0) % if baseline is present
 
             blRejectedCount_roi=sum(~blNanCheck_roi);
             if(blRejectedCount_roi>1)
-                warning('ROI Baseline Period in %i channels was invalid',blRejectedCount_roi); 
+                warning('pf2:resample:invalidBaseline', 'ROI Baseline Period in %i channels was invalid',blRejectedCount_roi);
             end
             validCh_roi=find(blNanCheck_roi==1);
             
