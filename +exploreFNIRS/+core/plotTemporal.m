@@ -539,11 +539,13 @@ function drawVLines(allAxes, vlines)
             lbl = {};
         end
 
+        hasLabel = ~isempty(lbl);
         lineArgs = {'Color', clr, 'LineStyle', sty, 'LineWidth', 1};
 
         for ai = 1:numel(allAxes)
             ax = allAxes(ai);
-            pf2_base.external.vline(ax, xPos, lineArgs, lbl);
+            pf2_base.external.vline(ax, xPos, lineArgs, lbl, ...
+                'handleVisibility', hasLabel);
         end
     end
 end

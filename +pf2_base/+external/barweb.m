@@ -147,6 +147,8 @@ useKSD=true;
 
 if(plotData||plotViolin)
     [jSz,kSz]=size(data_points);
+    warnState = warning('off', 'HISTOGRAM:notEnoughDataPoints');
+    warnCleanup = onCleanup(@() warning(warnState));
     for j=1:jSz
         for k=1:kSz
             pdata=data_points{j,k};

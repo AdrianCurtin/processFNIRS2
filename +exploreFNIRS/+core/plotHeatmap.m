@@ -53,6 +53,7 @@ function fig = plotHeatmap(groups, varargin)
     addParameter(p, 'SaveWidth', 800, @isnumeric);
     addParameter(p, 'SaveHeight', 500, @isnumeric);
     addParameter(p, 'SaveDPI', 150, @isnumeric);
+    addParameter(p, 'Colors', [], @(x) true);  % Accepted for API consistency, unused (heatmaps use Colormap)
     parse(p, groups, varargin{:});
     opts = p.Results;
 

@@ -404,9 +404,9 @@ function [fig, stats] = plotScatter(groups, varargin)
                         legendLabels = arrayfun(@(g) groups(g).label, ...
                             1:nGroups, 'UniformOutput', false);
                         lg = legend(ax, legendLabels, 'Location', 'best', 'FontSize', 8);
-                        lg.TextColor = 'k';
-                        lg.Color = 'w';
-                        lg.EdgeColor = [0.5 0.5 0.5];
+                        lg.TextColor = sty.LegendTextColor;
+                        lg.Color = sty.LegendBgColor;
+                        lg.EdgeColor = sty.LegendEdgeColor;
                     end
 
                     grid(ax, 'on');
