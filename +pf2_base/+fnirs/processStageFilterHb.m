@@ -144,7 +144,7 @@ validChannels_roi = [];
 curftimeMask_roi = [];
 funcOutput_roi = {};
 
-if(pf2_base.isnestedfield(data,'ROI.HbO')&&~isempty(data.ROI.HbO))
+if isfield(data,'ROI') && isstruct(data.ROI) && isfield(data.ROI,'HbO') && ~isempty(data.ROI.HbO)
     validChannels_roi=true(1,size(data.ROI.('HbO'),2));
     curftimeMask_roi=true(size(data.ROI.('HbO')));
 end
@@ -168,7 +168,7 @@ if(~isfield(method,'F'))
     %outData.HbR(:,validChannels)=medfilt1(outData.HbR(:,validChannels),25);
 else
     outData=data;
-    hasROI = pf2_base.isnestedfield(data,'ROI.HbO');
+    hasROI = isfield(data,'ROI') && isstruct(data.ROI) && isfield(data.ROI,'HbO');
 
     for i=1:length(method.F)
         pf=method.F{i};
@@ -308,14 +308,14 @@ else
             end
 
             data=outData;
-            hasROI = pf2_base.isnestedfield(data,'ROI.HbO');
+            hasROI = isfield(data,'ROI') && isstruct(data.ROI) && isfield(data.ROI,'HbO');
         else
             warning('Unable to identify NIRS input argument\n');
         end
     end
 end
 
-if(pf2_base.isnestedfield(outData,'ROI.info')&&~isempty(outData.ROI.info)&&~isfield(outData.ROI,'HbO'))
+if isfield(outData,'ROI') && isstruct(outData.ROI) && isfield(outData.ROI,'info') && ~isempty(outData.ROI.info) && ~isfield(outData.ROI,'HbO')
     warning('pf2:processStageFilterHb:noROIBuildStep', ...
         'No ROI build step was specified. Defaulting to nanmean of valid channels.');
     outData=pf2_build_nanmean_ROI(outData);
@@ -327,6 +327,9 @@ if(pf2_base.isnestedfield(outData,'ROI.info')&&~isempty(outData.ROI.info)&&~isfi
     end
 end
 
+
+% Check ROI state once for the final NaN-setting loop
+hasROI_final = isfield(outData,'ROI') && isstruct(outData.ROI) && isfield(outData.ROI,'HbO');
 
 invalidChannels=false(size(data.channels));
 
@@ -340,7 +343,7 @@ for bioM=1:length(bioM_list) % go through each biomarker and set invalid cahnnel
     
     outData.(bioM_list{bioM})(~curftimeMask)=nan;
     
-    if(pf2_base.isnestedfield(outData,'ROI.HbO') && ~isempty(validChannels_roi))
+    if hasROI_final && ~isempty(validChannels_roi)
         outData.ROI.(bioM_list{bioM})(:,~validChannels_roi)=nan;
         if ~isempty(curftimeMask_roi)
             outData.ROI.(bioM_list{bioM})(~curftimeMask_roi)=nan;

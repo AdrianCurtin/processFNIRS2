@@ -46,14 +46,16 @@ else
 
     fieldParts=strsplit(nestedFieldString,'.');
     for i=1:length(fieldParts)
-        
+
         curPartName=fieldParts{i};
         if(isnumeric(var)||isstring(var)||islogical(var))%gone too deep or too shallow
             isvalidfield=false;
+        elseif(isstruct(var))
+            isvalidfield=isfield(var,curPartName);
         elseif(istable(var))
             isvalidfield=ismember(curPartName,var.Properties.VariableNames);
         else
-            isvalidfield=isfield(var,curPartName)|(~istable(var)&isprop(var,curPartName));
+            isvalidfield=isfield(var,curPartName)||isprop(var,curPartName);
         end
         
         

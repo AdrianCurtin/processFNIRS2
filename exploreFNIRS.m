@@ -89,6 +89,11 @@ guidata(hObject, handles);
 
 pf2_base.applyLightTheme(hObject);
 
+% Add File menu with Import options
+mFile = uimenu(hObject, 'Label', 'File');
+uimenu(mFile, 'Label', 'Import File...', 'Callback', @(s,e) menu_import_file_Callback(handles));
+uimenu(mFile, 'Label', 'Import Directory...', 'Callback', @(s,e) menu_import_dir_Callback(handles));
+
 initialize_gui(hObject, handles, false);
 
 global ExFNIRS
@@ -307,6 +312,32 @@ initializeGUIvalues(handles);
 % UIWAIT makes exploreFNIRS wait for user response (see UIRESUME)
 % uiwait(handles.figure1);
 
+
+function menu_import_file_Callback(handles)
+% Import a single fNIRS file and open a new exploreFNIRS instance
+try
+    data = pf2.import.import();
+catch ME
+    errordlg(ME.message, 'Import Error');
+    return;
+end
+if isempty(data), return; end
+if isstruct(data), data = {data}; end
+exploreFNIRS(data);
+
+function menu_import_dir_Callback(handles)
+% Import a directory of fNIRS files and open a new exploreFNIRS instance
+dirPath = uigetdir('', 'Select fNIRS Data Directory');
+if isequal(dirPath, 0), return; end
+try
+    data = pf2.import.import(dirPath);
+catch ME
+    errordlg(ME.message, 'Import Error');
+    return;
+end
+if isempty(data), return; end
+if isstruct(data), data = {data}; end
+exploreFNIRS(data);
 
 function PopulateGUIfields(dataTable,handles)
 
@@ -1255,95 +1286,175 @@ function preprocessFNIRSData()
 global ExFNIRS
 if(ExFNIRS.UpdateNeeded==2||~isfield(ExFNIRS,'curPreprocessedFNIR'))
     exploreFNIRS.plotExTimeline();
-    %pf2_base.closeProgressHandles();
 
-     numSegs2Process=size(ExFNIRS.curProcessedData,1);
+    numSegs = size(ExFNIRS.curProcessedData, 1);
+    fprintf('ExploreFNIRS - Resampling and baselining %d segments\n', numSegs);
 
-    fprintf('ExploreFNIRS - Resampling and baselining fNIRS\n');
-    %hF=ProgressHandles.h.hF;
+    fNIR = ExFNIRS.curProcessedData;
+    baseline = cell(size(fNIR));
+    gbyFNIRS = fNIR;
+    gbyFNIRS_blk = cell(size(fNIR));
 
-   
-    ExFNIRS.curPreprocessedFNIR=[];
-    ExFNIRS.curPreprocessedFNIR.fNIR=ExFNIRS.curProcessedData;
-    ExFNIRS.curPreprocessedFNIR.baseline=cell(size(ExFNIRS.curProcessedData));
-    ExFNIRS.curPreprocessedFNIR.gbyFNIRS=ExFNIRS.curProcessedData;
-    ExFNIRS.curPreprocessedFNIR.gbyFNIRS_blk=cell(size(ExFNIRS.curProcessedData));
+    useBL    = ExFNIRS.settings.use_baseline;
+    blStart  = ExFNIRS.settings.baseline_start;
+    blEnd    = ExFNIRS.settings.baseline_end;
+    barRS    = ExFNIRS.settings.barchart_resample_size;
+    gaRS     = ExFNIRS.settings.grandavg_resample_size;
+    blkStart = ExFNIRS.settings.block_start;
 
-    for i=1:numSegs2Process
+    [canPar, poolOn] = pf2_base.accel.canParfor();
+    useParfor = canPar && poolOn && numSegs > 2;
 
-       fprintf('Resampling and baselining fNIRS %i of %i\n',i,numSegs2Process);
-       
-       if(ExFNIRS.settings.use_baseline)
-            ExFNIRS.curPreprocessedFNIR.baseline{i}=pf2.data.split(ExFNIRS.curPreprocessedFNIR.fNIR{i},ExFNIRS.settings.baseline_start,ExFNIRS.settings.baseline_end); %baselining is handled in processing section
-            ExFNIRS.curPreprocessedFNIR.gbyFNIRS_blk{i}=pf2.data.resample(ExFNIRS.curPreprocessedFNIR.gbyFNIRS{i}, ExFNIRS.settings.barchart_resample_size,'centerOnTime',ExFNIRS.settings.block_start,'timeOutMode','start','blfNIR',ExFNIRS.curPreprocessedFNIR.baseline{i},'averageAux',true,'flattenAux',true,'trimAux',false);
-            
-            ExFNIRS.curPreprocessedFNIR.gbyFNIRS{i}=pf2.data.resample(ExFNIRS.curPreprocessedFNIR.gbyFNIRS{i}, ExFNIRS.settings.grandavg_resample_size,'centerOnTime',ExFNIRS.settings.block_start,'timeOutMode','start','blfNIR',ExFNIRS.curPreprocessedFNIR.baseline{i},'averageAux',true,'flattenAux',true,'trimAux',false);
-            ExFNIRS.curPreprocessedFNIR.gbyFNIRS{i}.time=ExFNIRS.curPreprocessedFNIR.gbyFNIRS{i}.time+ExFNIRS.settings.block_start; %change time so that 0 is start of block
-       else
-            ExFNIRS.curPreprocessedFNIR.baseline{i}=[];
-            ExFNIRS.curPreprocessedFNIR.gbyFNIRS_blk{i}=pf2.data.resample(ExFNIRS.curPreprocessedFNIR.gbyFNIRS{i}, ExFNIRS.settings.barchart_resample_size,'centerOnTime',ExFNIRS.settings.block_start,'timeOutMode','start','averageAux',true,'flattenAux',true,'trimAux',false);
-            
-            ExFNIRS.curPreprocessedFNIR.gbyFNIRS{i}=pf2.data.resample(ExFNIRS.curPreprocessedFNIR.gbyFNIRS{i}, ExFNIRS.settings.grandavg_resample_size,'centerOnTime',ExFNIRS.settings.block_start,'timeOutMode','start','averageAux',true,'flattenAux',true,'trimAux',false);
-       end
+    if useParfor
+        parfor i = 1:numSegs
+            if useBL
+                bl = pf2.data.split(fNIR{i}, blStart, blEnd);
+                baseline{i} = bl;
+                gbyFNIRS_blk{i} = pf2.data.resample(fNIR{i}, barRS, ...
+                    'centerOnTime', blkStart, 'timeOutMode', 'start', ...
+                    'blfNIR', bl, 'averageAux', true, 'flattenAux', true, 'trimAux', false);
+                rs = pf2.data.resample(fNIR{i}, gaRS, ...
+                    'centerOnTime', blkStart, 'timeOutMode', 'start', ...
+                    'blfNIR', bl, 'averageAux', true, 'flattenAux', true, 'trimAux', false);
+                rs.time = rs.time + blkStart;
+                gbyFNIRS{i} = rs;
+            else
+                baseline{i} = [];
+                gbyFNIRS_blk{i} = pf2.data.resample(fNIR{i}, barRS, ...
+                    'centerOnTime', blkStart, 'timeOutMode', 'start', ...
+                    'averageAux', true, 'flattenAux', true, 'trimAux', false);
+                gbyFNIRS{i} = pf2.data.resample(fNIR{i}, gaRS, ...
+                    'centerOnTime', blkStart, 'timeOutMode', 'start', ...
+                    'averageAux', true, 'flattenAux', true, 'trimAux', false);
+            end
+        end
+    else
+        for i = 1:numSegs
+            fprintf('Resampling and baselining fNIRS %i of %i\n', i, numSegs);
+            if useBL
+                bl = pf2.data.split(fNIR{i}, blStart, blEnd);
+                baseline{i} = bl;
+                gbyFNIRS_blk{i} = pf2.data.resample(fNIR{i}, barRS, ...
+                    'centerOnTime', blkStart, 'timeOutMode', 'start', ...
+                    'blfNIR', bl, 'averageAux', true, 'flattenAux', true, 'trimAux', false);
+                rs = pf2.data.resample(fNIR{i}, gaRS, ...
+                    'centerOnTime', blkStart, 'timeOutMode', 'start', ...
+                    'blfNIR', bl, 'averageAux', true, 'flattenAux', true, 'trimAux', false);
+                rs.time = rs.time + blkStart;
+                gbyFNIRS{i} = rs;
+            else
+                baseline{i} = [];
+                gbyFNIRS_blk{i} = pf2.data.resample(fNIR{i}, barRS, ...
+                    'centerOnTime', blkStart, 'timeOutMode', 'start', ...
+                    'averageAux', true, 'flattenAux', true, 'trimAux', false);
+                gbyFNIRS{i} = pf2.data.resample(fNIR{i}, gaRS, ...
+                    'centerOnTime', blkStart, 'timeOutMode', 'start', ...
+                    'averageAux', true, 'flattenAux', true, 'trimAux', false);
+            end
+        end
     end
 
-    ExFNIRS.UpdateNeeded=true; % mark that data was preprocesed, but not averaged into groups
-else
+    ExFNIRS.curPreprocessedFNIR = struct();
+    ExFNIRS.curPreprocessedFNIR.fNIR = fNIR;
+    ExFNIRS.curPreprocessedFNIR.baseline = baseline;
+    ExFNIRS.curPreprocessedFNIR.gbyFNIRS = gbyFNIRS;
+    ExFNIRS.curPreprocessedFNIR.gbyFNIRS_blk = gbyFNIRS_blk;
 
-    ExFNIRS.UpdateNeeded=true; % mark that data was preprocesed, but not averaged into groups
+    ExFNIRS.UpdateNeeded = true; % mark that data was preprocessed, but not averaged into groups
+else
+    ExFNIRS.UpdateNeeded = true;
 end
 
 function processSelectedTable(handles,sellFullIdx,gbyIdx)
 global ExFNIRS
 pf2_base.closeProgressHandles();
 
-
 fprintf('ExploreFNIRS - Processing Groups\n');
-%hF=ProgressHandles.h.hF;
 
-numSegs2Process=size(ExFNIRS.selectedTable,1);
+numSegs = size(ExFNIRS.selectedTable, 1);
+numGroups = max(gbyIdx);
 
-ExFNIRS.gbyFlat=[];
-ExFNIRS.gbyFlat.fNIR=ExFNIRS.curPreprocessedFNIR.fNIR(sellFullIdx,:);
-ExFNIRS.gbyFlat.baseline=ExFNIRS.curPreprocessedFNIR.baseline(sellFullIdx,:);
-ExFNIRS.gbyFlat.gbyFNIRS=ExFNIRS.curPreprocessedFNIR.gbyFNIRS(sellFullIdx,:);
-ExFNIRS.gbyFlat.gbyFNIRS_blk=ExFNIRS.curPreprocessedFNIR.gbyFNIRS_blk(sellFullIdx,:);
-ExFNIRS.gbyFlat.gbyIndex=gbyIdx;
+ExFNIRS.gbyFlat = struct();
+ExFNIRS.gbyFlat.fNIR = ExFNIRS.curPreprocessedFNIR.fNIR(sellFullIdx,:);
+ExFNIRS.gbyFlat.baseline = ExFNIRS.curPreprocessedFNIR.baseline(sellFullIdx,:);
+ExFNIRS.gbyFlat.gbyFNIRS = ExFNIRS.curPreprocessedFNIR.gbyFNIRS(sellFullIdx,:);
+ExFNIRS.gbyFlat.gbyFNIRS_blk = ExFNIRS.curPreprocessedFNIR.gbyFNIRS_blk(sellFullIdx,:);
+ExFNIRS.gbyFlat.gbyIndex = gbyIdx;
 
+% Set the mode label once (not per-group)
+avgMode = ExFNIRS.settings.within_sub_avg_mode;
+if avgMode == 1
+    ExFNIRS.settings.within_sub_avg_mode_label = 'None';
+elseif avgMode == 2
+    ExFNIRS.settings.within_sub_avg_mode_label = 'Flat';
+elseif avgMode == 3
+    ExFNIRS.settings.within_sub_avg_mode_label = 'Hierarchy';
+end
 
-for i=1:max(gbyIdx)
-    fprintf('Processing Group %i of %i\n',i,max(gbyIdx));
-    
-    ExFNIRS.gby(i).gbyTables=ExFNIRS.selectedTable(gbyIdx==i,:); 
-    ExFNIRS.gby(i).gbyFNIRS=ExFNIRS.gbyFlat.gbyFNIRS(gbyIdx==i,:);
-    ExFNIRS.gby(i).gbyFNIRS_blk=ExFNIRS.gbyFlat.gbyFNIRS_blk(gbyIdx==i,:);
-    
-    missingFNIRSIdx=ExFNIRS.gby(i).gbyTables.missingFNIRS==1;
-    
-    if(ExFNIRS.settings.within_sub_avg_mode==1)
-       hArg=[]; 
-       ExFNIRS.settings.within_sub_avg_mode_label='None';
-    elseif(ExFNIRS.settings.within_sub_avg_mode==2)
-        hArg=ExFNIRS.gby(i).gbyTables(~missingFNIRSIdx,'SubjectID');
-        ExFNIRS.settings.within_sub_avg_mode_label='Flat';
-    elseif(ExFNIRS.settings.within_sub_avg_mode==3)
-        hArg=ExFNIRS.gby(i).gbyTables(~missingFNIRSIdx,ExFNIRS.dataHierarchy);
-        ExFNIRS.settings.within_sub_avg_mode_label='Hierarchy';
+% Pre-extract per-group data into locals (can't index globals inside parfor)
+grpTables    = cell(1, numGroups);
+grpFNIRS     = cell(1, numGroups);
+grpFNIRS_blk = cell(1, numGroups);
+grpHArg      = cell(1, numGroups);
+grpFlatArg   = cell(1, numGroups);
+barRS        = ExFNIRS.settings.barchart_resample_size;
+dataHierarchy = ExFNIRS.dataHierarchy;
+
+for i = 1:numGroups
+    grpTables{i}    = ExFNIRS.selectedTable(gbyIdx==i,:);
+    grpFNIRS{i}     = ExFNIRS.gbyFlat.gbyFNIRS(gbyIdx==i,:);
+    grpFNIRS_blk{i} = ExFNIRS.gbyFlat.gbyFNIRS_blk(gbyIdx==i,:);
+
+    missMask = grpTables{i}.missingFNIRS == 1;
+
+    if avgMode == 1
+        grpHArg{i} = [];
+    elseif avgMode == 2
+        grpHArg{i} = grpTables{i}(~missMask, 'SubjectID');
+    elseif avgMode == 3
+        grpHArg{i} = grpTables{i}(~missMask, dataHierarchy);
     end
-    
-    ExFNIRS.gby(i).gbyGrand=grandAvgFNIRS(ExFNIRS.gby(i).gbyFNIRS(~missingFNIRSIdx),false,[],false,hArg,false,true);
-    ExFNIRS.gby(i).gbyGrandBar=grandAvgFNIRS(ExFNIRS.gby(i).gbyFNIRS_blk(~missingFNIRSIdx),false, ExFNIRS.settings.barchart_resample_size,false,hArg,false,true);
-    ExFNIRS.gby(i).gbyGrandBarFlat=grandAvgFNIRS(ExFNIRS.gby(i).gbyFNIRS_blk(~missingFNIRSIdx),false, ExFNIRS.settings.barchart_resample_size,false,ExFNIRS.gby(i).gbyTables(~missingFNIRSIdx,'SubjectID'),false,true);
-    try
-        close(eHf);
-    catch
+    grpFlatArg{i} = grpTables{i}(~missMask, 'SubjectID');
+end
+
+% Grand averaging (parallel when pool available)
+gbyGrand        = cell(1, numGroups);
+gbyGrandBar     = cell(1, numGroups);
+gbyGrandBarFlat = cell(1, numGroups);
+
+[canPar, poolOn] = pf2_base.accel.canParfor();
+useParfor = canPar && poolOn && numGroups > 1;
+
+if useParfor
+    parfor i = 1:numGroups
+        missMask = grpTables{i}.missingFNIRS == 1;
+        gbyGrand{i}        = grandAvgFNIRS(grpFNIRS{i}(~missMask), false, [], false, grpHArg{i}, false, true);
+        gbyGrandBar{i}     = grandAvgFNIRS(grpFNIRS_blk{i}(~missMask), false, barRS, false, grpHArg{i}, false, true);
+        gbyGrandBarFlat{i} = grandAvgFNIRS(grpFNIRS_blk{i}(~missMask), false, barRS, false, grpFlatArg{i}, false, true);
+    end
+else
+    for i = 1:numGroups
+        fprintf('Processing Group %i of %i\n', i, numGroups);
+        missMask = grpTables{i}.missingFNIRS == 1;
+        gbyGrand{i}        = grandAvgFNIRS(grpFNIRS{i}(~missMask), false, [], false, grpHArg{i}, false, true);
+        gbyGrandBar{i}     = grandAvgFNIRS(grpFNIRS_blk{i}(~missMask), false, barRS, false, grpHArg{i}, false, true);
+        gbyGrandBarFlat{i} = grandAvgFNIRS(grpFNIRS_blk{i}(~missMask), false, barRS, false, grpFlatArg{i}, false, true);
     end
 end
 
-set(handles.text_status,'String',sprintf('%i Segments in\n%i Group(s)',numSegs2Process,max(gbyIdx)));
+% Write back to ExFNIRS.gby
+for i = 1:numGroups
+    ExFNIRS.gby(i).gbyTables      = grpTables{i};
+    ExFNIRS.gby(i).gbyFNIRS       = grpFNIRS{i};
+    ExFNIRS.gby(i).gbyFNIRS_blk   = grpFNIRS_blk{i};
+    ExFNIRS.gby(i).gbyGrand       = gbyGrand{i};
+    ExFNIRS.gby(i).gbyGrandBar    = gbyGrandBar{i};
+    ExFNIRS.gby(i).gbyGrandBarFlat = gbyGrandBarFlat{i};
+end
 
+set(handles.text_status, 'String', sprintf('%i Segments in\n%i Group(s)', numSegs, numGroups));
 
-flagForUpdate(false,handles);
+flagForUpdate(false, handles);
 
 
 function updateInfoGroupByVars(handles)
@@ -2235,6 +2346,10 @@ if(isfield(ExFNIRS,'UpdateNeeded')&&ExFNIRS.UpdateNeeded==4)
     ExFNIRS.UpdateNeeded=3;
 end
 
+% Create Experiment object for settings persistence and CLI round-trip
+ExFNIRS.experiment = exploreFNIRS.core.Experiment(ExFNIRS.data);
+syncSettingsToExperiment();
+
 if(ExFNIRS.settings.updateOnChange)
     updateSelectedTable(handles);
 else
@@ -2245,8 +2360,23 @@ end
 
 
 
+function syncSettingsToExperiment()
+% Sync current ExFNIRS.settings into the Experiment object
+global ExFNIRS
+if ~isfield(ExFNIRS, 'experiment'), return; end
+ex = ExFNIRS.experiment;
+s = ExFNIRS.settings;
 
-
+ex.settings.baseline = [s.baseline_start, s.baseline_end];
+ex.settings.useBaseline = s.use_baseline;
+ex.settings.resampleRate = s.grandavg_resample_size;
+ex.settings.barBinSize = s.barchart_resample_size;
+ex.settings.taskStart = s.block_start;
+modes = {'none', 'flat', 'hierarchy'};
+if s.within_sub_avg_mode >= 1 && s.within_sub_avg_mode <= 3
+    ex.settings.avgMode = modes{s.within_sub_avg_mode};
+end
+ExFNIRS.experiment = ex;
 
 % --- Executes on button press in checkbox_plot_all_data.
 function checkbox_plot_all_data_Callback(hObject, eventdata, handles)

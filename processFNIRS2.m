@@ -591,7 +591,7 @@ if(~isempty(data))
         if(outputData.ProcessOxy)
             fData.stage{4}=pf2_base.fnirs.processStageOD2Hb(fData.stage{3},fData.time,fData.info.Age,outputData.DirtyBaseline,curProbe,ctxBaseline,ctxDPF_mode,ctxDPF_fixed,ctxDPF_age); % Beer-Lambert conversion
         end
-        if(pf2_base.isnestedfield(fData,'ROI.info'))
+        if isfield(fData,'ROI') && isstruct(fData.ROI) && isfield(fData.ROI,'info')
             fData.stage{4}.ROI.info=fData.ROI.info; %Regenerate from info
         end
     else
@@ -600,7 +600,7 @@ if(~isempty(data))
            fData.stage{4}.channels=curProbe.ChannelList;
            warning('No channel information given, assuming all columns indexs correspond with channel numbers');
         end
-        if(pf2_base.isnestedfield(fData,'ROI.info'))
+        if isfield(fData,'ROI') && isstruct(fData.ROI) && isfield(fData.ROI,'info')
             fData.stage{4}.ROI=fData.ROI; % Use All ROI information provided
         end
     end

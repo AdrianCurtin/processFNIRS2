@@ -186,7 +186,7 @@ end
 
 numSegs=length(timeSeries);
 
-if(pf2_base.isnestedfield(fNIR,'ROI.HbR')&&~isempty(fNIR.ROI.HbR))
+if isfield(fNIR,'ROI') && isstruct(fNIR.ROI) && isfield(fNIR.ROI,'HbR') && ~isempty(fNIR.ROI.HbR)
     calcROI=true;
     numROI=size(fNIR.ROI.HbR,2);
 else
@@ -244,7 +244,7 @@ if(blLength>0) % if baseline is present
 
         if(calcROI)
 
-            if(pf2_base.isnestedfield(blfNIR,strcat('ROI.',+curB)))
+            if isfield(blfNIR,'ROI') && isstruct(blfNIR.ROI) && isfield(blfNIR.ROI, curB)
                 fB=blfNIR.ROI.(curB);
             else
                 warning('ROI mismatch: ROI is not defined in baseline file');
@@ -442,7 +442,7 @@ if(isfield(fNIR,'Aux')&&~isempty(fNIR.Aux)&&length(fields(fNIR.Aux))>1)
      
                 if(istable(curVar))
                     curTableVarNames=curVar.Properties.VariableNames;
-                    cur_time_ind=find(~isempty(intersect(validTimeFields,curTableVarNames)));
+                    cur_time_ind=find(ismember(validTimeFields,curTableVarNames),1);
                     t2trim=curVar{:,cur_time_ind};
                     minftime=times_start(1);
                     maxftime=times_end(end);
@@ -550,7 +550,7 @@ function [outAuxStruct] = recursiveAuxResample(aux_in,flattenAux,segLength,cente
 
     validTimeFields={'time','t','Time'};
 
-    cur_time_ind=find(~isempty(intersect(validTimeFields,auxFields)));
+    cur_time_ind=find(ismember(validTimeFields,auxFields),1);
 
     if(isempty(cur_time_ind))
         local_time=[];
@@ -699,9 +699,8 @@ function [outAuxStruct] = recursiveAuxResample(aux_in,flattenAux,segLength,cente
                             newVarNames{nV}=sprintf('val%i',nV);
                         end
                     end
-                    outAuxStruct.(curFieldName)=table(t_aux_resample,'VariableNames',{'time'});
-                    auxDat_rsTable=array2table(auxDat_resample,'VariableNames',newVarNames);
-                    outAuxStruct.(curFieldName)=[outAuxStruct.(curFieldName),auxDat_rsTable];
+                    outAuxStruct.(curFieldName)=array2table([t_aux_resample, auxDat_resample], ...
+                        'VariableNames', [{'time'}, newVarNames(:)']);
                 end
             else
                 outAuxStruct.(curFieldName)=auxDat_resample;
@@ -911,7 +910,7 @@ function [outAuxStruct] = recursiveAuxFlatten(aux_in,nir_time,parent_time_in)
 
     validTimeFields={'time','t','Time'};
 
-    cur_time_ind=find(~isempty(intersect(validTimeFields,auxFields)));
+    cur_time_ind=find(ismember(validTimeFields,auxFields),1);
 
     if(isempty(cur_time_ind))
         local_time=[];
@@ -1183,27 +1182,29 @@ function [rsData] = resample_internal(rsData_in,fTimeInd,numCh,numSegs,nanReject
     
     nTime=length(fTimeInd);
     fTimeInd_numCh=repmat(fTimeInd,[numCh,1]);
-    fTimeInd_numCh=fTimeInd_numCh+numSegs*repelem([0:numCh-1]',nTime,1);
+    fTimeInd_numCh=fTimeInd_numCh+numSegs*repelem((0:numCh-1)',nTime,1);
+
+    flat = rsData_in(:);
+    nanMask = isnan(flat);
+    sz = [numCh * numSegs, 1];
 
 try
-    fB_isNA=accumarray(fTimeInd_numCh,isnan(rsData_in(:)));
+    fB_isNA=accumarray(fTimeInd_numCh, double(nanMask), sz);
 catch
     rsData=[];
     return;
 end
-    fB_count=accumarray(fTimeInd_numCh,ones(size(fTimeInd_numCh)));
-
-    % Check edge case where last sample does not include last index, pad
-    % with 0s
-    diffCheck=(numCh*numSegs)-length(fB_isNA);
-    if(diffCheck>0)
-        fB_isNA=[fB_isNA;zeros([diffCheck,1])];
-        fB_count=[fB_count;zeros([diffCheck,1])];
-    end
+    fB_count=accumarray(fTimeInd_numCh, ones(size(fTimeInd_numCh)), sz);
 
     fB_nanCheck= reshape(fB_isNA./fB_count,[numCh,numSegs])<=nanRejectionLevel;
 
-    rsData=reshape(accumarray(fTimeInd_numCh,rsData_in(:),[numCh*numSegs',1],@(x)nanmean(x)),[numSegs,numCh]);
+    % Vectorized nanmean: sum non-NaN values, divide by valid count.
+    % Avoids 1-per-bin function calls to nanmean/mean/parseFlag.
+    flat(nanMask) = 0;
+    fB_sum = accumarray(fTimeInd_numCh, flat, sz);
+    fB_validCount = fB_count - fB_isNA;
+    fB_validCount(fB_validCount == 0) = NaN;
+    rsData = reshape(fB_sum ./ fB_validCount, [numSegs, numCh]);
 
     rsData(~fB_nanCheck)=NaN;
 

@@ -89,6 +89,14 @@ classdef Experiment < handle
         % Preserved order from select() for each variable
         % struct with field names = variable names, values = ordered cell arrays
         selectOrder_
+
+        % Per-segment preprocessing cache that survives reset()
+        % Cell array same size as obj.data; each element is [] or
+        % struct('pp', preprocessedSeg, 'bar', barSeg)
+        ppCache_
+
+        % ppKey string for which ppCache_ is valid
+        ppCacheKey_
     end
 
     properties (Dependent, SetAccess = private)
@@ -163,6 +171,8 @@ classdef Experiment < handle
             obj.groups = [];
             obj.isGrouped = false;
             obj.isAggregated = false;
+            obj.ppCache_ = cell(length(obj.data), 1);
+            obj.ppCacheKey_ = '';
         end
 
 
@@ -387,6 +397,7 @@ classdef Experiment < handle
 
             obj.groupByVars = vars;
             selData = obj.getSelectedData();
+            selIdx = find(obj.selectedIdx);  % original data indices
 
             [groupRows, ~, gbyIdx] = unique(selTable(:, vars), 'rows');
             nGroups = max(gbyIdx);
@@ -417,6 +428,7 @@ classdef Experiment < handle
                 mask = gbyIdx == g;
                 obj.groups(g).gbyTables = selTable(mask, :);
                 obj.groups(g).gbyFNIRS  = selData(mask);
+                obj.groups(g).dataIdx   = selIdx(mask);  % original indices into obj.data
                 obj.groups(g).gbyGrand  = [];
                 obj.groups(g).gbyGrandBarFlat = [];
                 obj.groups(g).gbyFNIRS_pp = {};
@@ -538,9 +550,16 @@ classdef Experiment < handle
             allBarBins  = nan(1, nGroups);
             skipGroup   = false(1, nGroups);
 
+            % Invalidate per-segment cache if preprocessing settings changed
+            if ~strcmp(ppKey, obj.ppCacheKey_)
+                obj.ppCache_ = cell(length(obj.data), 1);
+                obj.ppCacheKey_ = ppKey;
+            end
+
             for g = 1:nGroups
                 curData  = obj.groups(g).gbyFNIRS;
                 curTable = obj.groups(g).gbyTables;
+                dataIdx  = obj.groups(g).dataIdx;
 
                 % Skip empty groups
                 if isempty(curData)
@@ -570,28 +589,36 @@ classdef Experiment < handle
                         obj.groups(g).gbyFNIRS = curData;  % persist reprocessed data
                         obj.groups(g).cache.rawMethod = s.rawMethod;
                         obj.groups(g).cache.oxyMethod = s.oxyMethod;
-                        obj.groups(g).cache.ppKey = '';  % invalidate preprocessing cache
+                        % Invalidate per-segment cache for reprocessed segments
+                        for ri = 1:length(dataIdx)
+                            obj.ppCache_{dataIdx(ri)} = [];
+                        end
                         fprintf('  [%d] %s: reprocessed %d segments (raw=%s, oxy=%s)\n', ...
                             g, obj.groups(g).label, length(curData), s.rawMethod, s.oxyMethod);
                     end
                 end
 
-                % --- Preprocessing (cached) ---
-                hasCachedPP = isfield(obj.groups(g), 'cache') && ...
-                              ~isempty(obj.groups(g).cache) && ...
-                              isfield(obj.groups(g).cache, 'ppKey') && ...
-                              strcmp(obj.groups(g).cache.ppKey, ppKey) && ...
-                              ~isempty(obj.groups(g).cache.ppData);
+                % --- Preprocessing (cached per-segment) ---
+                allCached = all(~cellfun('isempty', obj.ppCache_(dataIdx)));
 
-                if hasCachedPP
-                    allPPData{g}  = obj.groups(g).cache.ppData;
-                    allBarData{g} = obj.groups(g).cache.barData;
-                    fprintf('  [%d] %s: using cached preprocessing\n', g, obj.groups(g).label);
+                if allCached
+                    ppData  = cell(size(curData));
+                    barData = cell(size(curData));
+                    for i = 1:length(curData)
+                        cached = obj.ppCache_{dataIdx(i)};
+                        ppData{i}  = cached.pp;
+                        barData{i} = cached.bar;
+                    end
+                    allPPData{g}  = ppData;
+                    allBarData{g} = barData;
+                    fprintf('  [%d] %s: using cached preprocessing (%d segments)\n', ...
+                        g, obj.groups(g).label, length(curData));
                 else
                     [allPPData{g}, allBarData{g}] = preprocessGroup(curData, s, doResample, doBaseline);
-                    obj.groups(g).cache.ppData  = allPPData{g};
-                    obj.groups(g).cache.barData = allBarData{g};
-                    obj.groups(g).cache.ppKey   = ppKey;
+                    % Store in per-segment cache
+                    for i = 1:length(curData)
+                        obj.ppCache_{dataIdx(i)} = struct('pp', allPPData{g}{i}, 'bar', allBarData{g}{i});
+                    end
                 end
 
                 % Build hierarchy args (cheap, needed for grandAvgFNIRS)

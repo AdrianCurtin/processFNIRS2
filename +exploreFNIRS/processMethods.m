@@ -80,23 +80,48 @@ if(~any(curRawMatchIdx&curOxyMatchIdx))
     %fprintf('ExploreFNIRS\nProcessing Method %s x %s %i of %i\n',rawMethodStr_label,oxyMethodStr_label,1,numData);
     %hF=ProgressHandles.h.hF;
     
-    for i=1:numData
-       fprintf('ExploreFNIRS - Processing Method %s x %s %i of %i\n',rawMethodStr_label,oxyMethodStr_label,i,numData);
-       
-       if(~isempty(data{i})&&length(data{i}.time)>1)
-           if(processOxyOnly)
-               if(isfield(data{i},'HbO'))
-                   data{i}=pf2.process.processOxy(data{i});
-               else
-                   warning('Data file for item %i has no Oxy Data, attempting to process with ''None''\n',i);
-                   data{i}=pf2(data{i});
-               end
-           else
-               data{i}=pf2(data{i});
-           end
-           data{i}=pf2.data.applyChannelMask(data{i});
-           data{i}=pf2.data.resample(data{i},ExFNIRS.settings.grandavg_resample_size,'centerOnT0',true,'timeOutMode','end','averageAux',false,'flattenAux',true);
-       end
+    % Filter out empty/invalid segments
+    validIdx = cellfun(@(d) ~isempty(d) && length(d.time) > 1, data);
+
+    if processOxyOnly
+        % Oxy-only: must loop (processOxy doesn't support cell arrays)
+        for i = find(validIdx)'
+            fprintf('ExploreFNIRS - Processing Method %s x %s %i of %i\n', rawMethodStr_label, oxyMethodStr_label, i, numData);
+            if isfield(data{i}, 'HbO')
+                data{i} = pf2.process.processOxy(data{i});
+            else
+                warning('Data file for item %i has no Oxy Data, attempting full processing', i);
+                data{i} = pf2(data{i});
+            end
+        end
+    else
+        % Full processing: use batch mode with parfor support
+        fprintf('ExploreFNIRS - Processing Method %s x %s (%d segments)\n', rawMethodStr_label, oxyMethodStr_label, sum(validIdx));
+        validData = data(validIdx);
+        validData = processFNIRS2(validData);
+        data(validIdx) = validData;
+    end
+
+    % Apply channel mask + resample (parallelizable)
+    rsSize = ExFNIRS.settings.grandavg_resample_size;
+    [canPar, poolOn] = pf2_base.accel.canParfor();
+    validIndices = find(validIdx);
+
+    if canPar && poolOn && numel(validIndices) > 2
+        parfor k = 1:numel(validIndices)
+            ii = validIndices(k);
+            d = data{ii};
+            d = pf2.data.applyChannelMask(d);
+            d = pf2.data.resample(d, rsSize, 'centerOnT0', true, ...
+                'timeOutMode', 'end', 'averageAux', false, 'flattenAux', true);
+            data{ii} = d;
+        end
+    else
+        for ii = validIndices'
+            data{ii} = pf2.data.applyChannelMask(data{ii});
+            data{ii} = pf2.data.resample(data{ii}, rsSize, 'centerOnT0', true, ...
+                'timeOutMode', 'end', 'averageAux', false, 'flattenAux', true);
+        end
     end
 
     
