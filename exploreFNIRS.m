@@ -176,6 +176,9 @@ if isa(inputData, 'exploreFNIRS.core.Experiment')
 
     if exS.barBinSize > 0
         ExFNIRS.settings.barchart_resample_size = exS.barBinSize;
+    else
+        % barBinSize=0 means full task window; derive from task duration
+        ExFNIRS.settings.barchart_resample_size = -1; % placeholder, resolved below
     end
     if exS.resampleRate > 0
         ExFNIRS.settings.grandavg_resample_size = exS.resampleRate;
@@ -202,7 +205,7 @@ end
 
 
 
-    
+
 
 
 if isempty(experimentSource)
@@ -215,10 +218,20 @@ if isempty(experimentSource)
     ExFNIRS.settings.barchart_resample_size=p.Results.barSegmentLength;
     ExFNIRS.settings.grandavg_resample_size=p.Results.resampleSize;
 else
-    % Derive block_end and plot bounds from data
-    firstSeg = ExFNIRS.data{1};
-    if isfield(firstSeg, 'time') && ~isempty(firstSeg.time)
-        ExFNIRS.settings.block_end = max(firstSeg.time);
+    % Use Experiment taskEnd if set, otherwise derive from data
+    exS = experimentSource.settings;
+    if isfinite(exS.taskEnd)
+        ExFNIRS.settings.block_end = exS.taskEnd;
+    else
+        firstSeg = ExFNIRS.data{1};
+        if isfield(firstSeg, 'time') && ~isempty(firstSeg.time)
+            ExFNIRS.settings.block_end = max(firstSeg.time);
+        end
+    end
+    % Derive bar bin size from task window if not explicitly set
+    if ExFNIRS.settings.barchart_resample_size <= 0
+        ExFNIRS.settings.barchart_resample_size = ...
+            ExFNIRS.settings.block_end - ExFNIRS.settings.block_start;
     end
     ExFNIRS.settings.plot_start = min(0, ExFNIRS.settings.block_start);
     ExFNIRS.settings.plot_end = ExFNIRS.settings.block_end;
@@ -819,6 +832,7 @@ global ExFNIRS
 ExFNIRS.settings.block_start=str2num(get(handles.edit_block_start,'String'));
 set(handles.edit_block_start,'String',sprintf('%.2f',ExFNIRS.settings.block_start));
 
+syncBlockSettingsUI(handles);
 exploreFNIRS.plotExTimeline();
 
 
@@ -855,6 +869,7 @@ global ExFNIRS
 ExFNIRS.settings.block_end=str2num(get(handles.edit_block_end,'String'));
 set(handles.edit_block_end,'String',sprintf('%.2f',ExFNIRS.settings.block_end));
 
+syncBlockSettingsUI(handles);
 exploreFNIRS.plotExTimeline();
 
 % --- Executes during object creation, after setting all properties.
@@ -1511,6 +1526,17 @@ set(handles.listbox_oxy_methods,'Value',find(iOxy));
 set(handles.listbox_raw_methods,'String',strsRaw);
 set(handles.listbox_raw_methods,'Value',find(iRaw));
 
+% Refresh optode list from processed data
+if isfield(ExFNIRS,'currentOpt') && ~isempty(ExFNIRS.currentOpt) ...
+        && strcmp(ExFNIRS.settings.ChannelMode,'fNIR')
+    if isfield(ExFNIRS,'currentOptLabels') && ~isempty(ExFNIRS.currentOptLabels)
+        set(handles.listbox_optode,'String',ExFNIRS.currentOptLabels);
+    else
+        set(handles.listbox_optode,'String',ExFNIRS.currentOpt);
+    end
+    set(handles.listbox_optode,'Value',1:length(ExFNIRS.currentOpt));
+end
+
 ExFNIRS.UpdateNeeded=2; % 2 indicates that data needs to be resampled
 
 end
@@ -2146,11 +2172,35 @@ end
 
 estimatedFS=nanmedian(fsArray(:));
 
+% Resolve device and attach to all segments that lack one
+try
+    firstWithDevice = [];
+    for i = 1:length(ExFNIRS.data)
+        if isfield(ExFNIRS.data{i}, 'device') && isa(ExFNIRS.data{i}.device, 'pf2.Device')
+            firstWithDevice = ExFNIRS.data{i}.device;
+            break;
+        end
+    end
+    if isempty(firstWithDevice) && ~isempty(ExFNIRS.data)
+        firstWithDevice = pf2.Device.load(ExFNIRS.data{1});
+    end
+    if ~isempty(firstWithDevice)
+        for i = 1:length(ExFNIRS.data)
+            if ~isfield(ExFNIRS.data{i}, 'device') || ~isa(ExFNIRS.data{i}.device, 'pf2.Device')
+                ExFNIRS.data{i}.device = firstWithDevice;
+            end
+        end
+        fprintf('Device: %s (%d channels)\n', firstWithDevice.name, firstWithDevice.nChannels);
+    end
+catch ME
+    warning('exploreFNIRS:DeviceResolve', 'Could not resolve device: %s', ME.message);
+end
+
 subIdAuto=1;
 
 fprintf('Building experimental data array\n');
 numEx=length(ExFNIRS.data);
-for i=1:length(numEx)
+for i=1:numEx
     fprintf('Preprocessing record %i of %i\n',i,numEx);
 
    if((~isfield(ExFNIRS.data{i},'raw')&&~isfield(ExFNIRS.data{i},'HbO'))||all(isnan(ExFNIRS.data{i}.time))||(length(ExFNIRS.data{i}.time)==1&&(isnan(ExFNIRS.data{i}.time)))||sum(sum(~isnan(ExFNIRS.data{i}.raw(:,2:end)),1),2)==0) %info only
@@ -2342,13 +2392,20 @@ strsOxy=get(handles.listbox_oxy_methods,'String');
 ExFNIRS.processedData=cell(length(strsOxy)*length(strsRaw),3);
 ExFNIRS.numProcessed=0;
 
-if(isfield(ExFNIRS,'UpdateNeeded')&&ExFNIRS.UpdateNeeded==4)
-    ExFNIRS.UpdateNeeded=3;
+if isfield(ExFNIRS,'UpdateNeeded') && ExFNIRS.UpdateNeeded==4
+    ExFNIRS.UpdateNeeded = 3;
+elseif ~isfield(ExFNIRS,'UpdateNeeded')
+    ExFNIRS.UpdateNeeded = 3;
 end
 
 % Create Experiment object for settings persistence and CLI round-trip
-ExFNIRS.experiment = exploreFNIRS.core.Experiment(ExFNIRS.data);
-syncSettingsToExperiment();
+try
+    ExFNIRS.experiment = exploreFNIRS.core.Experiment(ExFNIRS.data);
+    syncSettingsToExperiment();
+catch ME
+    warning('exploreFNIRS:ExperimentInit', ...
+        'Could not create Experiment object: %s', ME.message);
+end
 
 if(ExFNIRS.settings.updateOnChange)
     updateSelectedTable(handles);
@@ -2376,7 +2433,74 @@ modes = {'none', 'flat', 'hierarchy'};
 if s.within_sub_avg_mode >= 1 && s.within_sub_avg_mode <= 3
     ex.settings.avgMode = modes{s.within_sub_avg_mode};
 end
+ex.settings.taskEnd = s.block_end;
 ExFNIRS.experiment = ex;
+
+function syncBlockSettingsUI(handles)
+% Offer to update bar chart size and plot time when block times change
+global ExFNIRS
+s = ExFNIRS.settings;
+taskDuration = s.block_end - s.block_start;
+
+% Build list of proposed changes
+changes = {};
+if abs(s.barchart_resample_size - taskDuration) > 0.01
+    changes{end+1} = sprintf('Update bar chart bin size to %.2fs (currently %.2fs)', ...
+        taskDuration, s.barchart_resample_size);
+end
+if s.plot_end < s.block_end
+    changes{end+1} = sprintf('Extend plot end to %.2fs (currently %.2fs)', ...
+        s.block_end, s.plot_end);
+end
+if s.plot_start > s.block_start
+    changes{end+1} = sprintf('Extend plot start to %.2fs (currently %.2fs)', ...
+        s.block_start, s.plot_start);
+end
+
+if isempty(changes), return; end
+
+msg = sprintf('Block (Task) window changed. Update these settings to match?\n\n%s', ...
+    strjoin(changes, '\n'));
+answer = questdlg(msg, 'Update Settings', 'Yes', 'No', 'Yes');
+if ~strcmp(answer, 'Yes'), return; end
+
+if abs(s.barchart_resample_size - taskDuration) > 0.01
+    ExFNIRS.settings.barchart_resample_size = taskDuration;
+    set(handles.edit_barchart_resample_size, 'String', sprintf('%.2f', taskDuration));
+end
+if s.plot_end < s.block_end
+    ExFNIRS.settings.plot_end = s.block_end;
+    set(handles.edit_plot_end, 'String', sprintf('%.2f', s.block_end));
+end
+if s.plot_start > s.block_start
+    ExFNIRS.settings.plot_start = s.block_start;
+    set(handles.edit_plot_start, 'String', sprintf('%.2f', s.block_start));
+end
+
+function labels = buildOptodeLabels(uOpt, data)
+% Build display labels for optode listbox, marking short-sep channels
+labels = arrayfun(@num2str, uOpt, 'UniformOutput', false);
+try
+    dev = [];
+    for i = 1:length(data)
+        if isfield(data{i},'device') && isa(data{i}.device,'pf2.Device')
+            dev = data{i}.device;
+            break;
+        end
+    end
+    if ~isempty(dev) && dev.nShortSep > 0
+        ssMask = dev.isShortSep();
+        chList = dev.channelList();
+        for k = 1:numel(uOpt)
+            idx = find(chList == uOpt(k), 1);
+            if ~isempty(idx) && idx <= numel(ssMask) && ssMask(idx)
+                labels{k} = sprintf('%d (ss)', uOpt(k));
+            end
+        end
+    end
+catch
+    % Fall back to plain numeric labels
+end
 
 % --- Executes on button press in checkbox_plot_all_data.
 function checkbox_plot_all_data_Callback(hObject, eventdata, handles)
@@ -4118,15 +4242,29 @@ switch (ExFNIRS.settings.ChannelMode)
         if(initOPT||~isfield(ExFNIRS,'currentOpt')||isempty(ExFNIRS.currentOpt))
             uOpt=[];
             for i=1:length(ExFNIRS.data)
-                if(isfield(ExFNIRS.data{i},'channels'))
-                    uOpt=[uOpt;ExFNIRS.data{i}.channels(:)];
+                d=ExFNIRS.data{i};
+                if isfield(d,'channels')
+                    uOpt=[uOpt;d.channels(:)];
+                elseif isfield(d,'device') && ~isempty(d.device)
+                    uOpt=[uOpt;d.device.channelNumbers()'];
+                elseif isfield(d,'HbO')
+                    nCh=size(d.HbO,2)-1; % subtract marker column
+                    if nCh>0; uOpt=[uOpt;(1:nCh)']; end
+                elseif isfield(d,'raw') && isfield(d,'fchMask')
+                    nCh=length(d.fchMask);
+                    if nCh>0; uOpt=[uOpt;(1:nCh)']; end
                 end
             end
+            uOpt=uOpt(uOpt>0); % exclude marker column (-1) and time (0)
             uOpt=sort(unique(uOpt));
 
             ExFNIRS.currentOpt=uOpt;
+            ExFNIRS.currentOptLabels=buildOptodeLabels(uOpt,ExFNIRS.data);
         else
             uOpt=ExFNIRS.currentOpt;
+            if ~isfield(ExFNIRS,'currentOptLabels')||isempty(ExFNIRS.currentOptLabels)
+                ExFNIRS.currentOptLabels=buildOptodeLabels(uOpt,ExFNIRS.data);
+            end
         end
 
         set(handles.text_optode_label,'String','Optode');
@@ -4137,9 +4275,9 @@ switch (ExFNIRS.settings.ChannelMode)
         set(handles.listbox_optode,'Enable','on');
         set(handles.pushbutton_optodes_select_all,'Enable','on');
         set(handles.pushbutton_optodes_select_none,'Enable','on');
-        
-        
-        set(handles.listbox_optode,'String',uOpt);
+
+
+        set(handles.listbox_optode,'String',ExFNIRS.currentOptLabels);
         set(handles.listbox_optode,'Value',1);
         set(handles.listbox_optode,'UserData',[]);
 

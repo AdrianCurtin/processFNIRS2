@@ -1555,6 +1555,12 @@ classdef Experiment < handle
             end
             varargin = obj.injectColorScheme(varargin);
             varargin = obj.injectStatWindow(varargin);
+            if ~any(strcmpi(varargin(1:2:end), 'Device'))
+                dev = obj.resolveDevice();
+                if ~isempty(dev)
+                    varargin = [varargin, {'Device', dev}];
+                end
+            end
             [fig, results] = exploreFNIRS.core.plotLME(obj.groups, ...
                 obj.groupByVars, varargin{:});
         end

@@ -106,6 +106,7 @@ function [fig, results] = plotLME(groups, groupByVars, varargin)
     addParameter(p, 'SaveHeight', 500, @isnumeric);
     addParameter(p, 'SaveDPI', 150, @isnumeric);
     addParameter(p, 'ExcludeShortSeparation', true, @islogical);
+    addParameter(p, 'Device', [], @(x) isempty(x) || isa(x, 'pf2.Device') || ischar(x) || isstring(x));
     addParameter(p, 'DataType', 'fNIRS', @ischar);
     addParameter(p, 'SkipTimeFactor', false, @islogical);
     addParameter(p, 'StatWindow', [], @isnumeric);
@@ -359,7 +360,15 @@ function fig = plotTopoFstat(results, opts, channels, nBioM, nCh, sty)
                 minF = min(fVals(sigMask));
                 if ~isempty(which('pf2.probe.plot.interpolateValues3D'))
                     axes(ax); %#ok<LAXES>
-                    pf2.probe.plot.interpolateValues3D(fVals, [], minF, [], ...
+                    probeArg = [];
+                    if ~isempty(opts.Device)
+                        if isa(opts.Device, 'pf2.Device')
+                            probeArg = opts.Device.name;
+                        else
+                            probeArg = opts.Device;
+                        end
+                    end
+                    pf2.probe.plot.interpolateValues3D(fVals, probeArg, minF, [], ...
                         sprintf('%s: %s', bioM, termNames{t}), 'F-val', ...
                         'bufferDistance', 1);
                 else

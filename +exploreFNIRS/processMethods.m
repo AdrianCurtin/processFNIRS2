@@ -81,11 +81,12 @@ if(~any(curRawMatchIdx&curOxyMatchIdx))
     %hF=ProgressHandles.h.hF;
     
     % Filter out empty/invalid segments
-    validIdx = cellfun(@(d) ~isempty(d) && length(d.time) > 1, data);
+    validIdx = find(cellfun(@(d) ~isempty(d) && length(d.time) > 1, data));
 
     if processOxyOnly
         % Oxy-only: must loop (processOxy doesn't support cell arrays)
-        for i = find(validIdx)'
+        for k = 1:numel(validIdx)
+            i = validIdx(k);
             fprintf('ExploreFNIRS - Processing Method %s x %s %i of %i\n', rawMethodStr_label, oxyMethodStr_label, i, numData);
             if isfield(data{i}, 'HbO')
                 data{i} = pf2.process.processOxy(data{i});
@@ -95,33 +96,20 @@ if(~any(curRawMatchIdx&curOxyMatchIdx))
             end
         end
     else
-        % Full processing: use batch mode with parfor support
-        fprintf('ExploreFNIRS - Processing Method %s x %s (%d segments)\n', rawMethodStr_label, oxyMethodStr_label, sum(validIdx));
+        % Full processing: use batch mode (processFNIRS2 handles parfor internally)
+        fprintf('ExploreFNIRS - Processing Method %s x %s (%d segments)\n', rawMethodStr_label, oxyMethodStr_label, numel(validIdx));
         validData = data(validIdx);
         validData = processFNIRS2(validData);
         data(validIdx) = validData;
     end
 
-    % Apply channel mask + resample (parallelizable)
+    % Apply channel mask + resample
     rsSize = ExFNIRS.settings.grandavg_resample_size;
-    [canPar, poolOn] = pf2_base.accel.canParfor();
-    validIndices = find(validIdx);
-
-    if canPar && poolOn && numel(validIndices) > 2
-        parfor k = 1:numel(validIndices)
-            ii = validIndices(k);
-            d = data{ii};
-            d = pf2.data.applyChannelMask(d);
-            d = pf2.data.resample(d, rsSize, 'centerOnT0', true, ...
-                'timeOutMode', 'end', 'averageAux', false, 'flattenAux', true);
-            data{ii} = d;
-        end
-    else
-        for ii = validIndices'
-            data{ii} = pf2.data.applyChannelMask(data{ii});
-            data{ii} = pf2.data.resample(data{ii}, rsSize, 'centerOnT0', true, ...
-                'timeOutMode', 'end', 'averageAux', false, 'flattenAux', true);
-        end
+    for k = 1:numel(validIdx)
+        i = validIdx(k);
+        data{i} = pf2.data.applyChannelMask(data{i});
+        data{i} = pf2.data.resample(data{i}, rsSize, 'centerOnT0', true, ...
+            'timeOutMode', 'end', 'averageAux', false, 'flattenAux', true);
     end
 
     
@@ -133,6 +121,41 @@ else
     pf2('blLength',0);
     pf2('Raw_Method',rawMethodStr,'Oxy_Method',oxyMethodStr); 
    ExFNIRS.curProcessedData= ExFNIRS.processedData{curRawMatchIdx&curOxyMatchIdx,3};
+end
+
+% Update optode list from processed data (channels created by bvoxy)
+uOpt = [];
+for ii = 1:length(ExFNIRS.curProcessedData)
+    if ~isempty(ExFNIRS.curProcessedData{ii}) && isfield(ExFNIRS.curProcessedData{ii}, 'channels')
+        uOpt = [uOpt; ExFNIRS.curProcessedData{ii}.channels(:)]; %#ok<AGROW>
+    end
+end
+if ~isempty(uOpt)
+    uOpt = sort(unique(uOpt));
+    ExFNIRS.currentOpt = uOpt;
+    % Rebuild labels with short-sep markers
+    labels = arrayfun(@num2str, uOpt, 'UniformOutput', false);
+    try
+        dev = [];
+        for ii2 = 1:length(ExFNIRS.curProcessedData)
+            d = ExFNIRS.curProcessedData{ii2};
+            if ~isempty(d) && isfield(d,'device') && isa(d.device,'pf2.Device')
+                dev = d.device; break;
+            end
+        end
+        if ~isempty(dev) && dev.nShortSep > 0
+            ssMask = dev.isShortSep();
+            chList = dev.channelList();
+            for kk = 1:numel(uOpt)
+                idx = find(chList == uOpt(kk), 1);
+                if ~isempty(idx) && idx <= numel(ssMask) && ssMask(idx)
+                    labels{kk} = sprintf('%d (ss)', uOpt(kk));
+                end
+            end
+        end
+    catch
+    end
+    ExFNIRS.currentOptLabels = labels;
 end
 
 if(processOxyOnly)

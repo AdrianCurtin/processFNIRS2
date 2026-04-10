@@ -573,7 +573,7 @@ function [outAuxStruct] = recursiveAuxResample(aux_in,flattenAux,segLength,cente
         curField=aux_in.(curFieldName);
 
         % Skip metadata fields (used for labeling, not time-series data)
-        if ismember(curFieldName, {'varNames', 'unit'})
+        if ismember(curFieldName, {'varNames', 'unit'}) || endsWith(curFieldName, '_unit')
             continue;
         end
 
