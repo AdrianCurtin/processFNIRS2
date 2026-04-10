@@ -85,7 +85,8 @@ ids = { ...
 if isstruct(state)
     savedIds = fieldnames(state);
     for i = 1:numel(savedIds)
-        warning(state.(savedIds{i}).state, savedIds{i});
+        s = state.(savedIds{i});
+        warning(s.state, s.identifier);
     end
     if nargout > 0
         prev = state;
@@ -107,7 +108,7 @@ savedStates = struct();
 for i = 1:numel(ids)
     id = ids{i};
     safeKey = strrep(strrep(id, ':', '_'), '.', '_');
-    [~, savedStates.(safeKey)] = warning('query', id);
+    savedStates.(safeKey) = warning('query', id);
     warning(state, id);
 end
 
