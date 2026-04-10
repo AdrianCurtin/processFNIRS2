@@ -179,19 +179,34 @@ if(isnan(resampleSize)||resampleSize<=0)
     warning('Unable to resample data, invalid resampleFS');
 end
 
+% --- Resample (parallel when pool available) ---
+if(resample)
+    [canPar, poolOn] = pf2_base.accel.canParfor();
+    if(canPar && poolOn && numfSeg > 2)
+        parfor i=1:numfSeg
+            if(centerOnT0)
+                FNIRScellArray{i}=pf2.data.resample(FNIRScellArray{i},resampleSize,'centerOnT0',centerOnT0,'timeOutMode','start','averageAux',true,'flattenAux',true,'trimAux',true);
+            else
+                FNIRScellArray{i}=pf2.data.resample(FNIRScellArray{i},resampleSize,'centerOnT0',centerOnT0,'averageAux',true,'flattenAux',true,'trimAux',true);
+            end
+        end
+    else
+        for i=1:numfSeg
+            if(centerOnT0)
+                FNIRScellArray{i}=pf2.data.resample(FNIRScellArray{i},resampleSize,'centerOnT0',centerOnT0,'timeOutMode','start','averageAux',true,'flattenAux',true,'trimAux',true);
+            else
+                FNIRScellArray{i}=pf2.data.resample(FNIRScellArray{i},resampleSize,'centerOnT0',centerOnT0,'averageAux',true,'flattenAux',true,'trimAux',true);
+            end
+        end
+    end
+end
+
+% --- Collect metadata (cheap, sequential) ---
 segTimesAccum=cell(numfSeg,1);
 auxFieldsAccum=cell(numfSeg,1);
 auxSizesAccum=cell(numfSeg,1);
 
-for i=1:numfSeg % Resample and find max/min and num channels
-    if(resample)
-        if(centerOnT0)
-            FNIRScellArray{i}=pf2.data.resample(FNIRScellArray{i},resampleSize,'centerOnT0',centerOnT0,'timeOutMode','start','averageAux',true,'flattenAux',true,'trimAux',true);
-        else
-            FNIRScellArray{i}=pf2.data.resample(FNIRScellArray{i},resampleSize,'centerOnT0',centerOnT0,'averageAux',true,'flattenAux',true,'trimAux',true);
-        end
-    end
-
+for i=1:numfSeg
     if(isfield(FNIRScellArray{i},'segmentTimes'))
         segTimesAccum{i}=FNIRScellArray{i}.segmentTimes;
     end
@@ -203,7 +218,7 @@ for i=1:numfSeg % Resample and find max/min and num channels
         temp=false(size(possibleFields));
         for pf_ind=1:length(possibleFields)
             curField=FNIRScellArray{i}.Aux.(possibleFields{pf_ind});
-            possibleFieldSizes(pf_ind)=size(FNIRScellArray{i}.Aux.(possibleFields{pf_ind}),2);
+            possibleFieldSizes(pf_ind)=size(curField,2);
             if(~isempty(curField)&&istable(curField)&&ismember('time',curField.Properties.VariableNames))
                 temp(pf_ind)=true;
             end
