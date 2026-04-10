@@ -502,13 +502,24 @@ classdef Experiment < handle
                 end
             end
 
-            for g = 1:length(obj.groups)
+            % --- Stage A: Reprocessing + Preprocessing (sequential) ---
+            nGroups = length(obj.groups);
+            ppKey = buildPPKey(s);
+            allPPData   = cell(1, nGroups);
+            allBarData  = cell(1, nGroups);
+            allHVars    = cell(1, nGroups);
+            allFlatH    = cell(1, nGroups);
+            allBarBins  = nan(1, nGroups);
+            skipGroup   = false(1, nGroups);
+
+            for g = 1:nGroups
                 curData  = obj.groups(g).gbyFNIRS;
                 curTable = obj.groups(g).gbyTables;
 
                 % Skip empty groups
                 if isempty(curData)
                     warning('Group %d (%s) is empty, skipping', g, obj.groups(g).label);
+                    skipGroup(g) = true;
                     continue;
                 end
 
@@ -539,8 +550,7 @@ classdef Experiment < handle
                     end
                 end
 
-                % --- Stage A: Preprocessing (cached) ---
-                ppKey = buildPPKey(s);
+                % --- Preprocessing (cached) ---
                 hasCachedPP = isfield(obj.groups(g), 'cache') && ...
                               ~isempty(obj.groups(g).cache) && ...
                               isfield(obj.groups(g).cache, 'ppKey') && ...
@@ -548,38 +558,77 @@ classdef Experiment < handle
                               ~isempty(obj.groups(g).cache.ppData);
 
                 if hasCachedPP
-                    ppData = obj.groups(g).cache.ppData;
-                    barData = obj.groups(g).cache.barData;
+                    allPPData{g}  = obj.groups(g).cache.ppData;
+                    allBarData{g} = obj.groups(g).cache.barData;
                     fprintf('  [%d] %s: using cached preprocessing\n', g, obj.groups(g).label);
                 else
-                    [ppData, barData] = preprocessGroup(curData, s, doResample, doBaseline);
-                    obj.groups(g).cache.ppData = ppData;
-                    obj.groups(g).cache.barData = barData;
-                    obj.groups(g).cache.ppKey = ppKey;
+                    [allPPData{g}, allBarData{g}] = preprocessGroup(curData, s, doResample, doBaseline);
+                    obj.groups(g).cache.ppData  = allPPData{g};
+                    obj.groups(g).cache.barData = allBarData{g};
+                    obj.groups(g).cache.ppKey   = ppKey;
                 end
 
-                % --- Stage B: Grand averaging (always re-run) ---
-                hVars = buildHierarchyVars(curTable, validHierarchy, mode);
+                % Build hierarchy args (cheap, needed for grandAvgFNIRS)
+                allHVars{g}   = buildHierarchyVars(curTable, validHierarchy, mode);
+                allFlatH{g}   = buildHierarchyVars(curTable, validHierarchy, 'flat');
+                allBarBins(g) = computeBarBin(s, curData);
+            end
 
-                % Temporal resolution grand average
-                obj.groups(g).gbyGrand = grandAvgFNIRS( ...
-                    ppData, false, [], false, hVars, false, true);
+            % --- Stage B: Grand averaging (parallel when pool available) ---
+            activeIdx = find(~skipGroup);
+            nActive = length(activeIdx);
 
-                % Flat grand average for export/LME (bar chart resolution)
-                flatH = buildHierarchyVars(curTable, validHierarchy, 'flat');
-                barBin = computeBarBin(s, curData);
-                obj.groups(g).gbyGrandBarFlat = grandAvgFNIRS( ...
-                    barData, false, barBin, false, flatH, false, true);
+            gaResults     = cell(1, nGroups);
+            gaBarResults  = cell(1, nGroups);
 
-                % Store preprocessed segments for potential direct access
-                obj.groups(g).gbyFNIRS_pp = ppData;
+            [canUse, poolRunning] = pf2_base.accel.canParfor();
+            useParfor = canUse && poolRunning && nActive > 2;
 
-                if ~hasCachedPP
-                    fprintf('  [%d] %s: %d segments -> grand average\n', ...
-                        g, obj.groups(g).label, length(curData));
-                else
+            if useParfor
+                % Extract loop variables for parfor compatibility
+                ppCells  = allPPData(activeIdx);
+                barCells = allBarData(activeIdx);
+                hVCells  = allHVars(activeIdx);
+                fhCells  = allFlatH(activeIdx);
+                bbVec    = allBarBins(activeIdx);
+
+                tmpGA    = cell(1, nActive);
+                tmpBar   = cell(1, nActive);
+
+                parfor k = 1:nActive
+                    tmpGA{k}  = grandAvgFNIRS(ppCells{k}, false, [], false, hVCells{k}, false, true);
+                    tmpBar{k} = grandAvgFNIRS(barCells{k}, false, bbVec(k), false, fhCells{k}, false, true);
+                end
+
+                for k = 1:nActive
+                    gaResults{activeIdx(k)}    = tmpGA{k};
+                    gaBarResults{activeIdx(k)} = tmpBar{k};
+                end
+            else
+                for k = 1:nActive
+                    g = activeIdx(k);
+                    gaResults{g}    = grandAvgFNIRS(allPPData{g}, false, [], false, allHVars{g}, false, true);
+                    gaBarResults{g} = grandAvgFNIRS(allBarData{g}, false, allBarBins(g), false, allFlatH{g}, false, true);
+                end
+            end
+
+            % --- Write results back to obj ---
+            for g = 1:nGroups
+                if skipGroup(g), continue; end
+
+                obj.groups(g).gbyGrand        = gaResults{g};
+                obj.groups(g).gbyGrandBarFlat = gaBarResults{g};
+                obj.groups(g).gbyFNIRS_pp     = allPPData{g};
+
+                hasCachedPP = ~isempty(obj.groups(g).cache) && ...
+                              isfield(obj.groups(g).cache, 'ppKey') && ...
+                              strcmp(obj.groups(g).cache.ppKey, ppKey);
+                if hasCachedPP
                     fprintf('  [%d] %s: re-averaged (%s mode)\n', ...
                         g, obj.groups(g).label, mode);
+                else
+                    fprintf('  [%d] %s: %d segments -> grand average\n', ...
+                        g, obj.groups(g).label, length(obj.groups(g).gbyFNIRS));
                 end
             end
 
