@@ -325,6 +325,18 @@ function [eHbR,eHbO]=estimateAbsorb(lambda,coefs)
 % coeficients should be in 1/(cm*microMolar)
 % but are output in millimolar (1/(cm*uM))
 
+persistent cache
+if isempty(cache)
+    cache = containers.Map('KeyType','char','ValueType','any');
+end
+
+% Cache clear sentinel
+if ischar(lambda) && strcmp(lambda, '__clear__')
+    cache = containers.Map('KeyType','char','ValueType','any');
+    eHbR = []; eHbO = [];
+    return
+end
+
 %Sourced Data from http://omlc.org/spectra/hemoglobin/summary.html
 % molar extinction coefficient
 % Wavelength (nm), HbO, (1/(cm*M)), HbR(1/(cm*M))
@@ -464,14 +476,30 @@ altCoeff(:,[2,3])=altCoeff(:,[2,3])*1e-3; % convert from eta to absorption coeff
 
 if(nargin<2||isempty(coefs)) % AutoCalulate With
     coefs=altCoeff;
+    customCoefs = false;
+else
+    customCoefs = true;
 end
-     
+
+% Build cache key from rounded wavelengths (+ coefs hash if custom)
+if customCoefs
+    cacheKey = mat2str(round([lambda(:); coefs(:)], 6));
+else
+    cacheKey = mat2str(round(lambda(:), 6));
+end
+if cache.isKey(cacheKey)
+    cached = cache(cacheKey);
+    eHbO = cached.eHbO;
+    eHbR = cached.eHbR;
+    return
+end
+
 %fNIR Devices saturation coefficietns
       coeff_fd=[730,0.390,1.1022;...
           805, 0.836, 0.73708;...
           850, 1.058,0.69132;];
       %eHbR_730=1.1022; % [1/(mMol*cm)
-      %eHBO_730=0.390;      %  
+      %eHBO_730=0.390;      %
       %eHBR_805=0.73708;      %   saturation coefficients
       %eHBO_805=0.836;      %
       %eHBR_850=0.69132;      %
@@ -487,9 +515,11 @@ coeffHitachi=[700.8	701.5	702.3	703	703.7   826.4	827.2   827.9	828.7;  %wavelen
 % Need to update for 826.4, 827.2
 
 
-   
+
 eHbO=interp1(coefs(:,1),coefs(:,2),lambda)./1000;  %convert from 1/mM to 1/uM
 eHbR=interp1(coefs(:,1),coefs(:,3),lambda)./1000;   %convert from 1/mM to 1/uM
+
+cache(cacheKey) = struct('eHbO', eHbO, 'eHbR', eHbR);
 
 end
 

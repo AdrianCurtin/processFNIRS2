@@ -461,4 +461,187 @@ classdef HierarchicalAverageTest < matlab.unittest.TestCase
                 'S3 with identical data should return same values');
         end
     end
+
+    %% hierarchicalAverageMulti Tests
+    methods (Test)
+        function testMultiEquivalenceWithSingleFunc(testCase)
+            % Single-function multi call should match original function
+
+            arr = [10; 10; 5; 5; 2; 2];
+            hierarchy = cell(6, 2);
+            hierarchy(:,1) = {'Subject1';'Subject1';'Subject1';'Subject1';'Subject2';'Subject2'};
+            hierarchy(:,2) = {1; 1; 2; 2; 1; 1};
+
+            [avgOrig, labelsOrig] = pf2_base.hierarchicalAverage(arr, hierarchy, @nanmean);
+            [results, labelsMulti] = pf2_base.hierarchicalAverageMulti(arr, hierarchy, {@nanmean});
+
+            testCase.verifyEqual(results{1}, avgOrig, 'AbsTol', 1e-10, ...
+                'Multi with single func should match original');
+            testCase.verifyEqual(labelsMulti, labelsOrig, ...
+                'Labels should match');
+        end
+
+        function testMultiEquivalenceMedian(testCase)
+            % Median equivalence check
+
+            arr = [1; 2; 100; 10; 20; 30];
+            hierarchy = cell(6, 2);
+            hierarchy(:,1) = {'S1';'S1';'S1';'S2';'S2';'S2'};
+            hierarchy(:,2) = {1; 2; 3; 1; 2; 3};
+
+            avgOrig = pf2_base.hierarchicalAverage(arr, hierarchy, @nanmedian);
+            results = pf2_base.hierarchicalAverageMulti(arr, hierarchy, {@nanmedian});
+
+            testCase.verifyEqual(results{1}, avgOrig, 'AbsTol', 1e-10, ...
+                'Multi median should match original median');
+        end
+
+        function testMultiFourFunctions(testCase)
+            % Verify mean, median, max, min all computed correctly
+
+            arr = [10; 20; 30; 40];
+            hierarchy = {'S1'; 'S1'; 'S2'; 'S2'};
+
+            nanmax3 = @(x,dim) nanmax(x,[],dim);
+            nanmin3 = @(x,dim) nanmin(x,[],dim);
+            funcs = {@nanmean, @nanmedian, nanmax3, nanmin3};
+
+            results = pf2_base.hierarchicalAverageMulti(arr, hierarchy, funcs);
+
+            testCase.verifyEqual(numel(results), 4, 'Should return 4 results');
+            % S1: [10,20], S2: [30,40]
+            testCase.verifyEqual(results{1}, [15; 35], 'AbsTol', 1e-10, 'Mean');
+            testCase.verifyEqual(results{2}, [15; 35], 'AbsTol', 1e-10, 'Median');
+            testCase.verifyEqual(results{3}, [20; 40], 'AbsTol', 1e-10, 'Max');
+            testCase.verifyEqual(results{4}, [10; 30], 'AbsTol', 1e-10, 'Min');
+        end
+
+        function testMulti3DArray(testCase)
+            % Test with [N x T x C] input (the grandAvgFNIRS use case)
+
+            % 4 observations, 3 timepoints, 2 channels
+            arr = zeros(4, 3, 2);
+            arr(1,:,1) = [1 2 3];   arr(1,:,2) = [10 20 30];  % S1 trial 1
+            arr(2,:,1) = [3 4 5];   arr(2,:,2) = [30 40 50];  % S1 trial 2
+            arr(3,:,1) = [5 6 7];   arr(3,:,2) = [50 60 70];  % S2 trial 1
+            arr(4,:,1) = [7 8 9];   arr(4,:,2) = [70 80 90];  % S2 trial 2
+            hierarchy = {'S1'; 'S1'; 'S2'; 'S2'};
+
+            results = pf2_base.hierarchicalAverageMulti(arr, hierarchy, {@nanmean});
+
+            testCase.verifyEqual(size(results{1}), [2, 3, 2], ...
+                'Output should be [2 subjects x 3 timepoints x 2 channels]');
+            % S1 mean: ([1 2 3]+[3 4 5])/2 = [2 3 4] for ch1
+            testCase.verifyEqual(squeeze(results{1}(1,:,1)), [2 3 4], 'AbsTol', 1e-10, ...
+                'S1 ch1 timepoints should average correctly');
+        end
+
+        function testMultiThreeLevelHierarchy(testCase)
+            % Three-level hierarchy with multi functions
+
+            arr = [10; 20; 30; 40; 50; 60];
+            hierarchy = cell(6, 3);
+            hierarchy(:,1) = {'A';'A';'A';'A';'B';'B'};
+            hierarchy(:,2) = {'S1';'S1';'S2';'S2';'S3';'S3'};
+            hierarchy(:,3) = {1; 2; 1; 2; 1; 2};
+
+            % Compare each function individually
+            avgMean = pf2_base.hierarchicalAverage(arr, hierarchy, @nanmean);
+            avgMedian = pf2_base.hierarchicalAverage(arr, hierarchy, @nanmedian);
+
+            results = pf2_base.hierarchicalAverageMulti(arr, hierarchy, {@nanmean, @nanmedian});
+
+            testCase.verifyEqual(results{1}, avgMean, 'AbsTol', 1e-10, ...
+                'Multi mean should match original for 3-level hierarchy');
+            testCase.verifyEqual(results{2}, avgMedian, 'AbsTol', 1e-10, ...
+                'Multi median should match original for 3-level hierarchy');
+        end
+
+        function testMultiSingleObservation(testCase)
+            % Single observation edge case
+
+            arr = [42];
+            hierarchy = {'S1'};
+
+            results = pf2_base.hierarchicalAverageMulti(arr, hierarchy, {@nanmean, @nanmedian});
+
+            testCase.verifyEqual(results{1}, 42, 'AbsTol', 1e-10, ...
+                'Single obs mean should be itself');
+            testCase.verifyEqual(results{2}, 42, 'AbsTol', 1e-10, ...
+                'Single obs median should be itself');
+        end
+
+        function testMultiAllNaN(testCase)
+            % All-NaN data
+
+            arr = [NaN; NaN; 20; 30];
+            hierarchy = {'S1'; 'S1'; 'S2'; 'S2'};
+
+            results = pf2_base.hierarchicalAverageMulti(arr, hierarchy, {@nanmean});
+
+            testCase.verifyTrue(isnan(results{1}(1)), ...
+                'All-NaN group should produce NaN');
+            testCase.verifyEqual(results{1}(2), 25, 'AbsTol', 1e-10, ...
+                'S2 should average normally');
+        end
+
+        function testMultiAllUniqueRows(testCase)
+            % All unique rows — no averaging needed
+
+            arr = [10; 20; 30];
+            hierarchy = {'S1'; 'S2'; 'S3'};
+
+            results = pf2_base.hierarchicalAverageMulti(arr, hierarchy, {@nanmean, @nanmedian});
+
+            testCase.verifyEqual(results{1}, [10; 20; 30], 'AbsTol', 1e-10, ...
+                'No averaging should occur');
+            testCase.verifyEqual(results{2}, [10; 20; 30], 'AbsTol', 1e-10, ...
+                'No averaging should occur');
+        end
+
+        function testMultiNumericHierarchy(testCase)
+            % Numeric hierarchy input
+
+            arr = [10; 20; 30; 40];
+            hierarchy = [1 1; 1 2; 2 1; 2 2];
+
+            results = pf2_base.hierarchicalAverageMulti(arr, hierarchy, {@nanmean});
+
+            testCase.verifyEqual(results{1}(1), 15, 'AbsTol', 1e-10);
+            testCase.verifyEqual(results{1}(2), 35, 'AbsTol', 1e-10);
+        end
+
+        function testMultiRealisticFNIRS(testCase)
+            % Realistic 3-subject, 2-condition, 2-trial, 4-channel scenario
+
+            data = [
+                1, 2, 3, 4;    % S1, C1, T1
+                3, 4, 5, 6;    % S1, C1, T2
+                5, 6, 7, 8;    % S1, C2, T1
+                7, 8, 9, 10;   % S1, C2, T2
+                10, 20, 30, 40;  % S2, C1, T1
+                12, 22, 32, 42;  % S2, C1, T2
+                14, 24, 34, 44;  % S2, C2, T1
+                16, 26, 36, 46;  % S2, C2, T2
+                100, 200, 300, 400;  % S3, C1, T1
+                100, 200, 300, 400;  % S3, C1, T2
+                100, 200, 300, 400;  % S3, C2, T1
+                100, 200, 300, 400;  % S3, C2, T2
+            ];
+
+            hierarchy = cell(12, 3);
+            hierarchy(:,1) = {'S1';'S1';'S1';'S1';'S2';'S2';'S2';'S2';'S3';'S3';'S3';'S3'};
+            hierarchy(:,2) = {'C1';'C1';'C2';'C2';'C1';'C1';'C2';'C2';'C1';'C1';'C2';'C2'};
+            hierarchy(:,3) = {1; 2; 1; 2; 1; 2; 1; 2; 1; 2; 1; 2};
+
+            % Get reference from original
+            avgOrig = pf2_base.hierarchicalAverage(data, hierarchy, @nanmean);
+
+            % Get from multi
+            results = pf2_base.hierarchicalAverageMulti(data, hierarchy, {@nanmean});
+
+            testCase.verifyEqual(results{1}, avgOrig, 'AbsTol', 1e-10, ...
+                'Multi should match original for realistic fNIRS data');
+        end
+    end
 end

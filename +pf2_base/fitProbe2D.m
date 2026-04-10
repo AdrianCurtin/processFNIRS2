@@ -1,8 +1,27 @@
 function opt_2d_coords=fitProbe2D(ChxList,ChyList,ChzList, usePCA)
 % Fits a 2D representation of the plane as best as possible
 
+persistent cache
+if isempty(cache)
+    cache = containers.Map('KeyType','char','ValueType','any');
+end
+
+% Cache clear sentinel (matches Device.load() pattern)
+if ischar(ChxList) && strcmp(ChxList, '__clear__')
+    cache = containers.Map('KeyType','char','ValueType','any');
+    opt_2d_coords = [];
+    return
+end
+
 if(nargin<4)
     usePCA = true;
+end
+
+% Build cache key from rounded inputs
+cacheKey = mat2str(round([ChxList(:); ChyList(:); ChzList(:); usePCA], 6));
+if cache.isKey(cacheKey)
+    opt_2d_coords = cache(cacheKey);
+    return
 end
 
 if(usePCA)
@@ -148,10 +167,12 @@ end
 
 
 for c=1:numCh
-    
+
      [x1,y1,x2,y2]=cord2mask(ChxList(c),ChyList(c),lastWsize,lastHsize,true);
      opt_2d_coords{c}=[x1,y1,x2-x1,y2-y1];
 end
+
+cache(cacheKey) = opt_2d_coords;
 
 end
 

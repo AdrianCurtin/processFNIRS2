@@ -50,25 +50,25 @@ segROIpresent=false(size(FNIRScellArray));
 hasFNIRS=true(size(FNIRScellArray));
 
 removedIdx=false(size(FNIRScellArray));
-for i=length(FNIRScellArray):-1:1 
-    if(isempty(FNIRScellArray{i})||(sum(~isnan(FNIRScellArray{i}.time))==0&&...
-            pf2_base.isnestedfield(FNIRScellArray{i},'Aux')&&isempty(FNIRScellArray{i}.Aux))) % Empty Case
-        FNIRScellArray(i)=[];
-        segSampleTimes(i)=[];
-        segSampleCount(i)=[];
-        hierarchyVars(i,:)=[];
-        segROIpresent(i)=[];
-        segUnits(i)=[];
+keepMask=true(1,length(FNIRScellArray));
+for i=1:length(FNIRScellArray)
+    if(isempty(FNIRScellArray{i}))
+        keepMask(i)=false;
         removedIdx(i)=true;
-        hasFNIRS(i)=[];
-    elseif((sum(~isnan(FNIRScellArray{i}.time))==0&&pf2_base.isnestedfield(FNIRScellArray{i},'Aux'))) % no fnirs but has Aux
+        continue;
+    end
+    hasAux=isfield(FNIRScellArray{i},'Aux');
+    hasTime=isfield(FNIRScellArray{i},'time')&&~isempty(FNIRScellArray{i}.time);
+    noValidTime=hasTime&&sum(~isnan(FNIRScellArray{i}.time))==0;
+    hasROI=isfield(FNIRScellArray{i},'ROI')&&isfield(FNIRScellArray{i}.ROI,'HbO');
+
+    if(noValidTime&&hasAux&&isempty(FNIRScellArray{i}.Aux)) % Empty Case (no valid time, empty Aux)
+        keepMask(i)=false;
+        removedIdx(i)=true;
+    elseif(noValidTime&&hasAux) % no fnirs but has Aux
         hasFNIRS(i)=false;
-        
         segSampleTimes(i)=nan;
         segSampleCount(i)=0;
-        %segUnits{i}=FNIRScellArray{i}.units;
-        %FNIRScellArray{i}.fs=1/segSampleTimes(i);
-        %FNIRScellArray{i}.fs=round(FNIRScellArray{i}.fs,3);
         segROIpresent(i)=false;
     elseif(~isfield(FNIRScellArray{i},'fs')&&isfield(FNIRScellArray{i},'time')) % Missing sampling frequency
         FNIRScellArray{i}.time=round(FNIRScellArray{i}.time,5);
@@ -80,17 +80,9 @@ for i=length(FNIRScellArray):-1:1
         segUnits{i}=FNIRScellArray{i}.units;
         FNIRScellArray{i}.fs=1/segSampleTimes(i);
         FNIRScellArray{i}.fs=round(FNIRScellArray{i}.fs,3);
-        segROIpresent(i)=pf2_base.isnestedfield(FNIRScellArray{i},'ROI.HbO');
-        
-    elseif(~isfield(FNIRScellArray{i},'time')||all(isnan(FNIRScellArray{i}.time)))  % No Time information
-        FNIRScellArray(i)=[];
-        hierarchyVars(i,:)=[];
-        segSampleTimes(i)=[];
-        segSampleCount(i)=[];
-        segROIpresent(i)=[];
-        segUnits(i)=[];
-        hasFNIRS(i)=[];
-
+        segROIpresent(i)=hasROI;
+    elseif(~hasTime||all(isnan(FNIRScellArray{i}.time)))  % No Time information
+        keepMask(i)=false;
         warning('Cannot use groups which have no time info');
         removedIdx(i)=true;
     elseif(timeAlign)   % Force time alignment
@@ -101,7 +93,7 @@ for i=length(FNIRScellArray):-1:1
         segUnits{i}=FNIRScellArray{i}.units;
         FNIRScellArray{i}.fs=1/segSampleTimes(i);
         FNIRScellArray{i}.fs=round(FNIRScellArray{i}.fs,3);
-        segROIpresent(i)=pf2_base.isnestedfield(FNIRScellArray{i},'ROI.HbO');
+        segROIpresent(i)=hasROI;
     else   %Nicely aligned
         FNIRScellArray{i}.time=round(FNIRScellArray{i}.time,5);
         segSampleTimes(i)=median(diff(FNIRScellArray{i}.time));
@@ -113,9 +105,17 @@ for i=length(FNIRScellArray):-1:1
         end
         FNIRScellArray{i}.fs=1/segSampleTimes(i);
         FNIRScellArray{i}.fs=round(FNIRScellArray{i}.fs,3);
-        segROIpresent(i)=pf2_base.isnestedfield(FNIRScellArray{i},'ROI.HbO');
+        segROIpresent(i)=hasROI;
     end
 end
+% Single vectorized deletion instead of per-element shifting
+FNIRScellArray(~keepMask)=[];
+segSampleTimes(~keepMask)=[];
+segSampleCount(~keepMask)=[];
+hierarchyVars(~keepMask,:)=[];
+segROIpresent(~keepMask)=[];
+segUnits(~keepMask)=[];
+hasFNIRS(~keepMask)=[];
 
 numfSeg=length(FNIRScellArray);
 
@@ -179,11 +179,9 @@ if(isnan(resampleSize)||resampleSize<=0)
     warning('Unable to resample data, invalid resampleFS');
 end
 
-segmentTimesArr=[];
-
-auxFields(1)="";
-auxFieldSizes=[];
-auxFieldVarNames={};
+segTimesAccum=cell(numfSeg,1);
+auxFieldsAccum=cell(numfSeg,1);
+auxSizesAccum=cell(numfSeg,1);
 
 for i=1:numfSeg % Resample and find max/min and num channels
     if(resample)
@@ -192,32 +190,28 @@ for i=1:numfSeg % Resample and find max/min and num channels
         else
             FNIRScellArray{i}=pf2.data.resample(FNIRScellArray{i},resampleSize,'centerOnT0',centerOnT0,'averageAux',true,'flattenAux',true,'trimAux',true);
         end
-
-
     end
-    
+
     if(isfield(FNIRScellArray{i},'segmentTimes'))
-        segmentTimesArr=[segmentTimesArr;FNIRScellArray{i}.segmentTimes];
+        segTimesAccum{i}=FNIRScellArray{i}.segmentTimes;
     end
-    
+
     if(isfield(FNIRScellArray{i},'Aux')&&~isempty(FNIRScellArray{i}.Aux))
-        possibleFields=fields(FNIRScellArray{i}.Aux);
+        possibleFields=fieldnames(FNIRScellArray{i}.Aux);
         possibleFieldSizes=nan(size(possibleFields));
-        
+
         temp=false(size(possibleFields));
-        for(pf_ind=1:length(possibleFields))
+        for pf_ind=1:length(possibleFields)
             curField=FNIRScellArray{i}.Aux.(possibleFields{pf_ind});
             possibleFieldSizes(pf_ind)=size(FNIRScellArray{i}.Aux.(possibleFields{pf_ind}),2);
-            if(~isempty(curField)&&istable(curField)&&contains('time',curField.Properties.VariableNames))
+            if(~isempty(curField)&&istable(curField)&&ismember('time',curField.Properties.VariableNames))
                 temp(pf_ind)=true;
-                
             end
         end
-        auxFields=[auxFields;possibleFields(temp==1)];
-        auxFieldSizes=[auxFieldSizes;possibleFieldSizes(temp==1)];
-
+        auxFieldsAccum{i}=possibleFields(temp);
+        auxSizesAccum{i}=possibleFieldSizes(temp);
     end
-    
+
     minFtime=min(FNIRScellArray{i}.time);
     maxFtime=max(FNIRScellArray{i}.time);
     if(minFtime<minTime)
@@ -230,17 +224,24 @@ for i=1:numfSeg % Resample and find max/min and num channels
     if(hasFNIRS(i)&&size(FNIRScellArray{i}.HbO,2)>numCh)
        numCh=size(FNIRScellArray{i}.HbO,2);
     end
-    
-    if(hasFNIRS(i)&&calcROI&&pf2_base.isnestedfield(FNIRScellArray{i},'ROI.info')&&size(FNIRScellArray{i}.ROI.info,1)>numROI)
+
+    if(hasFNIRS(i)&&calcROI&&isfield(FNIRScellArray{i},'ROI')&&isfield(FNIRScellArray{i}.ROI,'info')&&size(FNIRScellArray{i}.ROI.info,1)>numROI)
         numROI=size(FNIRScellArray{i}.ROI.info,1);
     end
-    
+
     FNIRScellArray{i}.timeIdx=[FNIRScellArray{i}.time,[1:length(FNIRScellArray{i}.time)]',zeros(size(FNIRScellArray{i}.time))];
 end
 
-auxFields(1)=[]; %remove initial value
-[auxFields,idx]=unique(auxFields);
-auxFieldSizes=auxFieldSizes(idx);
+segmentTimesArr=vertcat(segTimesAccum{~cellfun(@isempty,segTimesAccum)});
+auxFieldsAll=vertcat(auxFieldsAccum{~cellfun(@isempty,auxFieldsAccum)});
+auxFieldSizesAll=vertcat(auxSizesAccum{~cellfun(@isempty,auxSizesAccum)});
+if(isempty(auxFieldsAll))
+    auxFields=string.empty;
+    auxFieldSizes=[];
+else
+    [auxFields,idx]=unique(string(auxFieldsAll));
+    auxFieldSizes=auxFieldSizesAll(idx);
+end
 numAuxFields=length(auxFields);
 
 maxTime=rem(maxTime-minTime,resampleSize)+maxTime;
@@ -343,7 +344,7 @@ end
 if(averageAux)
     auxFieldSizes(auxFieldSizes>1)=auxFieldSizes(auxFieldSizes>1)-1; % remove anticipated time column from var count (for all but single column data)
     for aux=1:length(auxFields)
-            curAuxField=auxFields{aux};
+            curAuxField=char(auxFields(aux));
             outGA.Aux.(curAuxField).data=nan(length(outGA.time),auxFieldSizes(aux),numfSeg);
     end
 end
@@ -356,28 +357,29 @@ for i=1:numfSeg
     if(hasFNIRS(i))
         numfCh=size(curFNIR.HbO,2);
         
-        validTidx=FNIRScellArray{i}.timeIdx(:,3)>0.&FNIRScellArray{i}.timeIdx(:,4)==1;
+        validTidx=FNIRScellArray{i}.timeIdx(:,3)>0 & logical(FNIRScellArray{i}.timeIdx(:,4));
         validT=false([numSegs,1]);
         validT(FNIRScellArray{i}.timeIdx(validTidx,3))=true;
-        
+
         for b=1:length(bioMs)
             curBioM=bioMs{b};
-            try 
-                outGA.(curBioM).data(validT==1,1:numfCh,i)=curFNIR.(curBioM)(FNIRScellArray{i}.timeIdx(validTidx,2),:,1);
-            catch 
-                x=1;
+            srcRows=FNIRScellArray{i}.timeIdx(validTidx,2);
+            nSrc=size(curFNIR.(curBioM),1);
+            if(max(srcRows)<=nSrc)
+                outGA.(curBioM).data(validT,1:numfCh,i)=curFNIR.(curBioM)(srcRows,:,1);
             end
         end
-        
-        if(calcROI&&pf2_base.isnestedfield(curFNIR,'ROI.HbO'))
-            if(~initROI&&pf2_base.isnestedfield(curFNIR,'ROI.HbO')&&~isempty(curFNIR.ROI.info))
+
+        hasROI_i=isfield(curFNIR,'ROI')&&isfield(curFNIR.ROI,'HbO');
+        if(calcROI&&hasROI_i)
+            if(~initROI&&isfield(curFNIR.ROI,'info')&&~isempty(curFNIR.ROI.info))
                 outGA.ROI.info=curFNIR.ROI.info;
                 initROI=true;
             end
             numfCh_roi=size(curFNIR.ROI.HbO,2);
             for b=1:length(bioMs)
                 curBioM=bioMs{b};
-                outGA.ROI.(curBioM).data(validT==1,1:numfCh_roi,i)=curFNIR.ROI.(curBioM)(FNIRScellArray{i}.timeIdx(validTidx,2),:,1);
+                outGA.ROI.(curBioM).data(validT,1:numfCh_roi,i)=curFNIR.ROI.(curBioM)(FNIRScellArray{i}.timeIdx(validTidx,2),:,1);
             end
         else
             numfCh_roi=0;
@@ -385,8 +387,8 @@ for i=1:numfSeg
     end
     
     if(isfield(curFNIR,'Aux')&&averageAux&&~isempty(curFNIR.Aux))
-        curSegAuxFields=fields(curFNIR.Aux);
-        
+        curSegAuxFields=fieldnames(curFNIR.Aux);
+
         if(~isempty(curSegAuxFields))
 
             rndTimesIdx=round(FNIRScellArray{i}.timeIdx,4);
@@ -397,10 +399,9 @@ for i=1:numfSeg
                         try
                             if(isstring(curFNIR.Aux.(curAuxField))||ischar(curFNIR.Aux.(curAuxField))||isempty(curFNIR.Aux.(curAuxField))...
                                     ||(~istable(curFNIR.Aux.(curAuxField))&&all(size(curFNIR.Aux.(curAuxField))==[1,1])))
-                                %outGA.Aux.(curAuxField)=[];
                                 continue;
                             end
-                            if(pf2_base.isnestedfield(curFNIR.Aux.(curAuxField),'time'))
+                            if(istable(curFNIR.Aux.(curAuxField))&&ismember('time',curFNIR.Aux.(curAuxField).Properties.VariableNames))
                                 auxTimes=round(curFNIR.Aux.(curAuxField).time,4);
                                 nonTimeColsIdx=~ismember(curFNIR.Aux.(curAuxField).Properties.VariableNames,'time');
                                 
@@ -432,7 +433,7 @@ for i=1:numfSeg
                                 auxTimes=round(curFNIR.Aux.time,4);
                                 nonTimeColsIdx=1;
                             else
-                                outGA.Aux.(curAuxField).data(validT==1,:,i)=nan;
+                                outGA.Aux.(curAuxField).data(validT,:,i)=nan;
                                 continue;
                             end
                             
@@ -441,9 +442,9 @@ for i=1:numfSeg
                             
                             if(~isempty(auxValidIdx))
                                 if(~istable(curFNIR.Aux.(curAuxField)))
-                                    outGA.Aux.(curAuxField).data(auxValidT==1,:,i)=curFNIR.Aux.(curAuxField)(auxValidIdx,nonTimeColsIdx);
+                                    outGA.Aux.(curAuxField).data(auxValidT,:,i)=curFNIR.Aux.(curAuxField)(auxValidIdx,nonTimeColsIdx);
                                 else
-                                    outGA.Aux.(curAuxField).data(auxValidT==1,:,i)=curFNIR.Aux.(curAuxField){auxValidIdx,nonTimeColsIdx};
+                                    outGA.Aux.(curAuxField).data(auxValidT,:,i)=curFNIR.Aux.(curAuxField){auxValidIdx,nonTimeColsIdx};
                                     if(~isfield(outGA.Aux.(curAuxField),'varNames'))
                                         temp_curVarNames=curFNIR.Aux.(curAuxField).Properties.VariableNames;
                                         outGA.Aux.(curAuxField).varNames=temp_curVarNames(~strcmp(temp_curVarNames,'time'));
@@ -473,28 +474,31 @@ end
 
 nanmax3=@(x,dim) nanmax(x,[],dim);
 nanmin3=@(x,dim) nanmin(x,[],dim);
+hAvgFuncs={@nanmean, @nanmedian, nanmax3, nanmin3};
 
 for b=1:length(bioMs) % Calculate hierarchical Average for each variable
     if(showProgress)
         waitbar(b/length(bioMs),hF,sprintf('grandAvgFNIRS\nAveraging biomarker %i of %i',b,length(bioMs)));
     end
     curBioM=bioMs{b};
-    inData= permute(outGA.(curBioM).data,[3,1,2]);
-    [hAvg.(curBioM).Mean,tierLabel,hierarchy]=pf2_base.hierarchicalAverage(inData,hierarchyVars,@nanmean);
-    hAvg.(curBioM).Median=pf2_base.hierarchicalAverage(inData,hierarchyVars,@nanmedian);
-    hAvg.(curBioM).Max=pf2_base.hierarchicalAverage(inData,hierarchyVars,nanmax3);
-    hAvg.(curBioM).Min=pf2_base.hierarchicalAverage(inData,hierarchyVars,nanmin3);
-    
+    inData=permute(outGA.(curBioM).data,[3,1,2]);
+    [res,tierLabel,hierarchy]=pf2_base.hierarchicalAverageMulti(inData,hierarchyVars,hAvgFuncs);
+    hAvg.(curBioM).Mean=res{1};
+    hAvg.(curBioM).Median=res{2};
+    hAvg.(curBioM).Max=res{3};
+    hAvg.(curBioM).Min=res{4};
+
     if(calcROI)
-        inData= permute(outGA.ROI.(curBioM).data,[3,1,2]);
-        [hAvg.ROI.(curBioM).Mean,tierLabel,hierarchy]=pf2_base.hierarchicalAverage(inData,hierarchyVars,@nanmean);
-        hAvg.ROI.(curBioM).Median=pf2_base.hierarchicalAverage(inData,hierarchyVars,@nanmedian);
-        hAvg.ROI.(curBioM).Max=pf2_base.hierarchicalAverage(inData,hierarchyVars,nanmax3);
-        hAvg.ROI.(curBioM).Min=pf2_base.hierarchicalAverage(inData,hierarchyVars,nanmin3);
+        inData=permute(outGA.ROI.(curBioM).data,[3,1,2]);
+        [res,tierLabel,hierarchy]=pf2_base.hierarchicalAverageMulti(inData,hierarchyVars,hAvgFuncs);
+        hAvg.ROI.(curBioM).Mean=res{1};
+        hAvg.ROI.(curBioM).Median=res{2};
+        hAvg.ROI.(curBioM).Max=res{3};
+        hAvg.ROI.(curBioM).Min=res{4};
     end
-    
+
     if(b==1)
-       outGA.info.Observation=tierLabel; 
+       outGA.info.Observation=tierLabel;
        outGA.info.Hierarchy=hierarchy;
        outGA.info.fs=resampleSize;
     end
@@ -537,17 +541,16 @@ end
 if(averageAux)
     for aux=1:numAuxFields
         if(showProgress)
-            fprintf('grandAvgFNIRS\nAveraging Auxillary Data %i of %i',b,length(bioMs));
+            fprintf('grandAvgFNIRS\nAveraging Auxillary Data %i of %i',aux,numAuxFields);
         end
-            
+
             curAuxField=char(auxFields(aux));
-          
-         
-            inData= permute(outGA.Aux.(curAuxField).data,[3,1,2]);
-            [hAvg.Aux.(curAuxField).Mean,hAvg.Aux.(curAuxField).tierLabel,hAvg.Aux.(curAuxField).Hierarchy]=pf2_base.hierarchicalAverage(inData,hierarchyVars,@nanmean);
-            hAvg.Aux.(curAuxField).Median=pf2_base.hierarchicalAverage(inData,hierarchyVars,@nanmedian);
-            hAvg.Aux.(curAuxField).Max=pf2_base.hierarchicalAverage(inData,hierarchyVars,nanmax3);
-            hAvg.Aux.(curAuxField).Min=pf2_base.hierarchicalAverage(inData,hierarchyVars,nanmin3);
+            inData=permute(outGA.Aux.(curAuxField).data,[3,1,2]);
+            [res,hAvg.Aux.(curAuxField).tierLabel,hAvg.Aux.(curAuxField).Hierarchy]=pf2_base.hierarchicalAverageMulti(inData,hierarchyVars,hAvgFuncs);
+            hAvg.Aux.(curAuxField).Mean=res{1};
+            hAvg.Aux.(curAuxField).Median=res{2};
+            hAvg.Aux.(curAuxField).Max=res{3};
+            hAvg.Aux.(curAuxField).Min=res{4};
     end
     
     for aux=1:numAuxFields
