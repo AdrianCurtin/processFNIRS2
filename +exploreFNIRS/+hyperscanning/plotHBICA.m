@@ -45,6 +45,7 @@ function fig = plotHBICA(result, varargin)
     addParameter(p, 'SaveWidth', 1000, @isnumeric);
     addParameter(p, 'SaveHeight', 700, @isnumeric);
     addParameter(p, 'SaveDPI', 150, @isnumeric);
+    addParameter(p, 'TightLayout', false, @islogical);
     parse(p, result, varargin{:});
     opts = p.Results;
 

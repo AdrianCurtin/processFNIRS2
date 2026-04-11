@@ -38,6 +38,7 @@ function fig = plotExperimentTimeline(settings, varargin)
     addParameter(p, 'SaveWidth', 800, @isnumeric);
     addParameter(p, 'SaveHeight', 350, @isnumeric);
     addParameter(p, 'SaveDPI', 150, @isnumeric);
+    addParameter(p, 'TightLayout', false, @islogical);
     parse(p, settings, varargin{:});
     opts = p.Results;
 

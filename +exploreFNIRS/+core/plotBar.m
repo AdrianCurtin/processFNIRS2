@@ -81,6 +81,7 @@ function fig = plotBar(groups, varargin)
     addParameter(p, 'SaveWidth', 600, @isnumeric);
     addParameter(p, 'SaveHeight', 400, @isnumeric);
     addParameter(p, 'SaveDPI', 150, @isnumeric);
+    addParameter(p, 'TightLayout', false, @islogical);
     addParameter(p, 'Colors', [], @(x) isempty(x) || isnumeric(x) || ischar(x) || isstring(x) || isa(x, 'function_handle') || isa(x, 'exploreFNIRS.core.ColorScheme'));
     parse(p, groups, varargin{:});
     opts = p.Results;

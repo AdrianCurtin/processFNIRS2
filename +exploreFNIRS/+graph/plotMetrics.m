@@ -48,6 +48,7 @@ function fig = plotMetrics(results, varargin)
     addParameter(p, 'SaveWidth', 800, @isnumeric);
     addParameter(p, 'SaveHeight', 400, @isnumeric);
     addParameter(p, 'SaveDPI', 150, @isnumeric);
+    addParameter(p, 'TightLayout', false, @islogical);
     parse(p, results, varargin{:});
     opts = p.Results;
     metricName = lower(opts.Metric);
@@ -116,13 +117,13 @@ function fig = plotMetrics(results, varargin)
     ylabel(ax, formatMetricName(metricName), 'FontSize', sty.FontSize);
 
     if nGroups > 1
-        lg = legend(ax, groupLabels, 'Location', 'best', 'FontSize', sty.FontSize - 1);
+        lg = legend(ax, pf2_base.plot.escapeTeX(groupLabels), 'Location', 'best', 'FontSize', sty.FontSize - 1);
         set(lg, 'TextColor', sty.LegendTextColor, ...
             'Color', sty.LegendBgColor, 'EdgeColor', sty.LegendEdgeColor);
     end
 
     if ~isempty(opts.Title)
-        title(ax, opts.Title, 'FontSize', sty.FontSize + 1);
+        title(ax, pf2_base.plot.escapeTeX(opts.Title), 'FontSize', sty.FontSize + 1);
     else
         title(ax, formatMetricName(metricName), 'FontSize', sty.FontSize + 1);
     end

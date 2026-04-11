@@ -46,6 +46,7 @@ function fig = plotDyadMatrix(result, varargin)
     addParameter(p, 'SaveWidth', 700, @isnumeric);
     addParameter(p, 'SaveHeight', 500, @isnumeric);
     addParameter(p, 'SaveDPI', 150, @isnumeric);
+    addParameter(p, 'TightLayout', false, @islogical);
     parse(p, result, varargin{:});
     opts = p.Results;
 
@@ -138,19 +139,19 @@ function fig = plotDyadMatrix(result, varargin)
     end
 
     % Axis labels
-    set(ax, 'XTick', 1:nDyads, 'XTickLabel', dyadLabels, 'XTickLabelRotation', 45);
-    set(ax, 'YTick', 1:nCh, 'YTickLabel', chLabels);
+    set(ax, 'XTick', 1:nDyads, 'XTickLabel', pf2_base.plot.escapeTeX(dyadLabels), 'XTickLabelRotation', 45);
+    set(ax, 'YTick', 1:nCh, 'YTickLabel', pf2_base.plot.escapeTeX(chLabels));
 
     % Reduce label density for large matrices
     if nDyads > 20
         tickStep = ceil(nDyads / 20);
         ticks = 1:tickStep:nDyads;
-        set(ax, 'XTick', ticks, 'XTickLabel', dyadLabels(ticks));
+        set(ax, 'XTick', ticks, 'XTickLabel', pf2_base.plot.escapeTeX(dyadLabels(ticks)));
     end
     if nCh > 20
         tickStep = ceil(nCh / 20);
         ticks = 1:tickStep:nCh;
-        set(ax, 'YTick', ticks, 'YTickLabel', chLabels(ticks));
+        set(ax, 'YTick', ticks, 'YTickLabel', pf2_base.plot.escapeTeX(chLabels(ticks)));
     end
 
     xlabel(ax, 'Dyad');
@@ -158,7 +159,7 @@ function fig = plotDyadMatrix(result, varargin)
 
     % Title
     if ~isempty(opts.Title)
-        title(ax, opts.Title);
+        title(ax, pf2_base.plot.escapeTeX(opts.Title));
     else
         methodStr = '';
         bioStr = '';
@@ -168,7 +169,7 @@ function fig = plotDyadMatrix(result, varargin)
         if isfield(result, 'biomarker')
             bioStr = result.biomarker;
         end
-        title(ax, sprintf('Dyad Coupling (%s, %s, N=%d)', methodStr, bioStr, nDyads));
+        title(ax, pf2_base.plot.escapeTeX(sprintf('Dyad Coupling (%s, %s, N=%d)', methodStr, bioStr, nDyads)));
     end
 
     % Apply style

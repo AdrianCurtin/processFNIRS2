@@ -22,6 +22,8 @@ function results = effectSize(groups, groupByVars, varargin)
 %   Seed        - Random seed for reproducibility (default: 2024)
 %   Biomarkers  - Cell array of biomarker names (default: {'HbO','HbR','HbTotal','CBSI'})
 %   Channels    - Channel indices (default: all)
+%   DataType    - 'fNIRS' (default) or 'ROI'. When 'ROI', computes effect
+%                 sizes per ROI instead of per channel.
 %   StatWindow  - [start, end] seconds to filter time bins (default: [])
 %   Verbose     - Print progress (default: true)
 %   ExcludeShortSeparation - Skip short-sep channels (default: true)
@@ -31,6 +33,7 @@ function results = effectSize(groups, groupByVars, varargin)
 %     .observed       - [nBio x nCh] effect size values
 %     .ci_lower       - [nBio x nCh] lower CI bound
 %     .ci_upper       - [nBio x nCh] upper CI bound
+%     .p              - [nBio x nCh] parametric p-values (two-sample t-test)
 %     .bootstrap_dist - {nBio x nCh} cell of bootstrap distributions
 %     .method         - Effect size method used
 %     .ci_level       - Confidence level used
@@ -39,6 +42,8 @@ function results = effectSize(groups, groupByVars, varargin)
 %     .channels       - Channel indices
 %     .conditions     - {2 x 1} cell of condition labels
 %     .nPerGroup      - [1 x 2] sample sizes
+%     .dataType       - 'fNIRS' or 'ROI'
+%     .labels         - Channel numbers or ROI names (for display)
 %
 % Example:
 %   ex = exploreFNIRS.core.Experiment(data);
@@ -68,6 +73,7 @@ function results = effectSize(groups, groupByVars, varargin)
     addParameter(p, 'Seed', 2024, @isnumeric);
     addParameter(p, 'Biomarkers', {'HbO','HbR','HbTotal','CBSI'}, @iscell);
     addParameter(p, 'Channels', [], @isnumeric);
+    addParameter(p, 'DataType', 'fNIRS', @ischar);
     addParameter(p, 'StatWindow', [], @isnumeric);
     addParameter(p, 'Verbose', true, @islogical);
     addParameter(p, 'ExcludeShortSeparation', true, @islogical);
@@ -90,10 +96,31 @@ function results = effectSize(groups, groupByVars, varargin)
             nGroups);
     end
 
+    isROIMode = strcmpi(opts.DataType, 'ROI');
+    ga = groups(1).gbyGrandBarFlat;
+
+    % Filter biomarkers to those available
+    validBio = {};
+    for i = 1:length(opts.Biomarkers)
+        if isROIMode
+            if pf2_base.isnestedfield(ga, ['ROI.' opts.Biomarkers{i}])
+                validBio{end+1} = opts.Biomarkers{i}; %#ok<AGROW>
+            end
+        else
+            if isfield(ga, opts.Biomarkers{i}) && ~isempty(ga.(opts.Biomarkers{i}))
+                validBio{end+1} = opts.Biomarkers{i}; %#ok<AGROW>
+            end
+        end
+    end
+    if isempty(validBio)
+        error('exploreFNIRS:stats:effectSize:noBiomarkers', ...
+            'None of the requested biomarkers found in data.');
+    end
+    opts.Biomarkers = validBio;
     nBioM = length(opts.Biomarkers);
 
     % Get time bins and apply StatWindow mask
-    barTimes = groups(1).gbyGrandBarFlat.time;
+    barTimes = ga.time;
     if ~isempty(opts.StatWindow)
         sw = opts.StatWindow;
         if ~isnumeric(sw) || numel(sw) ~= 2
@@ -105,26 +132,55 @@ function results = effectSize(groups, groupByVars, varargin)
         tMask = true(size(barTimes));
     end
 
-    % Determine channels
+    % Determine channels/ROIs
     firstBio = opts.Biomarkers{1};
-    if isempty(opts.Channels)
-        nCh = size(groups(1).gbyGrandBarFlat.(firstBio).data, 2);
-        channels = 1:nCh;
-    else
-        channels = opts.Channels;
-        nCh = length(channels);
-    end
-
-    % Exclude short separation channels
-    if opts.ExcludeShortSeparation
-        ssIdx = getShortSeparationIdx(groups);
-        if ~isempty(ssIdx)
-            channels = channels(~ismember(channels, ssIdx));
+    if isROIMode
+        if ~isfield(ga, 'ROI')
+            error('exploreFNIRS:stats:effectSize:noROI', ...
+                'No ROI data in grand average. Define ROIs before aggregating.');
+        end
+        if isempty(opts.Channels)
+            nCh = size(ga.ROI.(firstBio).data, 2);
+            channels = 1:nCh;
+        else
+            channels = opts.Channels;
             nCh = length(channels);
-            if opts.Verbose
-                fprintf('Excluding %d short separation channels\n', length(ssIdx));
+        end
+    else
+        if isempty(opts.Channels)
+            nCh = size(ga.(firstBio).data, 2);
+            channels = 1:nCh;
+        else
+            channels = opts.Channels;
+            nCh = length(channels);
+        end
+
+        % Exclude short separation channels (channel mode only)
+        if opts.ExcludeShortSeparation
+            ssIdx = getShortSeparationIdx(groups);
+            if ~isempty(ssIdx)
+                channels = channels(~ismember(channels, ssIdx));
+                nCh = length(channels);
+                if opts.Verbose
+                    fprintf('Excluding %d short separation channels\n', length(ssIdx));
+                end
             end
         end
+    end
+
+    % Build display labels
+    if isROIMode && isfield(ga.ROI, 'info')
+        roiInfo = ga.ROI.info;
+        if istable(roiInfo)
+            allNames = roiInfo.Properties.RowNames;
+        elseif isstruct(roiInfo) && isfield(roiInfo, 'Names')
+            allNames = roiInfo.Names;
+        else
+            allNames = arrayfun(@(i) sprintf('ROI%d', i), channels, 'UniformOutput', false);
+        end
+        labels = allNames(channels);
+    else
+        labels = arrayfun(@(c) sprintf('Ch%d', c), channels, 'UniformOutput', false);
     end
 
     % Initialize results
@@ -132,6 +188,7 @@ function results = effectSize(groups, groupByVars, varargin)
     results.observed = nan(nBioM, nCh);
     results.ci_lower = nan(nBioM, nCh);
     results.ci_upper = nan(nBioM, nCh);
+    results.p = nan(nBioM, nCh);
     results.bootstrap_dist = cell(nBioM, nCh);
     results.method = opts.Method;
     results.ci_level = opts.CI;
@@ -139,10 +196,17 @@ function results = effectSize(groups, groupByVars, varargin)
     results.biomarkers = opts.Biomarkers;
     results.channels = channels;
     results.conditions = {groups(1).label, groups(2).label};
+    results.dataType = opts.DataType;
+    results.labels = labels;
 
     % Get per-group sample sizes from 3rd dim of data
-    nA = size(groups(1).gbyGrandBarFlat.(firstBio).data, 3);
-    nB = size(groups(2).gbyGrandBarFlat.(firstBio).data, 3);
+    if isROIMode
+        nA = size(groups(1).gbyGrandBarFlat.ROI.(firstBio).data, 3);
+        nB = size(groups(2).gbyGrandBarFlat.ROI.(firstBio).data, 3);
+    else
+        nA = size(groups(1).gbyGrandBarFlat.(firstBio).data, 3);
+        nB = size(groups(2).gbyGrandBarFlat.(firstBio).data, 3);
+    end
     results.nPerGroup = [nA, nB];
 
     rng(opts.Seed);
@@ -155,9 +219,14 @@ function results = effectSize(groups, groupByVars, varargin)
             ch = channels(chI);
 
             % Extract per-subject means from gbyGrandBarFlat
-            % Data is [time x channels x subjects]
-            dataA = groups(1).gbyGrandBarFlat.(bioM).data(tMask, ch, :);
-            dataB = groups(2).gbyGrandBarFlat.(bioM).data(tMask, ch, :);
+            % Data is [time x channels/ROIs x subjects]
+            if isROIMode
+                dataA = groups(1).gbyGrandBarFlat.ROI.(bioM).data(tMask, ch, :);
+                dataB = groups(2).gbyGrandBarFlat.ROI.(bioM).data(tMask, ch, :);
+            else
+                dataA = groups(1).gbyGrandBarFlat.(bioM).data(tMask, ch, :);
+                dataB = groups(2).gbyGrandBarFlat.(bioM).data(tMask, ch, :);
+            end
 
             % Average across time bins -> [1 x 1 x nSub] -> [nSub x 1]
             meansA = squeeze(mean(dataA, 1, 'omitnan'));
@@ -178,6 +247,10 @@ function results = effectSize(groups, groupByVars, varargin)
             % Compute observed effect size
             results.observed(bIdx, chI) = computeES(meansA, meansB, opts.Method);
 
+            % Parametric p-value (two-sample t-test)
+            [~, pval] = ttest2(meansA, meansB);
+            results.p(bIdx, chI) = pval;
+
             % Bootstrap CI
             bootDist = nan(opts.NumBoot, 1);
             nAval = length(meansA);
@@ -196,8 +269,10 @@ function results = effectSize(groups, groupByVars, varargin)
 
         if opts.Verbose
             sigCount = sum(~isnan(results.observed(bIdx, :)));
-            fprintf('Effect size [%s]: computed for %d/%d channels\n', ...
-                bioM, sigCount, nCh);
+            unitLabel = 'channels';
+            if isROIMode, unitLabel = 'ROIs'; end
+            fprintf('Effect size [%s]: computed for %d/%d %s\n', ...
+                bioM, sigCount, nCh, unitLabel);
         end
     end
 end

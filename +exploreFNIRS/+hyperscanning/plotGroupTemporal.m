@@ -52,6 +52,7 @@ function fig = plotGroupTemporal(result, varargin)
     addParameter(p, 'SaveWidth', 800, @isnumeric);
     addParameter(p, 'SaveHeight', 450, @isnumeric);
     addParameter(p, 'SaveDPI', 150, @isnumeric);
+    addParameter(p, 'TightLayout', false, @islogical);
     parse(p, result, varargin{:});
     opts = p.Results;
 

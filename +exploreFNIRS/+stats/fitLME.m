@@ -30,8 +30,14 @@ function results = fitLME(groups, groupByVars, varargin)
 %   ExcludeShortSeparation - Skip short separation channels (default: true)
 %   DataType          - 'fNIRS' (default), 'Aux', or 'ROI'
 %   AuxField          - Aux field name (required when DataType='Aux')
-%   DiscreteTime      - Convert Time to categorical (default: true). When false,
-%                        Time remains numeric for continuous regression.
+%   TimeModel         - How to model Time when multiple bins exist (default: 'polynomial'):
+%                        'polynomial'  - Orthogonal polynomial time (growth curve analysis)
+%                        'discrete'    - Categorical dummy codes (one per bin)
+%                        'continuous'  - Centered numeric time (linear trend)
+%                        'none'        - Drop Time from model entirely
+%   PolynomialOrder   - Degree for polynomial TimeModel (default: 2, range: 1-5)
+%   DiscreteTime      - [Deprecated] Use TimeModel instead. true maps to
+%                        'discrete', false maps to 'continuous'.
 %   ModelFitTest      - Run joint coefficient test H0:all betas=0 (default: true)
 %   SkipContrasts     - Skip auto-contrast generation (default: false)
 %
@@ -56,6 +62,9 @@ function results = fitLME(groups, groupByVars, varargin)
 %     .coef_tstat      - Table of coefficient t-statistics [channels x coefficients]
 %     .coef_df         - Table of coefficient degrees of freedom [channels x coefficients]
 %     .modelFit        - Table of joint coefficient test results [channels x {p,F,df1,df2}]
+%     .timeModel       - TimeModel string used ('polynomial', 'discrete', etc.)
+%     .termLabels      - Struct mapping polynomial terms to readable names
+%                        (e.g. termLabels.ot1 = 'Time (Linear)')
 %
 % Example:
 %   ex = exploreFNIRS.core.Experiment(data);
@@ -76,6 +85,9 @@ function results = fitLME(groups, groupByVars, varargin)
 %   Satterthwaite, F. E. (1946). An approximate distribution of estimates
 %   of variance components. Biometrics Bulletin, 2(6), 110-114.
 %
+%   Mirman, D. (2017). Growth Curve Analysis and Visualization Using R.
+%   Chapman and Hall/CRC. DOI: 10.1201/9781315373218
+%
 % See also: exploreFNIRS.stats.runContrasts, exploreFNIRS.stats.summarize,
 %           exploreFNIRS.core.plotLME, exploreFNIRS.fx.autoContrast, fitlme
 
@@ -95,12 +107,31 @@ function results = fitLME(groups, groupByVars, varargin)
     addParameter(p, 'AuxField', '', @ischar);
     addParameter(p, 'ExcludeShortSeparation', true, @islogical);
     addParameter(p, 'SkipTimeFactor', false, @islogical);
-    addParameter(p, 'DiscreteTime', true, @islogical);
+    addParameter(p, 'TimeModel', '', @ischar);
+    addParameter(p, 'PolynomialOrder', 2, @(x) isnumeric(x) && isscalar(x) && x >= 1 && x <= 5);
+    addParameter(p, 'DiscreteTime', [], @islogical);
     addParameter(p, 'ModelFitTest', true, @islogical);
     addParameter(p, 'SkipContrasts', false, @islogical);
     addParameter(p, 'StatWindow', [], @isnumeric);
     parse(p, groups, groupByVars, varargin{:});
     opts = p.Results;
+
+    % Resolve TimeModel from deprecated DiscreteTime if needed
+    if ~isempty(opts.DiscreteTime)
+        if isempty(opts.TimeModel)
+            if opts.DiscreteTime
+                opts.TimeModel = 'discrete';
+            else
+                opts.TimeModel = 'continuous';
+            end
+            warning('pf2:stats:deprecatedParam', ...
+                'DiscreteTime is deprecated. Use TimeModel=''%s'' instead.', ...
+                opts.TimeModel);
+        end
+    end
+    if isempty(opts.TimeModel)
+        opts.TimeModel = 'polynomial';
+    end
 
     isAux = strcmpi(opts.DataType, 'Aux');
     isROI = strcmpi(opts.DataType, 'ROI');
@@ -147,11 +178,28 @@ function results = fitLME(groups, groupByVars, varargin)
     % Auto-include Time as factor when multiple time bins exist
     % (skip for GLM betas where time bins are meaningless)
     hasMultipleTimeBins = length(barTimes) > 1;
-    if hasMultipleTimeBins && ~ismember('Time', groupByVars) && ~opts.SkipTimeFactor
+    skipTimeInclusion = strcmpi(opts.TimeModel, 'none');
+    if hasMultipleTimeBins && ~ismember('Time', groupByVars) && ~opts.SkipTimeFactor && ~skipTimeInclusion
         groupByVars = [groupByVars, {'Time'}];
         if opts.Verbose
-            fprintf('Multiple time bins (%d). Auto-including Time as fixed effect.\n', ...
-                length(barTimes));
+            tmLabel = opts.TimeModel;
+            if strcmpi(tmLabel, 'polynomial')
+                tmLabel = sprintf('polynomial (order %d)', opts.PolynomialOrder);
+            end
+            fprintf('Multiple time bins (%d). Auto-including Time as %s.\n', ...
+                length(barTimes), tmLabel);
+        end
+    end
+
+    % Clamp PolynomialOrder to available time bins
+    if strcmpi(opts.TimeModel, 'polynomial') && hasMultipleTimeBins
+        maxOrder = length(barTimes) - 1;
+        if opts.PolynomialOrder > maxOrder
+            if opts.Verbose
+                fprintf('Clamping PolynomialOrder from %d to %d (%d time bins).\n', ...
+                    opts.PolynomialOrder, maxOrder, length(barTimes));
+            end
+            opts.PolynomialOrder = maxOrder;
         end
     end
 
@@ -185,15 +233,8 @@ function results = fitLME(groups, groupByVars, varargin)
                 'Empty merged table for aux data');
         end
 
-        % Convert Time to categorical for use as factor
-        if ismember('Time', mergedTable.Properties.VariableNames)
-            if iscell(mergedTable.Time) || isstring(mergedTable.Time)
-                mergedTable.Time = str2double(mergedTable.Time);
-            end
-            if hasMultipleTimeBins && opts.DiscreteTime
-                mergedTable.Time = categorical(mergedTable.Time);
-            end
-        end
+        % Transform Time column based on TimeModel
+        mergedTable = prepareTimeColumn(mergedTable, opts, hasMultipleTimeBins);
 
         % Build aux column names (matching mergeGbyTablesLong convention)
         % Use the resolved field name (may have _data suffix) for column matching
@@ -295,15 +336,8 @@ function results = fitLME(groups, groupByVars, varargin)
                     continue;
                 end
 
-                % Convert Time to categorical for use as factor
-                if ismember('Time', mergedTable.Properties.VariableNames)
-                    if iscell(mergedTable.Time) || isstring(mergedTable.Time)
-                        mergedTable.Time = str2double(mergedTable.Time);
-                    end
-                    if hasMultipleTimeBins && opts.DiscreteTime
-                        mergedTable.Time = categorical(mergedTable.Time);
-                    end
-                end
+                % Transform Time column based on TimeModel
+                mergedTable = prepareTimeColumn(mergedTable, opts, hasMultipleTimeBins);
 
                 % Build response variable name (matches mergeGbyTablesLong ROI convention)
                 varName = sprintf('ROI%d_%s_%s', roiIdx, roiLabel, bioM);
@@ -382,14 +416,7 @@ function results = fitLME(groups, groupByVars, varargin)
                 if isempty(mTable) || height(mTable) == 0
                     continue;
                 end
-                if ismember('Time', mTable.Properties.VariableNames)
-                    if iscell(mTable.Time) || isstring(mTable.Time)
-                        mTable.Time = str2double(mTable.Time);
-                    end
-                    if hasMultipleTimeBins && opts.DiscreteTime
-                        mTable.Time = categorical(mTable.Time);
-                    end
-                end
+                mTable = prepareTimeColumn(mTable, opts, hasMultipleTimeBins);
                 varName = sprintf('Opt%s_%s', chLabels{chI}, bioM);
                 if ~ismember(varName, mTable.Properties.VariableNames)
                     continue;
@@ -461,15 +488,8 @@ function results = fitLME(groups, groupByVars, varargin)
                         continue;
                     end
 
-                    % Convert Time to categorical for use as factor
-                    if ismember('Time', mergedTable.Properties.VariableNames)
-                        if iscell(mergedTable.Time) || isstring(mergedTable.Time)
-                            mergedTable.Time = str2double(mergedTable.Time);
-                        end
-                        if hasMultipleTimeBins && opts.DiscreteTime
-                            mergedTable.Time = categorical(mergedTable.Time);
-                        end
-                    end
+                    % Transform Time column based on TimeModel
+                    mergedTable = prepareTimeColumn(mergedTable, opts, hasMultipleTimeBins);
 
                     % Build variable name (response)
                     varName = sprintf('Opt%s_%s', chLabels{chI}, bioM);
@@ -500,6 +520,12 @@ function results = fitLME(groups, groupByVars, varargin)
     end
 
     results.statWindow = opts.StatWindow;
+    results.timeModel = opts.TimeModel;
+
+    % Build readable term labels for polynomial terms
+    if strcmpi(opts.TimeModel, 'polynomial')
+        results.termLabels = buildTermLabels(opts.PolynomialOrder);
+    end
 
     % Print ANOVA summary
     if opts.Verbose && ~isempty(results.anova_pval) && height(results.anova_pval) > 0
@@ -515,6 +541,14 @@ function [lmeString, dummyCodeStr] = buildFormula(varName, groupByVars, opts)
 % Build LME formula string from groupby variables and options
 
     dummyCodeStr = 'reference';
+    isPolyTime = strcmpi(opts.TimeModel, 'polynomial') && any(strcmpi(groupByVars, 'Time'));
+
+    % Separate polynomial time terms from regular groupby vars
+    if isPolyTime
+        nonTimeVars = groupByVars(~strcmpi(groupByVars, 'Time'));
+    else
+        nonTimeVars = groupByVars;
+    end
 
     % Build fixed effects part
     basicParts = {};
@@ -527,36 +561,70 @@ function [lmeString, dummyCodeStr] = buildFormula(varName, groupByVars, opts)
         mdlPrtString = '1';
     end
 
-    % Add groupby variables
+    % Add groupby variables (excluding Time for polynomial mode)
     if opts.AllInteractions
         curLMEGbyString = mdlPrtString;
-        for i = 1:length(groupByVars)
-            curLMEGbyString = sprintf('%s*%s', curLMEGbyString, groupByVars{i});
+        for i = 1:length(nonTimeVars)
+            curLMEGbyString = sprintf('%s*%s', curLMEGbyString, nonTimeVars{i});
         end
     else
         parts = {};
-        for i = 1:length(groupByVars)
+        for i = 1:length(nonTimeVars)
             if strcmp(mdlPrtString, '1')
-                parts{end+1} = groupByVars{i}; %#ok<AGROW>
+                parts{end+1} = nonTimeVars{i}; %#ok<AGROW>
             else
-                parts{end+1} = sprintf('%s*%s', mdlPrtString, groupByVars{i}); %#ok<AGROW>
+                parts{end+1} = sprintf('%s*%s', mdlPrtString, nonTimeVars{i}); %#ok<AGROW>
             end
         end
         curLMEGbyString = strjoin(parts, '+');
     end
 
+    % Append polynomial time terms and interactions
+    if isPolyTime
+        polyOrder = opts.PolynomialOrder;
+        otTerms = arrayfun(@(k) sprintf('ot%d', k), 1:polyOrder, ...
+            'UniformOutput', false);
+
+        % Main effects: ot1 + ot2 + ot3
+        polyMain = strjoin(otTerms, '+');
+
+        % Interactions: each non-Time groupby var x each ot term
+        polyInteract = {};
+        for i = 1:length(nonTimeVars)
+            for k = 1:polyOrder
+                polyInteract{end+1} = sprintf('%s:ot%d', nonTimeVars{i}, k); %#ok<AGROW>
+            end
+        end
+        polyInteractStr = strjoin(polyInteract, '+');
+
+        if isempty(curLMEGbyString) || strcmp(curLMEGbyString, '1')
+            curLMEGbyString = polyMain;
+        else
+            curLMEGbyString = sprintf('%s+%s', curLMEGbyString, polyMain);
+        end
+        if ~isempty(polyInteractStr)
+            curLMEGbyString = sprintf('%s+%s', curLMEGbyString, polyInteractStr);
+        end
+    end
+
+    % Random effects: upgrade to random slope for polynomial time
+    randomFx = opts.RandomEffects;
+    if isPolyTime && strcmp(randomFx, '1|SubjectID')
+        randomFx = '1+ot1|SubjectID';
+    end
+
     % Build full formula
     if opts.UseIntercept
         if isempty(curLMEGbyString) || strcmp(curLMEGbyString, '1')
-            lmeString = sprintf('%s~1+(%s)', varName, opts.RandomEffects);
+            lmeString = sprintf('%s~1+(%s)', varName, randomFx);
         else
             lmeString = sprintf('%s~%s+(%s)', varName, curLMEGbyString, ...
-                opts.RandomEffects);
+                randomFx);
         end
     else
         dummyCodeStr = 'full';
         lmeString = sprintf('%s~-1+%s+(%s)', varName, ...
-            strrep(curLMEGbyString, '*', ':'), opts.RandomEffects);
+            strrep(curLMEGbyString, '*', ':'), randomFx);
     end
 end
 
@@ -597,6 +665,7 @@ function results = initResults(nBioM, nCh, biomarkers, channels, groupByVars)
     results.channels = channels;
     results.groupByVars = groupByVars;
     results.statWindow = [];
+    results.termLabels = struct();
 end
 
 
@@ -620,6 +689,12 @@ function results = fitOneModel(results, mergedTable, varName, chRowName, ...
 
     results.formula = lmeString;
 
+    % Suppress MATLAB's own fitlme warnings when not verbose
+    if ~opts.Verbose
+        prevWarn = warning('off', 'all');
+        cleanupObj = onCleanup(@() warning(prevWarn));
+    end
+
     try
         rng(2019);
         mdl = fitlme(mergedTable, lmeString, ...
@@ -628,7 +703,43 @@ function results = fitOneModel(results, mergedTable, varName, chRowName, ...
 
         results.models{bIdx, chI} = mdl;
         results.AIC(bIdx, chI) = mdl.ModelCriterion.AIC;
+    catch ME_fit
+        % Convergence fallback: if polynomial random slope failed, retry
+        % with intercept-only random effects
+        if contains(lmeString, '1+ot1|SubjectID')
+            fallbackFormula = strrep(lmeString, '1+ot1|SubjectID', '1|SubjectID');
+            try
+                if opts.Verbose
+                    warning('pf2:stats:polyFallback', ...
+                        'Random slope model failed for %s. Falling back to (1|SubjectID).', ...
+                        varName);
+                end
+                rng(2019);
+                mdl = fitlme(mergedTable, fallbackFormula, ...
+                    'FitMethod', 'REML', 'CheckHessian', true, ...
+                    'DummyVarCoding', dummyCodeStr);
+                lmeString = fallbackFormula;
+                results.formula = lmeString;
+                results.models{bIdx, chI} = mdl;
+                results.AIC(bIdx, chI) = mdl.ModelCriterion.AIC;
+            catch ME_fallback
+                if opts.Verbose
+                    warning('pf2:stats:lmeFailed', ...
+                        'LME failed for %s (fallback also failed): %s', ...
+                        varName, ME_fallback.message);
+                end
+                return;
+            end
+        else
+            if opts.Verbose
+                warning('pf2:stats:lmeFailed', ...
+                    'LME failed for %s: %s', varName, ME_fit.message);
+            end
+            return;
+        end
+    end
 
+    try
         % ANOVA with Satterthwaite degrees of freedom
         anv = anova(mdl, 'DFMethod', 'satterthwaite');
         results.anova{bIdx, chI} = anv;
@@ -706,6 +817,95 @@ function results = fitOneModel(results, mergedTable, varName, chRowName, ...
             warning('pf2:stats:lmeFailed', ...
                 'LME failed for %s: %s', varName, ME.message);
         end
+    end
+end
+
+
+function labels = buildTermLabels(polyOrder)
+% BUILDTERMLABELS Map polynomial term names to readable labels
+%
+% Returns a struct where field names are the sanitized ANOVA term names
+% (e.g. 'ot1') and values are readable strings (e.g. 'Time (Linear)').
+
+    ordinalNames = {'Linear', 'Quadratic', 'Cubic', 'Quartic', 'Quintic'};
+    labels = struct();
+
+    for k = 1:polyOrder
+        termName = sprintf('ot%d', k);
+        if k <= length(ordinalNames)
+            labels.(termName) = sprintf('Time (%s)', ordinalNames{k});
+        else
+            labels.(termName) = sprintf('Time (Order %d)', k);
+        end
+    end
+end
+
+
+function T = prepareTimeColumn(T, opts, hasMultipleTimeBins)
+% PREPARETIMECOLUMN Transform Time column based on TimeModel setting
+%
+% Handles conversion from raw time values to the representation needed
+% for the selected TimeModel: polynomial, discrete, continuous, or none.
+
+    if ~ismember('Time', T.Properties.VariableNames)
+        return;
+    end
+
+    % Ensure numeric
+    if iscell(T.Time) || isstring(T.Time)
+        T.Time = str2double(T.Time);
+    end
+
+    if ~hasMultipleTimeBins
+        return;
+    end
+
+    switch lower(opts.TimeModel)
+        case 'polynomial'
+            % Orthogonal polynomial coding via QR decomposition
+            % Center time to [-1, 1] then compute ot1..otK
+            timeVals = T.Time;
+            uTime = unique(timeVals);
+            nBins = length(uTime);
+            polyOrder = min(opts.PolynomialOrder, nBins - 1);
+
+            % Map to [-1, 1]
+            tMin = min(uTime);
+            tMax = max(uTime);
+            if tMax == tMin
+                tNorm = zeros(size(uTime));
+            else
+                tNorm = 2 * (uTime - tMin) / (tMax - tMin) - 1;
+            end
+
+            % Build raw polynomial matrix and orthogonalize via QR
+            rawPoly = zeros(nBins, polyOrder);
+            for k = 1:polyOrder
+                rawPoly(:, k) = tNorm .^ k;
+            end
+            [Q, ~] = qr(rawPoly, 0);
+
+            % Map each observation's time bin to its orthogonal polynomial values
+            [~, binIdx] = ismember(timeVals, uTime);
+            for k = 1:polyOrder
+                colName = sprintf('ot%d', k);
+                T.(colName) = Q(binIdx, k);
+            end
+
+            % Remove Time column (polynomial terms replace it)
+            T.Time = [];
+
+        case 'discrete'
+            % Categorical dummy codes (original DiscreteTime=true behavior)
+            T.Time = categorical(T.Time);
+
+        case 'continuous'
+            % Center numeric time around mean
+            T.Time = T.Time - mean(T.Time);
+
+        case 'none'
+            % Drop Time entirely
+            T.Time = [];
     end
 end
 

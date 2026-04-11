@@ -454,6 +454,7 @@ function [dimMap, plotOpts, filterObj] = parseDimArgs(plotType, varargin)
     addParameter(p, 'SaveWidth', 600, @isnumeric);
     addParameter(p, 'SaveHeight', 400, @isnumeric);
     addParameter(p, 'SaveDPI', 150, @isnumeric);
+    addParameter(p, 'TightLayout', false, @islogical);
 
     % Colors
     addParameter(p, 'Colors', [], @(x) isempty(x) || isnumeric(x) || ischar(x) || isstring(x) || isa(x, 'function_handle') || isa(x, 'exploreFNIRS.core.ColorScheme'));
@@ -534,7 +535,8 @@ function [dimMap, plotOpts, filterObj] = parseDimArgs(plotType, varargin)
         'TaskStart', r.TaskStart, ...
         'TaskEnd', r.TaskEnd, ...
         'Colors', r.Colors, ...
-        'ColorScheme', r.ColorScheme);
+        'ColorScheme', r.ColorScheme, ...
+        'TightLayout', r.TightLayout);
 
     filterObj = r.Filter;
     if isempty(filterObj)

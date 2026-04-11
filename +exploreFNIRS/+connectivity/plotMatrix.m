@@ -44,6 +44,7 @@ function fig = plotMatrix(result, varargin)
     addParameter(p, 'SaveWidth', 600, @isnumeric);
     addParameter(p, 'SaveHeight', 550, @isnumeric);
     addParameter(p, 'SaveDPI', 150, @isnumeric);
+    addParameter(p, 'TightLayout', false, @islogical);
     parse(p, result, varargin{:});
     opts = p.Results;
     result = exploreFNIRS.connectivity.normalizeResult(result);

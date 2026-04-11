@@ -25,6 +25,9 @@ function [fig, results] = plotLME(groups, groupByVars, varargin)
 %                    Biomarkers not found in data are silently skipped.
 %                    Ignored when DataType='Aux'.
 %   Channels       - Vector of channel indices (default: all)
+%   ROIs           - ROI indices, names, or 'all' (default: [])
+%                    Mutually exclusive with Channels. Automatically sets
+%                    DataType to 'ROI'.
 %   AuxField       - Aux field name (required when DataType='Aux')
 %   RandomEffects  - Random effects formula (default: '1|SubjectID')
 %   UseIntercept   - Include intercept (default: true)
@@ -88,6 +91,7 @@ function [fig, results] = plotLME(groups, groupByVars, varargin)
     addRequired(p, 'groupByVars', @iscell);
     addParameter(p, 'Biomarkers', {'HbO','HbR','HbTotal','CBSI'}, @iscell);
     addParameter(p, 'Channels', [], @isnumeric);
+    addParameter(p, 'ROIs', [], @(x) isnumeric(x) || islogical(x) || ischar(x) || isstring(x) || iscell(x));
     addParameter(p, 'AuxField', '', @ischar);
     addParameter(p, 'RandomEffects', '1|SubjectID', @ischar);
     addParameter(p, 'UseIntercept', true, @islogical);
@@ -105,10 +109,13 @@ function [fig, results] = plotLME(groups, groupByVars, varargin)
     addParameter(p, 'SaveWidth', 800, @isnumeric);
     addParameter(p, 'SaveHeight', 500, @isnumeric);
     addParameter(p, 'SaveDPI', 150, @isnumeric);
+    addParameter(p, 'TightLayout', false, @islogical);
     addParameter(p, 'ExcludeShortSeparation', true, @islogical);
     addParameter(p, 'Device', [], @(x) isempty(x) || isa(x, 'pf2.Device') || ischar(x) || isstring(x));
     addParameter(p, 'DataType', 'fNIRS', @ischar);
     addParameter(p, 'SkipTimeFactor', false, @islogical);
+    addParameter(p, 'TimeModel', '', @ischar);
+    addParameter(p, 'PolynomialOrder', 2, @(x) isnumeric(x) && isscalar(x) && x >= 1 && x <= 5);
     addParameter(p, 'StatWindow', [], @isnumeric);
     addParameter(p, 'Colors', [], @(x) isempty(x) || isnumeric(x) || ischar(x) || isstring(x) || isa(x, 'function_handle') || isa(x, 'exploreFNIRS.core.ColorScheme'));
     parse(p, groups, groupByVars, varargin{:});
@@ -118,8 +125,38 @@ function [fig, results] = plotLME(groups, groupByVars, varargin)
         opts.Visible = 'off';
     end
 
+    % ROIs parameter: resolve to channel indices and switch to ROI mode
+    if ~isempty(opts.ROIs)
+        if ~isempty(opts.Channels)
+            error('exploreFNIRS:core:plotLME', ...
+                'ROIs and Channels are mutually exclusive.');
+        end
+        if ~isfield(groups(1).gbyGrand, 'ROI')
+            error('exploreFNIRS:core:plotLME', ...
+                'No ROI data in grand average. Define ROIs before aggregating.');
+        end
+        [roiIdx, roiNames] = resolveROIs(groups, opts.ROIs);
+        opts.Channels = roiIdx;
+        opts.ROINames = roiNames;
+        opts.DataType = 'ROI';
+    end
+
     isROIMode = strcmpi(opts.DataType, 'ROI');
     isAuxMode = strcmpi(opts.DataType, 'Aux');
+
+    % Resolve ROI names when DataType='ROI' set directly (without ROIs param)
+    if isROIMode && ~isfield(opts, 'ROINames')
+        if isfield(groups(1).gbyGrand, 'ROI') && isfield(groups(1).gbyGrand.ROI, 'info')
+            allNames = groups(1).gbyGrand.ROI.info.Properties.RowNames;
+            roiCh = opts.Channels;
+            if isempty(roiCh)
+                roiCh = 1:length(allNames);
+            end
+            opts.ROINames = allNames(roiCh(roiCh <= length(allNames)));
+        else
+            opts.ROINames = {};
+        end
+    end
 
     % Aux mode: topo not available (no probe geometry)
     if isAuxMode && opts.ShowTopo
@@ -182,6 +219,12 @@ function [fig, results] = plotLME(groups, groupByVars, varargin)
         'ExcludeShortSeparation', opts.ExcludeShortSeparation, ...
         'SkipTimeFactor', opts.SkipTimeFactor, ...
         'DataType', opts.DataType};
+    if ~isempty(opts.TimeModel)
+        statsArgs = [statsArgs, {'TimeModel', opts.TimeModel}];
+    end
+    if opts.PolynomialOrder ~= 2
+        statsArgs = [statsArgs, {'PolynomialOrder', opts.PolynomialOrder}];
+    end
     if isAuxMode
         statsArgs = [statsArgs, {'AuxField', opts.AuxField}];
     end
@@ -305,6 +348,11 @@ function fig = plotBarSummary(results, opts, channels, nBioM, nCh, sty)
             end
 
             set(ax, 'XTick', channels);
+            if strcmpi(opts.DataType, 'ROI') && isfield(opts, 'ROINames') && ...
+                    ~isempty(opts.ROINames) && length(opts.ROINames) == nCh
+                escapedNames = cellfun(@(s) strrep(s, '_', '\_'), opts.ROINames, 'UniformOutput', false);
+                set(ax, 'XTickLabel', escapedNames, 'XTickLabelRotation', 45);
+            end
             grid(ax, 'on');
             box(ax, 'on');
         end
@@ -369,16 +417,16 @@ function fig = plotTopoFstat(results, opts, channels, nBioM, nCh, sty)
                         end
                     end
                     pf2.probe.plot.interpolateValues3D(fVals, probeArg, minF, [], ...
-                        sprintf('%s: %s', bioM, termNames{t}), 'F-val', ...
+                        sprintf('%s: %s', bioM, pf2_base.plot.escapeTeX(termNames{t})), 'F-val', ...
                         'bufferDistance', 1);
                 else
                     bar(ax, channels, fVals, 'FaceColor', 'flat');
                     set(ax, 'XTick', channels);
                     ylabel(ax, 'F-stat');
-                    title(ax, sprintf('%s: %s', bioM, termNames{t}));
+                    title(ax, sprintf('%s: %s', bioM, pf2_base.plot.escapeTeX(termNames{t})));
                 end
             else
-                text(ax, 0.5, 0.5, sprintf('%s: %s\nn.s.', bioM, termNames{t}), ...
+                text(ax, 0.5, 0.5, sprintf('%s: %s\nn.s.', bioM, pf2_base.plot.escapeTeX(termNames{t})), ...
                     'HorizontalAlignment', 'center', 'Units', 'normalized');
                 axis(ax, 'off');
             end
@@ -449,4 +497,28 @@ function colors = getBarColors(nBioM)
     else
         colors = exploreFNIRS.core.getGroupColors(nBioM);
     end
+end
+
+
+function [roiIdx, roiNames] = resolveROIs(groups, rois)
+% Convert ROI input to numeric indices and name strings
+    roiInfo = groups(1).gbyGrand.ROI.info;
+    allNames = roiInfo.Properties.RowNames;
+
+    if ischar(rois) || isstring(rois)
+        if strcmpi(rois, 'all')
+            roiIdx = 1:length(allNames);
+        else
+            roiIdx = find(ismember(allNames, {char(rois)}));
+        end
+    elseif iscell(rois)
+        roiIdx = find(ismember(allNames, rois));
+    elseif islogical(rois)
+        roiIdx = find(rois);
+    else
+        roiIdx = rois;  % numeric
+    end
+
+    roiIdx = roiIdx(roiIdx <= length(allNames));
+    roiNames = allNames(roiIdx);
 end

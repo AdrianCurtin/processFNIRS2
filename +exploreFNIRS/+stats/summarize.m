@@ -22,13 +22,15 @@ function T = summarize(lmeResults, varargin)
 %                  'coefficients' - Fixed-effect coefficient estimates
 %                  'fit'          - Model fit statistics (AIC, BIC, LRT)
 %                  'correlations' - Scatter/topo correlation results
+%                  'effectsize'   - Effect sizes with bootstrap CIs
 %   Format       - Output format (default: 'table'):
 %                  'table'   - Standard MATLAB table
 %                  'console' - Prints clean formatted text to console
 %                  'latex'   - Prints LaTeX tabular environment to console
 %                  'apa'     - Adds APA-style formatted string column
-%   SigThreshold - Significance threshold for stars (default: 0.05)
-%   IncludeFDR   - Apply FDR correction to ANOVA p-values (default: false)
+%   SigThreshold    - Significance threshold for stars (default: 0.05)
+%   OnlySignificant - Filter to rows with non-empty Sig (default: false)
+%   IncludeFDR      - Apply FDR correction to ANOVA p-values (default: false)
 %   Biomarkers   - Cell array of biomarker names (for 'correlations')
 %   Channels     - Numeric array of channel numbers (for 'correlations')
 %   Groups       - Cell array of group labels (for 'correlations')
@@ -38,15 +40,17 @@ function T = summarize(lmeResults, varargin)
 % Outputs:
 %   T - Table with formatted results. Columns depend on Type:
 %
-%     'anova':        Channel, Biomarker, Term, FStat, df1, df2, pValue, Sig
-%     'contrasts':    Biomarker, Channel, Contrast, DeltaE, SD, F, df1, df2,
+%     'anova':        Optode, Biomarker, Term, FStat, df1, df2, pValue, Sig
+%     'contrasts':    Biomarker, Optode, Contrast, DeltaE, SD, F, df1, df2,
 %                     pValue, pCorrected, Sig
-%     'coefficients': Biomarker, Channel, Name, Estimate, SE, tStat, DF,
+%     'coefficients': Biomarker, Optode, Name, Estimate, SE, tStat, DF,
 %                     pValue, Sig
-%     'fit':          Biomarker, Channel, AIC, BIC, LogLik, NullChi2,
+%     'fit':          Biomarker, Optode, AIC, BIC, LogLik, NullChi2,
 %                     NullPval, Formula
-%     'correlations': Channel, N, r, p_pearson, rho, p_spearman, Sig
+%     'correlations': Optode, N, r, p_pearson, rho, p_spearman, Sig
 %                     (Group and Biomarker columns included when multiple)
+%     'effectsize':   Optode, Biomarker, g, CI_lower, CI_upper, pValue, Sig
+%                     (pValue included when effectSize results contain .p)
 %
 %     When Format='apa', an additional 'APA' column is appended with
 %     formatted strings like "F(1, 23.4) = 5.67, p = .012".
@@ -75,6 +79,7 @@ function T = summarize(lmeResults, varargin)
     addParameter(p, 'Type', 'anova', @ischar);
     addParameter(p, 'Format', 'table', @ischar);
     addParameter(p, 'SigThreshold', 0.05, @isnumeric);
+    addParameter(p, 'OnlySignificant', false, @islogical);
     addParameter(p, 'IncludeFDR', false, @islogical);
     % Metadata for correlation stats (optional, used with Type='correlations')
     addParameter(p, 'Biomarkers', {}, @iscell);
@@ -85,21 +90,78 @@ function T = summarize(lmeResults, varargin)
     parse(p, lmeResults, varargin{:});
     opts = p.Results;
 
+    % Extract term labels from results if available (polynomial time)
+    termLabels = struct();
+    if isfield(lmeResults, 'termLabels') && isstruct(lmeResults.termLabels)
+        termLabels = lmeResults.termLabels;
+    end
+
     switch lower(opts.Type)
         case 'anova'
-            T = summarizeAnova(lmeResults, opts);
+            T = summarizeAnova(lmeResults, opts, termLabels);
         case 'contrasts'
             T = summarizeContrasts(lmeResults, opts);
         case 'coefficients'
-            T = summarizeCoefficients(lmeResults, opts);
+            T = summarizeCoefficients(lmeResults, opts, termLabels);
         case 'fit'
             T = summarizeFit(lmeResults, opts);
         case 'correlations'
             T = summarizeCorrelations(lmeResults, opts);
+        case 'effectsize'
+            T = summarizeEffectSize(lmeResults, opts);
         otherwise
             error('exploreFNIRS:stats:summarize', ...
-                'Unknown Type: ''%s''. Use ''anova'', ''contrasts'', ''coefficients'', ''fit'', or ''correlations''.', ...
+                'Unknown Type: ''%s''. Use ''anova'', ''contrasts'', ''coefficients'', ''fit'', ''correlations'', or ''effectsize''.', ...
                 opts.Type);
+    end
+
+    % Clean up Optode/Biomarker columns for readability
+    if ~isempty(T)
+        if ismember('Optode', T.Properties.VariableNames)
+            vals = T.Optode;
+            if (isstring(vals) || iscell(vals))
+                uVals = unique(string(vals));
+                % Check if values look like fNIRS optode identifiers (Opt1, Opt1_HbO, etc.)
+                isGenericOpt = all(~ismissing(uVals) & ...
+                    ~cellfun('isempty', regexp(cellstr(uVals), '^Opt\d+')));
+                if isGenericOpt
+                    if numel(uVals) <= 1
+                        % Single optode — uninformative, drop
+                        T.Optode = [];
+                    else
+                        % Multiple optodes — keep as Optode, deduplicate
+                        T = deduplicateColumn(T, 'Optode');
+                    end
+                else
+                    % Non-optode values (variable names) — rename and deduplicate
+                    T = renamevars(T, 'Optode', 'Variable');
+                    T = deduplicateColumn(T, 'Variable');
+                end
+            elseif isnumeric(vals) && numel(unique(vals)) <= 1
+                T.Optode = [];
+            end
+        end
+        if ismember('Biomarker', T.Properties.VariableNames)
+            vals = T.Biomarker;
+            if (isstring(vals) || iscell(vals))
+                uVals = unique(string(vals));
+                uVals = uVals(~ismissing(uVals) & uVals ~= "");
+                if numel(uVals) <= 1
+                    % Single-valued or empty — always uninformative, drop
+                    T.Biomarker = [];
+                else
+                    T = deduplicateColumn(T, 'Biomarker');
+                end
+            elseif isnumeric(vals) && numel(unique(vals)) <= 1
+                T.Biomarker = [];
+            end
+        end
+    end
+
+    % Filter to significant rows only
+    if opts.OnlySignificant && ~isempty(T) && ismember('Sig', T.Properties.VariableNames)
+        keep = T.Sig ~= "" & ~ismissing(T.Sig);
+        T = T(keep, :);
     end
 
     % Console format: print formatted text and return the table
@@ -116,7 +178,7 @@ end
 
 %% Summary generators
 
-function T = summarizeAnova(results, opts)
+function T = summarizeAnova(results, opts, termLabels)
 % Build a tidy long-format ANOVA summary table
 
     if isempty(results.anova_pval) || height(results.anova_pval) == 0
@@ -131,7 +193,7 @@ function T = summarizeAnova(results, opts)
 
     % Pre-allocate
     nTotal = nRows * nTerms;
-    Channel = cell(nTotal, 1);
+    Optode = cell(nTotal, 1);
     Biomarker = cell(nTotal, 1);
     Term = cell(nTotal, 1);
     FStat = nan(nTotal, 1);
@@ -144,8 +206,8 @@ function T = summarizeAnova(results, opts)
     for r = 1:nRows
         for t = 1:nTerms
             idx = idx + 1;
-            Channel{idx} = rowNames{r};
-            Term{idx} = termNames{t};
+            Optode{idx} = rowNames{r};
+            Term{idx} = applyTermLabel(termNames{t}, termLabels);
             FStat(idx) = results.anova_Fstat{r, t};
             pValue(idx) = results.anova_pval{r, t};
 
@@ -166,9 +228,9 @@ function T = summarizeAnova(results, opts)
         end
     end
 
-    T = table(string(Channel), string(Biomarker), string(Term), ...
+    T = table(string(Optode), string(Biomarker), string(Term), ...
         FStat, df1, df2, pValue, string(Sig), ...
-        'VariableNames', {'Channel','Biomarker','Term','FStat','df1','df2','pValue','Sig'});
+        'VariableNames', {'Optode','Biomarker','Term','FStat','df1','df2','pValue','Sig'});
 
     % FDR correction across all ANOVA p-values
     if opts.IncludeFDR
@@ -212,7 +274,7 @@ function T = summarizeContrasts(results, opts)
             for r = 1:height(cTable)
                 row = struct();
                 row.Biomarker = bioM;
-                row.Channel = ch;
+                row.Optode = ch;
                 row.Contrast = cTable.Properties.RowNames{r};
                 row.DeltaE = cTable.deltaE(r);
                 row.SD = cTable.SD(r);
@@ -248,7 +310,7 @@ function T = summarizeContrasts(results, opts)
 end
 
 
-function T = summarizeCoefficients(results, opts)
+function T = summarizeCoefficients(results, opts, termLabels)
 % Build a tidy fixed-effect coefficient table
 
     [nBioM, nCh] = size(results.models);
@@ -267,8 +329,8 @@ function T = summarizeCoefficients(results, opts)
             for r = 1:height(coefs)
                 row = struct();
                 row.Biomarker = bioM;
-                row.Channel = ch;
-                row.Name = coefs.Name{r};
+                row.Optode = ch;
+                row.Name = applyTermLabel(coefs.Name{r}, termLabels);
                 row.Estimate = coefs.Estimate(r);
                 row.SE = coefs.SE(r);
                 row.tStat = coefs.tStat(r);
@@ -296,7 +358,7 @@ function T = summarizeFit(results, opts) %#ok<INUSD>
     [nBioM, nCh] = size(results.models);
 
     Biomarker = {};
-    Channel = [];
+    Optode = [];
     AIC = [];
     BIC = [];
     LogLik = [];
@@ -310,7 +372,7 @@ function T = summarizeFit(results, opts) %#ok<INUSD>
             if isempty(mdl), continue; end
 
             Biomarker{end+1, 1} = results.biomarkers{bIdx}; %#ok<AGROW>
-            Channel(end+1, 1) = results.channels(chI); %#ok<AGROW>
+            Optode(end+1, 1) = results.channels(chI); %#ok<AGROW>
             AIC(end+1, 1) = mdl.ModelCriterion.AIC; %#ok<AGROW>
             BIC(end+1, 1) = mdl.ModelCriterion.BIC; %#ok<AGROW>
             LogLik(end+1, 1) = mdl.LogLikelihood; %#ok<AGROW>
@@ -332,8 +394,109 @@ function T = summarizeFit(results, opts) %#ok<INUSD>
         return;
     end
 
-    T = table(string(Biomarker), Channel, AIC, BIC, LogLik, NullChi2, NullPval, string(Formula), ...
-        'VariableNames', {'Biomarker','Channel','AIC','BIC','LogLik','NullChi2','NullPval','Formula'});
+    T = table(string(Biomarker), Optode, AIC, BIC, LogLik, NullChi2, NullPval, string(Formula), ...
+        'VariableNames', {'Biomarker','Optode','AIC','BIC','LogLik','NullChi2','NullPval','Formula'});
+end
+
+
+function T = summarizeEffectSize(results, opts)
+% Build a tidy effect size summary table from effectSize results
+
+    if ~isfield(results, 'observed') || ~isfield(results, 'ci_lower')
+        error('exploreFNIRS:stats:summarize:invalidEffectSize', ...
+            'Input does not look like effectSize results. Expected .observed, .ci_lower, .ci_upper fields.');
+    end
+
+    [nBioM, nCh] = size(results.observed);
+    bioNames = results.biomarkers;
+    channels = results.channels;
+
+    % Method display name
+    switch lower(results.method)
+        case 'hedges_g',    methodStr = 'g';   methodFull = 'Hedges'' g';
+        case 'cohens_d',    methodStr = 'd';   methodFull = 'Cohen''s d';
+        case 'glass_delta', methodStr = 'delta'; methodFull = 'Glass''s delta';
+        otherwise,          methodStr = 'ES';  methodFull = results.method;
+    end
+
+    allRows = {};
+    for bIdx = 1:nBioM
+        for chI = 1:nCh
+            g = results.observed(bIdx, chI);
+            if isnan(g), continue; end
+
+            row = struct();
+            row.Optode = channels(chI);
+            if nBioM > 1
+                row.Biomarker = bioNames{bIdx};
+            end
+            row.g = g;
+            row.CI_lower = results.ci_lower(bIdx, chI);
+            row.CI_upper = results.ci_upper(bIdx, chI);
+
+            % Raw p-value from parametric t-test (if available)
+            if isfield(results, 'p')
+                row.pValue = results.p(bIdx, chI);
+            end
+
+            % Significance: CI excludes zero
+            lo = results.ci_lower(bIdx, chI);
+            hi = results.ci_upper(bIdx, chI);
+            if lo > 0 || hi < 0
+                row.Sig = '*';
+            else
+                row.Sig = '';
+            end
+
+            allRows{end+1} = row; %#ok<AGROW>
+        end
+    end
+
+    if isempty(allRows)
+        T = table();
+        return;
+    end
+
+    T = struct2table([allRows{:}]);
+    T = cellColumnsToString(T);
+
+    % Rename 'g' column to match the method
+    if ismember('g', T.Properties.VariableNames) && ~strcmp(methodStr, 'g')
+        T.Properties.VariableNames{strcmp(T.Properties.VariableNames, 'g')} = methodStr;
+    end
+
+    % FDR correction on raw p-values
+    if opts.IncludeFDR && ismember('pValue', T.Properties.VariableNames)
+        [qvals, ~, passed] = exploreFNIRS.fx.performFDR(T.pValue, opts.SigThreshold);
+        T.pCorrected = qvals;
+        T.FDR_Sig = passed;
+    end
+
+    % Store method info for latex/console output
+    T.Properties.UserData = struct('methodStr', methodStr, 'methodFull', methodFull, ...
+        'ciLevel', results.ci_level, 'nBoot', results.nBoot, ...
+        'conditions', {results.conditions}, 'nPerGroup', results.nPerGroup);
+
+    if strcmpi(opts.Format, 'apa')
+        esCol = methodStr;
+        if ~ismember(esCol, T.Properties.VariableNames)
+            esCol = 'g';
+        end
+        hasP = ismember('pValue', T.Properties.VariableNames);
+        apaStr = strings(height(T), 1);
+        for i = 1:height(T)
+            base = sprintf('%s = %.3f, %d%% CI [%.3f, %.3f]', ...
+                methodStr, T.(esCol)(i), ...
+                round(results.ci_level * 100), ...
+                T.CI_lower(i), T.CI_upper(i));
+            if hasP
+                apaStr(i) = sprintf('%s, p %s', base, formatP(T.pValue(i)));
+            else
+                apaStr(i) = base;
+            end
+        end
+        T.APA = apaStr;
+    end
 end
 
 
@@ -385,9 +548,9 @@ function T = summarizeCorrelationsPerChannel(stats, opts)
                     row.Biomarker = sprintf('Bio %d', bIdx);
                 end
                 if ~isempty(chNums) && chI <= length(chNums)
-                    row.Channel = chNums(chI);
+                    row.Optode = chNums(chI);
                 else
-                    row.Channel = chI;
+                    row.Optode = chI;
                 end
                 row.N = s.N;
                 row.r = s.r;
@@ -454,9 +617,9 @@ function T = summarizeCorrelationsTopo(stats, opts)
                     row.Biomarker = sprintf('Bio %d', bIdx);
                 end
                 if ~isempty(chNums) && chI <= length(chNums)
-                    row.Channel = chNums(chI);
+                    row.Optode = chNums(chI);
                 else
-                    row.Channel = chI;
+                    row.Optode = chI;
                 end
                 row.N = s.N(chI);
                 row.r = s.r(chI);
@@ -732,7 +895,8 @@ end
 function h = latexHeaders(names, tableType)
 % Map variable names to publication-style LaTeX headers
     map = containers.Map('KeyType', 'char', 'ValueType', 'char');
-    map('Channel')    = 'Channel';
+    map('Optode')     = 'Optode';
+    map('Variable')   = 'Variable';
     map('Biomarker')  = 'Biomarker';
     map('Term')       = 'Term';
     map('FStat')      = '$F$';
@@ -766,6 +930,12 @@ function h = latexHeaders(names, tableType)
     map('N')           = '$N$';
     map('q')           = '$q$';
     map('Group')       = 'Group';
+    map('g')           = '$g$';
+    map('d')           = '$d$';
+    map('delta')       = '$\delta$';
+    map('ES')          = 'ES';
+    map('CI_lower')    = 'CI Lower';
+    map('CI_upper')    = 'CI Upper';
 
     h = cell(1, length(names));
     for i = 1:length(names)
@@ -794,6 +964,8 @@ function c = latexCaption(tableType)
             c = 'Model Fit Statistics';
         case 'correlations'
             c = 'Correlation Results';
+        case 'effectsize'
+            c = 'Effect Sizes with Bootstrap Confidence Intervals';
         otherwise
             c = 'Summary';
     end
@@ -811,7 +983,61 @@ function n = latexNotes(tableType)
             n = '$^{*}p < .05$, $^{**}p < .01$, $^{***}p < .001$.';
         case 'correlations'
             n = '$r$ = Pearson, $\rho$ = Spearman. $^{*}p < .05$, $^{**}p < .01$, $^{***}p < .001$.';
+        case 'effectsize'
+            n = '$^{*}$CI excludes zero. $p$ = two-sample $t$-test.';
         otherwise
             n = '';
     end
+end
+
+
+function label = applyTermLabel(termName, termLabels)
+% APPLYTERMLABEL Map sanitized term name to readable label
+%
+% Handles direct matches (e.g. 'ot1' -> 'Time (Linear)') and interaction
+% terms (e.g. 'Condition:ot1' -> 'Condition x Time (Linear)').
+
+    if isempty(fieldnames(termLabels))
+        label = termName;
+        return;
+    end
+
+    % Direct match
+    if isfield(termLabels, termName)
+        label = termLabels.(termName);
+        return;
+    end
+
+    % Check for interaction terms containing polynomial components
+    % e.g. 'Conditionot1' (sanitized from 'Condition:ot1')
+    % or 'Condition:ot1' (raw ANOVA term)
+    label = termName;
+    fnames = fieldnames(termLabels);
+    for i = 1:length(fnames)
+        otName = fnames{i};
+        % Match both 'Var:otN' and sanitized 'VarotN' patterns
+        if contains(termName, otName)
+            prefix = strrep(termName, otName, '');
+            prefix = strrep(prefix, ':', '');
+            if ~isempty(prefix)
+                label = sprintf('%s x %s', prefix, termLabels.(otName));
+            else
+                label = termLabels.(otName);
+            end
+            return;
+        end
+    end
+end
+
+
+function T = deduplicateColumn(T, colName)
+% DEDUPLICATECOLUMN Show value only on first row of each consecutive group
+%   Replaces repeated consecutive values with "" for cleaner display.
+    vals = string(T.(colName));
+    for i = 2:numel(vals)
+        if vals(i) == vals(i-1)
+            vals(i) = "";
+        end
+    end
+    T.(colName) = vals;
 end

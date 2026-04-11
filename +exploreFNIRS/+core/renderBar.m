@@ -175,7 +175,7 @@ function renderBar(ax, groups, groupIdx, xVar, colorVar, biomarker, channels, op
         % --- No X or Color: one bar per group ---
         labels = cell(1, nSel);
         for i = 1:nSel
-            labels{i} = selGroups(i).label;
+            labels{i} = pf2_base.plot.escapeTeX(selGroups(i).label);
         end
         if useColorScheme
             colors = colorSpec.resolve(selGroups);
@@ -319,7 +319,7 @@ function drawFlatBars(ax, means, errors, ns, indiv, labels, colors, opts)
         end
     end
 
-    set(ax, 'XTick', barX, 'XTickLabel', labels, 'XTickLabelRotation', 30);
+    set(ax, 'XTick', barX, 'XTickLabel', pf2_base.plot.escapeTeX(labels), 'XTickLabelRotation', 30);
 
     % N labels
     for i = 1:nBars
@@ -414,13 +414,13 @@ function drawClusteredBars(ax, meanMatrix, errorMatrix, indivData, ...
         end
     end
 
-    set(ax, 'XTick', 1:nX, 'XTickLabel', uniqueX, 'XTickLabelRotation', 30);
+    set(ax, 'XTick', 1:nX, 'XTickLabel', pf2_base.plot.escapeTeX(uniqueX), 'XTickLabelRotation', 30);
     ylabel(ax, ylabelStr);
 
     % Legend
     validH = isvalid(legendHandles) & legendHandles ~= 0;
     if any(validH)
-        legend(ax, legendHandles(validH), legendLabels(validH), ...
+        legend(ax, legendHandles(validH), pf2_base.plot.escapeTeX(legendLabels(validH)), ...
             'Location', 'best', 'FontSize', 8);
     end
 end

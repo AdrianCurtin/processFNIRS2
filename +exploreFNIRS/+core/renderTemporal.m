@@ -113,7 +113,7 @@ function [legendHandles, legendEntries] = renderTemporal(ax, groups, groupIdx, c
         legendHandles(end+1) = h; %#ok<AGROW>
 
         % Build label (hide n=1 since it adds no information)
-        lbl = selGroups(i).label;
+        lbl = pf2_base.plot.escapeTeX(selGroups(i).label);
         nSubj = round(mean(nData(:, validCh), 'all', 'omitnan'));
         if nSubj > 1
             lbl = [lbl, sprintf(' (n=%d)', nSubj)]; %#ok<AGROW>

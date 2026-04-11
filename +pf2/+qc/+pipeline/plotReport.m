@@ -39,6 +39,7 @@ p.FunctionName = 'pf2.qc.pipeline.plotReport';
 addRequired(p, 'qcReport', @isstruct);
 addParameter(p, 'Visible', 'on', @ischar);
 addParameter(p, 'SavePath', '', @ischar);
+addParameter(p, 'TightLayout', false, @islogical);
 addParameter(p, 'Title', 'QC Pipeline Report', @ischar);
 
 parse(p, qcReport, varargin{:});
@@ -177,6 +178,7 @@ pf2_base.external.suptitle(fig, sprintf('%s  —  %d/%d channels passed', ...
 
 %% Save if requested
 saveOpts.SavePath = opts.SavePath;
+saveOpts.TightLayout = opts.TightLayout;
 pf2_base.plot.handleSave(fig, saveOpts);
 
 end

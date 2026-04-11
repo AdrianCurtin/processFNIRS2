@@ -24,6 +24,13 @@ function fig = plotHeatmap(groups, varargin)
 %                   Supports MATLAB builtins, Brewer (e.g. 'RdBu', 'Spectral'),
 %                   and matplotlib (e.g. 'viridis', 'plasma') names.
 %   CLim          - Color limits [cmin cmax] (default: auto symmetric)
+%   VLines        - Vertical annotation lines (e.g. task start/end).
+%                   Numeric vector of time positions (default dashed gray), or
+%                   struct array with fields:
+%                     .time  - (required) scalar time position
+%                     .label - (optional) text label string
+%                     .color - (optional) color spec (default: [0.5 0.5 0.5])
+%                     .style - (optional) line style (default: '--')
 %   Title         - Figure title (default: auto)
 %   Visible       - 'on' (default) or 'off'
 %   SavePath      - File path to save figure
@@ -47,12 +54,14 @@ function fig = plotHeatmap(groups, varargin)
     addParameter(p, 'SortChannels', 'index', @ischar);
     addParameter(p, 'Colormap', '', @(v) ischar(v) || isnumeric(v));
     addParameter(p, 'CLim', [], @(v) isempty(v) || (isnumeric(v) && numel(v) == 2));
+    addParameter(p, 'VLines', [], @(x) isempty(x) || isnumeric(x) || isstruct(x));
     addParameter(p, 'Title', '', @ischar);
     addParameter(p, 'Visible', 'on', @ischar);
     addParameter(p, 'SavePath', '', @ischar);
     addParameter(p, 'SaveWidth', 800, @isnumeric);
     addParameter(p, 'SaveHeight', 500, @isnumeric);
     addParameter(p, 'SaveDPI', 150, @isnumeric);
+    addParameter(p, 'TightLayout', false, @islogical);
     addParameter(p, 'Colors', [], @(x) true);  % Accepted for API consistency, unused (heatmaps use Colormap)
     parse(p, groups, varargin{:});
     opts = p.Results;
@@ -201,8 +210,54 @@ function fig = plotHeatmap(groups, varargin)
     set(cb, 'Color', sty.ForegroundColor);
     set(cb.Label, 'Color', sty.ForegroundColor);
 
+    % Vertical annotation lines (task start/end etc.)
+    if ~isempty(opts.VLines)
+        drawVLines(ax, opts.VLines);
+    end
+
     sty.applyToFigure(fig);
     pf2_base.plot.handleSave(fig, opts);
+end
+
+
+function drawVLines(ax, vlines)
+% Draw vertical annotation lines on heatmap axes
+    if isnumeric(vlines)
+        vlines = vlines(:);
+        tmp = struct('time', num2cell(vlines), ...
+            'label', repmat({''}, numel(vlines), 1), ...
+            'color', repmat({[0.5 0.5 0.5]}, numel(vlines), 1), ...
+            'style', repmat({'--'}, numel(vlines), 1));
+        vlines = tmp;
+    end
+
+    for vi = 1:numel(vlines)
+        v = vlines(vi);
+        xPos = v.time;
+
+        if isfield(v, 'color') && ~isempty(v.color)
+            clr = v.color;
+        else
+            clr = [0.5 0.5 0.5];
+        end
+
+        if isfield(v, 'style') && ~isempty(v.style)
+            sty = v.style;
+        else
+            sty = '--';
+        end
+
+        if isfield(v, 'label') && ~isempty(v.label)
+            lbl = {v.label};
+        else
+            lbl = {};
+        end
+
+        hasLabel = ~isempty(lbl);
+        lineArgs = {'Color', clr, 'LineStyle', sty, 'LineWidth', 1};
+        pf2_base.external.vline(ax, xPos, lineArgs, lbl, ...
+            'handleVisibility', hasLabel);
+    end
 end
 
 

@@ -154,7 +154,9 @@ classdef Experiment < handle
                 'avgMode',      'hierarchy', ... % 'hierarchy', 'flat', or 'none'
                 'rawMethod',    '', ...          % Raw processing method name ('' = no reprocessing)
                 'oxyMethod',    '', ...          % Oxy processing method name ('' = no reprocessing)
-                'statWindow',   [] ...           % [start, end] for bar/LME stats ([] = full range)
+                'statWindow',   [], ...          % [start, end] for bar/LME stats ([] = full range)
+                'timeModel',    '', ...          % TimeModel for LME: 'polynomial','discrete','continuous','none' ('' = fitLME default)
+                'polyOrder',    2 ...            % Polynomial order for GCA (1-5, default: 2)
             );
 
             % Copy settings from source Experiment
@@ -1091,6 +1093,7 @@ classdef Experiment < handle
             addParameter(p, 'SaveWidth', 600, @isnumeric);
             addParameter(p, 'SaveHeight', 400, @isnumeric);
             addParameter(p, 'SaveDPI', 150, @isnumeric);
+            addParameter(p, 'TightLayout', false, @islogical);
             addParameter(p, 'Colors', [], @(x) isempty(x) || isnumeric(x) || ischar(x) || isstring(x) || isa(x, 'function_handle') || isa(x, 'exploreFNIRS.core.ColorScheme'));
             addParameter(p, 'ColorScheme', [], @(x) isempty(x) || ischar(x) || isstring(x) || isa(x, 'exploreFNIRS.core.ColorScheme'));
             parse(p, varName, varargin{:});
@@ -1222,7 +1225,7 @@ classdef Experiment < handle
 
             % Legend identifies bars — replace tick labels with xlabel
             set(ax, 'XTickLabel', {});
-            xlabel(ax, strjoin(obj.groupByVars, ' x '));
+            xlabel(ax, pf2_base.plot.escapeTeX(strjoin(obj.groupByVars, ' x ')));
 
             % Legend with colored patches
             lh = gobjects(nGroups, 1);
@@ -1230,7 +1233,7 @@ classdef Experiment < handle
                 lh(g) = patch(ax, NaN, NaN, colors(g,:), ...
                     'EdgeColor', 'k', 'LineWidth', 2);
             end
-            lg = legend(ax, lh, groupLabels, 'Location', 'best');
+            lg = legend(ax, lh, pf2_base.plot.escapeTeX(groupLabels), 'Location', 'best');
             lg.TextColor = sty.LegendTextColor;
             lg.Color = sty.LegendBgColor;
             lg.EdgeColor = sty.LegendEdgeColor;
@@ -1247,9 +1250,9 @@ classdef Experiment < handle
             end
 
             if ~isempty(opts.Title)
-                title(ax, opts.Title);
+                title(ax, pf2_base.plot.escapeTeX(opts.Title));
             else
-                title(ax, sprintf('%s by %s', varName, strjoin(obj.groupByVars, ', ')));
+                title(ax, pf2_base.plot.escapeTeX(sprintf('%s by %s', varName, strjoin(obj.groupByVars, ', '))));
             end
 
             box(ax, 'on');
@@ -1302,6 +1305,7 @@ classdef Experiment < handle
             addParameter(p, 'SaveWidth', 600, @isnumeric);
             addParameter(p, 'SaveHeight', 400, @isnumeric);
             addParameter(p, 'SaveDPI', 150, @isnumeric);
+            addParameter(p, 'TightLayout', false, @islogical);
             addParameter(p, 'Colors', [], @(x) isempty(x) || isnumeric(x) || ischar(x) || isstring(x) || isa(x, 'function_handle') || isa(x, 'exploreFNIRS.core.ColorScheme'));
             addParameter(p, 'ColorScheme', [], @(x) isempty(x) || ischar(x) || isstring(x) || isa(x, 'exploreFNIRS.core.ColorScheme'));
             parse(p, xVar, yVar, varargin{:});
@@ -1455,15 +1459,15 @@ classdef Experiment < handle
                 end
             end
 
-            if ~isempty(opts.XLabel), xlabel(ax, opts.XLabel);
-            else, xlabel(ax, xVar); end
-            if ~isempty(opts.YLabel), ylabel(ax, opts.YLabel);
-            else, ylabel(ax, yVar); end
+            if ~isempty(opts.XLabel), xlabel(ax, pf2_base.plot.escapeTeX(opts.XLabel));
+            else, xlabel(ax, pf2_base.plot.escapeTeX(xVar)); end
+            if ~isempty(opts.YLabel), ylabel(ax, pf2_base.plot.escapeTeX(opts.YLabel));
+            else, ylabel(ax, pf2_base.plot.escapeTeX(yVar)); end
 
             if ~isempty(opts.Title)
-                title(ax, opts.Title);
+                title(ax, pf2_base.plot.escapeTeX(opts.Title));
             else
-                title(ax, sprintf('%s vs %s', yVar, xVar));
+                title(ax, pf2_base.plot.escapeTeX(sprintf('%s vs %s', yVar, xVar)));
             end
 
             box(ax, 'on');
@@ -1555,6 +1559,7 @@ classdef Experiment < handle
             end
             varargin = obj.injectColorScheme(varargin);
             varargin = obj.injectStatWindow(varargin);
+            varargin = obj.injectTimeModel(varargin);
             if ~any(strcmpi(varargin(1:2:end), 'Device'))
                 dev = obj.resolveDevice();
                 if ~isempty(dev)
@@ -1582,6 +1587,7 @@ classdef Experiment < handle
                     'Call aggregate() before plotAuxLME()');
             end
             varargin = obj.injectColorScheme(varargin);
+            varargin = obj.injectTimeModel(varargin);
             [fig, results] = exploreFNIRS.core.plotLME(obj.groups, ...
                 obj.groupByVars, 'DataType', 'Aux', 'AuxField', auxField, ...
                 varargin{:});
@@ -1612,14 +1618,15 @@ classdef Experiment < handle
 
 
         function [fig, results] = plotTopoLME(obj, varargin)
-        % PLOTTOPOLME 3D brain topo of LME ANOVA F-statistics
+        % PLOTTOPOLME Topographic map of LME ANOVA statistics
         %
         %   [fig, results] = ex.plotTopoLME()
         %   [fig, results] = ex.plotTopoLME('SigType', 'q', 'Biomarkers', {'HbO'})
+        %   [fig, results] = ex.plotTopoLME('Projection', '2D')
         %
-        % Renders significant F-statistics from LME ANOVA onto the 3D
-        % brain surface. One subplot per term; non-significant channels
-        % are NaN-masked. Requires aggregate() first.
+        % Renders significant statistics from LME ANOVA onto a 3D brain
+        % surface (default) or 2D probe layout. Use 'Projection','2D'
+        % for flat probe plots. Requires aggregate() first.
         %
         % See also: exploreFNIRS.core.plotTopoLME, plotLME
 
@@ -1633,14 +1640,16 @@ classdef Experiment < handle
 
 
         function [fig, results] = plotTopoROILME(obj, varargin)
-        % PLOTTOPOROILME 3D brain topo of ROI-level LME F-statistics
+        % PLOTTOPOROILME ROI-level LME topo (2D or 3D)
         %
         %   [fig, results] = ex.plotTopoROILME()
         %   [fig, results] = ex.plotTopoROILME('Biomarkers', {'HbO'})
+        %   [fig, results] = ex.plotTopoROILME('Projection', '2D')
         %
         % Convenience wrapper for plotTopoLME with DataType='ROI'.
-        % Broadcasts each ROI's F-statistic to all its constituent
-        % channels for 3D visualization. Requires aggregate() first.
+        % Broadcasts each ROI's statistic to constituent channels.
+        % Use 'Projection','2D' for flat probe plots with ROI labels.
+        % Requires aggregate() first.
         %
         % See also: exploreFNIRS.core.plotTopoLME, plotLME, statsROILME
 
@@ -1673,6 +1682,7 @@ classdef Experiment < handle
                     'Call aggregate() before statsFitLME()');
             end
             varargin = obj.injectStatWindow(varargin);
+            varargin = obj.injectTimeModel(varargin);
             results = exploreFNIRS.stats.fitLME(obj.groups, ...
                 obj.groupByVars, varargin{:});
         end
@@ -1722,6 +1732,7 @@ classdef Experiment < handle
                     'Call aggregate() before statsAuxLME()');
             end
             varargin = obj.injectStatWindow(varargin);
+            varargin = obj.injectTimeModel(varargin);
             results = exploreFNIRS.stats.fitLME(obj.groups, ...
                 obj.groupByVars, 'DataType', 'Aux', 'AuxField', auxField, ...
                 varargin{:});
@@ -1746,8 +1757,80 @@ classdef Experiment < handle
                     'Call aggregate() before statsROILME()');
             end
             varargin = obj.injectStatWindow(varargin);
+            varargin = obj.injectTimeModel(varargin);
             results = exploreFNIRS.stats.fitLME(obj.groups, ...
                 obj.groupByVars, 'DataType', 'ROI', varargin{:});
+        end
+
+
+        function results = statsAutoLME(obj, varargin)
+        % STATSAUTOLME Automatic per-channel LME model selection
+        %
+        %   results = ex.statsAutoLME()
+        %   results = ex.statsAutoLME('Biomarkers', {'HbO'}, 'Channels', 1:5)
+        %   results = ex.statsAutoLME('Criterion', 'BIC', 'DeltaThreshold', 4)
+        %
+        % Forward stepwise LME model selection per channel using AIC/BIC.
+        % Auto-discovers which factors matter for each channel independently.
+        % Results are compatible with statsSummarize() and statsRunContrasts().
+        % Requires aggregate() first.
+        %
+        % See also: exploreFNIRS.stats.autoModelLME, statsFitLME
+
+            if ~obj.isAggregated
+                error('exploreFNIRS:core:Experiment:statsAutoLME', ...
+                    'Call aggregate() before statsAutoLME()');
+            end
+            varargin = obj.injectStatWindow(varargin);
+            varargin = obj.injectTimeModel(varargin);
+            results = exploreFNIRS.stats.autoModelLME(obj.groups, ...
+                obj.groupByVars, varargin{:});
+        end
+
+
+        function results = statsAutoROILME(obj, varargin)
+        % STATSAUTOROILME Automatic per-ROI LME model selection
+        %
+        %   results = ex.statsAutoROILME()
+        %   results = ex.statsAutoROILME('Biomarkers', {'HbO'}, 'Channels', 1:3)
+        %
+        % Convenience wrapper for statsAutoLME with DataType='ROI'.
+        % Requires aggregate() first and ROIs defined.
+        %
+        % See also: exploreFNIRS.stats.autoModelLME, statsAutoLME
+
+            if ~obj.isAggregated
+                error('exploreFNIRS:core:Experiment:statsAutoROILME', ...
+                    'Call aggregate() before statsAutoROILME()');
+            end
+            varargin = obj.injectStatWindow(varargin);
+            varargin = obj.injectTimeModel(varargin);
+            results = exploreFNIRS.stats.autoModelLME(obj.groups, ...
+                obj.groupByVars, 'DataType', 'ROI', varargin{:});
+        end
+
+
+        function results = statsAutoInfoLME(obj, infoVar, varargin)
+        % STATSAUTOINFOLME Auto model selection with behavioral response
+        %
+        %   results = ex.statsAutoInfoLME('reactionTime')
+        %   results = ex.statsAutoInfoLME('accuracy', 'Biomarkers', {'HbO'})
+        %
+        % Forward stepwise selection per channel where the info variable is
+        % the response and each channel's biomarker value is a candidate
+        % predictor. Discovers whether brain activation predicts the
+        % behavioral outcome. Requires aggregate() first.
+        %
+        % See also: exploreFNIRS.stats.autoModelLME, statsAutoLME
+
+            if ~obj.isAggregated
+                error('exploreFNIRS:core:Experiment:statsAutoInfoLME', ...
+                    'Call aggregate() before statsAutoInfoLME()');
+            end
+            varargin = obj.injectStatWindow(varargin);
+            varargin = obj.injectTimeModel(varargin);
+            results = exploreFNIRS.stats.autoModelLME(obj.groups, ...
+                obj.groupByVars, 'ResponseVar', infoVar, varargin{:});
         end
 
 
@@ -1850,6 +1933,119 @@ classdef Experiment < handle
         end
 
 
+        function results = statsROIPermTest(obj, varargin)
+        % STATSROIPERMTEST Non-parametric permutation test for ROI-level data
+        %
+        %   results = ex.statsROIPermTest()
+        %   results = ex.statsROIPermTest('Biomarkers', {'HbO'}, 'NumPerm', 1000)
+        %
+        % Convenience wrapper for statsPermTest with DataType='ROI'.
+        % Performs sign-flip permutation testing per ROI. Requires
+        % aggregate() with exactly 2 groups and ROIs defined.
+        %
+        % See also: exploreFNIRS.stats.permTest, statsPermTest
+
+            if ~obj.isAggregated
+                error('exploreFNIRS:core:Experiment:statsROIPermTest', ...
+                    'Call aggregate() before statsROIPermTest()');
+            end
+            varargin = obj.injectStatWindow(varargin);
+            results = exploreFNIRS.stats.permTest(obj.groups, ...
+                obj.groupByVars, 'DataType', 'ROI', varargin{:});
+        end
+
+
+        function results = statsROIEffectSize(obj, varargin)
+        % STATSROIEFFECTSIZE Effect size with bootstrap CIs for ROI-level data
+        %
+        %   results = ex.statsROIEffectSize()
+        %   results = ex.statsROIEffectSize('Method', 'hedges_g', 'NumBoot', 2000)
+        %
+        % Convenience wrapper for statsEffectSize with DataType='ROI'.
+        % Computes effect sizes per ROI. Requires aggregate() with
+        % exactly 2 groups and ROIs defined.
+        %
+        % See also: exploreFNIRS.stats.effectSize, statsEffectSize
+
+            if ~obj.isAggregated
+                error('exploreFNIRS:core:Experiment:statsROIEffectSize', ...
+                    'Call aggregate() before statsROIEffectSize()');
+            end
+            varargin = obj.injectStatWindow(varargin);
+            results = exploreFNIRS.stats.effectSize(obj.groups, ...
+                obj.groupByVars, 'DataType', 'ROI', varargin{:});
+        end
+
+
+        function [T, stats] = brainBehavior(obj, infoVar, varargin)
+        % BRAINBEHAVIOR Brain-behavior correlation table (one call)
+        %
+        %   T = ex.brainBehavior('reactionTime')
+        %   T = ex.brainBehavior('Age', 'Biomarkers', {'HbO'}, 'CorrType', 'Spearman')
+        %   T = ex.brainBehavior('Score', 'Format', 'latex')
+        %   [T, stats] = ex.brainBehavior('RT', 'Channels', 1:5)
+        %
+        % Computes per-channel correlations between a behavioral/info
+        % variable and fNIRS biomarker data. Returns a publication-ready
+        % table via summarize(stats, 'Type', 'correlations').
+        %
+        % All plotScatter name-value parameters are accepted (Biomarkers,
+        % Channels, CorrType, etc.) plus summarize parameters (Format).
+        %
+        % Requires aggregate() first.
+        %
+        % See also: plotScatter, statsSummarize
+
+            if ~obj.isAggregated
+                error('exploreFNIRS:core:Experiment:brainBehavior', ...
+                    'Call aggregate() before brainBehavior()');
+            end
+
+            % Separate summarize params from plotScatter params
+            summarizeKeys = {'Format', 'SigThreshold'};
+            summarizeArgs = {};
+            scatterArgs = {};
+            i = 1;
+            while i <= length(varargin)
+                if ischar(varargin{i}) && any(strcmpi(varargin{i}, summarizeKeys))
+                    summarizeArgs = [summarizeArgs, varargin(i:i+1)]; %#ok<AGROW>
+                    i = i + 2;
+                else
+                    scatterArgs = [scatterArgs, varargin(i)]; %#ok<AGROW>
+                    i = i + 1;
+                end
+            end
+
+            % Run scatter headlessly (PlotTopo for per-channel, Visible off)
+            scatterArgs = [scatterArgs, {'PlotTopo', true, 'SavePath', ''}];
+            [fig, stats] = obj.plotScatter(infoVar, scatterArgs{:});
+            if ~isempty(fig) && isvalid(fig)
+                close(fig);
+            end
+
+            % Extract metadata for summarize
+            bioArgs = {};
+            chArgs = {};
+            corrArgs = {};
+            for k = 1:2:length(scatterArgs)
+                key = scatterArgs{k};
+                if strcmpi(key, 'Biomarkers')
+                    bioArgs = {'Biomarkers', scatterArgs{k+1}};
+                elseif strcmpi(key, 'Channels')
+                    chArgs = {'Channels', scatterArgs{k+1}};
+                elseif strcmpi(key, 'CorrType')
+                    corrArgs = {'CorrType', scatterArgs{k+1}};
+                end
+            end
+
+            T = exploreFNIRS.stats.summarize(stats, ...
+                'Type', 'correlations', ...
+                'InfoVar', infoVar, ...
+                bioArgs{:}, chArgs{:}, corrArgs{:}, ...
+                summarizeArgs{:});
+        end
+
+
         function T = infoTable(obj)
         % INFOTABLE Return the selected metadata as a plain table
         %
@@ -1943,6 +2139,19 @@ classdef Experiment < handle
         % See also: exploreFNIRS.report.demographicsTable
 
             T = exploreFNIRS.report.demographicsTable(obj, varargin{:});
+        end
+
+
+        function T = behavioralTable(obj, variables, varargin)
+        % BEHAVIORALTABLE Descriptive stats, comparisons, or correlations for behavioral data
+        %
+        %   T = ex.behavioralTable({'RT','Accuracy'})
+        %   T = ex.behavioralTable({'RT'}, 'Type', 'comparisons', 'GroupBy', 'Condition')
+        %   T = ex.behavioralTable({'RT','WM'}, 'Type', 'correlations', 'Format', 'latex')
+        %
+        % See also: exploreFNIRS.stats.behavioralTable
+
+            T = exploreFNIRS.stats.behavioralTable(obj, variables, varargin{:});
         end
 
 
@@ -2819,11 +3028,40 @@ classdef Experiment < handle
 
 
         function dev = resolveDevice(obj)
-        % RESOLVEDEVICE Extract Device from first data element
+        % RESOLVEDEVICE Extract or load Device, propagate to all data
+        %
+        %   Mirrors the GUI device resolution: first looks for an existing
+        %   pf2.Device on any data element, then tries Device.load() from
+        %   the first element.  Once resolved, attaches the Device to all
+        %   elements that lack one so subsequent calls are instant.
+
             dev = [];
-            if ~isempty(obj.data) && isfield(obj.data{1}, 'device') ...
-                    && isa(obj.data{1}.device, 'pf2.Device')
-                dev = obj.data{1}.device;
+            if isempty(obj.data), return; end
+
+            % 1. Find first element that already has a Device
+            for i = 1:length(obj.data)
+                if isfield(obj.data{i}, 'device') ...
+                        && isa(obj.data{i}.device, 'pf2.Device')
+                    dev = obj.data{i}.device;
+                    break;
+                end
+            end
+
+            % 2. Try loading from first element if none found
+            if isempty(dev)
+                try
+                    dev = pf2.Device.load(obj.data{1});
+                catch
+                    return;
+                end
+            end
+
+            % 3. Propagate to all elements that lack one
+            for i = 1:length(obj.data)
+                if ~isfield(obj.data{i}, 'device') ...
+                        || ~isa(obj.data{i}.device, 'pf2.Device')
+                    obj.data{i}.device = dev;
+                end
             end
         end
 
@@ -2872,6 +3110,18 @@ classdef Experiment < handle
             keys = args(1:2:end);
             if ~any(strcmpi(keys, 'StatWindow')) && ~isempty(obj.settings.statWindow)
                 args = [args, {'StatWindow', obj.settings.statWindow}];
+            end
+        end
+
+
+        function args = injectTimeModel(obj, args)
+        % INJECTTIMEMODEL Auto-inject timeModel/polyOrder settings
+            keys = args(1:2:end);
+            if ~any(strcmpi(keys, 'TimeModel')) && ~isempty(obj.settings.timeModel)
+                args = [args, {'TimeModel', obj.settings.timeModel}];
+            end
+            if ~any(strcmpi(keys, 'PolynomialOrder')) && obj.settings.polyOrder ~= 2
+                args = [args, {'PolynomialOrder', obj.settings.polyOrder}];
             end
         end
     end

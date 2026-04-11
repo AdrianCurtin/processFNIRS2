@@ -251,6 +251,7 @@ classdef ColorScheme
             addParameter(p, 'SaveWidth', 600, @isnumeric);
             addParameter(p, 'SaveHeight', 400, @isnumeric);
             addParameter(p, 'SaveDPI', 150, @isnumeric);
+            addParameter(p, 'TightLayout', false, @islogical);
             parse(p, varargin{:});
             opts = p.Results;
 
@@ -292,7 +293,7 @@ classdef ColorScheme
             bObj = ax.Children(1);
             bObj.CData = colors;
 
-            set(ax, 'YTick', 1:nGroups, 'YTickLabel', labels, ...
+            set(ax, 'YTick', 1:nGroups, 'YTickLabel', pf2_base.plot.escapeTeX(labels), ...
                 'YDir', 'reverse', 'XTick', []);
             xlim(ax, [0, 1.05]);
             xlabel(ax, '');

@@ -48,6 +48,7 @@ function fig = plotIntraROI(result, varargin)
     addParameter(p, 'SaveWidth', 700, @isnumeric);
     addParameter(p, 'SaveHeight', 450, @isnumeric);
     addParameter(p, 'SaveDPI', 150, @isnumeric);
+    addParameter(p, 'TightLayout', false, @islogical);
     parse(p, result, varargin{:});
     opts = p.Results;
 

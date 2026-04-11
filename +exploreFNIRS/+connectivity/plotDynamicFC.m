@@ -39,6 +39,7 @@ function fig = plotDynamicFC(dynamicResult, varargin)
     addParameter(p, 'SaveWidth', 900, @isnumeric);
     addParameter(p, 'SaveHeight', 700, @isnumeric);
     addParameter(p, 'SaveDPI', 150, @isnumeric);
+    addParameter(p, 'TightLayout', false, @islogical);
     parse(p, dynamicResult, varargin{:});
     opts = p.Results;
 

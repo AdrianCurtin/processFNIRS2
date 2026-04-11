@@ -51,6 +51,7 @@ function fig = plotChord(result, varargin)
     addParameter(p, 'SaveWidth', 600, @isnumeric);
     addParameter(p, 'SaveHeight', 600, @isnumeric);
     addParameter(p, 'SaveDPI', 150, @isnumeric);
+    addParameter(p, 'TightLayout', false, @islogical);
     parse(p, result, varargin{:});
     opts = p.Results;
     result = exploreFNIRS.connectivity.normalizeResult(result);
@@ -161,17 +162,17 @@ function fig = plotChord(result, varargin)
             ha = 'right';
         end
         text(ax, nodeX(i) * labelOffset, nodeY(i) * labelOffset, ...
-            chLabels{i}, 'HorizontalAlignment', ha, 'FontSize', 9);
+            pf2_base.plot.escapeTeX(chLabels{i}), 'HorizontalAlignment', ha, 'FontSize', 9);
     end
 
     if ~isempty(opts.Title)
-        title(ax, opts.Title);
+        title(ax, pf2_base.plot.escapeTeX(opts.Title));
     else
         titleStr = sprintf('Chord Diagram (%s, %s)', result.method, result.biomarker);
         if opts.SignificanceMask
             titleStr = sprintf('%s [p < %.2f]', titleStr, opts.PThreshold);
         end
-        title(ax, titleStr);
+        title(ax, pf2_base.plot.escapeTeX(titleStr));
     end
 
     hold(ax, 'off');

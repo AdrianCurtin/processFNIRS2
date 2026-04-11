@@ -18,6 +18,8 @@ function results = permTest(groups, groupByVars, varargin)
 % Name-Value Parameters:
 %   Biomarkers  - Cell array of biomarker names (default: {'HbO','HbR','HbTotal','CBSI'})
 %   Channels    - Channel indices (default: all)
+%   DataType    - 'fNIRS' (default) or 'ROI'. When 'ROI', tests per ROI
+%                 instead of per channel.
 %   StatWindow  - [start, end] seconds to filter time bins (default: [])
 %   NumPerm     - Number of permutations (default: 5000), or 'exact'
 %   Paired      - Paired (sign-flip) test (default: true)
@@ -45,6 +47,8 @@ function results = permTest(groups, groupByVars, varargin)
 %     .channels     - Channel indices
 %     .conditions   - {2 x 1} cell of condition labels
 %     .nSubjects    - Number of paired subjects
+%     .dataType     - 'fNIRS' or 'ROI'
+%     .labels       - Channel numbers or ROI names (for display)
 %
 % Example:
 %   ex = exploreFNIRS.core.Experiment(data);
@@ -73,6 +77,7 @@ function results = permTest(groups, groupByVars, varargin)
     addRequired(p, 'groupByVars', @iscell);
     addParameter(p, 'Biomarkers', {'HbO','HbR','HbTotal','CBSI'}, @iscell);
     addParameter(p, 'Channels', [], @isnumeric);
+    addParameter(p, 'DataType', 'fNIRS', @ischar);
     addParameter(p, 'StatWindow', [], @isnumeric);
     addParameter(p, 'NumPerm', 5000, @(x) (isnumeric(x) && x > 0) || (ischar(x) && strcmpi(x, 'exact')));
     addParameter(p, 'Paired', true, @islogical);
@@ -99,10 +104,31 @@ function results = permTest(groups, groupByVars, varargin)
             'Unpaired permutation test is not yet supported. Use ''Paired'', true.');
     end
 
+    isROIMode = strcmpi(opts.DataType, 'ROI');
+    ga = groups(1).gbyGrandBarFlat;
+
+    % Filter biomarkers to those available
+    validBio = {};
+    for i = 1:length(opts.Biomarkers)
+        if isROIMode
+            if pf2_base.isnestedfield(ga, ['ROI.' opts.Biomarkers{i}])
+                validBio{end+1} = opts.Biomarkers{i}; %#ok<AGROW>
+            end
+        else
+            if isfield(ga, opts.Biomarkers{i}) && ~isempty(ga.(opts.Biomarkers{i}))
+                validBio{end+1} = opts.Biomarkers{i}; %#ok<AGROW>
+            end
+        end
+    end
+    if isempty(validBio)
+        error('exploreFNIRS:stats:permTest:noBiomarkers', ...
+            'None of the requested biomarkers found in data.');
+    end
+    opts.Biomarkers = validBio;
     nBioM = length(opts.Biomarkers);
 
     % Get time bins and apply StatWindow mask
-    barTimes = groups(1).gbyGrandBarFlat.time;
+    barTimes = ga.time;
     if ~isempty(opts.StatWindow)
         sw = opts.StatWindow;
         if ~isnumeric(sw) || numel(sw) ~= 2
@@ -114,31 +140,65 @@ function results = permTest(groups, groupByVars, varargin)
         tMask = true(size(barTimes));
     end
 
-    % Determine channels
+    % Determine channels/ROIs
     firstBio = opts.Biomarkers{1};
-    if isempty(opts.Channels)
-        nCh = size(groups(1).gbyGrandBarFlat.(firstBio).data, 2);
-        channels = 1:nCh;
-    else
-        channels = opts.Channels;
-        nCh = length(channels);
-    end
-
-    % Exclude short separation channels
-    if opts.ExcludeShortSeparation
-        ssIdx = getShortSeparationIdx(groups);
-        if ~isempty(ssIdx)
-            channels = channels(~ismember(channels, ssIdx));
+    if isROIMode
+        if ~isfield(ga, 'ROI')
+            error('exploreFNIRS:stats:permTest:noROI', ...
+                'No ROI data in grand average. Define ROIs before aggregating.');
+        end
+        if isempty(opts.Channels)
+            nCh = size(ga.ROI.(firstBio).data, 2);
+            channels = 1:nCh;
+        else
+            channels = opts.Channels;
             nCh = length(channels);
-            if opts.Verbose
-                fprintf('Excluding %d short separation channels\n', length(ssIdx));
+        end
+    else
+        if isempty(opts.Channels)
+            nCh = size(ga.(firstBio).data, 2);
+            channels = 1:nCh;
+        else
+            channels = opts.Channels;
+            nCh = length(channels);
+        end
+
+        % Exclude short separation channels (channel mode only)
+        if opts.ExcludeShortSeparation
+            ssIdx = getShortSeparationIdx(groups);
+            if ~isempty(ssIdx)
+                channels = channels(~ismember(channels, ssIdx));
+                nCh = length(channels);
+                if opts.Verbose
+                    fprintf('Excluding %d short separation channels\n', length(ssIdx));
+                end
             end
         end
     end
 
+    % Build display labels
+    if isROIMode && isfield(ga.ROI, 'info')
+        roiInfo = ga.ROI.info;
+        if istable(roiInfo)
+            allNames = roiInfo.Properties.RowNames;
+        elseif isstruct(roiInfo) && isfield(roiInfo, 'Names')
+            allNames = roiInfo.Names;
+        else
+            allNames = arrayfun(@(i) sprintf('ROI%d', i), channels, 'UniformOutput', false);
+        end
+        labels = allNames(channels);
+    else
+        labels = arrayfun(@(c) sprintf('Ch%d', c), channels, 'UniformOutput', false);
+    end
+
     % Number of subjects per group (paired: must be equal)
-    nSubA = size(groups(1).gbyGrandBarFlat.(firstBio).data, 3);
-    nSubB = size(groups(2).gbyGrandBarFlat.(firstBio).data, 3);
+    if isROIMode
+        nSubA = size(groups(1).gbyGrandBarFlat.ROI.(firstBio).data, 3);
+        nSubB = size(groups(2).gbyGrandBarFlat.ROI.(firstBio).data, 3);
+    else
+        nSubA = size(groups(1).gbyGrandBarFlat.(firstBio).data, 3);
+        nSubB = size(groups(2).gbyGrandBarFlat.(firstBio).data, 3);
+    end
     nSub = min(nSubA, nSubB);
 
     if nSub < 2
@@ -186,6 +246,8 @@ function results = permTest(groups, groupByVars, varargin)
     results.channels = channels;
     results.conditions = {groups(1).label, groups(2).label};
     results.nSubjects = nSub;
+    results.dataType = opts.DataType;
+    results.labels = labels;
 
     rng(opts.Seed);
 
@@ -196,9 +258,14 @@ function results = permTest(groups, groupByVars, varargin)
             ch = channels(chI);
 
             % Extract per-subject means from gbyGrandBarFlat
-            % Data is [time x channels x subjects]
-            dataA = groups(1).gbyGrandBarFlat.(bioM).data(tMask, ch, :);
-            dataB = groups(2).gbyGrandBarFlat.(bioM).data(tMask, ch, :);
+            % Data is [time x channels/ROIs x subjects]
+            if isROIMode
+                dataA = groups(1).gbyGrandBarFlat.ROI.(bioM).data(tMask, ch, :);
+                dataB = groups(2).gbyGrandBarFlat.ROI.(bioM).data(tMask, ch, :);
+            else
+                dataA = groups(1).gbyGrandBarFlat.(bioM).data(tMask, ch, :);
+                dataB = groups(2).gbyGrandBarFlat.(bioM).data(tMask, ch, :);
+            end
 
             % Average across time -> [1 x 1 x nSub] -> [nSub x 1]
             meansA = squeeze(mean(dataA, 1, 'omitnan'));
@@ -287,8 +354,10 @@ function results = permTest(groups, groupByVars, varargin)
         if opts.Verbose
             nSig = sum(results.significant(bIdx, :));
             nValid = sum(~isnan(results.pvalue(bIdx, :)));
-            fprintf('PermTest [%s]: %d/%d channels significant (FDR < %.2f)\n', ...
-                bioM, nSig, nValid, opts.FDRThreshold);
+            unitLabel = 'channels';
+            if isROIMode, unitLabel = 'ROIs'; end
+            fprintf('PermTest [%s]: %d/%d %s significant (FDR < %.2f)\n', ...
+                bioM, nSig, nValid, unitLabel, opts.FDRThreshold);
         end
     end
 end

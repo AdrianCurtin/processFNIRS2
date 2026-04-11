@@ -59,6 +59,7 @@ function fig = plotNetwork(G, varargin)
     addParameter(p, 'SaveWidth', 600, @isnumeric);
     addParameter(p, 'SaveHeight', 600, @isnumeric);
     addParameter(p, 'SaveDPI', 150, @isnumeric);
+    addParameter(p, 'TightLayout', false, @islogical);
     parse(p, G, varargin{:});
     opts = p.Results;
 

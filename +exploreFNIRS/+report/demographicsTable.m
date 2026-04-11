@@ -26,8 +26,9 @@ function T = demographicsTable(experiment, varargin)
 %
 % Name-Value Parameters:
 %   Variables         - Cell array of variable names to summarize
-%                       (default: auto-detect from table, excluding
-%                       internal columns)
+%                       (default: common demographics — Age, Sex, Gender,
+%                       Group, Subgroup, Race, Ethnicity, Handedness,
+%                       Education, SES — filtered to those present in data)
 %   GroupBy           - Grouping variable name (default: '' = no grouping)
 %   SubjectVar        - Column identifying unique subjects
 %                       (default: 'SubjectID')
@@ -96,16 +97,27 @@ function T = demographicsTable(experiment, varargin)
 
     % --- Step 3: Determine variables to summarize ---
     if isempty(opts.Variables)
-        vars = fullTable.Properties.VariableNames;
-        exclude = {opts.SubjectVar, 'missingFNIRS', 'segmentIndex', ...
-                   'fileIndex', 'blockNumber', 'markerCode', ...
-                   'markerIndex', 'amplitude', 'filename', ...
-                   'probename', 'Session', 'Trial', 'Block', ...
-                   'BlockNumber'};
+        % Default: common demographic variables that exist in the table
+        defaultDemographics = {'Age', 'Sex', 'Gender', 'Group', 'Subgroup', ...
+            'Race', 'Ethnicity', 'Handedness', 'Education', 'SES'};
+        available = fullTable.Properties.VariableNames;
+        % Remove GroupBy from candidates (it's the column header, not a row)
         if ~isempty(opts.GroupBy)
-            exclude = [exclude, {opts.GroupBy}];
+            defaultDemographics = setdiff(defaultDemographics, {opts.GroupBy}, 'stable');
         end
-        vars = setdiff(vars, exclude, 'stable');
+        vars = intersect(defaultDemographics, available, 'stable');
+        if isempty(vars)
+            % Fallback: use all non-internal columns (original behavior)
+            exclude = {opts.SubjectVar, 'missingFNIRS', 'segmentIndex', ...
+                       'fileIndex', 'blockNumber', 'markerCode', ...
+                       'markerIndex', 'amplitude', 'filename', ...
+                       'probename', 'Session', 'Trial', 'Block', ...
+                       'BlockNumber'};
+            if ~isempty(opts.GroupBy)
+                exclude = [exclude, {opts.GroupBy}];
+            end
+            vars = setdiff(available, exclude, 'stable');
+        end
     else
         vars = opts.Variables;
     end
@@ -243,7 +255,7 @@ function T = demographicsTable(experiment, varargin)
             % One row per level
             for lv = 1:length(levels)
                 levelLabel = sprintf('  %s', levels(lv));
-                rowLabels{end+1} = levelLabel; %#ok<AGROW>
+                rowLabels{end+1} = sprintf('%s_%s', varName, levels(lv)); %#ok<AGROW>
                 displayLabels{end+1} = levelLabel; %#ok<AGROW>
                 row = cell(1, nCols);
 
@@ -280,6 +292,12 @@ function T = demographicsTable(experiment, varargin)
 
     % --- Step 7: Build output table ---
     safeNames = matlab.lang.makeValidName(colNames);
+    % Replace empty row labels to avoid cell2table RowNames error
+    for ri = 1:length(rowLabels)
+        if isempty(rowLabels{ri}) || strtrim(rowLabels{ri}) == ""
+            rowLabels{ri} = sprintf('Var_%d', ri);
+        end
+    end
     % Ensure unique row labels (categorical sub-levels may collide)
     rowLabels = matlab.lang.makeUniqueStrings(rowLabels);
     T = cell2table(rowData, 'VariableNames', safeNames, 'RowNames', rowLabels);
@@ -539,7 +557,7 @@ function printLatex(T, colNames, displayLabels)
         label = latexEscape(rowNames{r});
         % Indent sub-levels (they start with spaces)
         if length(rowNames{r}) > 2 && rowNames{r}(1) == ' '
-            label = ['\\quad ', strtrim(label)];
+            label = ['\quad ', strtrim(label)];
         end
         fprintf('%s', label);
         for c = 1:nCols

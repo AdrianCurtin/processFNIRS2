@@ -1,5 +1,5 @@
 function handleSave(fig, opts)
-% HANDLESAVE Save figure if SavePath is non-empty, no-op otherwise
+% HANDLESAVE Apply layout options and save figure if SavePath is non-empty
 %
 % Standardized save logic that replaces the repeated 8-line save block
 % in every plot function. Delegates to pf2_base.plot.saveFigure.
@@ -10,12 +10,19 @@ function handleSave(fig, opts)
 % Inputs:
 %   fig  - Figure handle
 %   opts - Struct with optional fields:
-%          .SavePath   - File path (empty = no-op)
-%          .SaveWidth  - Width in pixels (default: 800)
-%          .SaveHeight - Height in pixels (default: 500)
-%          .SaveDPI    - Resolution (default: 150)
+%          .TightLayout - Apply tight layout to reduce whitespace (default: false)
+%          .SavePath    - File path (empty = no-op)
+%          .SaveWidth   - Width in pixels (default: 800)
+%          .SaveHeight  - Height in pixels (default: 500)
+%          .SaveDPI     - Resolution (default: 150)
 %
-% See also: pf2_base.plot.saveFigure, pf2_base.plot.createFigure
+% See also: pf2_base.plot.saveFigure, pf2_base.plot.createFigure,
+%           pf2_base.plot.applyTightLayout
+
+    % Apply tight layout before saving (or for on-screen display)
+    if isfield(opts, 'TightLayout') && opts.TightLayout
+        pf2_base.plot.applyTightLayout(fig);
+    end
 
     if ~isfield(opts, 'SavePath') || isempty(opts.SavePath)
         return;

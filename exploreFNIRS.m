@@ -129,6 +129,13 @@ if(~isfield(ExFNIRS,'settings')||~isfield(ExFNIRS.settings,'baseline_start'))
     ExFNIRS.settings.processRaw=get(handles.checkbox_process_raw,'Value');
     ExFNIRS.settings.LME_use_intercept=get(handles.checkbox_LME_use_intercept,'Value');
     ExFNIRS.settings.LME_use_discreteTime=get(handles.checkbox_discreteTime,'Value');
+    % Map legacy checkbox to new TimeModel setting
+    if ExFNIRS.settings.LME_use_discreteTime
+        ExFNIRS.settings.LME_timeModel = 'discrete';
+    else
+        ExFNIRS.settings.LME_timeModel = 'polynomial';
+    end
+    ExFNIRS.settings.LME_polyOrder = 2;
     ExFNIRS.settings.LME_randomFxStr='1|SubjectID';
     ExFNIRS.settings.LME_use_customStr=get(handles.checkbox_lme_usecustom,'Value');
     ExFNIRS.settings.topoSigThrehold={'p',0.05};
@@ -2434,6 +2441,12 @@ if s.within_sub_avg_mode >= 1 && s.within_sub_avg_mode <= 3
     ex.settings.avgMode = modes{s.within_sub_avg_mode};
 end
 ex.settings.taskEnd = s.block_end;
+if isfield(s, 'LME_timeModel') && ~isempty(s.LME_timeModel)
+    ex.settings.timeModel = s.LME_timeModel;
+end
+if isfield(s, 'LME_polyOrder') && ~isempty(s.LME_polyOrder)
+    ex.settings.polyOrder = s.LME_polyOrder;
+end
 ExFNIRS.experiment = ex;
 
 function syncBlockSettingsUI(handles)
@@ -4508,6 +4521,12 @@ function checkbox_discreteTime_Callback(hObject, eventdata, handles)
 % Hint: get(hObject,'Value') returns toggle state of checkbox_discreteTime
 global ExFNIRS
 ExFNIRS.settings.LME_use_discreteTime=get(handles.checkbox_discreteTime,'Value');
+% Map legacy checkbox to new TimeModel setting
+if ExFNIRS.settings.LME_use_discreteTime
+    ExFNIRS.settings.LME_timeModel = 'discrete';
+else
+    ExFNIRS.settings.LME_timeModel = 'polynomial';
+end
 
 
 % --- Executes on selection change in popupmenu_lmer_randomeffects.

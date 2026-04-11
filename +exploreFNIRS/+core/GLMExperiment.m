@@ -455,6 +455,7 @@ classdef GLMExperiment < exploreFNIRS.core.Experiment
             addParameter(p, 'SaveWidth', 800, @isnumeric);
             addParameter(p, 'SaveHeight', 500, @isnumeric);
             addParameter(p, 'SaveDPI', 150, @isnumeric);
+            addParameter(p, 'TightLayout', false, @islogical);
             parse(p, subjectIdx, varargin{:});
             opts = p.Results;
 
@@ -477,7 +478,7 @@ classdef GLMExperiment < exploreFNIRS.core.Experiment
                 'TickLabelInterpreter', 'none');
             xlabel(ax, 'Regressors');
             ylabel(ax, 'Time (samples)');
-            title(ax, sprintf('Design Matrix: %s', r.subjectID));
+            title(ax, sprintf('Design Matrix: %s', pf2_base.plot.escapeTeX(r.subjectID)));
 
             sty = pf2_base.plot.PlotStyle.getDefault();
             sty.applyToFigure(fig);

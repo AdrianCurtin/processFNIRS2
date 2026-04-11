@@ -81,6 +81,7 @@ function [fig, stats] = plotNeuralEfficiencyCore(plotGroups, varargin)
     addParameter(p, 'SaveWidth', 600, @isnumeric);
     addParameter(p, 'SaveHeight', 500, @isnumeric);
     addParameter(p, 'SaveDPI', 150, @isnumeric);
+    addParameter(p, 'TightLayout', false, @islogical);
     parse(p, plotGroups, varargin{:});
     opts = p.Results;
 

@@ -53,6 +53,7 @@ function fig = plotBlockComparison(blockResults, varargin)
     addParameter(p, 'SaveWidth', 700, @isnumeric);
     addParameter(p, 'SaveHeight', 400, @isnumeric);
     addParameter(p, 'SaveDPI', 150, @isnumeric);
+    addParameter(p, 'TightLayout', false, @islogical);
     parse(p, blockResults, varargin{:});
     opts = p.Results;
 
@@ -218,12 +219,12 @@ function fig = plotBlockComparison(blockResults, varargin)
     end
 
     if ~isempty(opts.Title)
-        title(ax, opts.Title);
+        title(ax, pf2_base.plot.escapeTeX(opts.Title));
     else
         grp = blockResults(1).groups(gi);
         titleStr = sprintf('Connectivity by Block (%s, %s, %s)', ...
             grp.method, grp.biomarker, grp.label);
-        title(ax, titleStr);
+        title(ax, pf2_base.plot.escapeTeX(titleStr));
     end
 
     box(ax, 'on');

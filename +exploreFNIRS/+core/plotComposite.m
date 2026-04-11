@@ -52,6 +52,7 @@ function fig = plotComposite(groups, panels, varargin)
     addParameter(ip, 'SaveWidth', 1200, @isnumeric);
     addParameter(ip, 'SaveHeight', 800, @isnumeric);
     addParameter(ip, 'SaveDPI', 150, @isnumeric);
+    addParameter(ip, 'TightLayout', false, @islogical);
     parse(ip, groups, panels, varargin{:});
     opts = ip.Results;
 

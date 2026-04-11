@@ -78,6 +78,7 @@ function [fig, results] = plotInfoLME(dataTable, infoVar, groupByVars, varargin)
     addParameter(p, 'SaveWidth', 600, @isnumeric);
     addParameter(p, 'SaveHeight', 400, @isnumeric);
     addParameter(p, 'SaveDPI', 150, @isnumeric);
+    addParameter(p, 'TightLayout', false, @islogical);
     addParameter(p, 'Colors', [], @(x) true);  % Accepted for API consistency, unused
     parse(p, dataTable, infoVar, groupByVars, varargin{:});
     opts = p.Results;
@@ -159,13 +160,13 @@ function [fig, results] = plotInfoLME(dataTable, infoVar, groupByVars, varargin)
 
     % Title
     if ~isempty(opts.Title)
-        pf2_base.external.suptitle(fig, opts.Title);
+        pf2_base.external.suptitle(fig, pf2_base.plot.escapeTeX(opts.Title));
     else
         formulaStr = regexprep(results.formula, '^[^~]+~', ...
             [infoVar ' ~ ']);
         formulaStr = strrep(formulaStr, '+', ' + ');
         formulaStr = regexprep(formulaStr, '\s+', ' ');
-        pf2_base.external.suptitle(fig, formulaStr);
+        pf2_base.external.suptitle(fig, pf2_base.plot.escapeTeX(formulaStr));
     end
 
     sty.applyToFigure(fig);

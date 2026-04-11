@@ -21,10 +21,11 @@ function fig = plotTopo(groups, varargin)
 %   Device        - pf2.Device object for probe layout (default: [])
 %   Time          - Single time point for snapshot (default: [])
 %   TimeWindow    - [start, end] seconds to average over (default: full)
-%   Colormap      - Colormap name or matrix (default: 'jet')
+%   Colormap      - Colormap name or matrix (default: blue-white-red)
 %   CLim          - Color limits [cmin cmax] (default: auto)
 %   Layout        - 'single' (average groups) or 'pergroup' (side-by-side)
 %   Interpolation - 'none' (default) or 'natural'
+%   ChannelLabels - Cell array of custom labels per channel (default: channel numbers)
 %   Title         - Figure title (default: auto)
 %   Visible       - 'on' (default) or 'off'
 %   SavePath      - File path to save figure
@@ -43,16 +44,18 @@ function fig = plotTopo(groups, varargin)
     addParameter(p, 'Device', [], @(v) isempty(v) || isa(v, 'pf2.Device'));
     addParameter(p, 'Time', [], @(v) isempty(v) || (isnumeric(v) && isscalar(v)));
     addParameter(p, 'TimeWindow', [], @(v) isempty(v) || (isnumeric(v) && numel(v) == 2));
-    addParameter(p, 'Colormap', 'jet', @(v) ischar(v) || isnumeric(v));
+    addParameter(p, 'Colormap', '', @(v) ischar(v) || isnumeric(v));
     addParameter(p, 'CLim', [], @(v) isempty(v) || (isnumeric(v) && numel(v) == 2));
     addParameter(p, 'Layout', 'single', @ischar);
     addParameter(p, 'Interpolation', 'none', @ischar);
+    addParameter(p, 'ChannelLabels', {}, @(v) iscell(v) || isstring(v));
     addParameter(p, 'Title', '', @ischar);
     addParameter(p, 'Visible', 'on', @ischar);
     addParameter(p, 'SavePath', '', @ischar);
     addParameter(p, 'SaveWidth', 600, @isnumeric);
     addParameter(p, 'SaveHeight', 500, @isnumeric);
     addParameter(p, 'SaveDPI', 150, @isnumeric);
+    addParameter(p, 'TightLayout', false, @islogical);
     addParameter(p, 'Colors', [], @(x) true);  % Accepted for API consistency, unused (topo uses Colormap)
     parse(p, groups, varargin{:});
     opts = p.Results;
@@ -145,23 +148,21 @@ function fig = plotTopo(groups, varargin)
         avgVals = mean(allMat, 1, 'omitnan');
 
         ax = axes('Parent', fig);
-        plotTopoOnAxes(ax, avgVals, probeXY, chNums, opts, cLim);
-
-        sty = pf2_base.plot.PlotStyle.getDefault();
-        sty.applyToAxes(ax);
+        plotTopoOnAxes(ax, avgVals, probeXY, chNums, opts.ChannelLabels, opts, cLim);
     else
         % Per-group panels
         for g = 1:nPanels
             ax = subplot(1, nPanels, g, 'Parent', fig);
             if ~isempty(groupValues{g})
-                plotTopoOnAxes(ax, groupValues{g}, probeXY, chNums, opts, cLim);
+                plotTopoOnAxes(ax, groupValues{g}, probeXY, chNums, opts.ChannelLabels, opts, cLim);
             end
             title(ax, pf2_base.plot.escapeTeX(groups(g).label), 'FontSize', 11);
-
-            sty = pf2_base.plot.PlotStyle.getDefault();
-            sty.applyToAxes(ax);
         end
     end
+
+    % Apply theme to all axes and colorbars
+    sty = pf2_base.plot.PlotStyle.getDefault();
+    sty.applyToFigure(fig);
 
     % Title
     if ~isempty(opts.Title)
@@ -245,7 +246,7 @@ function [probeXY, chMask, chNums] = resolveProbeLayout(dev)
 end
 
 
-function plotTopoOnAxes(ax, vals, probeXY, chNums, opts, cLim)
+function plotTopoOnAxes(ax, vals, probeXY, chNums, customLabels, opts, cLim)
 % Plot topographic map on a single axes
     nCh = length(vals);
 
@@ -273,6 +274,11 @@ function plotTopoOnAxes(ax, vals, probeXY, chNums, opts, cLim)
         end
     end
 
+    % Override with custom labels if provided
+    if ~isempty(customLabels) && length(customLabels) == nCh
+        labels = customLabels;
+    end
+
     if strcmpi(opts.Interpolation, 'natural') && nCh > 3
         % Interpolated surface
         padX = 0.05 * (max(xPos) - min(xPos) + eps);
@@ -295,8 +301,13 @@ function plotTopoOnAxes(ax, vals, probeXY, chNums, opts, cLim)
         scatter(ax, xPos, yPos, 200, vals, 'filled', 'MarkerEdgeColor', 'k');
 
         for c = 1:nCh
-            text(ax, xPos(c), yPos(c), sprintf('%d', labels(c)), ...
-                'HorizontalAlignment', 'center', 'FontSize', 7, 'Color', 'w');
+            if iscell(labels) || isstring(labels)
+                lbl = char(labels{c});
+            else
+                lbl = sprintf('%d', labels(c));
+            end
+            text(ax, xPos(c), yPos(c), lbl, ...
+                'HorizontalAlignment', 'center', 'FontSize', 7, 'Color', 'k');
         end
         hold(ax, 'off');
         set(ax, 'CLim', cLim);
@@ -309,11 +320,26 @@ function plotTopoOnAxes(ax, vals, probeXY, chNums, opts, cLim)
     ylim(ax, [min(yPos) - padY, max(yPos) + padY]);
     set(ax, 'XTick', [], 'YTick', []);
 
-    if ischar(opts.Colormap)
+    if isempty(opts.Colormap)
+        colormap(ax, divergingColormap(256));
+    elseif ischar(opts.Colormap)
         cmapFn = exploreFNIRS.helper.getColormap(opts.Colormap);
         colormap(ax, cmapFn(256));
     else
         colormap(ax, opts.Colormap);
     end
     colorbar(ax);
+end
+
+
+function cmap = divergingColormap(n)
+% Blue-white-red diverging colormap centered on zero
+    half = floor(n / 2);
+    r1 = linspace(0.2, 1, half)';
+    g1 = linspace(0.3, 1, half)';
+    b1 = linspace(0.8, 1, half)';
+    r2 = linspace(1, 0.8, n - half)';
+    g2 = linspace(1, 0.2, n - half)';
+    b2 = linspace(1, 0.2, n - half)';
+    cmap = [r1 g1 b1; r2 g2 b2];
 end

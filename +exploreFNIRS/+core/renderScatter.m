@@ -126,7 +126,7 @@ function [legendHandles, legendEntries, stats] = renderScatter(ax, groups, group
         % Scatter
         h = scatter(ax, xVals, yVals, 25, clr, 'filled', 'MarkerFaceAlpha', 0.7);
         legendHandles(end+1) = h; %#ok<AGROW>
-        legendEntries{end+1} = sprintf('%s (n=%d)', selGroups(i).label, N); %#ok<AGROW>
+        legendEntries{end+1} = sprintf('%s (n=%d)', pf2_base.plot.escapeTeX(selGroups(i).label), N); %#ok<AGROW>
 
         % Fit line
         fitLine = false;

@@ -51,6 +51,7 @@ function fig = plotDirected(result, varargin)
     addParameter(p, 'SaveWidth', 600, @isnumeric);
     addParameter(p, 'SaveHeight', 600, @isnumeric);
     addParameter(p, 'SaveDPI', 150, @isnumeric);
+    addParameter(p, 'TightLayout', false, @islogical);
     parse(p, result, varargin{:});
     opts = p.Results;
     result = exploreFNIRS.connectivity.normalizeResult(result);
@@ -167,13 +168,13 @@ function fig = plotMatrixLayout(mat, chLabels, result, opts)
     end
 
     if ~isempty(opts.Title)
-        title(ax, opts.Title);
+        title(ax, pf2_base.plot.escapeTeX(opts.Title));
     else
         titleStr = sprintf('Directed Connectivity (%s, %s)', result.method, result.biomarker);
         if opts.SignificanceMask
             titleStr = sprintf('%s [p < %.2f]', titleStr, opts.PThreshold);
         end
-        title(ax, titleStr);
+        title(ax, pf2_base.plot.escapeTeX(titleStr));
     end
 
     sty.applyToAxes(ax);
@@ -276,14 +277,15 @@ function fig = plotCircularLayout(mat, chLabels, result, opts)
     chLabels = pf2_base.plot.escapeTeX(chLabels);
     labelOffset = 1.15;
     for i = 1:nCh
-        text(ax, nodeX(i) * labelOffset, nodeY(i) * labelOffset, chLabels{i}, ...
+        text(ax, nodeX(i) * labelOffset, nodeY(i) * labelOffset, ...
+            pf2_base.plot.escapeTeX(chLabels{i}), ...
             'HorizontalAlignment', 'center', 'FontSize', 9);
     end
 
     if ~isempty(opts.Title)
-        title(ax, opts.Title);
+        title(ax, pf2_base.plot.escapeTeX(opts.Title));
     else
-        title(ax, sprintf('Directed Connectivity (%s, %s)', result.method, result.biomarker));
+        title(ax, pf2_base.plot.escapeTeX(sprintf('Directed Connectivity (%s, %s)', result.method, result.biomarker)));
     end
 
     hold(ax, 'off');

@@ -114,6 +114,7 @@ function [fig, stats] = plotScatter(groups, varargin)
     addParameter(p, 'SaveWidth', 600, @isnumeric);
     addParameter(p, 'SaveHeight', 400, @isnumeric);
     addParameter(p, 'SaveDPI', 150, @isnumeric);
+    addParameter(p, 'TightLayout', false, @islogical);
     addParameter(p, 'Colors', [], @(x) isempty(x) || isnumeric(x) || ischar(x) || isstring(x) || isa(x, 'function_handle') || isa(x, 'exploreFNIRS.core.ColorScheme'));
     parse(p, groups, varargin{:});
     opts = p.Results;
@@ -263,7 +264,7 @@ function [fig, stats] = plotScatter(groups, varargin)
                         curColors = exploreFNIRS.core.getGroupColors(nCurGroups, opts.Colors);
                     end
 
-                    curWithin = withinLabels(plotByIdx == pIdx);
+                    curWithin = pf2_base.plot.escapeTeX(withinLabels(plotByIdx == pIdx));
 
                     for chI = 1:nCh
                         ch = allChannels(chI);
@@ -280,10 +281,12 @@ function [fig, stats] = plotScatter(groups, varargin)
                         end
 
                         if pIdx == 1
-                            title(ax, itemNames{chI});
+                            title(ax, pf2_base.plot.escapeTeX(itemNames{chI}));
                         end
                         if chI == 1
-                            ylabel(ax, sprintf('%s: %s', opts.PlotBy, plotByValues{pIdx}));
+                            ylabel(ax, sprintf('%s: %s', ...
+                                pf2_base.plot.escapeTeX(opts.PlotBy), ...
+                                pf2_base.plot.escapeTeX(plotByValues{pIdx})));
                         end
 
                         if opts.FlipXY
@@ -330,7 +333,7 @@ function [fig, stats] = plotScatter(groups, varargin)
                         end
 
                         if bIdx == 1
-                            title(ax, itemNames{chI});
+                            title(ax, pf2_base.plot.escapeTeX(itemNames{chI}));
                         end
                         if chI == 1
                             if opts.FlipXY
@@ -347,8 +350,8 @@ function [fig, stats] = plotScatter(groups, varargin)
 
                         spTotal = nBioM * nCh;
                         if nGroups > 1 && showLegend(opts.Legend, spIdx, spTotal)
-                            legendLabels = arrayfun(@(g) groups(g).label, ...
-                                1:nGroups, 'UniformOutput', false);
+                            legendLabels = pf2_base.plot.escapeTeX(arrayfun(@(g) groups(g).label, ...
+                                1:nGroups, 'UniformOutput', false));
                             lg = legend(ax, legendLabels, 'Location', 'best', 'FontSize', 8);
                             lg.TextColor = sty.LegendTextColor;
                             lg.Color = sty.LegendBgColor;
@@ -387,7 +390,7 @@ function [fig, stats] = plotScatter(groups, varargin)
                         stats(g, 1, chI) = curStats;
                     end
 
-                    title(ax, itemNames{chI});
+                    title(ax, pf2_base.plot.escapeTeX(itemNames{chI}));
                     if opts.FlipXY
                         xlabel(ax, sprintf('\\Delta[%s]', bioM));
                         if chI == 1 || mod(chI - 1, nCols) == 0
@@ -401,8 +404,8 @@ function [fig, stats] = plotScatter(groups, varargin)
                     end
 
                     if nGroups > 1 && showLegend(opts.Legend, chI, nCh)
-                        legendLabels = arrayfun(@(g) groups(g).label, ...
-                            1:nGroups, 'UniformOutput', false);
+                        legendLabels = pf2_base.plot.escapeTeX(arrayfun(@(g) groups(g).label, ...
+                            1:nGroups, 'UniformOutput', false));
                         lg = legend(ax, legendLabels, 'Location', 'best', 'FontSize', 8);
                         lg.TextColor = sty.LegendTextColor;
                         lg.Color = sty.LegendBgColor;
@@ -432,10 +435,10 @@ function [fig, stats] = plotScatter(groups, varargin)
         % Title
         if ~isempty(opts.Title)
             if nFigs > 1
-                pf2_base.external.suptitle(curFig, sprintf('%s — %s', opts.Title, ...
-                    opts.Biomarkers{fIdx}));
+                pf2_base.external.suptitle(curFig, sprintf('%s — %s', ...
+                    pf2_base.plot.escapeTeX(opts.Title), opts.Biomarkers{fIdx}));
             else
-                pf2_base.external.suptitle(curFig, opts.Title);
+                pf2_base.external.suptitle(curFig, pf2_base.plot.escapeTeX(opts.Title));
             end
         elseif nFigs > 1
             pf2_base.external.suptitle(curFig, sprintf('%s vs %s (%s)', ...
@@ -756,10 +759,10 @@ function [fig, stats] = plotTopoCorrelation(groups, opts, allChannels, tIdx)
                     bar(ax, allChannels, curR, 'FaceColor', 'flat');
                     ylabel(ax, clrBarTitle);
                     xlabel(ax, 'Channel');
-                    title(ax, groups(g).label);
+                    title(ax, pf2_base.plot.escapeTeX(groups(g).label));
                 end
             else
-                text(ax, 0.5, 0.5, sprintf('%s\nn.s.', groups(g).label), ...
+                text(ax, 0.5, 0.5, sprintf('%s\nn.s.', pf2_base.plot.escapeTeX(groups(g).label)), ...
                     'HorizontalAlignment', 'center', 'Units', 'normalized');
                 axis(ax, 'off');
             end
@@ -768,7 +771,7 @@ function [fig, stats] = plotTopoCorrelation(groups, opts, allChannels, tIdx)
 
     % Title
     if ~isempty(opts.Title)
-        pf2_base.external.suptitle(fig, opts.Title);
+        pf2_base.external.suptitle(fig, pf2_base.plot.escapeTeX(opts.Title));
     else
         pf2_base.external.suptitle(fig, sprintf('Topo: %s (%s, %s=%.2f)', ...
             pf2_base.plot.escapeTeX(opts.InfoVar), opts.CorrType, ...
