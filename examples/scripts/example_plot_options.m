@@ -261,6 +261,51 @@ fprintf('  Created 7 bar charts\n');
 
 
 %% ========================================================================
+%  3b. VIEW PADDING FOR TEMPORAL PLOTS
+%  ========================================================================
+%
+%  settings.viewPad widens the temporal grand average around the
+%  baseline-start / task-end edges so plotTemporal and plotHeatmap can
+%  show samples just outside the task. Bar values and downstream stats
+%  are auto-pinned to [taskStart, taskEnd] — widening the view never
+%  silently changes a bar value or an exported table entry.
+%
+%  Accepted forms:
+%    ex.settings.viewPad = []           % strict trim to [taskStart, taskEnd]
+%    ex.settings.viewPad = 5            % symmetric 5s pad on each side
+%    ex.settings.viewPad = [10, 5]      % 10s before baseline, 5s after task
+%
+%  Default is [5, 5]. Note: pre-baseline samples in the padded region
+%  show real signal minus the baseline mean — they are NOT flat at zero,
+%  only the mean OVER the baseline window is zero by construction.
+
+fprintf('\n=== 3b. View padding (viewPad) ===\n');
+
+% Widen the view to 10s before baseline and 5s after task end
+ex.settings.viewPad = [10, 5];
+ex.aggregate();
+
+fig = ex.plotTemporal('Channels', 1:4, 'Biomarkers', {'HbO'}, ...
+    'VLines', [-5, 0, 30], ...
+    'Title', '3b-i: plotTemporal with viewPad [10,5]s');
+
+% Heatmap supports 'XLim' for an additional visual crop of an already
+% widened view (without re-aggregating).
+fig = ex.plotHeatmap('Biomarker', 'HbO', 'XLim', [-5, 35], ...
+    'VLines', [0, 30], ...
+    'Title', '3b-ii: plotHeatmap with viewPad + XLim visual crop');
+
+% Verify bar values stay pinned to [taskStart, taskEnd]:
+figA = ex.plotBar('Biomarker', 'HbO', 'Channels', 1:4, ...
+    'Title', '3b-iii: bar with viewPad (same value as no pad)');
+
+ex.settings.viewPad = [];  % reset for subsequent examples
+ex.aggregate();
+
+fprintf('  Created 3 viewPad demo plots\n');
+
+
+%% ========================================================================
 %  4. SCATTER PLOTS
 %  ========================================================================
 %

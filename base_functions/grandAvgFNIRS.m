@@ -265,8 +265,11 @@ outGA.time=round([minTime:resampleSize:maxTime]',5);
 
 if(~isempty(segmentTimesArr))
     outGA.segmentTimes=unique(segmentTimesArr,'rows');
-    outGA.segmentTimes=sort(outGA.segmentTimes,1);
-     outGA.segmentTimes=round( outGA.segmentTimes,5);
+    % sortrows keeps [start, mid, end] tuples row-aligned; the previous
+    % sort(...,1) sorted each column independently and scrambled the
+    % association between time row i and segmentTimes row i.
+    outGA.segmentTimes=sortrows(outGA.segmentTimes,1);
+    outGA.segmentTimes=round( outGA.segmentTimes,5);
     outGA.time=outGA.time(ismember(outGA.time,outGA.segmentTimes(:,1)));
 else
     % Build segmentTimes from the time grid when not provided by input

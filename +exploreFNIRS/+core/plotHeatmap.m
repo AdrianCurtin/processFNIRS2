@@ -24,6 +24,8 @@ function fig = plotHeatmap(groups, varargin)
 %                   Supports MATLAB builtins, Brewer (e.g. 'RdBu', 'Spectral'),
 %                   and matplotlib (e.g. 'viridis', 'plasma') names.
 %   CLim          - Color limits [cmin cmax] (default: auto symmetric)
+%   XLim          - [min max] x-axis (time) limits for visual cropping
+%                   (default: full data range)
 %   VLines        - Vertical annotation lines (e.g. task start/end).
 %                   Numeric vector of time positions (default dashed gray), or
 %                   struct array with fields:
@@ -54,6 +56,7 @@ function fig = plotHeatmap(groups, varargin)
     addParameter(p, 'SortChannels', 'index', @ischar);
     addParameter(p, 'Colormap', '', @(v) ischar(v) || isnumeric(v));
     addParameter(p, 'CLim', [], @(v) isempty(v) || (isnumeric(v) && numel(v) == 2));
+    addParameter(p, 'XLim', [], @(v) isempty(v) || (isnumeric(v) && numel(v) == 2));
     addParameter(p, 'VLines', [], @(x) isempty(x) || isnumeric(x) || isstruct(x));
     addParameter(p, 'Title', '', @ischar);
     addParameter(p, 'Visible', 'on', @ischar);
@@ -209,6 +212,11 @@ function fig = plotHeatmap(groups, varargin)
     % Colorbar styling
     set(cb, 'Color', sty.ForegroundColor);
     set(cb.Label, 'Color', sty.ForegroundColor);
+
+    % Visual x-axis cropping (does not change underlying data)
+    if ~isempty(opts.XLim)
+        xlim(ax, opts.XLim);
+    end
 
     % Vertical annotation lines (task start/end etc.)
     if ~isempty(opts.VLines)

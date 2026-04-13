@@ -242,21 +242,26 @@ if(blLength>0) % if baseline is present
             blfNIR.(curB)=nan;
         end
 
-        if(calcROI)
+        % Per-iteration ROI guard. Using a loop-wide calcROI mutation here
+        % latched false on the first missing ROI biomarker and silently
+        % skipped ROI baseline subtraction for every subsequent biomarker
+        % in the second loop. Scope the "skip" to this iteration only.
+        roiOK = calcROI;
+        if(roiOK)
 
             if isfield(blfNIR,'ROI') && isstruct(blfNIR.ROI) && isfield(blfNIR.ROI, curB)
                 fB=blfNIR.ROI.(curB);
             else
                 warning('ROI mismatch: ROI is not defined in baseline file');
-                calcROI=false;
-                continue;
+                roiOK=false;
             end
 
-            if(size(fB,2)~=numROI)
+            if(roiOK && size(fB,2)~=numROI)
                 warning('ROI mismatch: ROI as defined in baseline not present in main fNIRS segment, calculations not performed');
-                calcROI=false;
-                continue;
+                roiOK=false;
             end
+        end
+        if(roiOK)
 
             blNanCheck_roi=sum(isnan(fB),1)/length(fB)<nanRejectionLevel; %calculate percentage of invalid values in baseline
 
@@ -367,7 +372,15 @@ for b = 1:length(bioMlist)
 
         fB_resample=resample_internal(fB,fTimeInd,numROI,numSegs,nanRejectionLevel);
 
-        if(~isempty(blLength)&&blLength>0)
+        % Only subtract a ROI baseline mean for this biomarker if the
+        % first loop successfully reduced blfNIR.ROI.(curB) to a 1xnROI
+        % row. When it didn't (missing field, size mismatch, etc.) the
+        % field is either absent or still holds the raw [T_bl x nROI]
+        % split slice — subtracting that would produce wrong-sized output.
+        hasROIBaseline = isfield(blfNIR,'ROI') && isstruct(blfNIR.ROI) && ...
+            isfield(blfNIR.ROI, curB) && size(blfNIR.ROI.(curB), 1) == 1;
+
+        if(~isempty(blLength)&&blLength>0&&hasROIBaseline)
             outFNIR.ROI.(curB)=fB_resample-repmat(blfNIR.ROI.(curB),[numSegs,1]);
         elseif(~isempty(blLength)&&isnan(blLength))
             outFNIR.ROI.(curB)=nan([numSegs,numROI]);
@@ -393,7 +406,7 @@ for b = 1:length(bioMlist)
                 end
             end
 
-            if(~isempty(blLength)&&blLength>0)
+            if(~isempty(blLength)&&blLength>0&&hasROIBaseline)
                 pFit.ROI.(curB)=pFit.ROI.(curB)-repmat(blfNIR.ROI.(curB),[numSegs,1]);
             elseif(~isempty(blLength)&&isnan(blLength))
                 pFit.ROI.(curB)=nan([numSegs,numROI]);

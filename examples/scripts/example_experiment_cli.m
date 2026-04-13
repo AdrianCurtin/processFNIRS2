@@ -75,6 +75,13 @@ ex.settings.taskStart = 0;
 ex.settings.taskEnd = 30;
 ex.settings.resampleRate = 1;
 ex.settings.useBaseline = true;
+% ex.settings.viewPad = [5, 5];  % default. Pads plotTemporal/plotHeatmap
+                                  % view around the baseline-start and
+                                  % task-end edges without affecting bar
+                                  % values or exports. Use [] for strict
+                                  % [taskStart, taskEnd] trim, or [pre,post]
+                                  % for asymmetric padding. See
+                                  % example_plot_options.m section 3b.
 
 % Set processing methods - data is reprocessed on first aggregate() call,
 % then cached. Changing the method triggers reprocessing on next aggregate().

@@ -155,6 +155,16 @@ classdef Experiment < handle
                 'rawMethod',    '', ...          % Raw processing method name ('' = no reprocessing)
                 'oxyMethod',    '', ...          % Oxy processing method name ('' = no reprocessing)
                 'statWindow',   [], ...          % [start, end] for bar/LME stats ([] = full range)
+                'viewPad',      [5, 5], ...      % Plot-only padding (seconds) around the
+                                ...              % baseline-start / task-end edges. Affects what
+                                ...              % plotTemporal/plotHeatmap show only; bar values
+                                ...              % stay pinned to [taskStart, taskEnd].
+                                ...              % [] = strict trim to [taskStart, taskEnd]
+                                ...              % scalar n = symmetric pad [n, n]
+                                ...              % [pre, post] = asymmetric pad
+                                ...              % Pre extends below baseline(1) (or taskStart if
+                                ...              % useBaseline=false). Post extends above taskEnd
+                                ...              % (or segment max if taskEnd=Inf).
                 'timeModel',    '', ...          % TimeModel for LME: 'polynomial','discrete','continuous','none' ('' = fitLME default)
                 'polyOrder',    2 ...            % Polynomial order for GCA (1-5, default: 2)
             );
@@ -473,16 +483,29 @@ classdef Experiment < handle
         %   bin size (in seconds). If settings.useBaseline is true, the
         %   baseline window (settings.baseline) is extracted and subtracted.
         %
+        % Two grand averages are produced per group:
+        %
+        %   gbyGrand        - Temporal grand average. Time vector is widened
+        %                     by settings.viewPad (default [5,5]) so that
+        %                     plotTemporal/plotHeatmap can show samples
+        %                     before baseline and after task end. Used by
+        %                     plotTemporal, plotHeatmap, and the time-mask
+        %                     in plotBar (see settings.statWindow).
+        %
+        %   gbyGrandBarFlat - Bar grand average. Time vector is strictly
+        %                     [0, taskDuration) regardless of viewPad. Used
+        %                     by toLongTable / toWideTable, writeCSV,
+        %                     statsFitLME, plotScatter, and
+        %                     plotNeuralEfficiency. Bar values stay pinned
+        %                     to the task window even when viewPad widens
+        %                     the temporal view.
+        %
         % Averaging Modes:
         %   'hierarchy' - Averages bottom-up through hierarchy levels
         %                 (Trial -> Condition -> Session -> Subject)
         %                 Prevents pseudoreplication.
         %   'flat'      - Average all observations per subject (one value each)
         %   'none'      - Each observation treated independently
-        %
-        % Also computes a flat (SubjectID-only) grand average for each group,
-        % stored in groups(i).gbyGrandBarFlat, which is used by export
-        % functions and LME models.
 
             if ~obj.isGrouped
                 error('exploreFNIRS:core:Experiment:aggregate', ...
@@ -511,12 +534,18 @@ classdef Experiment < handle
 
             if doResample || doBaseline
                 if isfinite(s.taskEnd)
-                    fprintf('Preprocessing: resample=%.2fs, baseline=[%.1f, %.1f]s, task=[%.1f, %.1f]s\n', ...
+                    fprintf('Preprocessing: resample=%.2fs, baseline=[%.1f, %.1f]s, task=[%.1f, %.1f]s', ...
                         s.resampleRate, s.baseline(1), s.baseline(2), s.taskStart, s.taskEnd);
                 else
-                    fprintf('Preprocessing: resample=%.2fs, baseline=[%.1f, %.1f]s, taskStart=%.1fs\n', ...
+                    fprintf('Preprocessing: resample=%.2fs, baseline=[%.1f, %.1f]s, taskStart=%.1fs', ...
                         s.resampleRate, s.baseline(1), s.baseline(2), s.taskStart);
                 end
+                if ~isempty(s.viewPad)
+                    pad = s.viewPad;
+                    if isscalar(pad), pad = [pad, pad]; end
+                    fprintf(', viewPad=[%.1f, %.1f]s', pad(1), pad(2));
+                end
+                fprintf('\n');
             end
             fprintf('Aggregating %d groups (mode: %s)...\n', length(obj.groups), mode);
 
@@ -849,10 +878,17 @@ classdef Experiment < handle
         %   fig = ex.plotTemporal('Biomarkers', {'HbO'}, 'Channels', 1:5)
         %   ex.plotTemporal('SavePath', 'temporal.png')
         %
+        % The visible time range is set at aggregate() time by
+        % settings.viewPad (default [5,5] seconds, padding around
+        % baseline-start and task-end). For visual cropping without
+        % re-aggregating, pass 'XLim', [tmin tmax]. Bar values produced
+        % by plotBar are auto-pinned to [taskStart, taskEnd] regardless
+        % of viewPad — widening the view never changes a bar value.
+        %
         % All name-value arguments are forwarded to
         % exploreFNIRS.core.plotTemporal. See help for that function.
         %
-        % See also: exploreFNIRS.core.plotTemporal
+        % See also: exploreFNIRS.core.plotTemporal, plotHeatmap
 
             if ~obj.isAggregated
                 error('exploreFNIRS:core:Experiment:plotTemporal', ...
@@ -2619,9 +2655,14 @@ classdef Experiment < handle
         %
         %   fig = ex.plotHeatmap()
         %   fig = ex.plotHeatmap('Biomarker', 'HbO', 'SortChannels', 'amplitude')
-        %   fig = ex.plotHeatmap('SavePath', 'heatmap.png')
+        %   fig = ex.plotHeatmap('XLim', [-5 35], 'SavePath', 'heatmap.png')
         %
-        % See also: exploreFNIRS.core.plotHeatmap
+        % The visible time range is set at aggregate() time by
+        % settings.viewPad (default [5,5] seconds, padding around
+        % baseline-start and task-end). For visual cropping of an
+        % already-wide view, pass 'XLim', [tmin tmax].
+        %
+        % See also: exploreFNIRS.core.plotHeatmap, plotTemporal
 
             if ~obj.isAggregated
                 error('exploreFNIRS:core:Experiment:plotHeatmap', ...
@@ -3107,9 +3148,28 @@ classdef Experiment < handle
 
         function args = injectStatWindow(obj, args)
         % INJECTSTATWINDOW Auto-inject statWindow setting as StatWindow param
+        %
+        % Precedence:
+        %   1. User-supplied StatWindow (left untouched)
+        %   2. settings.statWindow (when set)
+        %   3. [taskStart, taskEnd] when viewPad is set — pins bar stats
+        %      so widening the view never silently changes a bar value
             keys = args(1:2:end);
-            if ~any(strcmpi(keys, 'StatWindow')) && ~isempty(obj.settings.statWindow)
-                args = [args, {'StatWindow', obj.settings.statWindow}];
+            if any(strcmpi(keys, 'StatWindow')), return; end
+
+            s = obj.settings;
+            if ~isempty(s.statWindow)
+                args = [args, {'StatWindow', s.statWindow}];
+            elseif ~isempty(s.viewPad)
+                % Match the exclusive upper bound of trimToTaskWindow
+                % (t < tEnd) so the boundary bin at taskEnd — which is
+                % a post-task sample — is not included in the bar average.
+                if isfinite(s.taskEnd)
+                    pinEnd = s.taskEnd - 1e-9;
+                else
+                    pinEnd = inf;
+                end
+                args = [args, {'StatWindow', [s.taskStart, pinEnd]}];
             end
         end
 
@@ -3199,6 +3259,20 @@ if doResample || doBaseline
         barBin = taskDuration;
     end
 
+    % View bounds for ppData (display only). When viewPad=[], falls back
+    % to the legacy [taskStart, taskEnd) trim. When viewPad is set, the
+    % window is widened relative to baseline-start / task-end edges.
+    [viewStart, viewEnd, viewActive] = computeViewBounds(s, curData{1});
+
+    % For the non-resample baseline-correction path, the segment is split
+    % rather than resampled. Push the lower split bound earlier so that
+    % requested pre-baseline samples survive into ppData.
+    if doBaseline && viewActive
+        splitLow = min(s.baseline(2), viewStart);
+    else
+        splitLow = [];  % use legacy s.baseline(2)
+    end
+
     for i = 1:length(curData)
         seg = curData{i};
 
@@ -3219,9 +3293,16 @@ if doResample || doBaseline
                     'blfNIR', bl, ...
                     'averageAux', true, 'flattenAux', true, 'trimAux', false);
             else
-                ppData{i} = pf2.data.split(seg, s.baseline(2), inf, ...
+                if isempty(splitLow)
+                    ppData{i} = pf2.data.split(seg, s.baseline(2), inf, ...
+                        'blfNIR', bl);
+                else
+                    ppData{i} = pf2.data.split(seg, splitLow, inf, ...
+                        'blfNIR', bl);
+                end
+                % barData stays strictly post-baseline regardless of view
+                barData{i} = pf2.data.split(seg, s.baseline(2), inf, ...
                     'blfNIR', bl);
-                barData{i} = ppData{i};
             end
         else
             ppData{i} = pf2.data.resample(seg, s.resampleRate, ...
@@ -3235,12 +3316,15 @@ if doResample || doBaseline
                 'averageAux', true, 'flattenAux', true, 'trimAux', false);
         end
 
-        % Trim barData to task window (times are relative to taskStart)
+        % barData is always trimmed to the strict task window — bar values
+        % and downstream stats (LME, exports) must remain pinned regardless
+        % of the view setting.
         barData{i} = trimToTaskWindow(barData{i}, 0, taskDuration);
 
-        % Trim ppData to task window if taskEnd is explicitly set
-        if isfinite(s.taskEnd)
-            ppData{i} = trimToTaskWindow(ppData{i}, s.taskStart, effectiveTaskEnd);
+        % ppData uses the view bounds. When viewPad is empty this matches
+        % the legacy trim (and is a no-op when taskEnd is Inf).
+        if viewActive || isfinite(viewEnd)
+            ppData{i} = trimToTaskWindow(ppData{i}, viewStart, viewEnd);
         end
     end
 else
@@ -3248,6 +3332,55 @@ else
     barData = curData;
 end
 
+end
+
+
+function [viewStart, viewEnd, viewActive] = computeViewBounds(s, refSeg)
+% COMPUTEVIEWBOUNDS Compute the [start, end] trim window for ppData.
+%
+% When s.viewPad is empty, returns the legacy task window
+% [taskStart, taskEnd). When s.viewPad is set, widens the window relative
+% to the baseline-start / task-end edges.
+%
+% viewActive is true when viewPad is set (signals callers that the
+% non-resample split path should also widen its lower bound).
+
+doBaseline = s.useBaseline && ~isempty(s.baseline);
+
+if isempty(s.viewPad)
+    viewStart  = s.taskStart;
+    if isfinite(s.taskEnd)
+        viewEnd = s.taskEnd;
+    else
+        viewEnd = inf;
+    end
+    viewActive = false;
+    return;
+end
+
+pad = s.viewPad;
+if isscalar(pad)
+    pad = [pad, pad];
+elseif numel(pad) ~= 2
+    error('exploreFNIRS:core:Experiment:viewPad', ...
+        'settings.viewPad must be empty, scalar, or [pre, post]');
+end
+
+if doBaseline
+    lowerEdge = s.baseline(1);
+else
+    lowerEdge = s.taskStart;
+end
+
+if isfinite(s.taskEnd)
+    upperEdge = s.taskEnd;
+else
+    upperEdge = max(refSeg.time);
+end
+
+viewStart  = lowerEdge - pad(1);
+viewEnd    = upperEdge + pad(2);
+viewActive = true;
 end
 
 
@@ -3279,11 +3412,18 @@ function ppKey = buildPPKey(s)
 % The key encodes settings that affect Stage A (preprocessing). Changing
 % any of these values produces a different key, invalidating the cache.
 
-ppKey = sprintf('bl=[%.4f,%.4f]_rs=%.4f_bb=%.4f_ts=%.4f_te=%.4f_ub=%d_rm=%s_om=%s', ...
+if isempty(s.viewPad)
+    vpStr = 'none';
+else
+    vp = s.viewPad;
+    if isscalar(vp), vp = [vp, vp]; end
+    vpStr = sprintf('[%.4f,%.4f]', vp(1), vp(2));
+end
+ppKey = sprintf('bl=[%.4f,%.4f]_rs=%.4f_bb=%.4f_ts=%.4f_te=%.4f_ub=%d_rm=%s_om=%s_vp=%s', ...
     s.baseline(1), s.baseline(2), ...
     s.resampleRate, s.barBinSize, ...
     s.taskStart, s.taskEnd, s.useBaseline, ...
-    s.rawMethod, s.oxyMethod);
+    s.rawMethod, s.oxyMethod, vpStr);
 
 end
 
@@ -3299,12 +3439,34 @@ if all(keep), return; end
 nT = length(t);
 data.time = t(keep);
 
-% Trim biomarker arrays
+% Trim segmentTimes row-wise so [start, mid, end] tuples stay aligned
+% with the trimmed time vector. Required for downstream consumers
+% (e.g. mergeGbyTablesLong) that index segmentTimes by time row.
+if isfield(data, 'segmentTimes') && size(data.segmentTimes, 1) == nT
+    data.segmentTimes = data.segmentTimes(keep, :);
+end
+
+% Trim biomarker arrays (channel-level)
 bioFields = {'HbO','HbR','HbTotal','HbDiff','CBSI','raw','od'};
 for f = 1:length(bioFields)
     fn = bioFields{f};
     if isfield(data, fn) && isnumeric(data.(fn)) && size(data.(fn),1) == nT
         data.(fn) = data.(fn)(keep, :);
+    end
+end
+
+% Trim ROI biomarker arrays so they stay row-aligned with data.time.
+% Without this, downstream consumers (grandAvgFNIRS line 400, which
+% indexes ROI by the trimmed time's row positions) hit out-of-bounds
+% or silently align the wrong samples — producing a non-zero group mean
+% in the baseline window even though each segment was baseline-corrected.
+if isfield(data, 'ROI') && isstruct(data.ROI)
+    roiFields = fieldnames(data.ROI);
+    for f = 1:length(roiFields)
+        rf = roiFields{f};
+        if isnumeric(data.ROI.(rf)) && size(data.ROI.(rf), 1) == nT
+            data.ROI.(rf) = data.ROI.(rf)(keep, :);
+        end
     end
 end
 

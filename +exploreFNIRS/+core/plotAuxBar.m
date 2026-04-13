@@ -360,6 +360,16 @@ function [groupMeans, groupErrors, groupN, groupLabels, individualData] = ...
     groupLabels = cell(1, nGroups);
     individualData = cell(1, nGroups);
 
+    % Pre-fill labels so escapeTeX/legend code never sees an empty
+    % numeric [] slot when a group is skipped for lack of data.
+    for g = 1:nGroups
+        lbl = groups(g).label;
+        if isempty(lbl) || ~(ischar(lbl) || isstring(lbl))
+            lbl = sprintf('Group%d', g);
+        end
+        groupLabels{g} = char(lbl);
+    end
+
     for g = 1:nGroups
         ga = groups(g).gbyGrand;
         if ~isfield(ga, 'Aux') || ~isfield(ga.Aux, auxField)

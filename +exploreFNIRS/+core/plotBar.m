@@ -377,6 +377,18 @@ function [groupMeans, groupErrors, groupN, groupLabels, individualData] = ...
     groupLabels = cell(1, nGroups);
     individualData = cell(1, nGroups);
 
+    % Pre-fill labels so downstream escapeTeX/legend code never sees an
+    % empty numeric [] (which trips cellfun) when a group is skipped for
+    % lack of data. Labels are otherwise only set at the bottom of the
+    % loop, so any early 'continue' leaves the slot as [].
+    for g = 1:nGroups
+        lbl = groups(g).label;
+        if isempty(lbl) || ~(ischar(lbl) || isstring(lbl))
+            lbl = sprintf('Group%d', g);
+        end
+        groupLabels{g} = char(lbl);
+    end
+
     for g = 1:nGroups
         ga = groups(g).gbyGrand;
         if useROI

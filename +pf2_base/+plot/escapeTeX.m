@@ -17,7 +17,18 @@ function out = escapeTeX(in)
     elseif isstring(in)
         out = regexprep(in, '(?<!\\)_', '\\_');
     elseif iscell(in)
-        out = cellfun(@(s) regexprep(s, '(?<!\\)_', '\\_'), in, 'UniformOutput', false);
+        % Guard each element: pass through anything that isn't a char
+        % row vector or string so a single numeric [] slot doesn't kill
+        % the whole regexprep.
+        out = cell(size(in));
+        for k = 1:numel(in)
+            el = in{k};
+            if ischar(el) || isstring(el)
+                out{k} = regexprep(el, '(?<!\\)_', '\\_');
+            else
+                out{k} = el;
+            end
+        end
     else
         out = in;
     end
