@@ -286,7 +286,8 @@ classdef CustomContrastsTest < matlab.unittest.TestCase
 
             T = table(SubjectID, categorical(Condition), categorical(Time), HbO, ...
                 'VariableNames', {'SubjectID','Condition','Time','HbO'});
-            mdl3 = fitlme(T, 'HbO ~ Condition + (1|SubjectID)');
+            mdl3 = fitlme(T, 'HbO ~ Condition + (1|SubjectID)', ...
+                'DummyVarCoding', 'reference');
 
             spec = exploreFNIRS.stats.buildContrasts(mdl3, 'polynomial');
 

@@ -151,8 +151,8 @@ for chI = 1:nCh
         % Find the coefficient matching this term
         termRows = strcmp(coeffs.Name, termName);
         if ~any(termRows)
-            % Try prefix match for categorical levels (e.g., 'Condition_2')
-            termRows = strncmp(coeffs.Name, termName, length(termName));
+            % Match categorical dummy-coded levels like 'Condition_2'
+            termRows = startsWith(string(coeffs.Name), termName + "_");
         end
         if any(termRows)
             coefVal = coeffs.Estimate(find(termRows, 1));
@@ -282,8 +282,8 @@ for iPerm = 1:nPerm
                 coeffs = mdl.Coefficients;
                 termRows = strcmp(coeffs.Name, termName);
                 if ~any(termRows)
-                    % Try prefix match for categorical levels (e.g., 'Condition_2')
-                    termRows = strncmp(coeffs.Name, termName, length(termName));
+                    % Match categorical dummy-coded levels like 'Condition_2'
+                    termRows = startsWith(string(coeffs.Name), termName + "_");
                 end
                 if any(termRows)
                     coefVal = coeffs.Estimate(find(termRows, 1));
