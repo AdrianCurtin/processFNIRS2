@@ -776,21 +776,50 @@ function [probe, measurementList, deviceMetaDataTags, rawMax, strippedChannelsMa
     % Build probe structure
     probe = [];
 
-    % Handle optode positions
+    % Extract 2D/3D positions aligned with SNIRF detectorIndex/sourceIndex
+    % semantics: row k must be the position of detector/source k so that
+    % measurementList references resolve correctly. When DetPos/SrcPos are
+    % optode-indexed (height == TableOpt), compress by DetIdx/SrcIdx value
+    % and pad missing IDs with NaN (devices with non-contiguous numbering,
+    % e.g., merged-probe configs, otherwise produce scrambled positions).
     if height(probeStruct.DetPos) == height(probeStruct.SrcPos) && ...
             height(probeStruct.TableOpt) == height(probeStruct.DetPos)
-        [~, firstDetIdx] = unique(probeStruct.TableOpt.DetIdx);
-        [~, firstSrcIdx] = unique(probeStruct.TableOpt.SrcIdx);
-    else
-        firstDetIdx = 1:height(probeStruct.DetPos);
-        firstSrcIdx = 1:height(probeStruct.SrcPos);
-    end
+        detIds = probeStruct.TableOpt.DetIdx;
+        srcIds = probeStruct.TableOpt.SrcIdx;
 
-    % Extract 2D and 3D positions
-    probe.detectorPos2D = table2array(probeStruct.DetPos(firstDetIdx, {'x_2d', 'y_2d'}));
-    probe.detectorPos3D = table2array(probeStruct.DetPos(firstDetIdx, {'x', 'y', 'z'}));
-    probe.sourcePos2D = table2array(probeStruct.SrcPos(firstSrcIdx, {'x_2d', 'y_2d'}));
-    probe.sourcePos3D = table2array(probeStruct.SrcPos(firstSrcIdx, {'x', 'y', 'z'}));
+        detAll2D = table2array(probeStruct.DetPos(:, {'x_2d', 'y_2d'}));
+        detAll3D = table2array(probeStruct.DetPos(:, {'x', 'y', 'z'}));
+        srcAll2D = table2array(probeStruct.SrcPos(:, {'x_2d', 'y_2d'}));
+        srcAll3D = table2array(probeStruct.SrcPos(:, {'x', 'y', 'z'}));
+
+        maxDet = max(detIds(detIds > 0 & ~isnan(detIds)));
+        maxSrc = max(srcIds(srcIds > 0 & ~isnan(srcIds)));
+        if isempty(maxDet), maxDet = 0; end
+        if isempty(maxSrc), maxSrc = 0; end
+
+        probe.detectorPos2D = nan(maxDet, 2);
+        probe.detectorPos3D = nan(maxDet, 3);
+        probe.sourcePos2D   = nan(maxSrc, 2);
+        probe.sourcePos3D   = nan(maxSrc, 3);
+
+        for d = unique(detIds(:))'
+            if d <= 0 || isnan(d), continue; end
+            idx = find(detIds == d, 1);
+            probe.detectorPos2D(d, :) = detAll2D(idx, :);
+            probe.detectorPos3D(d, :) = detAll3D(idx, :);
+        end
+        for s = unique(srcIds(:))'
+            if s <= 0 || isnan(s), continue; end
+            idx = find(srcIds == s, 1);
+            probe.sourcePos2D(s, :) = srcAll2D(idx, :);
+            probe.sourcePos3D(s, :) = srcAll3D(idx, :);
+        end
+    else
+        probe.detectorPos2D = table2array(probeStruct.DetPos(:, {'x_2d', 'y_2d'}));
+        probe.detectorPos3D = table2array(probeStruct.DetPos(:, {'x', 'y', 'z'}));
+        probe.sourcePos2D   = table2array(probeStruct.SrcPos(:, {'x_2d', 'y_2d'}));
+        probe.sourcePos3D   = table2array(probeStruct.SrcPos(:, {'x', 'y', 'z'}));
+    end
 
     % Include landmark positions if available
     if isfield(probeStruct, 'landmarkPos3D')

@@ -42,7 +42,9 @@ function [ h, imgOut ] = interpolateValues3D(varargin)
 %   'cmap'              - Colormap for positive values (default: 'hotCropped')
 %   'cmap_lower'        - Colormap for negative values (default: 'winter')
 %   'labelfontsize'     - Font size for labels (default: 10)
-%   'labelfontcolor'    - Font color for labels (default: 'k')
+%   'labelfontcolor'    - Font color for labels (default: theme-aware via
+%                         pf2_base.plot.PlotStyle; black in light mode,
+%                         white in dark mode)
 %   'labelspherecolors' - Colors for source/detector spheres (default: ["r","y","w"])
 %   'brainColor'        - Base brain surface color (default: [0.92, 0.68, 0.68])
 %   'brainAlpha'        - Brain surface transparency (default: 1)
@@ -54,7 +56,16 @@ function [ h, imgOut ] = interpolateValues3D(varargin)
 %                         'back-left', 'back-right', or numeric [x, y, z].
 %   'logScale'          - Use logarithmic color scale (default: false)
 %   'interpolateType'   - Interpolation method (default: 'nearest')
-%                         Options: 'nearest', 'linear', 'quadratic', 'cubic'
+%                         Options: 'nearest', 'linear', 'quadratic', 'cubic'.
+%                         Note: 'linear'/'quadratic'/'cubic' are IDW powers
+%                         (0.5/1/1.5) applied to squared distance, not true
+%                         polynomial interpolation schemes.
+%   'UseGeodesic'       - Opt-in: use graph-geodesic distance on the
+%                         cortical mesh instead of Euclidean (default: false).
+%                         Prevents value bleed across sulci and hemispheres.
+%                         Applies to the surface brain only; voxel brain
+%                         projection remains Euclidean. Adds one-time cost
+%                         to build the mesh graph (cached per axes).
 %   'bufferDistance'    - Buffer around optodes in mm (default: auto)
 %   'includeSS'         - Include short separation channels (default: varies)
 %   'useTalairach'      - Use Talairach coordinates (default: false, uses MNI)
@@ -169,7 +180,7 @@ addParameter(p, 'useHighRes', true, @islogical);
 addParameter(p, 'cmap', defaultColormap, validColormap);
 addParameter(p, 'cmap_lower', defaultColormapLow, validColormap);
 addParameter(p, 'labelfontsize', 10, validScalarPosNum);
-addParameter(p, 'labelfontcolor', 'k', validColor);
+addParameter(p, 'labelfontcolor', [], validColor);  % [] => PlotStyle theme-aware default
 addParameter(p, 'labelspherecolors', ["r", "y","w"]);
 addParameter(p, 'brainColor', [0.92, 0.68, 0.68], validColor);
 addParameter(p, 'voxelColor', [1, 1, 1], validColor);
@@ -180,6 +191,7 @@ addParameter(p, 'showColorbar', true, @islogical);
 addParameter(p, 'initCamPosition', defaultCamPosition, validCamPosition);
 addParameter(p, 'logScale', false, @islogical);
 addParameter(p, 'interpolateType', defaultInterpolateType, validInterpolateType);
+addParameter(p, 'UseGeodesic', false, @islogical); % Opt-in: geodesic distance on cortical mesh (surface only)
 addParameter(p, 'bufferDistance', nan, validScalarPosNumOrNan); %In a grid, this may equal to sqrt(sd distance^2/2)
 addParameter(p, 'includeSS', shouldHideByDefault, @islogical);
 addParameter(p, 'showReference', false, @islogical);
@@ -287,7 +299,7 @@ negColorbar=false; % Enabled when only negative color bar is present and min>max
 
 
 if(isempty(p.Results.minval))
-    minVal = nanmin(data2plot_concat);
+    minVal = min(data2plot_concat, [], 'omitnan');
 end
 
 if(length(minVal)==2)
@@ -309,22 +321,22 @@ end
 if(isempty(maxVal)) % No max value specified
     if(~twosided)
         %[X,X] [Min1, Datamax]
-        maxVal=nanmax(data2plot_concat);
+        maxVal=max(data2plot_concat, [], 'omitnan');
         cbarUpper_minmax=[minVal maxVal];
     else
         %[DataMin, Min2] [Min1, Datamax] or DataMin-1e-3, DataMax+1e-3
-        dataMaxVal=max(max(minVal)+1e-3,nanmax(data2plot_concat));
+        dataMaxVal=max(max(minVal)+1e-3,max(data2plot_concat, [], 'omitnan'));
         cbarUpper_minmax=[max(minVal) dataMaxVal];
-        if(nanmax(data2plot_concat)<max(minVal))
+        if(max(data2plot_concat, [], 'omitnan')<max(minVal))
             hasUpperData=false;
         else
             hasUpperData=true;
         end
-        dataMinVal=min(min(minVal)-1e-3,nanmin(data2plot_concat));
+        dataMinVal=min(min(minVal)-1e-3,min(data2plot_concat, [], 'omitnan'));
         cbarLower_minmax=[dataMinVal min(minVal)];
-        if(nanmin(data2plot_concat)>min(minVal))
+        if(min(data2plot_concat, [], 'omitnan')>min(minVal))
             hasLowerData=false;
-        else        
+        else
             hasLowerData=true;
         end
     end
@@ -392,6 +404,16 @@ ax = p.Results.ax;
 bgc = p.Results.backgroundColor;
 if(~any(ismissing(bgc)) && ~isempty(bgc))
     set(ax, 'color', bgc);
+end
+
+% Resolve theme-aware default for label font color (dark-mode visibility)
+labelFontColor = p.Results.labelfontcolor;
+if isempty(labelFontColor)
+    try
+        labelFontColor = pf2_base.plot.PlotStyle.getDefault().ForegroundColor;
+    catch
+        labelFontColor = [0 0 0];
+    end
 end
 
 numericColors = isnumeric(p.Results.labelspherecolors);
@@ -552,7 +574,7 @@ if(multiprobe)
     
     
     
-    probeInfo.OptPos3D_mean = [nanmean(probeInfo.OptPos.x) nanmean(probeInfo.OptPos.y) nanmean(probeInfo.OptPos.z)];
+    probeInfo.OptPos3D_mean = [mean(probeInfo.OptPos.x, 'omitnan') mean(probeInfo.OptPos.y, 'omitnan') mean(probeInfo.OptPos.z, 'omitnan')];
     probeInfo.NumShortSeparation = sum(probeInfo.TableOpt.IsShortSeparation);
     probeInfo.NumOptodes = length(probeInfo.OptPos.x);
 else
@@ -641,7 +663,7 @@ if(show1020)
         
         probeInfo.NumOptodes = height(c1020);
         probeInfo.IsShortSeparation = zeros(1, probeInfo.NumOptodes);
-        probeInfo.OptPos3D_mean = nanmean([probeInfo.OptPos3DX probeInfo.OptPos3DY probeInfo.OptPos3DZ]);
+        probeInfo.OptPos3D_mean = mean([probeInfo.OptPos3DX probeInfo.OptPos3DY probeInfo.OptPos3DZ], 'omitnan');
         if(isnan(p.Results.bufferDistance))
             bufferDistance = 40/sqrt(2);
         end
@@ -815,7 +837,7 @@ if(p.Results.useTalairach)
     optPos=pf2_base.external.icbm_fsl2tal(optPos);
 end
 
-OptPos3D_mean=nanmean(optPos,1);
+OptPos3D_mean=mean(optPos, 1, 'omitnan');
 
 
 if(isnan(bufferDistance))
@@ -1225,36 +1247,46 @@ if(~all(dataEmpty))
     %     cerebro_mdl.b_dist=d;
     %     cerebro_mdl.b_area=bigbdidx(ind);
     
+    useGeodesic = p.Results.UseGeodesic;
+
+    % Build or retrieve squared-distance matrix [V x K]. Cache is keyed on
+    % controlPoints + useGeodesic so moving or adding optodes invalidates it.
+    cacheKey = 'iv3d_distCache';
+    cache = [];
     if animationOptimized
-        cache = getappdata(ax, 'iv3d_distCache');
-        if ~isempty(cache) && size(cache.dist_array, 2) == num_control
-            dist_array = cache.dist_array;
-            ind = cache.ind;
-        else
-            dist_array = sum(mdl.v.^2, 2) + sum(controlPoints.^2, 2)' - 2 * (mdl.v * controlPoints');
-            [d, ind] = min(dist_array, [], 2);
-            ind(d > max_distance_2) = 0;
-            setappdata(ax, 'iv3d_distCache', struct('dist_array', dist_array, 'ind', ind));
-        end
+        cache = getappdata(ax, cacheKey);
+    end
+
+    cacheValid = ~isempty(cache) ...
+                 && isfield(cache, 'controlPoints') ...
+                 && isequal(cache.controlPoints, controlPoints) ...
+                 && isfield(cache, 'useGeodesic') ...
+                 && isequal(cache.useGeodesic, useGeodesic);
+
+    if cacheValid
+        dist_array = cache.dist_array;
     else
-        dist_array = sum(mdl.v.^2, 2) + sum(controlPoints.^2, 2)' - 2 * (mdl.v * controlPoints');
-        [d, ind] = min(dist_array, [], 2);
-        ind(d > max_distance_2) = 0;
+        if useGeodesic
+            dist_array = iLocalGeodesicDistSq(ax, mdl.v, mdl.f, controlPoints);
+        else
+            dist_array = sum(mdl.v.^2, 2) + sum(controlPoints.^2, 2)' ...
+                         - 2 * (mdl.v * controlPoints');
+        end
+        if animationOptimized
+            setappdata(ax, cacheKey, struct( ...
+                'controlPoints', controlPoints, ...
+                'useGeodesic', useGeodesic, ...
+                'dist_array', dist_array));
+        end
     end
 
     % Exclude NaN channels from interpolation (e.g. masked-out channels)
     nanChannels = isnan(C);
     if any(nanChannels)
         dist_array(:, nanChannels) = Inf;
-        [d, ind] = min(dist_array, [], 2);
-        ind(d > max_distance_2) = 0;
-        ind(isinf(d)) = 0;
         C(nanChannels) = 0;
     end
 
-    c_min = nanmin(C, [], 'all');
-    c_max = nanmax(C, [], 'all');
-    
     if(isnumeric(cmap_high))
         nColorsMaxBar=size(cmap_high,1);
     else
@@ -1313,55 +1345,18 @@ if(~all(dataEmpty))
         mask = false(size(C));
     end
 
-    % blend cmap with brainColor according to alpha
+    % Blend colormap alpha with brainColor so downstream RGB has no alpha
     cmap = cmap .* cmap(:, 4) + repmat([brainColor(1:3),1], size(cmap, 1), 1) .* (1 - cmap(:, 4));
+    cmapRGB = cmap(:, 1:3);
 
-    switch projectmode
-        case 'nearest'
-            C_temp = [brainColor; reshape(ind2rgb(round(c_ind * (size(cmap, 1) - 1)) + 1, cmap),[],3)];
-            C_temp([-1; c_ind] < 0, :) = repmat(brainColor, sum(c_ind < 0) + 1, 1);
-            C_temp(mask, :) = repmat(brainColor, sum(mask), 1);
-            
-            Cs = C_temp(ind + 1, :);
-            
-        case {'linear', 'quadratic', 'cubic'}
-            switch projectmode
-                case 'linear'
-                    beta = 0.5;
-                case 'quadratic'
-                    beta = 1;
-                case 'cubic'
-                    beta = 1.5;
-            end
-            
-            dist_array(dist_array >= max_distance_2) = Inf;
-            my_interp_fx = @(dist, val, pow, dim) sum(val .* (1./(dist.^pow + 1e-8)) ./ sum(1./(dist.^pow + 1e-8), dim), dim);
-            
-            C_temp = repmat(c_ind', num_vertices, 1);
-            v_ind = my_interp_fx(dist_array, C_temp, beta, 2);
+    [Cs_proj, fadeAlpha_v] = pf2_base.plot.interpolateChannelColors( ...
+        dist_array, c_ind(:), cmapRGB, ...
+        'MaxDistance2', max_distance_2, ...
+        'ProjectMode', projectmode, ...
+        'ChanMask', mask(:));
 
-            Cs = reshape(ind2rgb(round(v_ind * (size(cmap, 1) - 1)) + 1, cmap), [], 3);
-
-            % Build per-vertex mask: vertices near only masked channels
-            if any(mask)
-                mask_weights = double(mask(:))';
-                v_mask = my_interp_fx(dist_array, repmat(mask_weights, num_vertices, 1), beta, 2) > 0.5;
-            else
-                v_mask = false(size(v_ind));
-            end
-            Cs(v_ind < 0 | v_mask, :) = repmat(brainColor, sum(v_ind < 0 | v_mask), 1);
-            Cs(ind == 0, :) = repmat(brainColor, sum(ind == 0), 1);
-    end
-
-    % Distance-based edge fading: smooth transition to brain color at buffer boundary
-    validVerts = ind > 0;
-    if any(validVerts)
-        vIdx = find(validVerts);
-        d_nearest = dist_array(sub2ind(size(dist_array), vIdx, ind(validVerts)));
-        d_ratio = sqrt(d_nearest / max_distance_2);  % 0 at channel, 1 at boundary
-        fadeAlpha = max(0, min(1, (1 - d_ratio) / 0.4));  % fade over outer 40%
-        Cs(vIdx,:) = Cs(vIdx,:) .* fadeAlpha + brainColor .* (1 - fadeAlpha);
-    end
+    % Blend projected colors with brainColor using fadeAlpha
+    Cs = Cs_proj .* fadeAlpha_v + brainColor .* (1 - fadeAlpha_v);
 
 else % No data to plot, everything is brain and anatomy
     Cs = repmat(brainColor, size(mdl.v, 1), 1);
@@ -1478,73 +1473,30 @@ if(~p.Results.showVoxelBrain)
 
 end
 
-% Project channel data onto voxel brain isosurface when both are active
+% Project channel data onto voxel brain isosurface when both are active.
+% Voxel path uses Euclidean distance regardless of UseGeodesic — building a
+% geodesic graph on the voxel isosurface would be prohibitively expensive
+% and the voxel render is primarily anatomical context.
 if p.Results.showVoxelBrain && ~all(dataEmpty)
     voxelPatches = findall(ax, 'Type', 'Patch', 'Tag', 'BrainVoxel');
     for vi = 1:length(voxelPatches)
         vp = voxelPatches(vi);
         vpVerts = get(vp, 'Vertices');
         vpBaseColors = get(vp, 'FaceVertexCData');
-        nv = size(vpVerts, 1);
 
-        % Distance from each isosurface vertex to each channel control point
-        vp_dist = sum(vpVerts.^2, 2) + sum(controlPoints.^2, 2)' - 2 * (vpVerts * controlPoints');
-        [vp_d, vp_ind] = min(vp_dist, [], 2);
-        vp_ind(vp_d > max_distance_2) = 0;
-
-        % Handle NaN channels
+        vp_dist = sum(vpVerts.^2, 2) + sum(controlPoints.^2, 2)' ...
+                  - 2 * (vpVerts * controlPoints');
         if exist('nanChannels', 'var') && any(nanChannels)
             vp_dist(:, nanChannels) = Inf;
-            [vp_d, vp_ind] = min(vp_dist, [], 2);
-            vp_ind(vp_d > max_distance_2) = 0;
-            vp_ind(isinf(vp_d)) = 0;
         end
 
-        vpCs = vpBaseColors;
-        hasData = vp_ind > 0;
+        [vp_proj, vp_fade] = pf2_base.plot.interpolateChannelColors( ...
+            vp_dist, c_ind(:), cmapRGB, ...
+            'MaxDistance2', max_distance_2, ...
+            'ProjectMode', projectmode, ...
+            'ChanMask', mask(:));
 
-        if any(hasData)
-            switch projectmode
-                case 'nearest'
-                    C_temp = [brainColor; reshape(ind2rgb(round(c_ind * (size(cmap, 1) - 1)) + 1, cmap), [], 3)];
-                    C_temp([-1; c_ind] < 0, :) = repmat(brainColor, sum(c_ind < 0) + 1, 1);
-                    if exist('mask', 'var') && any(mask)
-                        C_temp(mask, :) = repmat(brainColor, sum(mask), 1);
-                    end
-                    projColors = C_temp(vp_ind(hasData) + 1, :);
-
-                case {'linear', 'quadratic', 'cubic'}
-                    switch projectmode
-                        case 'linear',    beta_vp = 0.5;
-                        case 'quadratic', beta_vp = 1;
-                        case 'cubic',     beta_vp = 1.5;
-                    end
-                    vp_dist(vp_dist >= max_distance_2) = Inf;
-                    vp_C_temp = repmat(c_ind', nv, 1);
-                    vp_interp = @(dist, val, pow, dim) sum(val .* (1./(dist.^pow + 1e-8)) ./ sum(1./(dist.^pow + 1e-8), dim), dim);
-                    vp_v_ind = vp_interp(vp_dist, vp_C_temp, beta_vp, 2);
-                    projColors = reshape(ind2rgb(round(vp_v_ind(hasData) * (size(cmap, 1) - 1)) + 1, cmap), [], 3);
-
-                    if exist('mask', 'var') && any(mask)
-                        mask_weights = double(mask(:))';
-                        vp_v_mask = vp_interp(vp_dist, repmat(mask_weights, nv, 1), beta_vp, 2) > 0.5;
-                        projColors(vp_v_mask(hasData) | vp_v_ind(hasData) < 0, :) = ...
-                            repmat(brainColor, sum(vp_v_mask(hasData) | vp_v_ind(hasData) < 0), 1);
-                    else
-                        projColors(vp_v_ind(hasData) < 0, :) = ...
-                            repmat(brainColor, sum(vp_v_ind(hasData) < 0), 1);
-                    end
-            end
-
-            % Edge fading
-            d_nearest = vp_dist(sub2ind(size(vp_dist), find(hasData), vp_ind(hasData)));
-            d_ratio = sqrt(d_nearest / max_distance_2);
-            fadeAlpha = max(0, min(1, (1 - d_ratio) / 0.4));
-
-            % Blend projected color with base voxel color
-            vpCs(hasData, :) = projColors .* fadeAlpha + vpBaseColors(hasData, :) .* (1 - fadeAlpha);
-        end
-
+        vpCs = vp_proj .* vp_fade + vpBaseColors .* (1 - vp_fade);
         set(vp, 'FaceVertexCData', vpCs);
     end
 end
@@ -1600,9 +1552,9 @@ if(showChannels&&isfield(probeInfo, 'TableOpt')&&~contains('ProbeOpt',itemsToSki
     end
 
     if(include_ss)
-        h=text(optPos(:,1), optPos(:,2), optPos(:,3), string(probeInfo.TableOpt.OptodeNum), 'HorizontalAlignment', 'center','VerticalAlignment', 'middle', "FontSize", p.Results.labelfontsize, 'color', p.Results.labelfontcolor);
+        h=text(optPos(:,1), optPos(:,2), optPos(:,3), string(probeInfo.TableOpt.OptodeNum), 'HorizontalAlignment', 'center','VerticalAlignment', 'middle', "FontSize", p.Results.labelfontsize, 'color', labelFontColor);
     else
-        h=text(optPos(:,1), optPos(:,2), optPos(:,3), string(probeInfo.TableOpt.OptodeNum(~probeInfo.TableOpt.IsShortSeparation)), 'HorizontalAlignment', 'center','VerticalAlignment', 'middle', "FontSize", p.Results.labelfontsize, 'color', p.Results.labelfontcolor);
+        h=text(optPos(:,1), optPos(:,2), optPos(:,3), string(probeInfo.TableOpt.OptodeNum(~probeInfo.TableOpt.IsShortSeparation)), 'HorizontalAlignment', 'center','VerticalAlignment', 'middle', "FontSize", p.Results.labelfontsize, 'color', labelFontColor);
     end
     for i=1:length(h)
         h(i).Tag='OptLabel';
@@ -1626,7 +1578,7 @@ if(plotFNIRS_SD&&isfield(probeInfo,'TableSD'))
         h.Tag=sprintf('ProbeSrc');
         h.DisplayName='Source';
     end
-    h=text(srcPos(:,1), srcPos(:,2), srcPos(:,3), srcLabels, 'HorizontalAlignment', 'center','VerticalAlignment', 'middle', "FontSize", p.Results.labelfontsize, 'color', p.Results.labelfontcolor);
+    h=text(srcPos(:,1), srcPos(:,2), srcPos(:,3), srcLabels, 'HorizontalAlignment', 'center','VerticalAlignment', 'middle', "FontSize", p.Results.labelfontsize, 'color', labelFontColor);
     for i=1:length(h)
         h(i).Tag='ProbeSrcLabel';
     end
@@ -1638,7 +1590,7 @@ if(plotFNIRS_SD&&isfield(probeInfo,'TableSD'))
         h.Tag=sprintf('ProbeDet');
         h.DisplayName='Detector';
     end
-    h=text(detPos(:,1), detPos(:,2), detPos(:,3), detLabels, 'HorizontalAlignment', 'center','VerticalAlignment', 'middle', "FontSize", p.Results.labelfontsize, 'color', p.Results.labelfontcolor);
+    h=text(detPos(:,1), detPos(:,2), detPos(:,3), detLabels, 'HorizontalAlignment', 'center','VerticalAlignment', 'middle', "FontSize", p.Results.labelfontsize, 'color', labelFontColor);
     for i=1:length(h)
         h(i).Tag='ProbeDetLabel';
     end
@@ -1660,7 +1612,7 @@ if(plot1020&&~contains('Scatter1020',itemsToSkipPlot))
             h.Tag=sprintf('Scatter1020');
             hold on
 
-            h=text(ePos(1),ePos(2),ePos(3),c1020.Electrode(i),'HorizontalAlignment', 'center','VerticalAlignment', 'middle', "FontSize", p.Results.labelfontsize, 'color', p.Results.labelfontcolor);
+            h=text(ePos(1),ePos(2),ePos(3),c1020.Electrode(i),'HorizontalAlignment', 'center','VerticalAlignment', 'middle', "FontSize", p.Results.labelfontsize, 'color', labelFontColor);
             for k=1:length(h)
                 h(k).Tag='Label1020';
             end
@@ -1689,7 +1641,7 @@ if(isempty(itemsToSkipPlot))
     else
         switch(p.Results.initCamPosition)
             case 'auto'
-                autoPos = nanmean(optPos,1);
+                autoPos = mean(optPos, 1, 'omitnan');
                 if any(isnan(autoPos)) || norm(autoPos) == 0
                     campos([0,1200,0]);  % Fall back to front view
                 else
@@ -1825,7 +1777,7 @@ if p.Results.showColorbar && ~all(dataEmpty) && isempty(itemsToSkipPlot)
 
                 % Set colormap for upper colorbar
                 colormap(ax1, cmap_high(nColorsMaxBar));
-                caxis(ax1, cbarUpper_minmax);
+                clim(ax1, cbarUpper_minmax);
 
                 % Position upper colorbar in top half (or full height if no lower)
                 if hasLowerData
@@ -1848,7 +1800,7 @@ if p.Results.showColorbar && ~all(dataEmpty) && isempty(itemsToSkipPlot)
 
                 % Set colormap for lower colorbar
                 colormap(ax2, cmap_low(nColorsMaxBar));
-                caxis(ax2, cbarLower_minmax);
+                clim(ax2, cbarLower_minmax);
 
                 % Position lower colorbar in bottom half (or full height if no upper)
                 chNeg.Position = [cbX, curAxPosition(2), cbWidth, cbHeight];
@@ -1872,9 +1824,9 @@ if p.Results.showColorbar && ~all(dataEmpty) && isempty(itemsToSkipPlot)
 
         if p.Results.logScale
             set(ax1, 'ColorScale', 'log');
-            caxis(ax1, exp(cbarUpper_minmax));
+            clim(ax1, exp(cbarUpper_minmax));
         else
-            caxis(ax1, cbarUpper_minmax);
+            clim(ax1, cbarUpper_minmax);
         end
 
     end
@@ -2080,4 +2032,56 @@ end
 if ~isempty(savePath)
     fig = gcf();
     pf2_base.plot.saveFigure(fig, savePath, saveWidth, saveHeight, saveDPI);
+end
+
+end  % interpolateValues3D
+
+
+function distSq = iLocalGeodesicDistSq(ax, V, F, controlPoints)
+% Graph-geodesic squared distance from each mesh vertex to each control
+% point. Mesh graph is cached per-axes keyed on F (faces), so repeated
+% calls on the same probe/mesh reuse the graph build.
+%
+% Falls back to Euclidean (with warning) if MATLAB's graph/distances is
+% unavailable or the mesh is empty.
+
+    nV = size(V, 1);
+    K = size(controlPoints, 1);
+
+    try
+        % Build-or-retrieve mesh graph
+        meshCache = getappdata(ax, 'iv3d_meshGraph');
+        rebuild = isempty(meshCache) ...
+                  || ~isfield(meshCache, 'faces') ...
+                  || ~isequal(size(meshCache.faces), size(F)) ...
+                  || ~isequal(meshCache.faces, F);
+        if rebuild
+            E = [F(:, [1 2]); F(:, [2 3]); F(:, [3 1])];
+            E = sort(E, 2);
+            E = unique(E, 'rows');
+            w = sqrt(sum((V(E(:, 1), :) - V(E(:, 2), :)).^2, 2));
+            G = graph(E(:, 1), E(:, 2), w, nV);
+            meshCache = struct('faces', F, 'G', G);
+            setappdata(ax, 'iv3d_meshGraph', meshCache);
+        end
+        G = meshCache.G;
+
+        % Snap each control point to its nearest mesh vertex
+        seedDistSq = sum(V.^2, 2) + sum(controlPoints.^2, 2)' ...
+                     - 2 * (V * controlPoints');
+        [~, seedVerts] = min(seedDistSq, [], 1);   % 1 x K
+
+        % Dijkstra from each seed to all vertices
+        distGeo = zeros(nV, K);
+        for k = 1:K
+            distGeo(:, k) = distances(G, seedVerts(k));
+        end
+        distSq = distGeo.^2;
+        distSq(~isfinite(distSq)) = Inf;
+    catch ME
+        warning('pf2:interpolateValues3D:geodesicFallback', ...
+            'Geodesic distance failed (%s); falling back to Euclidean.', ME.message);
+        distSq = sum(V.^2, 2) + sum(controlPoints.^2, 2)' ...
+                 - 2 * (V * controlPoints');
+    end
 end

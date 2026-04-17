@@ -263,7 +263,7 @@ if(blLength>0) % if baseline is present
         end
         if(roiOK)
 
-            blNanCheck_roi=sum(isnan(fB),1)/length(fB)<nanRejectionLevel; %calculate percentage of invalid values in baseline
+            blNanCheck_roi=sum(isnan(fB),1)/size(fB,1)<nanRejectionLevel; %calculate percentage of invalid values in baseline
 
             blRejectedCount_roi=sum(~blNanCheck_roi);
             if(blRejectedCount_roi>1)
@@ -838,12 +838,12 @@ function [outAuxStruct] = recursiveAuxResample(aux_in,flattenAux,segLength,cente
                     auxDat_resample=resample_internal(auxDat,t_ind,nAuxChan_col,numSegs_aux,nanRejectionLevel);
 
                     if(flattenAux)
-                        numCols=length(numericIdx);
+                        numCols=sum(numericIdx);
 
                         if(numCols>1)
-                            newVarNames=cell(size(numericIdx));
-                        
-                           for nName=1:length(newVarNames)
+                            newVarNames=cell(1,numCols);
+
+                           for nName=1:numCols
                                newVarNames{nName}=sprintf('%s_%i',curVarName,nName);
                             end
                         else
@@ -1096,13 +1096,13 @@ function [outAuxStruct] = recursiveAuxFlatten(aux_in,nir_time,parent_time_in)
                    
                     auxDat_resample=rsArr;
 
-                    
-                    numCols=length(numericIdx);
+
+                    numCols=sum(numericIdx);
 
                     if(numCols>1)
-                        newVarNames=cell(size(numericIdx));
-                    
-                       for nName=1:length(newVarNames)
+                        newVarNames=cell(1,numCols);
+
+                       for nName=1:numCols
                            newVarNames{nName}=sprintf('%s_%i',curVarName,nName);
                         end
                     else
@@ -1209,7 +1209,7 @@ catch
 end
     fB_count=accumarray(fTimeInd_numCh, ones(size(fTimeInd_numCh)), sz);
 
-    fB_nanCheck= reshape(fB_isNA./fB_count,[numCh,numSegs])<=nanRejectionLevel;
+    fB_nanCheck= reshape(fB_isNA./fB_count,[numSegs,numCh])<=nanRejectionLevel;
 
     % Vectorized nanmean: sum non-NaN values, divide by valid count.
     % Avoids 1-per-bin function calls to nanmean/mean/parseFlag.
