@@ -104,6 +104,7 @@ function results = autoModelLME(groups, groupByVars, varargin)
     addParameter(p, 'ExcludeShortSeparation', true, @islogical);
     addParameter(p, 'ContrastThreshold', 0.1, @isnumeric);
     addParameter(p, 'ResponseVar', '', @ischar);
+    addParameter(p, 'ForcedTerms', {}, @iscell);
     parse(p, groups, groupByVars, varargin{:});
     opts = p.Results;
     opts.Criterion = upper(opts.Criterion);
@@ -285,7 +286,7 @@ function results = autoModelLME(groups, groupByVars, varargin)
                 biomarkerCol = '';
             end
 
-            if bIdx == 1 && chI == 1
+            if ~isfield(results, 'mergedTable') || isempty(results.mergedTable)
                 results.mergedTable = mergedTable;
             end
 
@@ -324,6 +325,18 @@ function results = autoModelLME(groups, groupByVars, varargin)
                     baseTimeTerms = {'Time'};
                 end
             end
+
+            % Prepend forced terms (always included in base model)
+            forcedTerms = {};
+            for fi = 1:numel(opts.ForcedTerms)
+                ft = opts.ForcedTerms{fi};
+                if ismember(ft, mergedTable.Properties.VariableNames)
+                    forcedTerms{end+1} = ft; %#ok<AGROW>
+                elseif opts.Verbose
+                    warning('ForcedTerm "%s" not found in merged table, skipping', ft);
+                end
+            end
+            baseTimeTerms = [forcedTerms, baseTimeTerms];
 
             randomFx = opts.RandomEffects;
 

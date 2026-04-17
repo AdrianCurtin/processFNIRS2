@@ -95,7 +95,7 @@ if nargin < 1
   filename=[pathname,file];
   fid = fopen([pathname file]);
 
-elseif ~isstr(file)
+elseif ~ischar(file) && ~isstring(file)
   error('Input must be a string representing a filename');
 elseif nargin<2
     fid=fopen(file);
@@ -117,8 +117,7 @@ end
 if fid==-1
   error('Data file not found or permission denied');
 end
-
-%fclose(fid);
+fidCleanup = onCleanup(@() fcloseIfOpen(fid));
 
 fNIR=[];
 
@@ -155,7 +154,7 @@ if(isempty(header))
 end
 
 if(isempty(header))
-    error('Unkown delimiter or file type');
+    error('Unknown delimiter or file type');
 end
 
 
@@ -165,7 +164,9 @@ lineNum=lineNum+1;
 header.HeaderInfo=lineF;
 lineF=fgetl(fid);
 startLineNum=lineNum;
+clear fidCleanup;
 fclose(fid);
+fid=-1;
 
 dataLineParts=strsplit(header.HeaderInfo,delimiter);
 
@@ -177,6 +178,10 @@ markCol=find(strcmp(dataLineParts,'Mark'));
 
 fprintf('Importing %s...\n',filename);
 fid=fopen(filename,'r');
+if fid==-1
+  error('Unable to reopen file for data read: %s', filename);
+end
+fidCleanup = onCleanup(@() fcloseIfOpen(fid));
 for i=1:startLineNum
     line=fgetl(fid);  % Figure out the number of columns based on the header
 end
@@ -204,7 +209,9 @@ else
     datetimeCol=[];
 end
 
+clear fidCleanup;
 fclose(fid);
+fid=-1;
 
 
 hMES = data;%importdata(filename,delimiter,startLineNum);
@@ -417,4 +424,13 @@ if length(Name2) > 1
 end
 Name2 = matlab.lang.makeValidName(Name2);
 
+end
+
+function fcloseIfOpen(fid)
+    if ~isempty(fid) && isnumeric(fid) && fid > 0
+        try
+            fclose(fid);
+        catch
+        end
+    end
 end

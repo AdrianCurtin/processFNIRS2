@@ -119,9 +119,9 @@ for g=1:length(gbyTables)
         channelIndexes=1:numCh;
         channelLabels=cellstr(num2str(channelIndexes(:)));
     elseif(exportFNIR)
-       numCh=length(channelIndexes); 
+       numCh=length(channelIndexes);
     else
-       numCH=0; 
+       numCh=0;
     end
     if(isempty(times))
         numTimes=length(curBarGA.time);

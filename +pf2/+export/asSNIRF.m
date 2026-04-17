@@ -757,10 +757,11 @@ function [probe, measurementList, deviceMetaDataTags, rawMax, strippedChannelsMa
             if(invalidWv(i))
                 warning('This channel has an invalid wavelength')
                 measurement.wavelengthIndex = nan;
+                measurement.wavelengthActual = nan;
             else
                 measurement.wavelengthIndex = wvI(i);
+                measurement.wavelengthActual = wvList(measurement.wavelengthIndex);
             end
-            measurement.wavelengthActual = wvList(measurement.wavelengthIndex);
             measurement.dataUnit = c2v('au');
         end
       

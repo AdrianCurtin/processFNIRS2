@@ -103,6 +103,7 @@ if(isempty(pathname))
 end
 
 curdir=cd;
+cdCleanup = onCleanup(@() cd(curdir));
 if(~isempty(pathname))
     cd(pathname);
 end
@@ -590,7 +591,7 @@ if(isfield(fNIR,'probeinfo'))
    
 end
 
-cd(curdir);
+% cd restored automatically by cdCleanup
 end
 
 

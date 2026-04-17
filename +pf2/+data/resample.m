@@ -224,7 +224,7 @@ if(blLength>0) % if baseline is present
 
         fB=blfNIR.(curB);
    
-        blNanCheck=sum(isnan(fB),1)/length(fB)<nanRejectionLevel; %calculate percentage of invalid values in baseline
+        blNanCheck=sum(isnan(fB),1)/size(fB,1)<nanRejectionLevel; %calculate percentage of invalid values in baseline
 
         blRejectedCount=sum(~blNanCheck);
         

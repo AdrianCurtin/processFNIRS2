@@ -95,6 +95,12 @@ else
 
     startSample = find(time >= startTime, 1);
     endSample = find(time >= endTime, 1);
+    if isempty(startSample)
+        startSample = 1;
+    end
+    if isempty(endSample)
+        endSample = length(time);
+    end
     baselineSamples = startSample:endSample;
 end
 
