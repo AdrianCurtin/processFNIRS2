@@ -476,11 +476,10 @@ end
 [~,~,mdlCoef]=fixedEffects(mdl,'DFMethod','satterthwaite');
 
 [~,uNameIdx]=unique(cName);
-
-% UDATE vs. 0 index for unqiue names
-isV0=isV0(uNameIdx);
-
 uNameIdx=sort(uNameIdx);
+
+% Update vs. 0 index to match sorted uNameIdx ordering
+isV0=isV0(uNameIdx);
 for c=1:length(uNameIdx)
     row_idx=uNameIdx(c);
     curRow=cRows(row_idx,:);

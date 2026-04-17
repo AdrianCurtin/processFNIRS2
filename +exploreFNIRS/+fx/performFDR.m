@@ -23,7 +23,7 @@ function [qvalues,k,passed]=performFDR(pvalues,pThreshold)
 %
 % Outputs:
 %   qvalues    - FDR-corrected q-values, same size as pvalues
-%                q = p * m / k, where m = number of valid tests, k = critical rank
+%                q_i = min_{j>=i}( p_(j) * m / j ), m = number of valid tests
 %                Values > 1 are capped at 1
 %   k          - Critical rank: largest i where p(i) <= pThreshold * i / m
 %                Minimum value of 1
@@ -34,7 +34,9 @@ function [qvalues,k,passed]=performFDR(pvalues,pThreshold)
 %   1. Sort valid (non-NaN) p-values in ascending order
 %   2. For each p-value at rank i, calculate threshold: q * i / m
 %   3. Find largest k where p(k) <= threshold
-%   4. Calculate adjusted q-values: q(i) = p(i) * m / k
+%   4. Compute candidate q-values q_i = p_(i) * m / i
+%   5. Enforce monotonicity via running min from the tail:
+%      q_i = min_{j>=i}( p_(j) * m / j )
 %
 % Notes:
 %   - NaN p-values are excluded from the test count and remain NaN in output
@@ -70,8 +72,10 @@ if m==0
     return;
 end
 
-% Sort valid p-values to find critical rank
-pSorted=sort(pvalues(~isnan(pvalues(:))));
+% Sort valid p-values
+validIdx=find(~isnan(pvalues(:)));
+pVec=pvalues(validIdx);
+[pSorted,sortOrd]=sort(pVec(:));
 
 % Find critical k: largest rank i where p(i) <= pThreshold * i / m
 k=0;
@@ -82,7 +86,16 @@ for i=1:m
 end
 k=max(k,1);
 
-% Compute q-values and determine significance
-qvalues=pvalues*m/k;
-qvalues(qvalues>1)=1;
+% Standard BH adjusted p-values: q_i = min_{j>=i}( p_(j) * m / j )
+qSorted=pSorted.*m./(1:m)';
+for i=(m-1):-1:1
+    qSorted(i)=min(qSorted(i),qSorted(i+1));
+end
+qSorted(qSorted>1)=1;
+
+% Unsort back to original positions
+qVec=zeros(m,1);
+qVec(sortOrd)=qSorted;
+qvalues=nan(size(pvalues));
+qvalues(validIdx)=qVec;
 passed=qvalues<=pThreshold;

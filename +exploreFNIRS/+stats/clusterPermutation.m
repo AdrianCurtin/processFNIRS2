@@ -255,7 +255,8 @@ for iPerm = 1:nPerm
             chFormula = strrep(formula, formulaDV, varName);
 
             mdl = fitlme(permTable, chFormula, ...
-                'FitMethod', 'REML', 'CheckHessian', false);
+                'FitMethod', 'REML', 'CheckHessian', false, ...
+                'DummyVarCoding', 'reference');
 
             anv = anova(mdl, 'DFMethod', 'satterthwaite');
             termIdx = find(strcmp(anv.Term, termName), 1);
