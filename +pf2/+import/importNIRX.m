@@ -69,7 +69,7 @@ else
    forceChannelCheck=true;
 end
 
-channelCheckVersion=1;
+channelCheckVersion=pf2_base.channelCheckVersion();
 for vi_=1:2:numel(varargin)
     if ischar(varargin{vi_}) && strcmpi(varargin{vi_},'ChannelCheckVersion')
         channelCheckVersion=varargin{vi_+1};

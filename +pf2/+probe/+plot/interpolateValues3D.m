@@ -60,12 +60,27 @@ function [ h, imgOut ] = interpolateValues3D(varargin)
 %                         Note: 'linear'/'quadratic'/'cubic' are IDW powers
 %                         (0.5/1/1.5) applied to squared distance, not true
 %                         polynomial interpolation schemes.
-%   'UseGeodesic'       - Opt-in: use graph-geodesic distance on the
-%                         cortical mesh instead of Euclidean (default: false).
-%                         Prevents value bleed across sulci and hemispheres.
-%                         Applies to the surface brain only; voxel brain
-%                         projection remains Euclidean. Adds one-time cost
-%                         to build the mesh graph (cached per axes).
+%   'UseGeodesic'       - Use graph-geodesic distance on the cortical mesh
+%                         instead of Euclidean (default: true). Prevents
+%                         value bleed across sulci and the interhemispheric
+%                         fissure. Pass false to restore the pre-v0.9
+%                         Euclidean behavior. Applies to the surface brain
+%                         only; voxel brain projection remains Euclidean.
+%                         Adds a one-time mesh-graph build (cached per axes).
+%   'ForceLightMode'    - Override theme detection: white background, black
+%                         axes tick/labels and probe labels (default: false).
+%                         Useful for publication figures regardless of the
+%                         MATLAB desktop theme.
+%   'ChannelAlpha'      - [1 x K] per-channel alpha in [0,1]. Default all 1
+%                         (fully opaque). Use with 'AlphaMode','transparent'
+%                         to hide channels (e.g. non-significant stats) —
+%                         the brain surface shows through rather than being
+%                         blended with brainColor.
+%   'AlphaMode'         - 'blend' (default) | 'transparent'. In 'blend',
+%                         non-contributing vertices are mixed with brainColor
+%                         (legacy behavior). In 'transparent', per-vertex
+%                         FaceVertexAlphaData is set so the mesh is actually
+%                         see-through where channel alpha is low.
 %   'bufferDistance'    - Buffer around optodes in mm (default: auto)
 %   'includeSS'         - Include short separation channels (default: varies)
 %   'useTalairach'      - Use Talairach coordinates (default: false, uses MNI)
@@ -191,7 +206,9 @@ addParameter(p, 'showColorbar', true, @islogical);
 addParameter(p, 'initCamPosition', defaultCamPosition, validCamPosition);
 addParameter(p, 'logScale', false, @islogical);
 addParameter(p, 'interpolateType', defaultInterpolateType, validInterpolateType);
-addParameter(p, 'UseGeodesic', false, @islogical); % Opt-in: geodesic distance on cortical mesh (surface only)
+addParameter(p, 'UseGeodesic', true, @islogical); % Geodesic distance on cortical mesh (surface only). Pass false for legacy Euclidean.
+addParameter(p, 'ChannelAlpha', [], @(x) isempty(x) || (isnumeric(x) && all(x(:) >= 0) && all(x(:) <= 1))); % [1xK] per-channel alpha in [0,1]
+addParameter(p, 'AlphaMode', 'blend', @(x) any(validatestring(lower(char(x)), {'blend','transparent'}))); % 'blend' (default) | 'transparent'
 addParameter(p, 'bufferDistance', nan, validScalarPosNumOrNan); %In a grid, this may equal to sqrt(sd distance^2/2)
 addParameter(p, 'includeSS', shouldHideByDefault, @islogical);
 addParameter(p, 'showReference', false, @islogical);
@@ -206,6 +223,7 @@ addParameter(p, 'BA_cmp', @lines, validColormap); % Colors in Brodmann areas
 addParameter(p, 'useVoxelBrodmannAreas', false, @islogical); % Colors in Brodmann areas
 addParameter(p, 'showVoxelBrain', false, @islogical); % Colors in Brodmann areas
 addParameter(p, 'voxelLighting', 'none', @(x) ischar(x) || isstring(x));
+addParameter(p, 'ForceLightMode', false, @islogical); % Per-call override: white bg, black axes/labels
 centerCamPos=[0,-20,0];
 addParameter(p, 'camTarget', centerCamPos, validCamPosition); % Target Camera location
 addParameter(p, 'camUp', [0,0,1] , validCamPosition); % Target Camera location
@@ -401,19 +419,38 @@ end
 cmap_low = @(n) flip(cmap_low_t(n));
 
 ax = p.Results.ax;
+forceLightMode = p.Results.ForceLightMode;
 bgc = p.Results.backgroundColor;
+if forceLightMode && (isempty(bgc) || any(ismissing(bgc)))
+    bgc = [1 1 1];
+end
 if(~any(ismissing(bgc)) && ~isempty(bgc))
     set(ax, 'color', bgc);
+    parentFig = ancestor(ax, 'figure');
+    if ~isempty(parentFig) && isvalid(parentFig) && forceLightMode
+        set(parentFig, 'Color', bgc);
+    end
 end
 
-% Resolve theme-aware default for label font color (dark-mode visibility)
+% Resolve theme-aware default for label font color (dark-mode visibility).
+% ForceLightMode overrides any theme detection to keep axes/labels readable
+% on a white background.
 labelFontColor = p.Results.labelfontcolor;
 if isempty(labelFontColor)
-    try
-        labelFontColor = pf2_base.plot.PlotStyle.getDefault().ForegroundColor;
-    catch
+    if forceLightMode
         labelFontColor = [0 0 0];
+    else
+        try
+            labelFontColor = pf2_base.plot.PlotStyle.getDefault().ForegroundColor;
+        catch
+            labelFontColor = [0 0 0];
+        end
     end
+end
+
+% When forcing light mode, set axes tick/label colors so xyz labels render black
+if forceLightMode
+    set(ax, 'XColor', [0 0 0], 'YColor', [0 0 0], 'ZColor', [0 0 0]);
 end
 
 numericColors = isnumeric(p.Results.labelspherecolors);
@@ -476,7 +513,7 @@ hold off
 
 
 
-itemsToDelete={'BrainVoxel','BA_area_mrk','Eye','ProbeOpt','OptLabel','ProbeSrc','ProbeSrcLabel','ProbeDet','ProbeDetLabel','Scatter1020','Label1020','ScatterCurve','OptLines','BrainRef'};
+itemsToDelete={'BrainVoxel','BrainOverlay','BrainVoxelOverlay','BA_area_mrk','Eye','ProbeOpt','OptLabel','ProbeSrc','ProbeSrcLabel','ProbeDet','ProbeDetLabel','Scatter1020','Label1020','ScatterCurve','OptLines','BrainRef'};
 
 grootHandle=groot;
 grootHandle.ShowHiddenHandles=true;
@@ -1287,6 +1324,30 @@ if(~all(dataEmpty))
         C(nanChannels) = 0;
     end
 
+    % Per-channel alpha (default fully opaque; NaN channels → 0). The user
+    % may pass alpha in the same shape as their data2plot (pre-subset) or
+    % already subset to numel(C); both are accepted.
+    chanAlpha = p.Results.ChannelAlpha;
+    if isempty(chanAlpha)
+        chanAlpha = ones(size(C));
+    else
+        chanAlpha = chanAlpha(:);
+        if numel(chanAlpha) == numel(C)
+            % already subset — use as-is
+        elseif numel(chanAlpha) == numel(includeChannels) && any(includeChannels)
+            chanAlpha = chanAlpha(includeChannels);
+        else
+            error('pf2:interpolateValues3D:channelAlphaSize', ...
+                'ChannelAlpha must have one entry per channel (got %d, expected %d or %d).', ...
+                numel(chanAlpha), numel(C), numel(includeChannels));
+        end
+    end
+    if any(nanChannels)
+        chanAlpha(nanChannels) = 0;
+    end
+    alphaMode = lower(string(p.Results.AlphaMode));
+    transparentMode = alphaMode == "transparent";
+
     if(isnumeric(cmap_high))
         nColorsMaxBar=size(cmap_high,1);
     else
@@ -1355,12 +1416,31 @@ if(~all(dataEmpty))
         'ProjectMode', projectmode, ...
         'ChanMask', mask(:));
 
-    % Blend projected colors with brainColor using fadeAlpha
-    Cs = Cs_proj .* fadeAlpha_v + brainColor .* (1 - fadeAlpha_v);
+    if transparentMode
+        % Two-sided dead-zone channels (mask == true) should be transparent
+        % rather than brainColor — the gap between the two colorbars then
+        % appears as see-through rather than as a flat brain-colored band.
+        chanAlphaCombined = chanAlpha;
+        if any(mask)
+            chanAlphaCombined(mask(:)) = 0;
+        end
+        % Interpolate per-channel alpha onto vertices with the same kernel,
+        % then combine with the distance-based fade. Caller binds vertexAlpha
+        % to the brain patch as FaceVertexAlphaData.
+        chanAlphaInterp = iLocalInterpScalar(dist_array, chanAlphaCombined, max_distance_2, projectmode);
+        vertexAlpha = fadeAlpha_v .* chanAlphaInterp;
+        Cs = Cs_proj;
+    else
+        % Legacy blend path — non-contributing vertices mix with brainColor.
+        Cs = Cs_proj .* fadeAlpha_v + brainColor .* (1 - fadeAlpha_v);
+        vertexAlpha = [];
+    end
 
 else % No data to plot, everything is brain and anatomy
     Cs = repmat(brainColor, size(mdl.v, 1), 1);
-    
+    vertexAlpha = [];
+    transparentMode = false;
+
     if(showBrodmann&&~p.Results.showVoxelBrain)
         
         
@@ -1435,40 +1515,62 @@ else % No data to plot, everything is brain and anatomy
 end
 
 if(~p.Results.showVoxelBrain)
-    brainHndl=findobj(ax,'Type','Patch','Tag','Brain');
-    
+    brainHndl  = findobj(ax,'Type','Patch','Tag','Brain');
+    overlayHndl = findobj(ax,'Type','Patch','Tag','BrainOverlay');
+
+    useLineColor = ~isempty(p.Results.brainLineColor) && all(~isnan(p.Results.brainLineColor));
+    if useLineColor
+        edgeProps = {'EdgeColor', p.Results.brainLineColor, 'LineStyle', '-'};
+    else
+        edgeProps = {'LineStyle', 'None'};
+    end
+
+    % In transparent mode the base Brain patch stays solid (brainColor) and
+    % a second BrainOverlay patch holds the stat colors with per-vertex
+    % alpha so the anatomy remains visible under non-significant regions.
+    if transparentMode && ~isempty(vertexAlpha)
+        baseCs = repmat(brainColor, size(mdl.v, 1), 1);
+    else
+        baseCs = Cs;
+    end
+
+    baseProps = {'vertices', mdl.v, 'faces', mdl.f, ...
+                 'FaceVertexCData', baseCs, 'FaceColor','interp', ...
+                 'AmbientStrength', ka, 'DiffuseStrength', kd, 'SpecularStrength', ks, ...
+                 'FaceAlpha', p.Results.brainAlpha};
+
     if(isempty(brainHndl))
         brainHndl=ax;
         cameratoolbar
         hold off
-        if(~isempty(p.Results.brainLineColor)&&all(~isnan(p.Results.brainLineColor)))
-            brainHndl=patch(brainHndl,'vertices', mdl.v, 'faces', mdl.f,'FaceVertexCData',Cs,'FaceColor','interp',...
-                'AmbientStrength',ka, 'DiffuseStrength', kd, 'SpecularStrength',ks, ...
-                'EdgeColor', p.Results.brainLineColor,'FaceAlpha', p.Results.brainAlpha,'LineStyle', '-');
-        else
-            brainHndl=patch(brainHndl,'vertices', mdl.v, 'faces', mdl.f,'FaceVertexCData',Cs,'FaceColor','interp',...
-                'AmbientStrength',ka, 'DiffuseStrength', kd, 'SpecularStrength',ks, ...
-                'LineStyle', 'None','FaceAlpha', p.Results.brainAlpha);
-        end
-        
+        brainHndl = patch(brainHndl, baseProps{:}, edgeProps{:});
+
         brainHndl.Tag='Brain';
         brainHndl.DisplayName='Brain';
         brainHndl.HandleVisibility='off';
         hold on;
-        
-        
     else
-        
-        if(~isempty(p.Results.brainLineColor)&&all(~isnan(p.Results.brainLineColor)))
-            set(brainHndl,'vertices', mdl.v, 'faces', mdl.f,'FaceVertexCData',Cs,'FaceColor','interp',...
-                'AmbientStrength',ka, 'DiffuseStrength', kd, 'SpecularStrength',ks, ...
-                'EdgeColor', p.Results.brainLineColor,'FaceAlpha', p.Results.brainAlpha,'LineStyle', '-');
+        set(brainHndl, baseProps{:}, edgeProps{:}, 'FaceVertexAlphaData', []);
+    end
+
+    % Manage stat overlay patch
+    if transparentMode && ~isempty(vertexAlpha)
+        overlayProps = {'vertices', mdl.v, 'faces', mdl.f, ...
+                        'FaceVertexCData', Cs, 'FaceColor','interp', ...
+                        'AmbientStrength', ka, 'DiffuseStrength', kd, 'SpecularStrength', ks, ...
+                        'FaceVertexAlphaData', vertexAlpha, 'FaceAlpha', 'interp', ...
+                        'AlphaDataMapping', 'none', 'LineStyle', 'None'};
+        hold on
+        if isempty(overlayHndl)
+            overlayHndl = patch(ax, overlayProps{:});
+            overlayHndl.Tag = 'BrainOverlay';
+            overlayHndl.DisplayName = 'BrainOverlay';
+            overlayHndl.HandleVisibility = 'off';
         else
-            set(brainHndl,'vertices', mdl.v, 'faces', mdl.f,'FaceVertexCData',Cs,'FaceColor','interp',...
-                'AmbientStrength',ka, 'DiffuseStrength', kd, 'SpecularStrength',ks, ...
-                'LineStyle', 'None','FaceAlpha', p.Results.brainAlpha);
+            set(overlayHndl, overlayProps{:});
         end
-        
+    elseif ~isempty(overlayHndl)
+        delete(overlayHndl);
     end
 
 end
@@ -1479,9 +1581,15 @@ end
 % and the voxel render is primarily anatomical context.
 if p.Results.showVoxelBrain && ~all(dataEmpty)
     voxelPatches = findall(ax, 'Type', 'Patch', 'Tag', 'BrainVoxel');
+    existingOverlays = findall(ax, 'Type', 'Patch', 'Tag', 'BrainVoxelOverlay');
+    if ~isempty(existingOverlays) && ~transparentMode
+        delete(existingOverlays);
+        existingOverlays = [];
+    end
     for vi = 1:length(voxelPatches)
         vp = voxelPatches(vi);
         vpVerts = get(vp, 'Vertices');
+        vpFaces = get(vp, 'Faces');
         vpBaseColors = get(vp, 'FaceVertexCData');
 
         vp_dist = sum(vpVerts.^2, 2) + sum(controlPoints.^2, 2)' ...
@@ -1496,8 +1604,29 @@ if p.Results.showVoxelBrain && ~all(dataEmpty)
             'ProjectMode', projectmode, ...
             'ChanMask', mask(:));
 
-        vpCs = vp_proj .* vp_fade + vpBaseColors .* (1 - vp_fade);
-        set(vp, 'FaceVertexCData', vpCs);
+        if transparentMode
+            % Leave the anatomical voxel patch untouched and draw an overlay.
+            % Dead-zone channels contribute zero alpha so the two-sided gap
+            % appears transparent rather than filled.
+            vpChanAlphaIn = chanAlpha;
+            if any(mask)
+                vpChanAlphaIn(mask(:)) = 0;
+            end
+            vpChanAlpha = iLocalInterpScalar(vp_dist, vpChanAlphaIn, max_distance_2, projectmode);
+            vpVertexAlpha = vp_fade .* vpChanAlpha;
+            set(vp, 'FaceVertexCData', vpBaseColors, 'FaceVertexAlphaData', []);
+
+            hold on
+            overlay = patch(ax, 'Vertices', vpVerts, 'Faces', vpFaces, ...
+                'FaceVertexCData', vp_proj, 'FaceColor', 'interp', ...
+                'FaceVertexAlphaData', vpVertexAlpha, 'FaceAlpha', 'interp', ...
+                'AlphaDataMapping', 'none', 'EdgeColor', 'none');
+            overlay.Tag = 'BrainVoxelOverlay';
+            overlay.HandleVisibility = 'off';
+        else
+            vpCs = vp_proj .* vp_fade + vpBaseColors .* (1 - vp_fade);
+            set(vp, 'FaceVertexCData', vpCs, 'FaceVertexAlphaData', []);
+        end
     end
 end
 
@@ -1789,7 +1918,11 @@ if p.Results.showColorbar && ~all(dataEmpty) && isempty(itemsToSkipPlot)
 
             % Create lower colorbar if needed
             if hasLowerData
-                ax2 = axes('Position', ax1.Position, 'Visible', 'off');
+                % Must parent ax2 to the same figure as ax1 — `axes(...)`
+                % without 'Parent' binds to gcf, which may be a different
+                % figure when the caller passed 'ax' as a name-value.
+                ax2 = axes('Parent', ancestor(ax1, 'figure'), ...
+                           'Position', ax1.Position, 'Visible', 'off');
                 chNeg = colorbar(ax2, 'Location', 'eastoutside');
                 chNeg.Tag = 'Lower';
                 chNeg.Color = textClr;
@@ -2035,6 +2168,42 @@ if ~isempty(savePath)
 end
 
 end  % interpolateValues3D
+
+
+function va = iLocalInterpScalar(distSquared, cAlpha, maxDist2, projectMode)
+% Interpolate a per-channel scalar in [0,1] onto mesh vertices using the
+% same kernel that interpolateChannelColors uses for values. Returns zero
+% for out-of-range vertices. Used to build per-vertex alpha in transparent
+% AlphaMode.
+    [d, ind] = min(distSquared, [], 2);
+    outOfRange = d > maxDist2 | ~isfinite(d);
+    ind(outOfRange) = 0;
+    V = size(distSquared, 1);
+    va = zeros(V, 1);
+
+    switch lower(string(projectMode))
+        case "nearest"
+            valid = ind > 0;
+            va(valid) = cAlpha(ind(valid));
+        case {"linear", "quadratic", "cubic"}
+            switch lower(string(projectMode))
+                case "linear",    beta = 0.5;
+                case "quadratic", beta = 1;
+                case "cubic",     beta = 1.5;
+            end
+            d2 = distSquared;
+            d2(d2 >= maxDist2 | isnan(d2)) = Inf;
+            w = 1 ./ (d2.^beta + 1e-8);
+            wSum = sum(w, 2);
+            va = (w * cAlpha) ./ wSum;
+            va(~isfinite(wSum) | wSum == 0) = 0;
+        otherwise
+            error('pf2:interpolateValues3D:badProjectMode', ...
+                'Unknown ProjectMode for alpha interpolation: %s', projectMode);
+    end
+    va(~isfinite(va)) = 0;
+    va = max(0, min(1, va));
+end
 
 
 function distSq = iLocalGeodesicDistSq(ax, V, F, controlPoints)

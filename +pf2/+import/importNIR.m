@@ -77,7 +77,7 @@ fchMask=[];
 autoLoadMrk=true;
 
 forceChannelCheck=false; % if channelcheck is enabled manually, then honor, otherwise load only first time
-channelCheckVersion=1;
+channelCheckVersion=pf2_base.channelCheckVersion();
 for vi_=1:2:numel(varargin)
     if ischar(varargin{vi_}) && strcmpi(varargin{vi_},'ChannelCheckVersion')
         channelCheckVersion=varargin{vi_+1};

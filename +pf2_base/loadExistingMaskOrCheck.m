@@ -18,8 +18,11 @@ function fNIR=loadExistingMaskOrCheck(fNIR,nirFilename,channelCheckVersion)
 %                         Used to locate the *_CH.mat sidecar. If omitted,
 %                         reads from fNIR.info.filename.
 %   channelCheckVersion - (optional) Which GUI to launch when no saved mask
-%                         exists. 1 = probeCheckGUI (default, legacy),
-%                         2 = pf2.qc.ChannelCheck (App Designer).
+%                         exists. 1 = probeCheckGUI (legacy GUIDE),
+%                         2 = pf2.qc.ChannelCheck (App Designer). Defaults
+%                         to the highest version supported by the running
+%                         MATLAB installation (see
+%                         pf2_base.channelCheckVersion).
 %
 % Outputs:
 %   fNIR - fNIRS structure with fchMask field updated [struct]
@@ -45,7 +48,7 @@ function fNIR=loadExistingMaskOrCheck(fNIR,nirFilename,channelCheckVersion)
 		end
 	end
 	if nargin < 3 || isempty(channelCheckVersion)
-		channelCheckVersion = 1;
+		channelCheckVersion = pf2_base.channelCheckVersion();
 	end
 
 	if(~isempty(nirFilename))
