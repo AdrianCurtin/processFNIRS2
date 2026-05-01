@@ -33,7 +33,9 @@ function hhh=vline(varargin)
 
 validX= @(x) isempty(x)||isnumeric(x)||isdatetime(x)||isduration(x);
 validAxesHandle= @(x) isa(x,'matlab.graphics.axis.Axes')&&isvalid(x);
-validStrCell = @(x) ischar(x) || (iscell(x));
+% Accept linespec ('r:'), cells of options ({'Color',[0 0 0]}), or RGB triple/quad.
+validStrCell = @(x) ischar(x) || iscell(x) || ...
+    (isnumeric(x) && isvector(x) && (numel(x)==3 || numel(x)==4));
 validHeight= @(x) isnumeric(x)&&~isempty(x);
 
 if(isa(varargin{1},'matlab.graphics.axis.Axes')) %If first argument is axes then move to front
@@ -73,8 +75,13 @@ if isempty(x)
     return;
 end
     
-if ~iscell(lineVarargin)
-    lineVarargin={lineVarargin};
+% Translate a bare numeric color (RGB[A] triple/quad) into a Name-Value
+% pair that plot() accepts. Otherwise wrap as {linespec}.
+if isnumeric(lineVarargin) && isvector(lineVarargin) && ...
+        (numel(lineVarargin)==3 || numel(lineVarargin)==4)
+    lineVarargin = {'Color', lineVarargin};
+elseif ~iscell(lineVarargin)
+    lineVarargin = {lineVarargin};
 end
 
 if ~iscell(lineLabels)

@@ -167,5 +167,28 @@ classdef PlotHelpersTest < matlab.unittest.TestCase
             % Check default offset [0.03, 0] is applied
             testCase.verifyEqual(pos(1), 0.1 + 0.03, 'AbsTol', 0.001);
         end
+
+        %% vline numeric-color regression
+        function testVlineAcceptsRGBTriple(testCase)
+            % Regression: pf2.data.plot.raw / .oxy pass sty.ForegroundColor
+            % (an RGB triple) as the linespec slot. vline used to reject
+            % this with 'lineVarargin must be ischar||iscell'.
+            fig = figure('Visible', 'off');
+            cleanup = onCleanup(@() close(fig)); %#ok<NASGU>
+            plot(0:10, sin(0:10));
+            % Triple
+            testCase.verifyWarningFree(@() ...
+                pf2_base.external.vline(5, [0.2 0.3 0.4], 'lab', 0.5));
+            % Quad (RGBA)
+            testCase.verifyWarningFree(@() ...
+                pf2_base.external.vline(5, [0.2 0.3 0.4 0.8], 'lab', 0.5));
+            % Linespec still works
+            testCase.verifyWarningFree(@() ...
+                pf2_base.external.vline(5, 'r:', 'lab', 0.5));
+            % Cell of options still works
+            testCase.verifyWarningFree(@() ...
+                pf2_base.external.vline(5, {'Color', [0 0 0], 'LineWidth', 2}, ...
+                    'lab', 0.5));
+        end
     end
 end

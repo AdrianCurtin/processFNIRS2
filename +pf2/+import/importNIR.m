@@ -509,31 +509,48 @@ if(hasDataSource)
 
     fprintf('Loading configuration for: %s %s\n',imagerModel,probeStyle);
 
-    switch(probeStyle)
-        case 'Split'
-            fNIR.info.probename='fNIR_Devices_fNIR1000_Split_2x2ch';
-            fNIR.raw=fNIR.raw(:,1:13);
-        case 'Linear'
-            error('This probe is unsupported');
-            fNIR.info.probename='fNIR_Devices_fNIR1000_Linear';
-            fNIR.raw=fNIR.raw(:,1:13);
-        case 'HD' % 2x8 +2
-            fNIR.info.probename='fNIR_Devices_fNIR2000_18ch';
+    is_3000 = contains(dataSource,'3000C');
+    is_HD = contains(dataSource,'HDS') || contains(dataSource,'HD');
+
+    if(is_3000)
+        if(is_HD)
+            probeStyle = 'HD';
+            fNIR.info.probename='fNIR_Devices_fNIR3000_18ch';
             fNIR.raw=fNIR.raw(:,1:55);
-        case 'HDS' % 2x8 +2
-            fNIR.info.probename='fNIR_Devices_fNIR2000_18ch';
+        else
+            probeStyle = 'HDS';
+            fNIR.info.probename='fNIR_Devices_fNIR3000_18ch';
             fNIR.raw=fNIR.raw(:,1:55);
-        case 'SD' % 2x2 +1
-            error('This probe is unsupported');
-            fNIR.info.probename='fNIR_Devices_fNIR1000_Split_2x2ch';
-            fNIR.raw=fNIR.raw(:,1:(20*3+1));
-        case 'LD' % 1x4 +2
-            error('This probe is unsupported');
-            fNIR.info.probename='fNIR_Devices_fNIR1000';
-            fNIR.raw=fNIR.raw(:,1:(6*3+1));
-        otherwise
-             warning('Unidentified Probe\n');
-            fNIR.info.probename='Unknown .nir file';
+        end
+    else
+
+        switch(probeStyle)
+            case 'Split'
+                fNIR.info.probename='fNIR_Devices_fNIR1000_Split_2x2ch';
+                fNIR.raw=fNIR.raw(:,1:13);
+            case 'Linear'
+                error('This probe is unsupported');
+                fNIR.info.probename='fNIR_Devices_fNIR1000_Linear';
+                fNIR.raw=fNIR.raw(:,1:13);
+            case 'HD' % 2x8 +2
+                fNIR.info.probename='fNIR_Devices_fNIR2000_18ch';
+                fNIR.raw=fNIR.raw(:,1:55);
+            case 'HDS' % 2x8 +2
+                fNIR.info.probename='fNIR_Devices_fNIR2000_18ch';
+                fNIR.raw=fNIR.raw(:,1:55);
+            case 'SD' % 2x2 +1
+                error('This probe is unsupported');
+                fNIR.info.probename='fNIR_Devices_fNIR1000_Split_2x2ch';
+                fNIR.raw=fNIR.raw(:,1:(20*3+1));
+            case 'LD' % 1x4 +2
+                error('This probe is unsupported');
+                fNIR.info.probename='fNIR_Devices_fNIR1000';
+                fNIR.raw=fNIR.raw(:,1:(6*3+1));
+            otherwise
+                warning('Unidentified Probe\n');
+                fNIR.info.probename='Unknown .nir file';
+        end
+
     end
 
 else
