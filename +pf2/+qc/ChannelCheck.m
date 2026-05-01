@@ -48,10 +48,14 @@ classdef ChannelCheck < matlab.apps.AppBase
         NumChannels     double = 0
         IsProcessed     logical = false
         ChannelColumns  cell = {}       % {ch} = raw column indices
+        ChannelWavelengths cell = {}    % {ch} = wavelength (nm) per column, NaN if unknown
+        DeviceWLOrder   double = []     % sorted unique non-zero wavelengths (short -> long)
 
         % --- Channel State ---
         FchMask         double = []
         OrigFchMask     double = []
+        OrigFchMaskAll  cell = {}      % multi-file: per-dataset original mask
+        OrigHadFchMask  logical = false(1,0)  % multi-file: dataset originally had fchMask
         MaskHistory     cell = {}
         MaskFuture      cell = {}
         SelectedChannel double = 1
@@ -193,6 +197,18 @@ classdef ChannelCheck < matlab.apps.AppBase
                 app.IsMultiFile = true;
                 app.AllData = dataOrCell(:)';
                 initialData = dataOrCell{1};
+
+                % Snapshot original masks per dataset so Cancel can revert
+                % edits made while navigating between datasets.
+                n = numel(app.AllData);
+                app.OrigFchMaskAll = cell(1, n);
+                app.OrigHadFchMask = false(1, n);
+                for i = 1:n
+                    if isfield(app.AllData{i}, 'fchMask')
+                        app.OrigFchMaskAll{i} = app.AllData{i}.fchMask;
+                        app.OrigHadFchMask(i) = true;
+                    end
+                end
             elseif isstruct(dataOrCell)
                 app.IsMultiFile = false;
                 initialData = dataOrCell;
@@ -211,8 +227,7 @@ classdef ChannelCheck < matlab.apps.AppBase
 
                 if app.IsMultiFile
                     buildDatasetLabels(app);
-                    app.DatasetListBox.Value = ...
-                        app.DatasetListBox.Items{1};
+                    app.DatasetListBox.Value = app.CurrentDataIndex;
                 end
 
                 app.UIFigure.Visible = 'on';
@@ -318,6 +333,7 @@ classdef ChannelCheck < matlab.apps.AppBase
             app.MarkGoodBtn.Text = 'Good';
             app.MarkGoodBtn.BackgroundColor = [0.85, 1, 0.85];
             app.MarkGoodBtn.FontColor = [0, 0, 0];
+            app.MarkGoodBtn.Tooltip = 'Mark selected channel Good (1).';
             app.MarkGoodBtn.ButtonPushedFcn = ...
                 @(~,~) setChannelState(app, app.SelectedChannel, 1);
 
@@ -327,6 +343,7 @@ classdef ChannelCheck < matlab.apps.AppBase
             app.MarkNoisyBtn.Text = 'Noisy';
             app.MarkNoisyBtn.BackgroundColor = [1, 0.95, 0.80];
             app.MarkNoisyBtn.FontColor = [0, 0, 0];
+            app.MarkNoisyBtn.Tooltip = 'Mark selected channel Noisy (2).';
             app.MarkNoisyBtn.ButtonPushedFcn = ...
                 @(~,~) setChannelState(app, app.SelectedChannel, 0.5);
 
@@ -336,6 +353,7 @@ classdef ChannelCheck < matlab.apps.AppBase
             app.MarkRejectBtn.Text = 'Reject';
             app.MarkRejectBtn.BackgroundColor = [1, 0.85, 0.85];
             app.MarkRejectBtn.FontColor = [0, 0, 0];
+            app.MarkRejectBtn.Tooltip = 'Mark selected channel Rejected (3).';
             app.MarkRejectBtn.ButtonPushedFcn = ...
                 @(~,~) setChannelState(app, app.SelectedChannel, 0);
 
@@ -344,12 +362,14 @@ classdef ChannelCheck < matlab.apps.AppBase
             app.PrevChBtn.Layout.Row = 6;
             app.PrevChBtn.Layout.Column = 1;
             app.PrevChBtn.Text = '< Prev';
+            app.PrevChBtn.Tooltip = 'Previous channel (Left arrow).';
             app.PrevChBtn.ButtonPushedFcn = @(~,~) navChannel(app, -1);
 
             app.NextChBtn = uibutton(ctrlGrid, 'push');
             app.NextChBtn.Layout.Row = 6;
             app.NextChBtn.Layout.Column = 2;
             app.NextChBtn.Text = 'Next >';
+            app.NextChBtn.Tooltip = 'Next channel (Right arrow).';
             app.NextChBtn.ButtonPushedFcn = @(~,~) navChannel(app, 1);
 
             % Detail axes (main view)
@@ -369,7 +389,14 @@ classdef ChannelCheck < matlab.apps.AppBase
             app.LeftPanel.Layout.Column = 1;
 
             g = uigridlayout(app.LeftPanel, [8, 2]);
-            g.RowHeight = {90, 6, 22, '1x', 28, 22, '0.6x', 30};
+            % Dataset controls (rows 3-5) only make sense for multi-file
+            % batch reviews; collapse those rows otherwise so QC takes
+            % over the freed space.
+            if app.IsMultiFile
+                g.RowHeight = {90, 6, 22, '1x', 28, 22, '0.6x', 30};
+            else
+                g.RowHeight = {90, 6, 0, 0, 0, 22, '1x', 30};
+            end
             g.ColumnWidth = {'1x', '1x'};
             g.Padding = [6,6,6,6];
             g.RowSpacing = 4;
@@ -389,14 +416,16 @@ classdef ChannelCheck < matlab.apps.AppBase
             app.DatasetLabel = uilabel(g);
             app.DatasetLabel.Layout.Row = 3;
             app.DatasetLabel.Layout.Column = [1, 2];
-            app.DatasetLabel.Text = 'Datasets';
+            app.DatasetLabel.Text = 'Files in batch';
             app.DatasetLabel.FontWeight = 'bold';
+            app.DatasetLabel.Tooltip = 'When you launch ChannelCheck with a cell array of fNIRS structs, each appears here. Edits are remembered as you switch between them.';
 
             % Row 4: Dataset listbox
             app.DatasetListBox = uilistbox(g);
             app.DatasetListBox.Layout.Row = 4;
             app.DatasetListBox.Layout.Column = [1, 2];
             app.DatasetListBox.Items = {};
+            app.DatasetListBox.Tooltip = 'Select a file to review. * marks files with edits; counts show rejected/noisy channels.';
             app.DatasetListBox.ValueChangedFcn = ...
                 @(~,evt) onDatasetSelect(app, evt);
 
@@ -405,6 +434,7 @@ classdef ChannelCheck < matlab.apps.AppBase
             app.DatasetPrevBtn.Layout.Row = 5;
             app.DatasetPrevBtn.Layout.Column = 1;
             app.DatasetPrevBtn.Text = '< Prev';
+            app.DatasetPrevBtn.Tooltip = 'Previous file in batch.';
             app.DatasetPrevBtn.ButtonPushedFcn = ...
                 @(~,~) navigateDataset(app, -1);
 
@@ -412,6 +442,7 @@ classdef ChannelCheck < matlab.apps.AppBase
             app.DatasetNextBtn.Layout.Row = 5;
             app.DatasetNextBtn.Layout.Column = 2;
             app.DatasetNextBtn.Text = 'Next >';
+            app.DatasetNextBtn.Tooltip = 'Next file in batch.';
             app.DatasetNextBtn.ButtonPushedFcn = ...
                 @(~,~) navigateDataset(app, 1);
 
@@ -455,6 +486,11 @@ classdef ChannelCheck < matlab.apps.AppBase
             app.ProbeGridPanel = uipanel(parent, 'Title', '');
             app.ProbeGridPanel.Layout.Row = 1;
             app.ProbeGridPanel.Layout.Column = 2;
+            % Don't let MATLAB shuffle children; we keep the probe
+            % aspect ratio intact via SizeChangedFcn.
+            app.ProbeGridPanel.AutoResizeChildren = 'off';
+            app.ProbeGridPanel.SizeChangedFcn = ...
+                @(~,~) relayoutMiniAxes(app);
         end
 
         function createRightPanel(app, parent)
@@ -499,16 +535,20 @@ classdef ChannelCheck < matlab.apps.AppBase
             g.Padding = [6,2,6,2];
             g.ColumnSpacing = 4;
 
+            modKey = 'Ctrl/Cmd';
+
             app.RunQCBtn = uibutton(g, 'push');
             app.RunQCBtn.Layout.Row = 1;
             app.RunQCBtn.Layout.Column = 1;
             app.RunQCBtn.Text = 'Run QC';
+            app.RunQCBtn.Tooltip = 'Run the QC pipeline (saturation, SCI, cardiac, CoV, Takizawa) and update recommendations.';
             app.RunQCBtn.ButtonPushedFcn = @(~,~) runQC(app);
 
             app.QCSettingsBtn = uibutton(g, 'push');
             app.QCSettingsBtn.Layout.Row = 1;
             app.QCSettingsBtn.Layout.Column = 2;
             app.QCSettingsBtn.Text = 'QC Setup';
+            app.QCSettingsBtn.Tooltip = 'Edit QC thresholds (SCI, CoV, cardiac SNR, etc.).';
             app.QCSettingsBtn.ButtonPushedFcn = @(~,~) openQCSettings(app);
 
             app.AcceptRecsBtn = uibutton(g, 'push');
@@ -516,6 +556,7 @@ classdef ChannelCheck < matlab.apps.AppBase
             app.AcceptRecsBtn.Layout.Column = 3;
             app.AcceptRecsBtn.Text = 'Accept Recs';
             app.AcceptRecsBtn.Enable = 'off';
+            app.AcceptRecsBtn.Tooltip = 'Replace the current mask with the QC pipeline''s recommendations. Confirms before overwriting manual edits.';
             app.AcceptRecsBtn.ButtonPushedFcn = ...
                 @(~,~) applyQCRecommendations(app);
 
@@ -523,12 +564,14 @@ classdef ChannelCheck < matlab.apps.AppBase
             app.RejectNoisyBtn.Layout.Row = 1;
             app.RejectNoisyBtn.Layout.Column = 4;
             app.RejectNoisyBtn.Text = 'Reject Noisy';
+            app.RejectNoisyBtn.Tooltip = 'Promote all channels currently flagged "noisy" to "rejected".';
             app.RejectNoisyBtn.ButtonPushedFcn = @(~,~) bulkRejectNoisy(app);
 
             app.ResetAllBtn = uibutton(g, 'push');
             app.ResetAllBtn.Layout.Row = 1;
             app.ResetAllBtn.Layout.Column = 5;
             app.ResetAllBtn.Text = 'Reset All';
+            app.ResetAllBtn.Tooltip = 'Mark every channel "good" (1).';
             app.ResetAllBtn.ButtonPushedFcn = @(~,~) bulkResetAll(app);
 
             app.UndoBtn = uibutton(g, 'push');
@@ -536,6 +579,7 @@ classdef ChannelCheck < matlab.apps.AppBase
             app.UndoBtn.Layout.Column = 6;
             app.UndoBtn.Text = 'Undo';
             app.UndoBtn.Enable = 'off';
+            app.UndoBtn.Tooltip = sprintf('Undo last channel mask change (%s+Z).', modKey);
             app.UndoBtn.ButtonPushedFcn = @(~,~) undo(app);
 
             app.RedoBtn = uibutton(g, 'push');
@@ -543,6 +587,7 @@ classdef ChannelCheck < matlab.apps.AppBase
             app.RedoBtn.Layout.Column = 7;
             app.RedoBtn.Text = 'Redo';
             app.RedoBtn.Enable = 'off';
+            app.RedoBtn.Tooltip = sprintf('Redo last undone change (%s+Shift+Z or %s+Y).', modKey, modKey);
             app.RedoBtn.ButtonPushedFcn = @(~,~) redo(app);
 
             app.AutoScaleChk = uicheckbox(g);
@@ -550,6 +595,7 @@ classdef ChannelCheck < matlab.apps.AppBase
             app.AutoScaleChk.Layout.Column = 8;
             app.AutoScaleChk.Text = 'Per-Ch Scale';
             app.AutoScaleChk.Value = false;
+            app.AutoScaleChk.Tooltip = 'Off: shared Y-range across all mini-plots. On: each mini-plot autoscales independently.';
             app.AutoScaleChk.ValueChangedFcn = ...
                 @(~,evt) onAutoScaleChange(app, evt);
 
@@ -558,6 +604,7 @@ classdef ChannelCheck < matlab.apps.AppBase
             app.ShowMarkersChk.Layout.Column = 9;
             app.ShowMarkersChk.Text = 'Markers';
             app.ShowMarkersChk.Value = false;
+            app.ShowMarkersChk.Tooltip = 'Show event markers on time-series plots.';
             app.ShowMarkersChk.ValueChangedFcn = ...
                 @(~,evt) onMarkersChange(app, evt);
 
@@ -565,6 +612,7 @@ classdef ChannelCheck < matlab.apps.AppBase
             app.MarkerCodesBtn.Layout.Row = 1;
             app.MarkerCodesBtn.Layout.Column = 10;
             app.MarkerCodesBtn.Text = 'Codes...';
+            app.MarkerCodesBtn.Tooltip = 'Choose which marker codes to display.';
             app.MarkerCodesBtn.ButtonPushedFcn = ...
                 @(~,~) openMarkerSettings(app);
 
@@ -583,12 +631,14 @@ classdef ChannelCheck < matlab.apps.AppBase
             app.SaveBtn.Text = 'Save';
             app.SaveBtn.BackgroundColor = [0.75, 0.92, 0.75];
             app.SaveBtn.FontColor = [0, 0, 0];
+            app.SaveBtn.Tooltip = sprintf('Apply mask edits and close (%s+S).', modKey);
             app.SaveBtn.ButtonPushedFcn = @(~,~) closeApp(app, false);
 
             app.CancelBtn = uibutton(g, 'push');
             app.CancelBtn.Layout.Row = 1;
             app.CancelBtn.Layout.Column = 14;
             app.CancelBtn.Text = 'Cancel';
+            app.CancelBtn.Tooltip = 'Discard all edits and close (Esc).';
             app.CancelBtn.ButtonPushedFcn = @(~,~) closeApp(app, true);
         end
 
@@ -596,8 +646,14 @@ classdef ChannelCheck < matlab.apps.AppBase
 
         function loadData(app, dataStruct)
             app.Data = dataStruct;
+            % Treat as processed when hemoglobin output exists. Some
+            % pipelines retain `raw` alongside `HbO` for debugging, so
+            % positively detect via processingInfo / units rather than
+            % requiring `raw` to be absent.
             app.IsProcessed = isfield(dataStruct, 'HbO') && ...
-                              ~isfield(dataStruct, 'raw');
+                              (isfield(dataStruct, 'processingInfo') || ...
+                               isfield(dataStruct, 'units') || ...
+                               ~isfield(dataStruct, 'raw'));
 
             % Resolve device
             app.Dev = [];
@@ -640,17 +696,29 @@ classdef ChannelCheck < matlab.apps.AppBase
             resolveChannelColumns(app);
             resolveLayout(app);
 
-            % Initialize mask
+            % Initialize mask: prefer in-memory fchMask, otherwise try the
+            % *_CH.mat sidecar next to the original recording, otherwise
+            % default to all-good.
+            sidecarMask = [];
+            if ~isfield(dataStruct, 'fchMask') || isempty(dataStruct.fchMask)
+                sidecarMask = tryLoadSidecarMask(dataStruct);
+            end
+
             if isfield(dataStruct, 'fchMask') && ~isempty(dataStruct.fchMask)
                 app.FchMask = dataStruct.fchMask(:)';
-                % Pad or truncate to match NumChannels
-                if numel(app.FchMask) < app.NumChannels
-                    app.FchMask(end+1:app.NumChannels) = 1;
-                elseif numel(app.FchMask) > app.NumChannels
-                    app.FchMask = app.FchMask(1:app.NumChannels);
-                end
+            elseif ~isempty(sidecarMask)
+                app.FchMask = sidecarMask(:)';
+                fprintf('Channel mask loaded from sidecar (%d rejected, %d noisy).\n', ...
+                    sum(app.FchMask == 0), sum(app.FchMask == 0.5));
             else
                 app.FchMask = ones(1, app.NumChannels);
+            end
+
+            % Pad or truncate to match NumChannels
+            if numel(app.FchMask) < app.NumChannels
+                app.FchMask(end+1:app.NumChannels) = 1;
+            elseif numel(app.FchMask) > app.NumChannels
+                app.FchMask = app.FchMask(1:app.NumChannels);
             end
             app.OrigFchMask = app.FchMask;
             app.MaskHistory = {};
@@ -695,22 +763,27 @@ classdef ChannelCheck < matlab.apps.AppBase
         function resolveChannelColumns(app)
             app.ChannelColumns = {};
             app.AmbientColumns = {};
+            app.ChannelWavelengths = {};
+            app.DeviceWLOrder = [];
             if app.IsProcessed
                 for ch = 1:app.NumChannels
                     app.ChannelColumns{ch} = ch;
                     app.AmbientColumns{ch} = [];
+                    app.ChannelWavelengths{ch} = NaN;
                 end
                 return;
             end
             if ~isempty(app.Dev)
                 chNums = app.Dev.channelNumbers();
                 wls = app.Dev.wavelengths();
+                app.DeviceWLOrder = sort(unique(wls(wls > 0 & ~isnan(wls))));
                 for ch = 1:app.NumChannels
                     cols = find(chNums == ch & wls > 0);
                     if isempty(cols)
                         cols = find(chNums == ch);
                     end
                     app.ChannelColumns{ch} = cols;
+                    app.ChannelWavelengths{ch} = wls(cols);
                     app.AmbientColumns{ch} = find(chNums == ch & wls == 0);
                 end
             else
@@ -719,7 +792,62 @@ classdef ChannelCheck < matlab.apps.AppBase
                 for ch = 1:app.NumChannels
                     app.ChannelColumns{ch} = (ch-1)*nWl + (1:nWl);
                     app.AmbientColumns{ch} = [];
+                    app.ChannelWavelengths{ch} = nan(1, nWl);
                 end
+            end
+        end
+
+        function colors = miniSignalColors(app, ch, nSigs)
+            % Per-signal colors for mini-plots: HbO/HbR for processed,
+            % wavelength-aware coloring for raw.
+            colors = cell(1, nSigs);
+            if app.IsProcessed
+                palette = {app.HbOColor, app.HbRColor};
+                for s = 1:nSigs
+                    cidx = min(s, numel(palette));
+                    colors{s} = palette{cidx};
+                end
+                return;
+            end
+            wls = [];
+            if ch <= numel(app.ChannelWavelengths)
+                wls = app.ChannelWavelengths{ch};
+            end
+            for s = 1:nSigs
+                if s <= numel(wls)
+                    wlVal = wls(s);
+                else
+                    wlVal = NaN;
+                end
+                colors{s} = wavelengthColor(app, wlVal, s);
+            end
+        end
+
+        function [clr, label] = wavelengthColor(app, wl, fallbackIdx)
+            % Map a wavelength (nm) to the canonical WL1/WL2 color slot.
+            % Falls back to position-based coloring when wl is NaN or the
+            % device wavelength order is unknown.
+            label = '';
+            if ~isnan(wl) && ~isempty(app.DeviceWLOrder)
+                pos = find(app.DeviceWLOrder == wl, 1);
+                if ~isempty(pos)
+                    if pos == 1
+                        clr = app.WL1Color;
+                    else
+                        clr = app.WL2Color;
+                    end
+                    label = sprintf('%g nm', wl);
+                    return;
+                end
+            end
+            % Fallback: use signal index ordering
+            palette = {app.WL1Color, app.WL2Color, app.AmbientColor};
+            cidx = min(max(fallbackIdx, 1), numel(palette));
+            clr = palette{cidx};
+            if ~isnan(wl)
+                label = sprintf('%g nm', wl);
+            else
+                label = sprintf('WL%d', fallbackIdx);
             end
         end
 
@@ -763,7 +891,7 @@ classdef ChannelCheck < matlab.apps.AppBase
                 stats(ch).mean = m;
                 stats(ch).std = s;
                 stats(ch).cov = cv;
-                stats(ch).isNoisy = any(cv > 0.1);
+                stats(ch).isNoisy = any(cv > app.QCSettings.CoVThreshold);
             end
             app.ChanStats = stats;
         end
@@ -871,30 +999,23 @@ classdef ChannelCheck < matlab.apps.AppBase
                 end
             end
 
+            % Cache layout (possibly the synthetic fallback grid above)
+            % so relayoutMiniAxes can find it.
+            app.LayoutPositions = layout;
+
             for ch = 1:nCh
                 if ch > numel(layout) || isempty(layout{ch})
                     continue;
                 end
 
-                pos = layout{ch};
-                % Y-flip (layout: y=0 at top; MATLAB: y=0 at bottom)
-                % Scale to 90% with 5% margin
-                sc = 0.88;
-                mg = (1 - sc) / 2;
-                normPos = [pos(1)*sc + mg, ...
-                           (1 - pos(2) - pos(4))*sc + mg, ...
-                           pos(3)*sc, ...
-                           pos(4)*sc];
-
                 ax = uiaxes(app.ProbeGridPanel);
                 ax.Units = 'normalized';
-                ax.Position = normPos;
                 ax.Box = 'on';
                 ax.XTick = [];
                 ax.YTick = [];
                 ax.FontSize = 7;
                 ax.Title.String = sprintf('%d', ch);
-                ax.Title.FontSize = 8;
+                ax.Title.FontSize = 12;
                 ax.Title.FontWeight = 'bold';
                 if app.IsDarkMode
                     ax.Color = app.GoodBg;
@@ -923,6 +1044,91 @@ classdef ChannelCheck < matlab.apps.AppBase
                 app.MiniAxes{ch} = ax;
                 app.MiniContextMenus{ch} = cm;
             end
+
+            % Position axes preserving probe aspect ratio
+            relayoutMiniAxes(app);
+        end
+
+        function relayoutMiniAxes(app)
+            % Re-position the mini-axes within ProbeGridPanel so that the
+            % stored probe layout is fitted into the largest centered
+            % rectangle whose pixel aspect matches the probe's natural
+            % aspect ratio. Called on initial build and on every
+            % SizeChangedFcn from ProbeGridPanel.
+            if isempty(app.MiniAxes) || isempty(app.LayoutPositions)
+                return;
+            end
+            layout = app.LayoutPositions;
+
+            % Probe bounding box from non-empty layout entries
+            valid = ~cellfun(@isempty, layout(1:min(end, app.NumChannels)));
+            if ~any(valid), return; end
+            pts = vertcat(layout{valid});
+            xmin = min(pts(:,1));
+            ymin = min(pts(:,2));
+            xmax = max(pts(:,1) + pts(:,3));
+            ymax = max(pts(:,2) + pts(:,4));
+            pw = xmax - xmin;
+            ph = ymax - ymin;
+            if pw <= 0 || ph <= 0, return; end
+            probeAspect = pw / ph;
+
+            % Panel pixel size
+            if isempty(app.ProbeGridPanel) || ~isvalid(app.ProbeGridPanel)
+                return;
+            end
+            oldUnits = app.ProbeGridPanel.Units;
+            app.ProbeGridPanel.Units = 'pixels';
+            panelPos = app.ProbeGridPanel.Position;
+            app.ProbeGridPanel.Units = oldUnits;
+            panelW = panelPos(3);
+            panelH = panelPos(4);
+            if panelW <= 1 || panelH <= 1, return; end
+            panelAspect = panelW / panelH;
+
+            % Largest centered rectangle (in panel-normalized units) whose
+            % pixel aspect matches the probe.
+            outerMargin = 0.03;
+            usableW = 1 - 2 * outerMargin;
+            usableH = 1 - 2 * outerMargin;
+            if probeAspect > panelAspect
+                fitW = usableW;
+                fitH = (panelAspect / probeAspect) * usableW;
+            else
+                fitH = usableH;
+                fitW = (probeAspect / panelAspect) * usableH;
+            end
+            fitX = (1 - fitW) / 2;
+            fitY = (1 - fitH) / 2;
+
+            % Per-channel inner margin so axes don't touch
+            innerSc = 0.92;
+            innerMg = (1 - innerSc) / 2;
+
+            for ch = 1:app.NumChannels
+                if ch > numel(layout) || isempty(layout{ch}), continue; end
+                if ch > numel(app.MiniAxes), continue; end
+                ax = app.MiniAxes{ch};
+                if isempty(ax) || ~isvalid(ax), continue; end
+
+                p = layout{ch};
+                nx = (p(1) - xmin) / pw;
+                ny = (p(2) - ymin) / ph;
+                nw = p(3) / pw;
+                nh = p(4) / ph;
+
+                % Y-flip: layout y=0 at top, MATLAB y=0 at bottom
+                cellX = fitX + nx * fitW;
+                cellY = fitY + (1 - ny - nh) * fitH;
+                cellW = nw * fitW;
+                cellH = nh * fitH;
+
+                ax.Units = 'normalized';
+                ax.Position = [cellX + cellW * innerMg, ...
+                               cellY + cellH * innerMg, ...
+                               cellW * innerSc, ...
+                               cellH * innerSc];
+            end
         end
 
         function plotAllMiniChannels(app)
@@ -940,12 +1146,8 @@ classdef ChannelCheck < matlab.apps.AppBase
             d = app.MiniData{ch};
             nSigs = size(d, 2);
 
-            % Determine colors
-            if app.IsProcessed
-                colors = {app.HbOColor, app.HbRColor};
-            else
-                colors = {app.WL1Color, app.WL2Color, app.AmbientColor};
-            end
+            % Per-signal colors
+            sigColors = miniSignalColors(app, ch, nSigs);
 
             % Plot (create lines or update)
             if isempty(app.MiniLines{ch}) || ...
@@ -955,16 +1157,16 @@ classdef ChannelCheck < matlab.apps.AppBase
                 hold(ax, 'on');
                 lines = gobjects(1, nSigs);
                 for s = 1:nSigs
-                    cidx = min(s, numel(colors));
                     lines(s) = plot(ax, t, d(:, s), ...
-                        'Color', colors{cidx}, 'LineWidth', 0.8, ...
+                        'Color', sigColors{s}, 'LineWidth', 0.8, ...
                         'HitTest', 'off', 'PickableParts', 'none');
                 end
                 hold(ax, 'off');
                 app.MiniLines{ch} = lines;
             else
                 for s = 1:nSigs
-                    set(app.MiniLines{ch}(s), 'XData', t, 'YData', d(:, s));
+                    set(app.MiniLines{ch}(s), 'XData', t, 'YData', d(:, s), ...
+                        'Color', sigColors{s});
                 end
             end
 
@@ -978,8 +1180,8 @@ classdef ChannelCheck < matlab.apps.AppBase
             if ~app.IsProcessed && ch <= numel(app.AmbientData) ...
                     && ~isempty(app.AmbientData{ch})
                 hold(ax, 'on');
-                h = plot(ax, t, app.AmbientData{ch}, ':', ...
-                    'Color', [app.AmbientColor, 0.6], 'LineWidth', 0.5, ...
+                h = plot(ax, t, app.AmbientData{ch}, '-', ...
+                    'Color', app.AmbientColor, 'LineWidth', 0.7, ...
                     'HitTest', 'off', 'PickableParts', 'none');
                 auxHandles(end+1) = h; %#ok<AGROW>
                 hold(ax, 'off');
@@ -1030,8 +1232,10 @@ classdef ChannelCheck < matlab.apps.AppBase
                 app.MiniAuxLines{ch} = auxHandles;
             end
 
-            % Y-axis: global scale (default) or per-channel autoscale
-            ax.XLimMode = 'auto';
+            % Tight X-range: start..end of the displayed segment
+            if numel(t) >= 2
+                xlim(ax, [t(1), t(end)]);
+            end
             if app.AutoScaleOn
                 % Per-channel autoscale
                 ax.YLimMode = 'auto';
@@ -1048,22 +1252,24 @@ classdef ChannelCheck < matlab.apps.AppBase
             ax = app.MiniAxes{ch};
             if isempty(ax) || ~isvalid(ax), return; end
 
+            % State glyph: ✅ good, ⚠ noisy, ❌ rejected.
             state = app.FchMask(ch);
             if state == 0
                 ax.Color = app.RejectBg;
-                ax.Title.String = sprintf('%d X', ch);
+                stateGlyph = char(10060);    % ❌
                 ax.Title.Color = [0.8, 0.1, 0.1];
             elseif state == 0.5
                 ax.Color = app.NoisyBg;
-                ax.Title.String = sprintf('%d ~', ch);
+                stateGlyph = char(9888);     % ⚠
                 ax.Title.Color = [0.8, 0.5, 0.0];
             else
                 ax.Color = app.GoodBg;
-                ax.Title.String = sprintf('%d', ch);
-                ax.Title.Color = app.ThemeFg;
+                stateGlyph = char(9989);     % ✅
+                ax.Title.Color = [0.2, 0.6, 0.2];
             end
+            ax.Title.String = sprintf('%d - %s', ch, stateGlyph);
 
-            % QC recommendation indicator
+            % QC recommendation indicator (overlays a flag glyph)
             if app.QCComputed && ch <= numel(app.QCRecommendations)
                 rec = app.QCRecommendations(ch);
                 if rec == 0
@@ -1096,8 +1302,14 @@ classdef ChannelCheck < matlab.apps.AppBase
                     'HitTest', 'off', 'PickableParts', 'none');
                 hold(ax, 'off');
 
-                % Build QC tooltip for this channel
-                ax.Tooltip = buildQCTooltip(app, ch);
+                % Build QC tooltip for this channel. UIAxes only exposes
+                % a Tooltip property on some MATLAB releases — guard.
+                if isprop(ax, 'Tooltip')
+                    try
+                        ax.Tooltip = buildQCTooltip(app, ch);
+                    catch
+                    end
+                end
             end
         end
 
@@ -1163,13 +1375,21 @@ classdef ChannelCheck < matlab.apps.AppBase
                 raw = app.Data.raw(:, cols);
                 [t, rd] = pf2.qc.ChannelCheck.smartDownsample( ...
                     timeVec, raw, maxPts);
-                colors = {app.WL1Color, app.WL2Color, app.AmbientColor};
+                wls = [];
+                if ch <= numel(app.ChannelWavelengths)
+                    wls = app.ChannelWavelengths{ch};
+                end
                 hold(app.DetailAxes, 'on');
                 for s = 1:size(rd, 2)
-                    cidx = min(s, numel(colors));
+                    if s <= numel(wls)
+                        wlVal = wls(s);
+                    else
+                        wlVal = NaN;
+                    end
+                    [clr, lbl] = wavelengthColor(app, wlVal, s);
                     plot(app.DetailAxes, t, rd(:, s), ...
-                        'Color', colors{cidx}, 'LineWidth', 1, ...
-                        'DisplayName', sprintf('WL%d', s));
+                        'Color', clr, 'LineWidth', 1, ...
+                        'DisplayName', lbl);
                 end
                 % Ambient channel
                 if ch <= numel(app.AmbientColumns) && ~isempty(app.AmbientColumns{ch})
@@ -1178,8 +1398,8 @@ classdef ChannelCheck < matlab.apps.AppBase
                     if ~isempty(ambCols)
                         [~, ambD] = pf2.qc.ChannelCheck.smartDownsample( ...
                             timeVec, app.Data.raw(:, ambCols(1)), maxPts);
-                        plot(app.DetailAxes, t, ambD, ':', ...
-                            'Color', app.AmbientColor, 'LineWidth', 0.8, ...
+                        plot(app.DetailAxes, t, ambD, '-', ...
+                            'Color', app.AmbientColor, 'LineWidth', 1.0, ...
                             'DisplayName', 'Ambient');
                     end
                 end
@@ -1255,6 +1475,11 @@ classdef ChannelCheck < matlab.apps.AppBase
 
             xlabel(app.DetailAxes, 'Time (s)');
             title(app.DetailAxes, sprintf('Channel %d', ch));
+
+            % Tight X-range: start..end of the displayed segment
+            if numel(t) >= 2
+                xlim(app.DetailAxes, [t(1), t(end)]);
+            end
 
             % Store data for cursor tooltip
             if app.IsProcessed
@@ -1389,7 +1614,7 @@ classdef ChannelCheck < matlab.apps.AppBase
                 end
             end
             if s.isNoisy
-                lines{end+1} = 'CoV > 0.1: NOISY';
+                lines{end+1} = sprintf('CoV > %.2f: NOISY', app.QCSettings.CoVThreshold);
             end
 
             % QC details if available — show per-check results
@@ -1451,6 +1676,56 @@ classdef ChannelCheck < matlab.apps.AppBase
             else
                 app.StateLabel.Text = 'Rejected';
                 app.StateLabel.FontColor = [0.8, 0.1, 0.1];
+            end
+            % Highlight the button that matches the current state, dim
+            % the others, and disable the active one so it can't be
+            % pressed redundantly.
+            highlightStateButton(app, state);
+        end
+
+        function highlightStateButton(app, state)
+            % Selected button: saturated bg + white text + bold + bullet
+            % prefix so it reads as the active radio choice. Inactive
+            % buttons keep a subtle state-color tint so they still look
+            % like clickable buttons (not greyed-out or disabled).
+            activeGood   = [0.30, 0.65, 0.30];
+            inactiveGood = [0.86, 0.95, 0.86];
+            activeNoisy  = [0.92, 0.62, 0.20];
+            inactiveNoisy = [0.99, 0.93, 0.80];
+            activeReject = [0.82, 0.28, 0.28];
+            inactiveReject = [0.99, 0.86, 0.86];
+
+            inactiveGoodFg = [0.10, 0.35, 0.10];
+            inactiveNoisyFg = [0.50, 0.35, 0.05];
+            inactiveRejectFg = [0.55, 0.10, 0.10];
+
+            isGood = (state == 1);
+            isNoisy = (state == 0.5);
+            isReject = (state == 0);
+
+            bullet = char(9679);  % ●
+
+            styleStateBtn(app.MarkGoodBtn, isGood, ...
+                activeGood, inactiveGood, inactiveGoodFg, 'Good', bullet);
+            styleStateBtn(app.MarkNoisyBtn, isNoisy, ...
+                activeNoisy, inactiveNoisy, inactiveNoisyFg, 'Noisy', bullet);
+            styleStateBtn(app.MarkRejectBtn, isReject, ...
+                activeReject, inactiveReject, inactiveRejectFg, 'Reject', bullet);
+
+            function styleStateBtn(btn, isActive, activeBg, inactiveBg, inactiveFg, label, mark)
+                if isempty(btn) || ~isvalid(btn), return; end
+                btn.Enable = 'on';
+                if isActive
+                    btn.BackgroundColor = activeBg;
+                    btn.FontColor = [1, 1, 1];
+                    btn.FontWeight = 'bold';
+                    btn.Text = sprintf('%s %s', mark, label);
+                else
+                    btn.BackgroundColor = inactiveBg;
+                    btn.FontColor = inactiveFg;
+                    btn.FontWeight = 'normal';
+                    btn.Text = label;
+                end
             end
         end
 
@@ -1526,6 +1801,13 @@ classdef ChannelCheck < matlab.apps.AppBase
             nRej = sum(app.FchMask == 0);
             app.SummaryLabel.Text = sprintf( ...
                 '%d good, %d noisy, %d rejected', nGood, nNoisy, nRej);
+
+            % Mirror the current-dataset status into the multi-file list.
+            if app.IsMultiFile && ~isempty(app.DatasetListBox) && ...
+                    isvalid(app.DatasetListBox) && ...
+                    ~isempty(app.DatasetListBox.Items)
+                buildDatasetLabels(app);
+            end
         end
 
         function bulkRejectNoisy(app)
@@ -1755,6 +2037,13 @@ classdef ChannelCheck < matlab.apps.AppBase
                 saveQCSettings(newS);
                 delete(dlg);
 
+                % Recompute the noisy flag in stats since CoVThreshold may
+                % have changed, then refresh the visible detail stats.
+                computeStats(app);
+                if ~isempty(app.SelectedChannel) && app.SelectedChannel >= 1
+                    updateStatsDisplay(app, app.SelectedChannel);
+                end
+
                 % Re-run QC with new settings
                 if ~app.IsProcessed
                     runQC(app);
@@ -1764,6 +2053,29 @@ classdef ChannelCheck < matlab.apps.AppBase
 
         function applyQCRecommendations(app)
             if ~app.QCComputed, return; end
+
+            % If the user has made manual edits since this dataset was
+            % loaded, confirm before overwriting them.
+            hasManualEdits = ~isempty(app.OrigFchMask) && ...
+                             numel(app.FchMask) == numel(app.OrigFchMask) && ...
+                             any(app.FchMask ~= app.OrigFchMask);
+            if hasManualEdits && ~app.SkipConfirmation
+                nDiff = sum(app.FchMask ~= app.OrigFchMask);
+                answer = uiconfirm(app.UIFigure, ...
+                    sprintf(['You have %d manual channel edit(s) on this dataset.\n\n', ...
+                            'Accepting recommendations will replace those edits ' , ...
+                            'with the QC pipeline''s suggestions.\n\n', ...
+                            'Continue? (Undo with Ctrl/Cmd+Z if needed.)'], nDiff), ...
+                    'Overwrite Manual Edits?', ...
+                    'Options', {'Replace with Recommendations', 'Cancel'}, ...
+                    'DefaultOption', 'Cancel', ...
+                    'CancelOption', 'Cancel', ...
+                    'Icon', 'warning');
+                if ~strcmp(answer, 'Replace with Recommendations')
+                    return;
+                end
+            end
+
             pushUndo(app);
             app.FchMask = app.QCRecommendations;
             app.Data.fchMask = app.FchMask;
@@ -1841,14 +2153,23 @@ classdef ChannelCheck < matlab.apps.AppBase
             hold(app.QCAxes, 'on');
 
             if useSpatial
-                % Probe-arranged QC map
+                % Probe-arranged QC map. Use the same bounding box +
+                % axis-equal trick as the mini-axes grid so the probe is
+                % drawn at its natural aspect ratio.
+                pts = vertcat(layout{1:nCh});
+                xmin = min(pts(:,1));
+                ymin = min(pts(:,2));
+                xmax = max(pts(:,1) + pts(:,3));
+                ymax = max(pts(:,2) + pts(:,4));
+                pad = 0.04 * max(xmax - xmin, ymax - ymin);
+
                 for ch = 1:nCh
                     if ch > numel(layout) || isempty(layout{ch}), continue; end
                     pos = layout{ch};  % [x, y, w, h] normalized
                     rec = app.QCRecommendations(ch);
                     clr = qcColor(rec);
                     cx = pos(1) + pos(3) / 2;
-                    cy = 1 - (pos(2) + pos(4) / 2);  % Y-flip
+                    cy = (ymin + ymax) - (pos(2) + pos(4) / 2);  % Y-flip
                     hw = pos(3) * 0.45;
                     hh = pos(4) * 0.45;
                     fill(app.QCAxes, ...
@@ -1859,8 +2180,10 @@ classdef ChannelCheck < matlab.apps.AppBase
                         'HorizontalAlignment', 'center', ...
                         'FontSize', 6, 'Color', [1, 1, 1]);
                 end
-                xlim(app.QCAxes, [-0.05, 1.05]);
-                ylim(app.QCAxes, [-0.05, 1.05]);
+                xlim(app.QCAxes, [xmin - pad, xmax + pad]);
+                ylim(app.QCAxes, [ymin - pad, ymax + pad]);
+                app.QCAxes.DataAspectRatioMode = 'manual';
+                app.QCAxes.DataAspectRatio = [1, 1, 1];
             else
                 % Fallback grid
                 nGridCols = ceil(sqrt(nCh));
@@ -1881,6 +2204,8 @@ classdef ChannelCheck < matlab.apps.AppBase
                 end
                 xlim(app.QCAxes, [0, nGridCols + 1]);
                 ylim(app.QCAxes, [0, nGridRows + 1]);
+                app.QCAxes.DataAspectRatioMode = 'manual';
+                app.QCAxes.DataAspectRatio = [1, 1, 1];
             end
 
             hold(app.QCAxes, 'off');
@@ -1919,7 +2244,10 @@ classdef ChannelCheck < matlab.apps.AppBase
             selectChannel(app, 1);
             updateSummaryBar(app);
 
-            app.DatasetListBox.Value = app.DatasetListBox.Items{newIdx};
+            % Rebuild labels so previously-edited datasets show their
+            % rejection counts and the current selection moves with us.
+            buildDatasetLabels(app);
+            app.DatasetListBox.Value = app.CurrentDataIndex;
 
             % Reset QC state for new dataset
             app.QCComputed = false;
@@ -1940,6 +2268,17 @@ classdef ChannelCheck < matlab.apps.AppBase
             labels = cell(1, n);
             for i = 1:n
                 d = app.AllData{i};
+
+                % Current dataset uses the live mask in memory; others
+                % reflect what was committed to AllData via navigation.
+                if i == app.CurrentDataIndex && ~isempty(app.FchMask)
+                    mask = app.FchMask;
+                elseif isfield(d, 'fchMask')
+                    mask = d.fchMask;
+                else
+                    mask = [];
+                end
+
                 lbl = sprintf('%d', i);
                 if isfield(d, 'info')
                     if isfield(d.info, 'SubjectID') && ~isempty(d.info.SubjectID)
@@ -1952,10 +2291,59 @@ classdef ChannelCheck < matlab.apps.AppBase
                         lbl = sprintf('%s | S%s', lbl, string(d.info.Session));
                     end
                 end
+
+                % Append review status: rejection/noisy counts plus an
+                % edited-vs-original marker.
+                if ~isempty(mask)
+                    nRej = sum(mask == 0);
+                    nNoisy = sum(mask == 0.5);
+                    if i <= numel(app.OrigFchMaskAll)
+                        orig = app.OrigFchMaskAll{i};
+                    else
+                        orig = [];
+                    end
+                    if isempty(orig)
+                        isEdited = any(mask ~= 1);
+                    elseif numel(mask) == numel(orig)
+                        isEdited = any(mask ~= orig);
+                    else
+                        isEdited = true;
+                    end
+                    statusBits = {};
+                    if nRej > 0
+                        statusBits{end+1} = sprintf('%d rej', nRej); %#ok<AGROW>
+                    end
+                    if nNoisy > 0
+                        statusBits{end+1} = sprintf('%d noisy', nNoisy); %#ok<AGROW>
+                    end
+                    if isEdited && ~(nRej > 0 || nNoisy > 0)
+                        statusBits{end+1} = 'edited'; %#ok<AGROW>
+                    end
+                    if ~isempty(statusBits)
+                        lbl = sprintf('%s  [%s]', lbl, strjoin(statusBits, ', '));
+                    end
+                    if isEdited
+                        lbl = ['* ', lbl];
+                    end
+                end
+
                 labels{i} = lbl;
+            end
+
+            % Preserve selection across rebuilds (ItemsData is the index)
+            prevValue = [];
+            if ~isempty(app.DatasetListBox.Items) && ...
+                    ~isempty(app.DatasetListBox.Value)
+                prevValue = app.DatasetListBox.Value;
             end
             app.DatasetListBox.Items = labels;
             app.DatasetListBox.ItemsData = 1:n;
+            if ~isempty(prevValue) && isnumeric(prevValue) && ...
+                    prevValue >= 1 && prevValue <= n
+                app.DatasetListBox.Value = prevValue;
+            elseif n >= 1
+                app.DatasetListBox.Value = app.CurrentDataIndex;
+            end
         end
 
         %% ---- Save / Close -----------------------------------------
@@ -1982,8 +2370,20 @@ classdef ChannelCheck < matlab.apps.AppBase
             if ~isvalid(app.UIFigure), return; end
 
             if cancelled
-                % Restore original mask
+                % Restore original mask for the visible dataset
                 app.Data.fchMask = app.OrigFchMask;
+
+                % Multi-file: also revert edits that were committed into
+                % AllData by saveCurrentMaskToCell during navigation.
+                if app.IsMultiFile
+                    for i = 1:numel(app.AllData)
+                        if app.OrigHadFchMask(i)
+                            app.AllData{i}.fchMask = app.OrigFchMaskAll{i};
+                        elseif isfield(app.AllData{i}, 'fchMask')
+                            app.AllData{i} = rmfield(app.AllData{i}, 'fchMask');
+                        end
+                    end
+                end
             else
                 % Save
                 app.Data.fchMask = app.FchMask;
@@ -2057,6 +2457,12 @@ classdef ChannelCheck < matlab.apps.AppBase
                     if hasModifier(evt, 'control') || hasModifier(evt, 'command')
                         redo(app);
                     end
+                case 's'
+                    if hasModifier(evt, 'control') || hasModifier(evt, 'command')
+                        closeApp(app, false);
+                    end
+                case 'escape'
+                    closeApp(app, true);
             end
         end
 
@@ -2308,4 +2714,41 @@ end
 function saveQCSettings(s)
 % Persist QC settings to MATLAB prefs
     setpref('pf2_ChannelCheck', 'QCSettings', s);
+end
+
+function mask = tryLoadSidecarMask(dataStruct)
+% Look for a *_CH.mat sidecar next to dataStruct.info.filename and return
+% the first numeric field whose name contains 'mask'. Returns [] if no
+% filename, no sidecar, or no mask field found.
+    mask = [];
+    if ~isfield(dataStruct, 'info') || ~isfield(dataStruct.info, 'filename')
+        return;
+    end
+    fn = dataStruct.info.filename;
+    if isempty(fn) || ~(ischar(fn) || isstring(fn))
+        return;
+    end
+    [pathstr, name, ~] = fileparts(char(fn));
+    if isempty(pathstr)
+        sidecar = [name, '_CH.mat'];
+    else
+        sidecar = fullfile(pathstr, [name, '_CH.mat']);
+    end
+    if exist(sidecar, 'file') ~= 2
+        return;
+    end
+    try
+        s = load(sidecar);
+    catch
+        return;
+    end
+    flds = fieldnames(s);
+    hits = find(contains(lower(flds), 'mask'));
+    for i = 1:numel(hits)
+        v = s.(flds{hits(i)});
+        if isnumeric(v)
+            mask = v;
+            return;
+        end
+    end
 end
