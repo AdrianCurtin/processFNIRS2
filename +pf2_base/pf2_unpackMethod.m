@@ -96,6 +96,18 @@ function x=pf2_unpackMethod(method)
             continue
         end
 
+        % Recover from cfg files corrupted by an older INI reader that
+        % truncated values containing '=' (e.g. inside descriptions). The
+        % serialized form starts with `struct(`; try to eval back to a struct.
+        if (ischar(Fidx) || isstring(Fidx)) && startsWith(strtrim(char(Fidx)), 'struct(')
+            try
+                Fidx = eval(char(Fidx));
+                x.F{idx} = Fidx;
+            catch
+                % Leave as-is; downstream check will warn.
+            end
+        end
+
         if isstruct(Fidx) && length(Fidx) > 1
            %This is a struct array for some reason — change it back!
            F_noarray.f=Fidx(1).f;

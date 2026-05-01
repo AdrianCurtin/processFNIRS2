@@ -215,25 +215,20 @@ classdef INI < hgsetget & dynamicprops
                                    end
                                end
                                
-                           % Field     
+                           % Field
                            case '='
                                fieldEndLine=ftell(ID);
-                               [String,~,~,~,~] = regexp(Line,['[=' Object.CommentChar  ']'],'split');
-                               Field = rename(strTrimStrip(String{1}));
-                               Value = String{2};
+                               % Split on the FIRST '=' only — everything after
+                               % belongs to the value (which may contain '=' inside
+                               % strings or struct(...) expressions).
+                               eqIdx = strfind(Line,'=');
+                               firstEq = eqIdx(1);
+                               Field = rename(strTrimStrip(Line(1:firstEq-1)));
+                               Value = Line(firstEq+1:end);
                                Struct_section = get(Object,Section);
-                               
-                            
+
                                Value2 = strTrimStrip(Value);
-                               if ~isempty(Value2)&&(strcmp(Value2(1),'''')||strcmp(Value2(1),'"'))
-                                   for s = 3:numel(String)  % looks like its trying to acount for spaces?
-                                        Value = [ Value '=' String{s}]; %#ok<AGROW>
-                                   end
-                                   
-                                   isString=true;
-                               else
-                                   isString=false; 
-                               end
+                               isString = ~isempty(Value2) && (Value2(1) == '''' || Value2(1) == '"');
 
                   
                                
