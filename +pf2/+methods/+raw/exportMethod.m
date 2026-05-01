@@ -47,6 +47,11 @@ jsonStruct.functions = {};
 if isfield(method, 'F')
     for i = 1:length(method.F)
         func = method.F{i};
+        % In-memory cfg holds PipelineFunction objects (cfg gets re-set
+        % to the unpacked form by pf2.methods.raw.create); convert.
+        if isa(func, 'pf2_base.PipelineFunction')
+            func = func.toStruct();
+        end
         funcStruct = struct();
         funcStruct.f = func.f;
         funcStruct.args = func.args;

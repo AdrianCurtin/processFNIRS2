@@ -61,6 +61,57 @@ classdef OxyPipeline < pf2_base.Pipeline
                 obj = obj.remove(idx);
             end
         end
+
+        function out = run(obj, data, varargin)
+        % RUN Execute the oxy pipeline on a data struct via processFNIRS2.
+        %
+        %   out = p.run(data)
+        %   out = p.run(data, 'Context', ctx)
+        %   out = p.run(data, 'RawMethod', 'wl_raw')   % default: 'None'
+        %
+        % Injects this pipeline as the oxy method. By default the raw stage
+        % is set to 'None' — caller is responsible for ensuring the input
+        % data either is already raw with a sensible OD interpretation OR
+        % already contains processed Hb data (Stage 2 will run regardless).
+        % For previews on raw data, set 'RawMethod' to a chain that includes
+        % at least pf2_Intensity2OD, or use Pipeline.runFull(rawP, oxyP, data).
+
+            ip = inputParser;
+            ip.addParameter('Context',   [], @(x) isempty(x) || isa(x, 'pf2_base.ProcessingContext'));
+            ip.addParameter('RawMethod', 'None', @(x) ischar(x) || isstring(x));
+            ip.parse(varargin{:});
+
+            if isempty(ip.Results.Context)
+                pf2_base.RawPipeline.warmupSetFDevice(data);
+                ctx = pf2_base.ProcessingContext.fromGlobals();
+            else
+                ctx = ip.Results.Context;
+            end
+
+            method = obj.toMethod();
+            if isempty(method.name) || strcmp(method.name, ''), method.name = 'inline_oxy'; end
+            ctx.oxyMethod     = method;
+            ctx.oxyMethodName = method.name;
+
+            rawName = char(ip.Results.RawMethod);
+            if strcmpi(rawName, 'None')
+                ctx.rawMethod     = struct('F', {{}}, 'name', 'None');
+                ctx.rawMethodName = 'None';
+            else
+                % Look up the named raw method from the library.
+                if ~isempty(ctx.rawMethodsLib) && isfield(ctx.rawMethodsLib, 'cfg') ...
+                        && isfield(ctx.rawMethodsLib.cfg, rawName)
+                    ctx.rawMethod = pf2_base.pf2_unpackMethod(ctx.rawMethodsLib.cfg.(rawName));
+                    ctx.rawMethod.name = rawName;
+                    ctx.rawMethodName  = rawName;
+                else
+                    error('pf2:OxyPipeline:rawMethodNotFound', ...
+                        'Raw method ''%s'' not found in library.', rawName);
+                end
+            end
+
+            out = processFNIRS2(data, 'Context', ctx);
+        end
     end
 
     methods (Access = private)

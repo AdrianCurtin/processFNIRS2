@@ -570,5 +570,182 @@ classdef PipelineFunctionTest < matlab.unittest.TestCase
             tc.verifyTrue(isempty(pf2_base.PipelineFunction.parseToken('[]')));
         end
 
+        %% Per-arg metadata tests (Phase A1)
+
+        function testMetadataDefaultsEmpty(tc)
+            % Metadata cells default to empty per-arg slots when not provided.
+            pf = pf2_base.PipelineFunction('myFunc', ...
+                {'x','cutoff'}, {[], 0.1}, {'x'});
+            tc.verifyEqual(numel(pf.argTypes), 2);
+            tc.verifyEqual(numel(pf.argChoices), 2);
+            tc.verifyEqual(numel(pf.argRanges), 2);
+            tc.verifyEqual(numel(pf.argUnits), 2);
+            tc.verifyEqual(numel(pf.argDescriptions), 2);
+            % Special args auto-tagged 'special'
+            tc.verifyEqual(pf.argTypes{1}, 'special');
+            % Custom args with no provided type stay empty
+            tc.verifyEqual(pf.argTypes{2}, '');
+            tc.verifyEmpty(pf.argRanges{2});
+            tc.verifyEqual(pf.argUnits{2}, '');
+            tc.verifyEqual(pf.argDescriptions{2}, '');
+        end
+
+        function testMetadataExplicit(tc)
+            pf = pf2_base.PipelineFunction('myFunc', ...
+                {'x','cutoff'}, {[], 0.1}, {'x'}, ...
+                'ArgTypes',        {'special','double'}, ...
+                'ArgRanges',       {[], [0, Inf]}, ...
+                'ArgUnits',        {'', 'Hz'}, ...
+                'ArgDescriptions', {'input', 'low-pass cutoff'});
+            tc.verifyEqual(pf.argTypes{2},        'double');
+            tc.verifyEqual(pf.argRanges{2},       [0, Inf]);
+            tc.verifyEqual(pf.argUnits{2},        'Hz');
+            tc.verifyEqual(pf.argDescriptions{2}, 'low-pass cutoff');
+        end
+
+        function testMetadataPaddingTooShort(tc)
+            % Provided metadata shorter than args is padded with empties.
+            pf = pf2_base.PipelineFunction('myFunc', ...
+                {'x','cutoff','order'}, {[], 0.1, 5}, {'x'}, ...
+                'ArgTypes', {'special','double'});
+            tc.verifyEqual(numel(pf.argTypes), 3);
+            tc.verifyEqual(pf.argTypes{3}, '');
+        end
+
+        function testMetadataPaddingTooLong(tc)
+            % Provided metadata longer than args is truncated.
+            pf = pf2_base.PipelineFunction('myFunc', ...
+                {'x','cutoff'}, {[], 0.1}, {'x'}, ...
+                'ArgTypes', {'special','double','int','int'});
+            tc.verifyEqual(numel(pf.argTypes), 2);
+            tc.verifyEqual(pf.argTypes, {'special','double'});
+        end
+
+        function testMetadataPreservedOnSetParam(tc)
+            pf = pf2_base.PipelineFunction('myFunc', ...
+                {'x','cutoff'}, {[], 0.1}, {'x'}, ...
+                'ArgTypes',  {'special','double'}, ...
+                'ArgRanges', {[], [0, 1]}, ...
+                'ArgUnits',  {'', 'Hz'});
+            pf2 = pf.setParam('cutoff', 0.05);
+            tc.verifyEqual(pf2.argDefaults{2}, 0.05);
+            tc.verifyEqual(pf2.argTypes{2},    'double');
+            tc.verifyEqual(pf2.argRanges{2},   [0, 1]);
+            tc.verifyEqual(pf2.argUnits{2},    'Hz');
+        end
+
+        function testMetadataExtendedOnAddArg(tc)
+            pf = pf2_base.PipelineFunction('myFunc', ...
+                {'x','cutoff'}, {[], 0.1}, {'x'}, ...
+                'ArgTypes', {'special','double'});
+            pf2 = pf.addArg('newArg', 42);
+            tc.verifyEqual(numel(pf2.argTypes),        3);
+            tc.verifyEqual(numel(pf2.argChoices),      3);
+            tc.verifyEqual(numel(pf2.argRanges),       3);
+            tc.verifyEqual(numel(pf2.argUnits),        3);
+            tc.verifyEqual(numel(pf2.argDescriptions), 3);
+            tc.verifyEqual(pf2.argTypes{3}, '');
+        end
+
+        function testMetadataShrunkOnRemoveArg(tc)
+            pf = pf2_base.PipelineFunction('myFunc', ...
+                {'x','cutoff','order'}, {[], 0.1, 5}, {'x'}, ...
+                'ArgTypes', {'special','double','int'}, ...
+                'ArgUnits', {'', 'Hz', 'samples'});
+            pf2 = pf.removeArg('cutoff');
+            tc.verifyEqual(pf2.argNames,  {'x','order'});
+            tc.verifyEqual(pf2.argTypes,  {'special','int'});
+            tc.verifyEqual(pf2.argUnits,  {'', 'samples'});
+        end
+
+        function testArgMetaReturnsStruct(tc)
+            pf = pf2_base.PipelineFunction('myFunc', ...
+                {'x','cutoff'}, {[], 0.1}, {'x'}, ...
+                'ArgTypes',        {'special','double'}, ...
+                'ArgRanges',       {[], [0, 1]}, ...
+                'ArgUnits',        {'', 'Hz'}, ...
+                'ArgDescriptions', {'', 'cutoff freq'});
+            m = pf.argMeta('cutoff');
+            tc.verifyEqual(m.name,        'cutoff');
+            tc.verifyEqual(m.type,        'double');
+            tc.verifyEqual(m.range,       [0, 1]);
+            tc.verifyEqual(m.unit,        'Hz');
+            tc.verifyEqual(m.description, 'cutoff freq');
+            tc.verifyEqual(m.default,     0.1);
+            tc.verifyFalse(m.isSpecial);
+        end
+
+        function testArgMetaUnknownErrors(tc)
+            pf = pf2_base.PipelineFunction('myFunc', {'x'}, {[]}, {'x'});
+            tc.verifyError(@() pf.argMeta('nope'), ...
+                'pf2:PipelineFunction:unknownArg');
+        end
+
+        %% Role enum tests (Phase A3)
+
+        function testRoleDefaultsEmpty(tc)
+            pf = pf2_base.PipelineFunction('myFunc', {'x'}, {[]}, {'x'});
+            tc.verifyEqual(pf.role, '');
+            tc.verifyFalse(pf.isIntensity2OD);
+        end
+
+        function testRoleNameFallbackForIntensity2OD(tc)
+            % Legacy: a func whose name contains 'Intensity2OD' should
+            % auto-set role and isIntensity2OD even without explicit Role.
+            pf = pf2_base.PipelineFunction('pf2_Intensity2OD', {'x'}, {[]}, {'x'});
+            tc.verifyTrue(pf.isIntensity2OD);
+            tc.verifyEqual(pf.role, 'intensity2od');
+        end
+
+        function testRoleExplicitOverridesName(tc)
+            % Renamed Intensity2OD function with explicit Role still detected.
+            pf = pf2_base.PipelineFunction('pf2_FooBar', {'x'}, {[]}, {'x'}, ...
+                'Role', 'intensity2od');
+            tc.verifyTrue(pf.isIntensity2OD);
+            tc.verifyEqual(pf.role, 'intensity2od');
+        end
+
+        function testRolePreservedOnSetParam(tc)
+            pf = pf2_base.PipelineFunction('myFunc', ...
+                {'x','cutoff'}, {[], 0.1}, {'x'}, 'Role', 'filter');
+            pf2 = pf.setParam('cutoff', 0.05);
+            tc.verifyEqual(pf2.role, 'filter');
+        end
+
+        function testRoleLoadedFromConfig(tc)
+            pf2_base.Pipeline.loadFuncConfig(true);
+            pf2_base.PipelineFunction.lookupFunctionMeta('__clear_cache__');
+            pf = pf2_base.PipelineFunction.detect('pf2_lpf');
+            tc.verifyEqual(pf.role, 'filter');
+            pfI = pf2_base.PipelineFunction.detect('pf2_Intensity2OD');
+            tc.verifyEqual(pfI.role, 'intensity2od');
+            tc.verifyTrue(pfI.isIntensity2OD);
+        end
+
+        function testRoleRoundTripStruct(tc)
+            pf = pf2_base.PipelineFunction('myFunc', {'x'}, {[]}, {'x'}, ...
+                'Role', 'rejection');
+            s = pf.toStruct();
+            tc.verifyEqual(s.role, 'rejection');
+            pf2 = pf2_base.PipelineFunction.fromStruct(s);
+            tc.verifyEqual(pf2.role, 'rejection');
+        end
+
+        function testMetadataLoadedFromConfig(tc)
+            % pf2_lpf in pf2_functions_default.cfg has metadata; verify it loads.
+            pf2_base.Pipeline.loadFuncConfig(true);
+            pf = pf2_base.PipelineFunction.detect('pf2_lpf');
+            % freq_cut should be marked as a 'double' in Hz with [0,Inf] range.
+            m = pf.argMeta('freq_cut');
+            tc.verifyEqual(m.type,  'double');
+            tc.verifyEqual(m.unit,  'Hz');
+            tc.verifyEqual(m.range, [0, Inf]);
+            tc.verifyTrue(contains(m.description, 'Cutoff'));
+            % Nf is an int with samples unit.
+            mNf = pf.argMeta('Nf');
+            tc.verifyEqual(mNf.type, 'int');
+            tc.verifyEqual(mNf.unit, 'samples');
+        end
+
     end
 end

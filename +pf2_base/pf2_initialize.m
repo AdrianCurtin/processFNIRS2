@@ -90,14 +90,52 @@ PF2.defaultRawMethodsPath=sprintf('%s/pf2_raw_methods_stored_processFNIRS2.cfg',
 if(~isfield(PF2,'myRawMethods')||~isfield(PF2,'baseline'))
 
    disp('Initializing processfNIRS2');
+
+   % Detect first-time install: prefdir cfg files don't exist yet.
+   firstTimeRaw = ~exist(PF2.defaultRawMethodsPath, 'file');
+   firstTimeOxy = ~exist(PF2.defaultOxyMethodsPath, 'file');
+
    PF2.myRawMethods=processFNIRS2_configureMethods('loadMethodsCallback',hObject,handles,[],PF2.defaultRawMethodsPath,true);
    for i=1:length(PF2.myRawMethods.cfg.Sections)
-      fprintf('Loaded Raw method: %s\n',PF2.myRawMethods.cfg.Sections{i}); 
+      fprintf('Loaded Raw method: %s\n',PF2.myRawMethods.cfg.Sections{i});
    end
-   
+
    PF2.myOxyMethods=processFNIRS2_configureMethods('loadMethodsCallback',hObject,handles,[],PF2.defaultOxyMethodsPath,true);
    for i=1:length(PF2.myOxyMethods.cfg.Sections)
-      fprintf('Loaded Oxy method: %s\n',PF2.myOxyMethods.cfg.Sections{i}); 
+      fprintf('Loaded Oxy method: %s\n',PF2.myOxyMethods.cfg.Sections{i});
+   end
+
+   % First-time install: apply repo-shipped seed methods so users have
+   % working defaults out of the box. Failures are non-fatal.
+   if firstTimeRaw || firstTimeOxy
+       try
+           seeds = pf2.methods.seeds.list();
+           for k = 1:numel(seeds)
+               s = seeds(k);
+               if strcmp(s.stage,'raw') && ~firstTimeRaw, continue; end
+               if strcmp(s.stage,'oxy') && ~firstTimeOxy, continue; end
+               try
+                   p = feval(['pf2.methods.seeds.' s.stage '.' s.name]);
+                   p.save(s.stage);
+                   fprintf('Seeded %s method: %s\n', s.stage, s.name);
+               catch ME
+                   warning('pf2:initialize:seedFailed', ...
+                       'Could not seed %s method ''%s'': %s', s.stage, s.name, ME.message);
+               end
+           end
+           % Reload to pick up newly-seeded methods
+           if firstTimeRaw
+               PF2.myRawMethods = processFNIRS2_configureMethods( ...
+                   'loadMethodsCallback', hObject, handles, [], PF2.defaultRawMethodsPath, true);
+           end
+           if firstTimeOxy
+               PF2.myOxyMethods = processFNIRS2_configureMethods( ...
+                   'loadMethodsCallback', hObject, handles, [], PF2.defaultOxyMethodsPath, true);
+           end
+       catch ME
+           warning('pf2:initialize:seedingError', ...
+               'First-time seeding error: %s', ME.message);
+       end
    end
    
    PF2.curDPF_fixed=5.93;   %Default differential pathlength for adult human head (van der Zee 1992)

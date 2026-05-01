@@ -44,6 +44,7 @@ classdef PipelineFunction
         validStages       double
         requiresOD        logical
         style             char
+        role              char  % '' | 'intensity2od' | 'motion' | 'filter' | 'rejection' | 'roi' | 'transform'
 
         % Precomputed argument mapping
         argNames          cell
@@ -52,6 +53,14 @@ classdef PipelineFunction
         specialTypes      uint8
         customIndices     double
         customNames       cell
+
+        % Per-argument metadata (parallel to argNames; missing entries empty)
+        % Used by validators and the methods editor to render type-aware widgets.
+        argTypes          cell  % {'double'|'int'|'logical'|'string'|'enum'|'special'|''}
+        argChoices        cell  % {cell of valid values | []}  for enum types
+        argRanges         cell  % {[min,max] | []}             for numeric types
+        argUnits          cell  % {char | ''}
+        argDescriptions   cell  % {char | ''}
 
         % Precomputed output mapping
         outputNames       cell
@@ -95,12 +104,18 @@ classdef PipelineFunction
                 obj.validStages = [];
                 obj.requiresOD = false;
                 obj.style = 'positional';
+                obj.role = '';
                 obj.argNames = {};
                 obj.argDefaults = {};
                 obj.specialMask = logical([]);
                 obj.specialTypes = uint8([]);
                 obj.customIndices = [];
                 obj.customNames = {};
+                obj.argTypes = {};
+                obj.argChoices = {};
+                obj.argRanges = {};
+                obj.argUnits = {};
+                obj.argDescriptions = {};
                 obj.outputNames = {};
                 obj.xOutIdx = 0;
                 obj.maskOutIdx = 0;
@@ -119,6 +134,12 @@ classdef PipelineFunction
             p.addParameter('Description', '', @ischar);
             p.addParameter('ValidStages', [], @isnumeric);
             p.addParameter('RequiresOD', false, @islogical);
+            p.addParameter('Role', '', @(x) ischar(x) || isstring(x));
+            p.addParameter('ArgTypes',        {}, @iscell);
+            p.addParameter('ArgChoices',      {}, @iscell);
+            p.addParameter('ArgRanges',       {}, @iscell);
+            p.addParameter('ArgUnits',        {}, @iscell);
+            p.addParameter('ArgDescriptions', {}, @iscell);
             p.parse(varargin{:});
 
             obj.funcName = char(funcName);
@@ -128,7 +149,17 @@ classdef PipelineFunction
             obj.validStages = p.Results.ValidStages;
             obj.requiresOD = p.Results.RequiresOD;
             obj.style = p.Results.Style;
-            obj.isIntensity2OD = contains(obj.funcName, 'Intensity2OD');
+            obj.role = lower(char(p.Results.Role));
+            % Derive isIntensity2OD from role first; fall back to name match
+            % so legacy registrations without an explicit role keep working.
+            if strcmp(obj.role, 'intensity2od')
+                obj.isIntensity2OD = true;
+            elseif isempty(obj.role) && contains(obj.funcName, 'Intensity2OD')
+                obj.isIntensity2OD = true;
+                obj.role = 'intensity2od';  % canonicalize
+            else
+                obj.isIntensity2OD = false;
+            end
 
             % Ensure cell arrays
             if ~iscell(args), args = {args}; end
@@ -142,6 +173,14 @@ classdef PipelineFunction
                 defaults(end+1:numel(args)) = {[]};
             end
             obj.argDefaults = defaults;
+
+            % Normalize per-arg metadata cells to length(args), padding with empty defaults.
+            nA = numel(args);
+            obj.argTypes        = pf2_base.PipelineFunction.padMeta(p.Results.ArgTypes,        nA, '');
+            obj.argChoices      = pf2_base.PipelineFunction.padMeta(p.Results.ArgChoices,      nA, []);
+            obj.argRanges       = pf2_base.PipelineFunction.padMeta(p.Results.ArgRanges,       nA, []);
+            obj.argUnits        = pf2_base.PipelineFunction.padMeta(p.Results.ArgUnits,        nA, '');
+            obj.argDescriptions = pf2_base.PipelineFunction.padMeta(p.Results.ArgDescriptions, nA, '');
 
             % Build the special argument map (persistent, shared across all instances)
             specialMap = pf2_base.PipelineFunction.specialArgMap();
@@ -167,6 +206,14 @@ classdef PipelineFunction
             obj.specialTypes = sTypes;
             obj.customIndices = custIdx;
             obj.customNames = custNames;
+
+            % Backfill argType='special' for special-arg slots that have no
+            % explicit type. Custom-arg slots with no type stay '' (= 'auto').
+            for k = 1:nA
+                if sMask(k) && isempty(obj.argTypes{k})
+                    obj.argTypes{k} = 'special';
+                end
+            end
 
             % Precompute output indices
             obj.outputNames = outputs;
@@ -268,11 +315,7 @@ classdef PipelineFunction
             newDefaults = obj.argDefaults;
             newDefaults{argIdx} = value;
             newObj = pf2_base.PipelineFunction(obj.funcName, obj.argNames, ...
-                newDefaults, obj.outputNames, ...
-                'Style', obj.style, 'Name', obj.name, ...
-                'Description', obj.description, ...
-                'ValidStages', obj.validStages, ...
-                'RequiresOD', obj.requiresOD);
+                newDefaults, obj.outputNames, obj.metadataNVArgs{:});
         end
 
         function newObj = addArg(obj, argName, defaultValue)
@@ -301,12 +344,11 @@ classdef PipelineFunction
 
             newArgs = [obj.argNames, {argName}];
             newDefaults = [obj.argDefaults, {defaultValue}];
+            % Extend each metadata array with one empty slot for the new arg.
+            nv = obj.metadataNVArgs;
+            nv = pf2_base.PipelineFunction.appendEmptyMetaSlot(nv);
             newObj = pf2_base.PipelineFunction(obj.funcName, newArgs, ...
-                newDefaults, obj.outputNames, ...
-                'Style', obj.style, 'Name', obj.name, ...
-                'Description', obj.description, ...
-                'ValidStages', obj.validStages, ...
-                'RequiresOD', obj.requiresOD);
+                newDefaults, obj.outputNames, nv{:});
         end
 
         function newObj = removeArg(obj, argName)
@@ -328,12 +370,11 @@ classdef PipelineFunction
             newArgs(idx) = [];
             newDefaults = obj.argDefaults;
             newDefaults(idx) = [];
+            % Drop the metadata slot at the same index from each metadata array.
+            nv = obj.metadataNVArgs;
+            nv = pf2_base.PipelineFunction.dropMetaSlot(nv, idx);
             newObj = pf2_base.PipelineFunction(obj.funcName, newArgs, ...
-                newDefaults, obj.outputNames, ...
-                'Style', obj.style, 'Name', obj.name, ...
-                'Description', obj.description, ...
-                'ValidStages', obj.validStages, ...
-                'RequiresOD', obj.requiresOD);
+                newDefaults, obj.outputNames, nv{:});
         end
 
         function newObj = addOutput(obj, outputName)
@@ -351,11 +392,26 @@ classdef PipelineFunction
 
             newOutputs = [obj.outputNames, {outputName}];
             newObj = pf2_base.PipelineFunction(obj.funcName, obj.argNames, ...
-                obj.argDefaults, newOutputs, ...
-                'Style', obj.style, 'Name', obj.name, ...
-                'Description', obj.description, ...
-                'ValidStages', obj.validStages, ...
-                'RequiresOD', obj.requiresOD);
+                obj.argDefaults, newOutputs, obj.metadataNVArgs{:});
+        end
+
+        function nvArgs = metadataNVArgs(obj)
+        % METADATANVARGS Return the metadata NV-pair cell for cloning.
+        %
+        % Used internally by setParam/addArg/removeArg/addOutput to propagate
+        % all configuration into a freshly-constructed copy.
+
+            nvArgs = {'Style',           obj.style, ...
+                      'Name',            obj.name, ...
+                      'Description',     obj.description, ...
+                      'ValidStages',     obj.validStages, ...
+                      'RequiresOD',      obj.requiresOD, ...
+                      'Role',            obj.role, ...
+                      'ArgTypes',        obj.argTypes, ...
+                      'ArgChoices',      obj.argChoices, ...
+                      'ArgRanges',       obj.argRanges, ...
+                      'ArgUnits',        obj.argUnits, ...
+                      'ArgDescriptions', obj.argDescriptions};
         end
 
         function val = getParam(obj, paramName)
@@ -368,6 +424,148 @@ classdef PipelineFunction
                     paramName, strjoin(obj.customNames, ', '));
             end
             val = obj.argDefaults{obj.customIndices(idx)};
+        end
+
+        function meta = argMeta(obj, argName)
+        % ARGMETA Return per-argument metadata as a struct.
+        %
+        %   meta = pf.argMeta('freq_cut')
+        %
+        % Fields: name, type, choices, range, unit, description, default,
+        %         isSpecial, specialType.
+
+            argName = char(argName);
+            idx = find(strcmp(obj.argNames, argName), 1);
+            if isempty(idx)
+                error('pf2:PipelineFunction:unknownArg', ...
+                    'Argument ''%s'' not found. Available: %s', ...
+                    argName, strjoin(obj.argNames, ', '));
+            end
+            meta = struct( ...
+                'name',        obj.argNames{idx}, ...
+                'type',        obj.argTypes{idx}, ...
+                'choices',     {obj.argChoices{idx}}, ...
+                'range',       obj.argRanges{idx}, ...
+                'unit',        obj.argUnits{idx}, ...
+                'description', obj.argDescriptions{idx}, ...
+                'default',     {obj.argDefaults{idx}}, ...
+                'isSpecial',   obj.specialMask(idx), ...
+                'specialType', obj.specialTypes(idx));
+        end
+
+        function res = validate(obj, argName, value)
+        % VALIDATE Check whether `value` is acceptable for `argName`.
+        %
+        %   res = pf.validate('freq_cut', 0.05)
+        %
+        % Returns a struct with fields:
+        %   .ok       (logical)  true if value passes type/range/choice checks
+        %   .severity (char)     'error' | 'warning' | 'info' | 'ok'
+        %   .message  (char)     human-readable description (empty if ok)
+        %
+        % Special args are not validated (they are filled at runtime); the
+        % result is always {ok=true, severity='ok'} for them.
+        % Args with no declared type accept any value.
+
+            res = struct('ok', true, 'severity', 'ok', 'message', '');
+            argName = char(argName);
+            idx = find(strcmp(obj.argNames, argName), 1);
+            if isempty(idx)
+                res.ok = false; res.severity = 'error';
+                res.message = sprintf('Unknown argument ''%s''', argName);
+                return
+            end
+            if obj.specialMask(idx)
+                return  % special args are filled at runtime
+            end
+            t = obj.argTypes{idx};
+            if isempty(t) || strcmp(t, 'auto')
+                return  % no declared type → accept anything
+            end
+
+            switch lower(t)
+                case 'double'
+                    if ~isnumeric(value) || ~isscalar(value) || ~isreal(value)
+                        res = mkErr(argName, 'must be a real numeric scalar');
+                        return
+                    end
+                    rng = obj.argRanges{idx};
+                    if ~isempty(rng) && (value < rng(1) || value > rng(2))
+                        res = mkErr(argName, sprintf('out of range [%g, %g]', rng(1), rng(2)));
+                        return
+                    end
+                case 'int'
+                    if ~isnumeric(value) || ~isscalar(value) || ~isreal(value) ...
+                            || value ~= floor(value) || ~isfinite(value)
+                        res = mkErr(argName, 'must be a finite integer');
+                        return
+                    end
+                    rng = obj.argRanges{idx};
+                    if ~isempty(rng) && (value < rng(1) || value > rng(2))
+                        res = mkErr(argName, sprintf('out of range [%g, %g]', rng(1), rng(2)));
+                        return
+                    end
+                case 'logical'
+                    if ~(islogical(value) || (isnumeric(value) && isscalar(value) && (value==0 || value==1)))
+                        res = mkErr(argName, 'must be logical / 0 / 1');
+                        return
+                    end
+                case 'string'
+                    if ~(ischar(value) || isstring(value))
+                        res = mkErr(argName, 'must be a string');
+                        return
+                    end
+                case 'enum'
+                    choices = obj.argChoices{idx};
+                    if isempty(choices)
+                        return  % enum without choices: skip
+                    end
+                    matched = false;
+                    for c = 1:numel(choices)
+                        if isequal(choices{c}, value) || ...
+                                ((ischar(value)||isstring(value)) && ...
+                                 (ischar(choices{c})||isstring(choices{c})) && ...
+                                 strcmp(char(value), char(choices{c})))
+                            matched = true; break
+                        end
+                    end
+                    if ~matched
+                        choiceStrs = cellfun(@formatChoice, choices, 'UniformOutput', false);
+                        res = mkErr(argName, sprintf('must be one of {%s}', strjoin(choiceStrs, ', ')));
+                        return
+                    end
+                otherwise
+                    % Unknown type — silently accept.
+            end
+
+            function r = mkErr(name, msg)
+                r = struct('ok', false, 'severity', 'error', ...
+                    'message', sprintf('%s: %s', name, msg));
+            end
+            function s = formatChoice(c)
+                if ischar(c) || isstring(c), s = ['''' char(c) ''''];
+                else, s = num2str(c); end
+            end
+        end
+
+        function issues = validateAll(obj)
+        % VALIDATEALL Validate every custom-arg default; return failures.
+        %
+        %   issues = pf.validateAll()
+        %
+        % Returns a struct array (possibly empty) of validate() results
+        % for every custom arg whose current default value fails.
+
+            issues = struct('ok', {}, 'severity', {}, 'message', {}, 'arg', {});
+            for k = 1:numel(obj.customNames)
+                name = obj.customNames{k};
+                val  = obj.argDefaults{obj.customIndices(k)};
+                res  = obj.validate(name, val);
+                if ~res.ok
+                    res.arg = name;
+                    issues(end+1) = res; %#ok<AGROW>
+                end
+            end
         end
 
         function s = params(obj)
@@ -487,6 +685,9 @@ classdef PipelineFunction
             if obj.requiresOD
                 s.requiresOD = true;
             end
+            if ~isempty(obj.role)
+                s.role = obj.role;
+            end
         end
 
         function hasX = hasSpecialArg(obj, argType)
@@ -592,7 +793,8 @@ classdef PipelineFunction
             end
 
             % Restore metadata from struct fields first, fall back to config
-            [cfgName, cfgDesc, cfgStages, cfgReqOD] = pf2_base.PipelineFunction.lookupFunctionMeta(funcName);
+            [cfgName, cfgDesc, cfgStages, cfgReqOD, cfgRole] = ...
+                pf2_base.PipelineFunction.lookupFunctionMeta(funcName);
 
             if isfield(s, 'displayName') && ~isempty(s.displayName)
                 displayName = s.displayName;
@@ -614,15 +816,77 @@ classdef PipelineFunction
             else
                 reqOD = cfgReqOD;
             end
+            % Coerce to logical: cfg INI eval gives 0/1 doubles.
+            if ~islogical(reqOD), reqOD = logical(reqOD); end
+            if isfield(s, 'role') && ~isempty(s.role)
+                roleVal = s.role;
+            else
+                roleVal = cfgRole;
+            end
 
             styleVal = 'positional';
             if isfield(s, 'style') && ~isempty(s.style)
                 styleVal = s.style;
             end
 
+            % Enrich per-arg metadata from the function library if registered.
+            % Method cfgs only persist (funcName, args, argvals); per-arg
+            % types/ranges/choices/units/descriptions live in the function
+            % library cfg and should be re-attached on load.
+            argTypes        = repmat({''}, 1, numel(args));
+            argChoices      = repmat({[]}, 1, numel(args));
+            argRanges       = repmat({[]}, 1, numel(args));
+            argUnits        = repmat({''}, 1, numel(args));
+            argDescriptions = repmat({''}, 1, numel(args));
+            try
+                fnCfg = pf2_base.Pipeline.loadFuncConfig();
+                if isfield(fnCfg, funcName)
+                    sec = fnCfg.(funcName);
+                    for k = 1:numel(args)
+                        an = args{k};
+                        kT = [an '_type'];
+                        kC = [an '_choices'];
+                        kR = [an '_range'];
+                        kU = [an '_unit'];
+                        kD = [an '_description'];
+                        if isfield(sec, kT)
+                            v = sec.(kT);
+                            if iscell(v) && ~isempty(v), v = v{1}; end
+                            argTypes{k} = strrep(char(v), '''', '');
+                        end
+                        if isfield(sec, kC)
+                            v = sec.(kC);
+                            if (ischar(v) || isstring(v)), v = eval(char(v)); end
+                            if ~iscell(v), v = {v}; end
+                            argChoices{k} = v;
+                        end
+                        if isfield(sec, kR)
+                            v = sec.(kR);
+                            if (ischar(v) || isstring(v)), v = eval(char(v)); end
+                            argRanges{k} = v;
+                        end
+                        if isfield(sec, kU)
+                            v = sec.(kU);
+                            if iscell(v) && ~isempty(v), v = v{1}; end
+                            argUnits{k} = strrep(char(v), '''', '');
+                        end
+                        if isfield(sec, kD)
+                            v = sec.(kD);
+                            if iscell(v) && ~isempty(v), v = v{1}; end
+                            argDescriptions{k} = strrep(char(v), '''', '');
+                        end
+                    end
+                end
+            catch
+                % Function library unavailable — leave metadata empty.
+            end
+
             pf = pf2_base.PipelineFunction(funcName, args, defaults, outputs, ...
                 'Style', styleVal, 'Name', displayName, 'Description', desc, ...
-                'ValidStages', stages, 'RequiresOD', reqOD);
+                'ValidStages', stages, 'RequiresOD', reqOD, 'Role', roleVal, ...
+                'ArgTypes', argTypes, 'ArgChoices', argChoices, ...
+                'ArgRanges', argRanges, 'ArgUnits', argUnits, ...
+                'ArgDescriptions', argDescriptions);
         end
 
         function names = specialArgNames()
@@ -631,6 +895,126 @@ classdef PipelineFunction
             names = {'x', 'fs', 'fTime', 'fchMask', 'ftimeChMask', ...
                      'fChannelNumbers', 'fChannelSD', 'fProbeInfo', ...
                      'fMarkers', 'fNIRstruct', 'fAux', 'fAmbient'};
+        end
+
+        function T = listAvailable(stage)
+        % LISTAVAILABLE Enumerate registered PipelineFunctions from cfg.
+        %
+        %   T = pf2_base.PipelineFunction.listAvailable()        % all
+        %   T = pf2_base.PipelineFunction.listAvailable('raw')   % stage 1 only
+        %   T = pf2_base.PipelineFunction.listAvailable('oxy')   % stage 2/3 only
+        %
+        % Returns a MATLAB table with columns:
+        %   funcName, displayName, description, role, validStages, requiresOD
+        %
+        % Used by editor UIs as the function-library data source.
+
+            if nargin < 1, stage = ''; end
+            stage = lower(char(stage));
+
+            cfg = pf2_base.Pipeline.loadFuncConfig();
+            names = fieldnames(cfg);
+
+            funcName    = strings(0,1);
+            displayName = strings(0,1);
+            description = strings(0,1);
+            role        = strings(0,1);
+            validStages = cell(0,1);
+            requiresOD  = false(0,1);
+
+            for k = 1:numel(names)
+                n   = names{k};
+                sec = cfg.(n);
+                stages = [];
+                if isfield(sec, 'validStages')
+                    v = sec.validStages;
+                    if ischar(v) || isstring(v), v = str2num(char(v)); end %#ok<ST2NM>
+                    stages = v;
+                end
+                % Stage filter
+                if ~isempty(stage)
+                    if strcmp(stage, 'raw') && ~ismember(1, stages), continue; end
+                    if strcmp(stage, 'oxy') && ~any(ismember([2 3], stages)) ...
+                            && ~ismember(2, stages), continue; end
+                end
+                dn = ''; if isfield(sec, 'Name'),        dn = strrep(char(getCellOrStr(sec.Name)),    '''',''); end
+                ds = ''; if isfield(sec, 'Description'), ds = strrep(char(getCellOrStr(sec.Description)),'''',''); end
+                rl = ''; if isfield(sec, 'Role'),        rl = strrep(char(getCellOrStr(sec.Role)),    '''',''); end
+                ro = false;
+                if isfield(sec, 'requiresOD')
+                    val = sec.requiresOD;
+                    ro = isnumeric(val) && val == 1;
+                end
+
+                funcName(end+1,1)    = string(n); %#ok<AGROW>
+                displayName(end+1,1) = string(dn); %#ok<AGROW>
+                description(end+1,1) = string(ds); %#ok<AGROW>
+                role(end+1,1)        = string(rl); %#ok<AGROW>
+                validStages{end+1,1} = stages; %#ok<AGROW>
+                requiresOD(end+1,1)  = ro; %#ok<AGROW>
+            end
+
+            T = table(funcName, displayName, description, role, validStages, requiresOD);
+
+            function v = getCellOrStr(x)
+                if iscell(x) && ~isempty(x), v = x{1}; else, v = x; end
+            end
+        end
+
+        function out = padMeta(in, n, fillValue)
+        % PADMETA Normalize a metadata cell array to length n.
+        %
+        %   out = pf2_base.PipelineFunction.padMeta(in, n, fillValue)
+        %
+        % Truncates if longer; pads with fillValue if shorter; returns a
+        % length-n cell with fillValue everywhere if in is empty.
+
+            if isempty(in)
+                out = repmat({fillValue}, 1, n);
+                return
+            end
+            if ~iscell(in), in = {in}; end
+            if numel(in) < n
+                in(end+1:n) = {fillValue};
+            elseif numel(in) > n
+                in = in(1:n);
+            end
+            out = in;
+        end
+
+        function nv = appendEmptyMetaSlot(nv)
+        % APPENDEMPTYMETASLOT Extend each metadata cell in an NV-pair list
+        % returned by metadataNVArgs by one empty slot. Used by addArg.
+
+            metaKeys = {'ArgTypes','ArgChoices','ArgRanges','ArgUnits','ArgDescriptions'};
+            fillFor = {'',         [],          [],         '',        ''};
+            for k = 1:numel(metaKeys)
+                idx = find(strcmp(nv, metaKeys{k}), 1);
+                if ~isempty(idx)
+                    cellVal = nv{idx+1};
+                    if ~iscell(cellVal), cellVal = {cellVal}; end
+                    cellVal{end+1} = fillFor{k}; %#ok<AGROW>
+                    nv{idx+1} = cellVal;
+                end
+            end
+        end
+
+        function nv = dropMetaSlot(nv, slot)
+        % DROPMETASLOT Remove index `slot` from each metadata cell in an
+        % NV-pair list returned by metadataNVArgs. Used by removeArg.
+
+            metaKeys = {'ArgTypes','ArgChoices','ArgRanges','ArgUnits','ArgDescriptions'};
+            for k = 1:numel(metaKeys)
+                idx = find(strcmp(nv, metaKeys{k}), 1);
+                if ~isempty(idx)
+                    cellVal = nv{idx+1};
+                    if ~iscell(cellVal), cellVal = {cellVal}; end
+                    if slot >= 1 && slot <= numel(cellVal)
+                        cellVal(slot) = [];
+                    end
+                    nv{idx+1} = cellVal;
+                end
+            end
         end
 
         function pf = detect(funcName)
@@ -835,12 +1219,36 @@ classdef PipelineFunction
             if pf.requiresOD
                 sec.requiresOD = 1;
             end
+            if ~isempty(pf.role)
+                sec.Role = sprintf('''%s''', pf.role);
+            end
 
             % Write custom parameter defaults
             for k = 1:numel(pf.customIndices)
                 argName = pf.customNames{k};
                 val = pf.argDefaults{pf.customIndices(k)};
                 sec.(argName) = val;
+            end
+
+            % Write per-arg metadata (type, choices, range, unit, description)
+            for k = 1:numel(pf.argNames)
+                an = pf.argNames{k};
+                if k <= numel(pf.argTypes) && ~isempty(pf.argTypes{k}) ...
+                        && ~strcmp(pf.argTypes{k}, 'special')
+                    sec.([an '_type']) = sprintf('''%s''', pf.argTypes{k});
+                end
+                if k <= numel(pf.argChoices) && ~isempty(pf.argChoices{k})
+                    sec.([an '_choices']) = pf.argChoices{k};
+                end
+                if k <= numel(pf.argRanges) && ~isempty(pf.argRanges{k})
+                    sec.([an '_range']) = pf.argRanges{k};
+                end
+                if k <= numel(pf.argUnits) && ~isempty(pf.argUnits{k})
+                    sec.([an '_unit']) = sprintf('''%s''', pf.argUnits{k});
+                end
+                if k <= numel(pf.argDescriptions) && ~isempty(pf.argDescriptions{k})
+                    sec.([an '_description']) = sprintf('''%s''', pf.argDescriptions{k});
+                end
             end
 
             ini.add(secName, sec);
@@ -880,13 +1288,17 @@ classdef PipelineFunction
             m = argMap;
         end
 
-        function [displayName, desc, stages, reqOD] = lookupFunctionMeta(funcName)
+        function [displayName, desc, stages, reqOD, roleStr] = lookupFunctionMeta(funcName)
         % LOOKUPFUNCTIONMETA Look up function metadata from the config.
+        %
+        % The 5th return value (Role) is optional — older callers asking for
+        % only 4 outputs continue to work unchanged.
 
             displayName = '';
             desc = '';
             stages = [];
             reqOD = false;
+            roleStr = '';
 
             try
                 persistent funcCfg
@@ -918,6 +1330,11 @@ classdef PipelineFunction
                     if isfield(sec, 'requiresOD')
                         val = sec.requiresOD;
                         reqOD = isnumeric(val) && val == 1;
+                    end
+                    if isfield(sec, 'Role')
+                        v = sec.Role;
+                        if iscell(v) && ~isempty(v), v = v{1}; end
+                        roleStr = strrep(char(v), '''', '');
                     end
                 end
             catch

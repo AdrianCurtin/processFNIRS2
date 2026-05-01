@@ -352,6 +352,24 @@ classdef INI < hgsetget & dynamicprops
                     Value = func2str(Value);
                 end
 
+                % Convert MATLAB objects with a toStruct method (e.g.
+                % pf2_base.PipelineFunction) to their canonical legacy
+                % struct form before serializing — otherwise we'd write
+                % implementation-internal property names that no reader
+                % knows how to interpret.
+                if isobject(Value) && ~isstring(Value) ...
+                        && ~isa(Value, 'function_handle') ...
+                        && ismethod(Value, 'toStruct')
+                    Value = Value.toStruct();
+                end
+
+                % Treat any remaining objects (without toStruct) as structs
+                % so they round-trip through eval as structs.
+                isObj = isobject(Value) && ~isstring(Value) && ...
+                        ~isa(Value, 'function_handle');
+                if isObj
+                    Symbols = {'struct(',')'};
+                else
                 switch class(Value)
                     case 'struct'
                         Symbols = {'struct(',')'};
@@ -372,7 +390,8 @@ classdef INI < hgsetget & dynamicprops
                             Symbols = {'[',']'};
                         end
                 end
-                
+                end  % end isObj else
+
                 fprintf(ID,Symbols{1});
                 
                 if isobject(Value)

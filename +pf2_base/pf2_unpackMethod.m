@@ -53,7 +53,40 @@ function x=pf2_unpackMethod(method)
     end
     
     if isfield(x,'F') && iscell(x.F)
-        % F is already a proper cell array — use as-is
+        % Recover from a much earlier corruption mode: F is a flat cell
+        % {'funcName','val','funcName','val',...} produced by a buggy INI
+        % writer that emitted PipelineFunction objects without struct(...)
+        % wrappers. Split at every 'funcName' marker into per-step structs.
+        if ~isempty(x.F) && all(cellfun(@(c) ~isstruct(c) && ~isa(c,'pf2_base.PipelineFunction'), x.F))
+            funcNameIdx = find(cellfun(@(c) (ischar(c)||isstring(c)) && strcmp(char(c),'funcName'), x.F));
+            if numel(funcNameIdx) >= 1 && mod(numel(x.F),2) == 0
+                breakpoints = [funcNameIdx, numel(x.F)+1];
+                stepStructs = cell(1, numel(funcNameIdx));
+                for s = 1:numel(funcNameIdx)
+                    chunk = x.F(breakpoints(s):breakpoints(s+1)-1);
+                    % MATLAB's struct() distributes cell values across struct
+                    % array elements: struct('a',{'x','y'}) yields a 1x2
+                    % struct, NOT a struct with .a={'x','y'}. We want every
+                    % cell value to be stored as-is. Wrap all cell values in
+                    % {{}} to suppress distribution.
+                    for cc = 2:2:numel(chunk)
+                        if iscell(chunk{cc})
+                            chunk{cc} = {chunk{cc}};
+                        end
+                    end
+                    try
+                        stepStructs{s} = struct(chunk{:});
+                    catch
+                        stepStructs{s} = [];
+                    end
+                end
+                stepStructs = stepStructs(~cellfun(@isempty, stepStructs));
+                if ~isempty(stepStructs)
+                    x.F = stepStructs;
+                end
+            end
+        end
+        % F is now a proper cell array — proceed
     elseif isfield(x,'F') && isstruct(x.F)
         % Config loading produced a struct array — convert to cell
         tmp = cell(1, numel(x.F));
@@ -106,6 +139,38 @@ function x=pf2_unpackMethod(method)
             catch
                 % Leave as-is; downstream check will warn.
             end
+        end
+
+        % Recovery from cfgs written by an older INI without toStruct
+        % conversion: struct has PipelineFunction property names
+        % ('funcName', 'argNames', ...) rather than the legacy keys
+        % ('f', 'args', ...). Translate BEFORE the struct-array branch
+        % so the unpacker's `.f` lookups succeed.
+        if isstruct(Fidx) && ~isfield(Fidx, 'f') && isfield(Fidx, 'funcName')
+            translated = struct();
+            translated.f = Fidx(1).funcName;
+            if isfield(Fidx, 'argNames'),    translated.args = Fidx(1).argNames;            else, translated.args = {}; end
+            if isfield(Fidx, 'argDefaults')
+                translated.argvals         = Fidx(1).argDefaults;
+                translated.default_argvals = Fidx(1).argDefaults;
+            else
+                translated.argvals         = {};
+                translated.default_argvals = {};
+            end
+            if isfield(Fidx, 'outputNames'), translated.output = Fidx(1).outputNames; else, translated.output = {'x'}; end
+            for fn = {'name','description','validStages','requiresOD','role','style'}
+                if isfield(Fidx, fn{1}), translated.(fn{1}) = Fidx(1).(fn{1}); end
+            end
+            % Coerce numeric requiresOD to logical (constructor expects bool).
+            if isfield(translated, 'requiresOD') && ~islogical(translated.requiresOD)
+                translated.requiresOD = logical(translated.requiresOD);
+            end
+            if isfield(translated, 'name')
+                translated.displayName = translated.name;
+                translated = rmfield(translated, 'name');
+            end
+            Fidx = translated;
+            x.F{idx} = Fidx;
         end
 
         if isstruct(Fidx) && length(Fidx) > 1

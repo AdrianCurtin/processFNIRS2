@@ -385,6 +385,69 @@ classdef Pipeline
             end
             fprintf('%s\n', obj.describe());
         end
+
+        function out = run(obj, data, varargin) %#ok<INUSD>
+        % RUN Execute the pipeline on a data struct.
+        %
+        % Stage-specific behavior is defined by the subclass:
+        %   RawPipeline.run(data) — runs Stage 1+2 (raw → OD → Hb)
+        %   OxyPipeline.run(data) — runs Stage 3 (Hb → filtered Hb)
+        %
+        % The base Pipeline class is stage-agnostic and refuses to run.
+        % Use RawPipeline / OxyPipeline.
+
+            error('pf2:Pipeline:runNotSupported', ...
+                ['Pipeline.run requires a stage-specific subclass ' ...
+                 '(RawPipeline or OxyPipeline). Got: %s'], class(obj));
+        end
+
+        function issues = validate(obj)
+        % VALIDATE Return all configuration issues across the pipeline.
+        %
+        %   issues = p.validate()
+        %
+        % Returns a struct array with fields:
+        %   .step     (double) step index (0 = pipeline-level issue)
+        %   .funcName (char)   function name (empty for pipeline-level)
+        %   .arg      (char)   argument name (empty if not arg-specific)
+        %   .severity (char)   'error' | 'warning' | 'info'
+        %   .message  (char)   description
+        %
+        % Aggregates per-step PipelineFunction.validateAll() and applies
+        % cross-step ordering rules (e.g. requiresOD step must come after
+        % an Intensity2OD step in raw pipelines).
+
+            issues = struct('step', {}, 'funcName', {}, 'arg', {}, ...
+                            'severity', {}, 'message', {});
+            seenIntensity2OD = false;
+            for k = 1:numel(obj.steps)
+                pf = obj.steps{k};
+                % Per-step arg validation
+                stepIssues = pf.validateAll();
+                for j = 1:numel(stepIssues)
+                    issues(end+1) = struct( ...
+                        'step',     k, ...
+                        'funcName', pf.funcName, ...
+                        'arg',      stepIssues(j).arg, ...
+                        'severity', stepIssues(j).severity, ...
+                        'message',  stepIssues(j).message); %#ok<AGROW>
+                end
+                % Ordering: requiresOD must follow an Intensity2OD step
+                if pf.requiresOD && ~seenIntensity2OD
+                    issues(end+1) = struct( ...
+                        'step',     k, ...
+                        'funcName', pf.funcName, ...
+                        'arg',      '', ...
+                        'severity', 'error', ...
+                        'message',  sprintf(['Step %d (%s) requires OD ', ...
+                            'input but no Intensity2OD step precedes it'], ...
+                            k, pf.funcName)); %#ok<AGROW>
+                end
+                if pf.isIntensity2OD
+                    seenIntensity2OD = true;
+                end
+            end
+        end
     end
 
     methods (Access = protected)
@@ -556,9 +619,66 @@ classdef Pipeline
                 reqOD = isnumeric(val) && val == 1;
             end
 
+            % Optional Role tag (replaces fragile name-substring detection).
+            roleStr = '';
+            if isfield(sec, 'Role')
+                v = sec.Role;
+                if iscell(v) && ~isempty(v), v = v{1}; end
+                roleStr = strrep(char(v), '''', '');
+            end
+
+            % Per-arg metadata: optional cfg keys of the form
+            %   <argName>_type, <argName>_choices, <argName>_range,
+            %   <argName>_unit, <argName>_description
+            % (INI normalizes repeated underscores, so the cfg may use either
+            %  '__' or '_' — we look for the canonical single-underscore form.)
+            nA = numel(args);
+            argTypes        = repmat({''}, 1, nA);
+            argChoices      = repmat({[]}, 1, nA);
+            argRanges       = repmat({[]}, 1, nA);
+            argUnits        = repmat({''}, 1, nA);
+            argDescriptions = repmat({''}, 1, nA);
+            for k = 1:nA
+                an = args{k};
+                kT = [an '_type'];
+                kC = [an '_choices'];
+                kR = [an '_range'];
+                kU = [an '_unit'];
+                kD = [an '_description'];
+                if isfield(sec, kT)
+                    v = sec.(kT);
+                    if iscell(v) && ~isempty(v), v = v{1}; end
+                    argTypes{k} = char(strrep(char(v), '''', ''));
+                end
+                if isfield(sec, kC)
+                    v = sec.(kC);
+                    if (ischar(v) || isstring(v)), v = eval(char(v)); end
+                    if ~iscell(v), v = {v}; end
+                    argChoices{k} = v;
+                end
+                if isfield(sec, kR)
+                    v = sec.(kR);
+                    if (ischar(v) || isstring(v)), v = eval(char(v)); end
+                    argRanges{k} = v;
+                end
+                if isfield(sec, kU)
+                    v = sec.(kU);
+                    if iscell(v) && ~isempty(v), v = v{1}; end
+                    argUnits{k} = char(strrep(char(v), '''', ''));
+                end
+                if isfield(sec, kD)
+                    v = sec.(kD);
+                    if iscell(v) && ~isempty(v), v = v{1}; end
+                    argDescriptions{k} = char(strrep(char(v), '''', ''));
+                end
+            end
+
             pf = pf2_base.PipelineFunction(funcName, args, defaults, outputs, ...
                 'Name', displayName, 'Description', desc, ...
-                'ValidStages', stages, 'RequiresOD', reqOD);
+                'ValidStages', stages, 'RequiresOD', reqOD, 'Role', roleStr, ...
+                'ArgTypes', argTypes, 'ArgChoices', argChoices, ...
+                'ArgRanges', argRanges, 'ArgUnits', argUnits, ...
+                'ArgDescriptions', argDescriptions);
         end
     end
 end

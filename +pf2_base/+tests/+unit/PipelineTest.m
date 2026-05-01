@@ -655,5 +655,84 @@ classdef PipelineTest < matlab.unittest.TestCase
             tc.verifyEqual(p.getStep(2).funcName, 'pf2_lpf');
         end
 
+        %% ============================================================
+        %%  Phase A2: validate() and run()
+        %% ============================================================
+
+        function testValidateCleanPipeline(tc)
+            pf2_base.Pipeline.loadFuncConfig(true);
+            p = pf2_base.RawPipeline('test');
+            p = p.add('pf2_Intensity2OD');
+            p = p.add('pf2_MotionCorrectTDDR');
+            p = p.add('pf2_lpf', 'freq_cut', 0.05);
+            issues = p.validate();
+            tc.verifyEmpty(issues);
+        end
+
+        function testValidateOutOfRange(tc)
+            pf2_base.Pipeline.loadFuncConfig(true);
+            p = pf2_base.RawPipeline('test');
+            p = p.add('pf2_Intensity2OD');
+            p = p.add('pf2_lpf', 'freq_cut', -1);  % out of [0,Inf]
+            issues = p.validate();
+            tc.verifyNumElements(issues, 1);
+            tc.verifyEqual(issues(1).step, 2);
+            tc.verifyEqual(issues(1).arg,  'freq_cut');
+            tc.verifyEqual(issues(1).severity, 'error');
+        end
+
+        function testValidateOrderingRequiresOD(tc)
+            % requiresOD step must follow an Intensity2OD step
+            pf2_base.Pipeline.loadFuncConfig(true);
+            p = pf2_base.RawPipeline('test');
+            p = p.add('pf2_MotionCorrectTDDR');     % requires OD
+            issues = p.validate();
+            tc.verifyTrue(any(strcmp({issues.severity}, 'error')));
+            tc.verifyTrue(any(arrayfun(@(s) contains(s.message, 'Intensity2OD'), issues)));
+        end
+
+        function testValidateOrderingFixedAfterInsert(tc)
+            pf2_base.Pipeline.loadFuncConfig(true);
+            p = pf2_base.RawPipeline('test');
+            p = p.add('pf2_MotionCorrectTDDR');
+            tc.verifyNotEmpty(p.validate());
+            p = p.insert(1, 'pf2_Intensity2OD');
+            tc.verifyEmpty(p.validate());
+        end
+
+        function testValidateEnumChoice(tc)
+            pf2_base.Pipeline.loadFuncConfig(true);
+            pf = pf2_base.PipelineFunction.detect('pf2_lpf');
+            r = pf.validate('filtType', 1);
+            tc.verifyTrue(r.ok);
+            r = pf.validate('filtType', 99);
+            tc.verifyFalse(r.ok);
+            tc.verifyTrue(contains(r.message, 'must be one of'));
+        end
+
+        function testValidateUnknownArg(tc)
+            pf = pf2_base.PipelineFunction('myFunc', {'x'}, {[]}, {'x'});
+            r = pf.validate('nope', 1);
+            tc.verifyFalse(r.ok);
+            tc.verifyEqual(r.severity, 'error');
+        end
+
+        function testBaseRunNotSupported(tc)
+            p = pf2_base.Pipeline('x');
+            tc.verifyError(@() p.run(struct('raw', 1)), ...
+                'pf2:Pipeline:runNotSupported');
+        end
+
+        function testRawPipelineRunSmoke(tc)
+            % Run a simple raw pipeline through processFNIRS2 via run().
+            pf2_base.Pipeline.loadFuncConfig(true);
+            p = pf2_base.RawPipeline('smoke');
+            p = p.add('pf2_Intensity2OD');
+            y = pf2.import.sampleData;
+            out = p.run(y);
+            tc.verifyTrue(isfield(out, 'HbO'));
+            tc.verifySize(out.HbO, [1169 16]);
+        end
+
     end
 end
