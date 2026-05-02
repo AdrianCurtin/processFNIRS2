@@ -497,64 +497,35 @@ end
 numRawChannels=size(data,2)-1;
 
 if(hasDataSource)
-    dataSource = fNIR.info.header.DataSource;
+    [cfgName, modelToken, probeStyle] = resolveProbeFromDataSource(fNIR.info.header.DataSource);
+    fprintf('Loading configuration for: Model %s %s\n', modelToken, probeStyle);
 
-    dataSourceParts = strsplit(dataSource,', ');
-
-    imagerModel = dataSourceParts{2}; % ex Model 2000S Imager, Model 1200W Imager
-
-    probeStyle = dataSourceParts{end-1}; % ex HD split
-
-    numOptodes = sscanf(dataSourceParts{end},'%i optodes'); %ex: 4 18
-
-    fprintf('Loading configuration for: %s %s\n',imagerModel,probeStyle);
-
-    is_3000 = contains(dataSource,'3000C');
-    is_HD = contains(dataSource,'HDS') || contains(dataSource,'HD');
-
-    if(is_3000)
-        if(is_HD)
-            probeStyle = 'HD';
-            fNIR.info.probename='fNIR_Devices_fNIR3000_18ch';
-            fNIR.raw=fNIR.raw(:,1:55);
-        else
-            probeStyle = 'HDS';
-            fNIR.info.probename='fNIR_Devices_fNIR3000_18ch';
-            fNIR.raw=fNIR.raw(:,1:55);
+    if(~isempty(cfgName))
+        fNIR.info.probename = cfgName;
+        % Trim trailing columns based on the cfg's expected raw width.
+        % Trailing columns may be unused detector slots reported by the imager.
+        try
+            dev = pf2.Device.load(cfgName);
+            expectedCols = length(dev.wavelengths());
+            if(size(fNIR.raw,2) >= expectedCols)
+                fNIR.raw = fNIR.raw(:, 1:expectedCols);
+            else
+                warning('pf2:import:rawWidthMismatch', ...
+                    'Probe %s expects %d raw columns; data has %d. Skipping trim.', ...
+                    cfgName, expectedCols, size(fNIR.raw,2));
+            end
+        catch ME
+            warning('pf2:import:probeLoadFailed', ...
+                'Failed to load probe %s: %s', cfgName, ME.message);
         end
     else
-
-        switch(probeStyle)
-            case 'Split'
-                fNIR.info.probename='fNIR_Devices_fNIR1000_Split_2x2ch';
-                fNIR.raw=fNIR.raw(:,1:13);
-            case 'Linear'
-                error('This probe is unsupported');
-                fNIR.info.probename='fNIR_Devices_fNIR1000_Linear';
-                fNIR.raw=fNIR.raw(:,1:13);
-            case 'HD' % 2x8 +2
-                fNIR.info.probename='fNIR_Devices_fNIR2000_18ch';
-                fNIR.raw=fNIR.raw(:,1:55);
-            case 'HDS' % 2x8 +2
-                fNIR.info.probename='fNIR_Devices_fNIR2000_18ch';
-                fNIR.raw=fNIR.raw(:,1:55);
-            case 'SD' % 2x2 +1
-                error('This probe is unsupported');
-                fNIR.info.probename='fNIR_Devices_fNIR1000_Split_2x2ch';
-                fNIR.raw=fNIR.raw(:,1:(20*3+1));
-            case 'LD' % 1x4 +2
-                error('This probe is unsupported');
-                fNIR.info.probename='fNIR_Devices_fNIR1000';
-                fNIR.raw=fNIR.raw(:,1:(6*3+1));
-            otherwise
-                warning('Unidentified Probe\n');
-                fNIR.info.probename='Unknown .nir file';
-        end
-
+        warning('pf2:import:unidentifiedProbe', ...
+            'Unidentified probe (model "%s", style "%s")', modelToken, probeStyle);
+        fNIR.info.probename = 'Unknown .nir file';
     end
 
 else
-       
+
     switch(numRawChannels)
         case 12
             fNIR.info.probename='fNIR_Devices_fNIR1000_Linear';
@@ -631,6 +602,96 @@ end
 
 function loadExistingOrOpen()
 
+end
+
+function [cfgName, modelToken, probeStyle] = resolveProbeFromDataSource(dataSource)
+% RESOLVEPROBEFROMDATASOURCE Map a COBI Studio "Data Source" string to a probe cfg.
+%
+% Parses comma-separated DataSource lines from COBI Studio. Tolerates
+% formatting differences across COBI versions by:
+%   - extracting model digits via regex anywhere in the string,
+%   - scanning all parts for a known probe-style keyword (HD/HDS/Split/Linear/LD/SD),
+%   - falling back to the second-to-last part (older versions) if no match.
+%
+% Examples handled:
+%   'Device 1, Model 3000C Imager, Port 1, HD, 18 optodes'   (newer)
+%   'Device 1, Model 2000S Imager, Port 1, HDS, 18 optodes'  (newer)
+%   'Device 1, Model 1200W Imager, Port 1, HD, 16 optodes'   (newer)
+%   'Device 1, Model 1000 Imager, Port 1, LD, 6 optodes'     (newer)
+%   'Model 1000, HD'                                         (older / minimal)
+%
+% Returns:
+%   cfgName    - Probe config name (without .cfg), or '' if unrecognized.
+%   modelToken - Imager model token (e.g. '3000C', '2000S', '1200W', '1000').
+%   probeStyle - Probe style token (e.g. 'HD', 'HDS', 'Split', 'Linear', 'LD').
+
+    cfgName = '';
+    modelToken = '';
+    probeStyle = '';
+
+    if(~ischar(dataSource) && ~isstring(dataSource))
+        return;
+    end
+    parts = strtrim(strsplit(char(dataSource), ','));
+
+    % Extract model token: "Model NNNN[X]" anywhere in the string.
+    % "Imager" suffix is optional (older COBI versions may omit it).
+    modelMatch = regexp(strjoin(parts, ', '), ...
+        'Model\s+(\d+)([A-Za-z]*)', 'tokens', 'once');
+    if(isempty(modelMatch))
+        return;
+    end
+    modelDigits = modelMatch{1};
+    modelToken = [modelDigits modelMatch{2}];
+
+    % Find probe style by scanning parts for a known keyword.
+    % This is more robust than position-based parsing across COBI versions.
+    knownStyles = {'HDS','HD','Split','Linear','LD','SD'};
+    for i = 1:numel(parts)
+        token = regexp(parts{i}, '^[A-Za-z]+$', 'match', 'once');
+        if(isempty(token)); continue; end
+        idx = find(strcmpi(knownStyles, token), 1);
+        if(~isempty(idx))
+            probeStyle = knownStyles{idx};
+            break;
+        end
+    end
+
+    % Fallback: take second-to-last comma part (matches legacy parser).
+    if(isempty(probeStyle) && numel(parts) >= 2)
+        probeStyle = strtrim(parts{end-1});
+    end
+
+    cfgName = lookupProbeCfg(modelDigits, probeStyle);
+end
+
+function cfgName = lookupProbeCfg(modelDigits, probeStyle)
+% LOOKUPPROBECFG Map (model digits, probe style) to a device cfg name.
+%
+% 3000-series imagers use the dedicated fNIR3000 cfg. Earlier-generation
+% imagers (1000/1200/2000) share the probeStyle-based mapping that
+% historically dispatched on style alone.
+
+    cfgName = '';
+
+    if(strcmp(modelDigits, '3000'))
+        switch(probeStyle)
+            case {'HD','HDS'}
+                cfgName = 'fNIR_Devices_fNIR3000';
+        end
+        return;
+    end
+
+    switch(probeStyle)
+        case {'HD','HDS'}      % 2x8 + 2 short-sep
+            cfgName = 'fNIR_Devices_fNIR2000_18ch';
+        case 'Split'           % 2x2
+            cfgName = 'fNIR_Devices_fNIR1000_Split_2x2ch';
+        case 'Linear'          % 1x4 linear
+            cfgName = 'fNIR_Devices_fNIR1000_Linear';
+        case 'LD'              % Square patch, detector at center, 4 corner sources
+            cfgName = 'fNIR_Devices_fNIR1000_LD';
+    end
 end
 
 function markers=importMrk(mrk_filename,startCode,mrkSourceID)
