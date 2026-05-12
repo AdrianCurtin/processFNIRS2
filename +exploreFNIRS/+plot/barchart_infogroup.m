@@ -426,6 +426,14 @@ if(exSettings.plot_legend_mode==3||(exSettings.plot_legend_mode==2))
     end
 end
 
+% Apply current PlotStyle (theme-aware, respects ForceLightMode) so axes,
+% legend, and colorbar colors match light/dark preference.
+try
+    sty = pf2_base.plot.PlotStyle.getDefault();
+    sty.applyToFigure(ExFNIRS.figHandles.main);
+catch
+end
+
 
 fprintf('\nInfo Table Values\n');
 global barChartTable;
