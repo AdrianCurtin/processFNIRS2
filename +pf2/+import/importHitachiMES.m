@@ -165,7 +165,6 @@ header.HeaderInfo=lineF;
 lineF=fgetl(fid);
 startLineNum=lineNum;
 clear fidCleanup;
-fclose(fid);
 fid=-1;
 
 dataLineParts=strsplit(header.HeaderInfo,delimiter);
@@ -210,7 +209,6 @@ else
 end
 
 clear fidCleanup;
-fclose(fid);
 fid=-1;
 
 
