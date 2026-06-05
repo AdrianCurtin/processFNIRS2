@@ -87,6 +87,11 @@ classdef Editor < matlab.apps.AppBase
     % ====================================================================
     methods (Access = public)
         function app = Editor(varargin)
+            if pf2_base.env.isOctave()
+                error('pf2:gui:octaveUnsupported', ...
+                    ['pf2.methods.Editor requires MATLAB (App Designer). ' ...
+                     'Under Octave, edit methods via the Pipeline API.']);
+            end
             ip = inputParser;
             ip.addParameter('Stage', 'raw', @(x) ismember(lower(char(x)), {'raw','oxy'}));
             ip.parse(varargin{:});

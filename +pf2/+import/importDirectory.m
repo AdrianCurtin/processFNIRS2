@@ -80,8 +80,15 @@ function allData = importDirectory(dirPath, pattern, varargin)
             'Directory not found: %s', dirPath);
     end
 
-    % Resolve to absolute path (use pwd as base so relative paths work on Windows)
-    dirPath = char(java.io.File(pwd, dirPath).getCanonicalPath());
+    % Resolve to a canonical absolute path. Only prepend pwd when the path
+    % is relative -- java.io.File(pwd, dirPath) treats its second argument as
+    % a child even when it is already absolute, which would turn '/data/x'
+    % into '<pwd>/data/x' on macOS/Linux.
+    jf = java.io.File(dirPath);
+    if ~jf.isAbsolute()
+        jf = java.io.File(pwd, dirPath);
+    end
+    dirPath = char(jf.getCanonicalPath());
 
     % --- Determine importer from pattern extension ---
     [~, ~, ext] = fileparts(pattern);

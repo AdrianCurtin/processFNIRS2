@@ -96,6 +96,12 @@ function [ h, imgOut ] = interpolateValues3D(varargin)
 %   'animated'          - Optimize for animation (default: false)
 %   'voxelLighting'     - Lighting style for voxel brain (default: 'none')
 %                         Options: 'none', 'realistic', 'dramatic', 'clinical'
+%   'savePath'          - File path to save the rendered figure (default: '').
+%                         This is the supported way to save 3D renders
+%                         headlessly — see Notes.
+%   'saveWidth'         - Saved image width in pixels (default: figure width)
+%   'saveHeight'        - Saved image height in pixels (default: figure height)
+%   'saveDPI'           - Saved image resolution (default: 150)
 %
 % Outputs:
 %   h      - Handle to the axes containing the visualization
@@ -121,6 +127,12 @@ function [ h, imgOut ] = interpolateValues3D(varargin)
 %   - Requires cerebro_mdl.mat brain mesh data file
 %   - Short separation channels are excluded by default when data is provided
 %   - Uses 'animated' mode for video generation to avoid redrawing static elements
+%   - HEADLESS SAVING: 3D cortical surfaces only rasterize in a *visible*
+%     figure. Under headless MATLAB (-batch / -nodisplay) the generic
+%     figure('Visible','off') + saveas/exportgraphics pattern produces a
+%     BLANK image. Use the 'savePath' option instead (or capture the imgOut
+%     output and imwrite it) — both render correctly headlessly. This applies
+%     to all wrappers (pf2.probe.plot.showProbe3D, pf2.probe.project.*).
 %
 % See also: pf2.probe.plot.showProbe3D, pf2.probe.plot.interpolateValues,
 %           pf2.probe.plot.imageValues, exploreFNIRS
@@ -160,11 +172,23 @@ if(numel(varargin) > 0 && isa(varargin{1},'matlab.graphics.axis.Axes')) %If firs
     ax=varargin{1};
     varargin=varargin(2:end);
 else
-    curFig=gcf;
-    if(~curFig.Visible)
-        figure();
-    end
+    % Draw into the current figure/axes. Do NOT spawn a new visible figure
+    % when the current one is off-screen — that orphaned the caller's
+    % invisible figure and produced blank headless saves (the figure the
+    % caller saved was empty because drawing went to the new figure instead).
     ax=gca;
+end
+
+% 3D cortical surfaces only rasterize in a visible figure under headless
+% MATLAB (-batch / -nodisplay). If the target figure is off-screen, make it
+% visible for the duration of the render and restore its original visibility
+% on return. This lets 'savePath' and the returned imgOut work headlessly
+% without spawning a surprise window or orphaning the caller's figure.
+renderFig = ancestor(ax, 'figure');
+if ~isempty(renderFig) && strcmpi(char(renderFig.Visible), 'off')
+    origVisibleState = renderFig.Visible;
+    renderFig.Visible = 'on';
+    restoreVisibleOnExit = onCleanup(@() iLocalRestoreVisible(renderFig, origVisibleState)); %#ok<NASGU>
 end
 
 
@@ -2154,20 +2178,29 @@ end
 
 h=ax;
 
-if (nargout > 0)
-    h=ax;
-
+% The render figure is made visible above (when off-screen) for the whole
+% draw, so getframe/saveFigure here rasterize real content rather than a
+% blank frame. Visibility is restored on function return via onCleanup.
+if (nargout > 1)
     frame=getframe(ax);
     imgOut = frame.cdata;
 end
 
 % Save figure if requested
 if ~isempty(savePath)
-    fig = gcf();
+    fig = ancestor(ax, 'figure');
     pf2_base.plot.saveFigure(fig, savePath, saveWidth, saveHeight, saveDPI);
 end
 
 end  % interpolateValues3D
+
+
+function iLocalRestoreVisible(figHandle, vis)
+% Restore a figure's Visible state (used by the off-screen render path).
+if isgraphics(figHandle)
+    figHandle.Visible = vis;
+end
+end
 
 
 function va = iLocalInterpScalar(distSquared, cAlpha, maxDist2, projectMode)

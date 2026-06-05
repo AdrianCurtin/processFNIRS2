@@ -54,6 +54,12 @@ function varargout = exploreFNIRS(varargin) % exploreFNIRS(data,timeShiftTo0,blS
 
 % Last Modified by GUIDE v2.5 26-Aug-2019 17:40:22
 
+if pf2_base.env.isOctave()
+    error('pf2:gui:octaveUnsupported', ...
+        ['exploreFNIRS requires MATLAB. Under Octave, use the programmatic ' ...
+         'group-analysis API instead of the GUI.']);
+end
+
 % Begin initialization code - DO NOT EDIT
 gui_Singleton = 1;
 gui_State = struct('gui_Name',       mfilename, ...

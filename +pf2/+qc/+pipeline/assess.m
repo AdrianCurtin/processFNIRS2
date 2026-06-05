@@ -391,6 +391,7 @@ for ci = 1:numel(checks)
             report.cov.values = covValues;
             report.cov.pass = covPass;
             report.cov.threshold = opts.CoVThreshold;
+            report.cov.skipped = false;  % CoV always runs; clear the emptyCheck default
             passMatrix(ci, :) = covPass;
 
         case 'takizawa'

@@ -165,6 +165,11 @@ classdef ChannelCheck < matlab.apps.AppBase
 
         function app = ChannelCheck(dataOrCell, varargin)
         % Constructor. Accepts struct or cell array.
+            if pf2_base.env.isOctave()
+                error('pf2:gui:octaveUnsupported', ...
+                    ['pf2.qc.ChannelCheck requires MATLAB (App Designer). ' ...
+                     'Under Octave, use pf2.qc.pipeline.assess for headless QC.']);
+            end
             p = inputParser;
             addRequired(p, 'dataOrCell');
             addParameter(p, 'CalledFromImport', false, @islogical);

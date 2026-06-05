@@ -27,6 +27,38 @@ classdef PipelineFunction
 %   'ValidStages' - Numeric vector of valid stages (e.g. [1,2])
 %   'RequiresOD'  - Logical, true if function needs OD input
 %
+% Writing a custom step:
+%   A step is a plain function on the MATLAB path. Its arguments are bound
+%   by NAME: any arg whose name matches a reserved "special" name below is
+%   auto-filled from the processing context; every other name takes its
+%   value from the step's defaults/argvals. Outputs are bound the same way.
+%
+%   Special argument names (auto-filled inputs):
+%     'x'               - data matrix (valid channels only) [T x C]
+%     'fs'              - sampling frequency (Hz)
+%     'fTime'           - time vector [T x 1]
+%     'fchMask'         - channel mask (valid channels)
+%     'ftimeChMask'     - time-channel mask [T x C]
+%     'fChannelNumbers' - channel IDs
+%     'fChannelSD'      - source-detector distances
+%     'fProbeInfo'      - probe geometry struct
+%     'fMarkers'        - event markers
+%     'fAux'            - auxiliary data
+%     'fAmbient'        - dark/ambient channel data
+%     'fNIRstruct'      - the full fNIRS data struct
+%
+%   Output names that write back into the pipeline: 'x', 'fchMask',
+%   'ftimeChMask'. Declare 'x' as an output to update the signal matrix.
+%
+%   Minimal one-in/one-out step:
+%     function xz = pf2_zscore(x)
+%         xz = (x - mean(x,1,'omitnan')) ./ std(x,0,1,'omitnan');
+%     end
+%     p = p.add('pf2_zscore', {'x'}, {[]}, {'x'});
+%
+% See also (full per-step execution contract):
+%   pf2_base.fnirs.processStageRaw2OD, pf2_base.fnirs.processStageFilterHb
+%
 % Example:
 %   pf = pf2_base.PipelineFunction('pf2_lpf', ...
 %       {'x','filtType','fs','freq_cut','Nf'}, ...

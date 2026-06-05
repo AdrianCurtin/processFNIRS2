@@ -36,14 +36,18 @@ if(pf2_base.isnestedfield(PF2,'myRawMethods.cfg.Sections')&&length(PF2.myRawMeth
         return;
     else
         if(onlyCurrentMethod)
-            rawMethodsList=rawMethodsCellStr{isCurrent};
+            if(any(isCurrent))
+                rawMethodsList=rawMethodsCellStr{isCurrent};
+            else
+                rawMethodsList='';   % no current method selected
+            end
         else
             rawMethodsList=rawMethodsCellStr;
         end
     end
 
 else
-    methodListStr=sprintf('No Oxy Processing Methods Loaded\nPlease import or configure methods first\n');
+    methodListStr=sprintf('No Raw Processing Methods Loaded\nPlease import or configure methods first\n');
    
     
     if(nargout==0)

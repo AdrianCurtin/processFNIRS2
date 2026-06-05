@@ -61,7 +61,8 @@ classdef Pipeline
         %
         %   p = p.add(pfObj)                  % Append existing PipelineFunction
         %   p = p.add('pf2_lpf')              % Look up from config
-        %   p = p.add('pf2_lpf', 'freq_cut', 0.2)  % Override defaults
+        %   p = p.add('pf2_lpf', 'freq_cut', 0.2)  % Override defaults (NV pairs)
+        %   p = p.add('pf2_lpf', struct('freq_cut', 0.2)) % ...or a param struct
         %   p = p.add('myFunc', {'x','fs','a'}, {[],[],5}, {'x'})
         %       Direct construction: funcName, args, defaults, outputs
         %
@@ -94,6 +95,19 @@ classdef Pipeline
             end
 
             nvPairs = varargin(nvStart:end);
+
+            % Convenience: accept a single struct of parameters in place of
+            % name-value pairs, e.g. add('pf2_lpf', struct('freq_cut', 0.2)).
+            % An empty struct() is treated as "no overrides".
+            if numel(nvPairs) == 1 && isstruct(nvPairs{1})
+                s = nvPairs{1};
+                fn = fieldnames(s);
+                nvPairs = cell(1, 2 * numel(fn));
+                nvPairs(1:2:end) = fn;
+                for k = 1:numel(fn)
+                    nvPairs{2*k} = s.(fn{k});
+                end
+            end
 
             % Try to build from config
             cfg = pf2_base.Pipeline.loadFuncConfig();
@@ -229,16 +243,48 @@ classdef Pipeline
         end
 
         function obj = swapStep(obj, idxOrName, funcNameOrPF, varargin)
-        % SWAPSTEP Replace a step (by index or name).
+        % SWAPSTEP Replace a step (by index or name) with a different function.
         %
         %   p = p.swapStep(2, 'pf2_hpf', 'freq_cut', 0.008)
         %   p = p.swapStep('pf2_lpf', 'pf2_hpf', 'freq_cut', 0.008)
+        %
+        % To REORDER existing steps (not replace one), use move() instead.
+
+            if isnumeric(funcNameOrPF)
+                error('pf2_base:Pipeline:swapStepNumeric', ...
+                    ['swapStep replaces a step with a FUNCTION name/object, ' ...
+                     'not an index.\nTo reorder existing steps, use ' ...
+                     'p = p.move(from, to).']);
+            end
 
             idx = obj.resolveIndex(idxOrName);
 
             temp = pf2_base.Pipeline();
             temp = temp.add(funcNameOrPF, varargin{:});
             obj.steps{idx} = temp.steps{1};
+        end
+
+        function obj = move(obj, fromIdxOrName, toIdx)
+        % MOVE Move an existing step to a new position.
+        %
+        %   p = p.move(3, 1)            % move step 3 to the front
+        %   p = p.move('pf2_lpf', 2)    % move the lpf step to position 2
+        %
+        % toIdx is the final 1-based position of the moved step (clamped to
+        % the valid range). Reordering preserves every step; nothing is added
+        % or removed. Use swapStep() to replace a step with a different one.
+
+            from = obj.resolveIndex(fromIdxOrName);
+            if ~(isnumeric(toIdx) && isscalar(toIdx))
+                error('pf2_base:Pipeline:moveBadTarget', ...
+                    'move(from, toIdx): toIdx must be a scalar position.');
+            end
+            n = numel(obj.steps);
+            toIdx = max(1, min(round(toIdx), n));
+
+            pf = obj.steps{from};
+            obj.steps(from) = [];
+            obj.steps = [obj.steps(1:toIdx-1), {pf}, obj.steps(toIdx:end)];
         end
 
         function obj = addFromString(obj, callStr)

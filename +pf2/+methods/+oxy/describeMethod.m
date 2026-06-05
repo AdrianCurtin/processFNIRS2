@@ -50,12 +50,27 @@ if nargin < 2, ctx = []; end
 methodsLib = pf2_base.resolveMethodsLib('oxy', ctx);
 
 if(nargin<1)
-   oxyMethod=pf2.methods.oxy(true); 
+   oxyMethod=pf2.methods.oxy(true);
    getByIndex=false;
 elseif(isnumeric(oxyMethod))
     getByIndex=true;
 else
     getByIndex=false;
+end
+
+% No current method selected (e.g. fresh install): report gracefully
+% rather than failing the cfg lookup below.
+if(~getByIndex && (isempty(oxyMethod) || (ischar(oxyMethod) && isempty(strtrim(oxyMethod)))))
+    msg=sprintf(['No current Oxy Method selected.\n' ...
+        'Use pf2.methods.oxy.setMethod(...) to select one, ' ...
+        'or pf2.methods.oxy.list() to see available methods.\n']);
+    if(nargout>0)
+        descrip=msg;
+        functions={};
+    else
+        fprintf(2,'%s',msg);
+    end
+    return;
 end
 
     

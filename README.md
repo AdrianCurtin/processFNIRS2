@@ -117,6 +117,58 @@ pf2.methods.raw.importMethod('shared_method.mat');
 pf2.methods.raw.delete('OldMethod');
 ```
 
+### Building Pipelines Programmatically
+For full code-level control, build a processing chain step by step with the
+Pipeline API (`pf2_base.RawPipeline` for Stage 1, `pf2_base.OxyPipeline` for
+Stage 3). Pipelines are value objects: every mutating call returns a new copy.
+
+```matlab
+% Build a raw-stage pipeline from scratch
+p = pf2_base.RawPipeline('myPipeline');
+p = p.add('pf2_Intensity2OD');                 % required first step
+p = p.add('pf2_MotionCorrectTDDR');
+p = p.add('pf2_lpf', 'freq_cut', 0.08);        % step with a parameter
+
+% Inspect, modify, reorder
+disp(p.describe());                             % print steps + current params
+p = p.setParam('pf2_lpf', 'freq_cut', 0.05);   % tune a parameter
+p = p.insert(2, 'pf2_hpf', 'freq_cut', 0.01);  % insert at a position
+p = p.move('pf2_hpf', 3);                       % reorder steps (no add/remove)
+p = p.swapStep('pf2_MotionCorrectTDDR', 'pf2_MotionCorrectWavelet'); % replace a step
+p = p.remove('pf2_hpf');                        % drop a step
+
+% Run it end-to-end on a data struct
+out = p.run(data);                             % returns standard processFNIRS2 output
+
+% Or persist it as a named method (the pipeline's name becomes the method name)
+p.save('raw');                                  % register 'myPipeline' as a raw method
+p2 = pf2_base.RawPipeline.fromMethod('myPipeline');  % reload later
+```
+
+To start from an existing method instead of an empty pipeline, load it with
+`pf2_base.RawPipeline.fromMethod('x6_TDDR_lpf')`, then `describe()`, edit, and
+`run()` or `save()`.
+
+**Writing a custom processing step:** a step is a plain function on the path.
+Its arguments are bound *by name* — reserved names like `x` (the signal
+matrix), `fs`, `fTime`, and `fchMask` are auto-filled from the processing
+context; any other name takes its value from the step's defaults. Declare `x`
+as an output to write the result back into the pipeline.
+
+```matlab
+% functions/pf2_zscore.m
+function xz = pf2_zscore(x)
+    xz = (x - mean(x,1,'omitnan')) ./ std(x,0,1,'omitnan');
+end
+
+% wire it in: add('name', {args}, {defaults}, {outputs})
+p = p.add('pf2_zscore', {'x'}, {[]}, {'x'});
+```
+
+See `help pf2_base.PipelineFunction` for the full list of reserved argument
+names and the input/output contract, and `examples/scripts/example_pipeline_basics.m`
+and `examples/scripts/example_pipeline_custom_function.m` for runnable walkthroughs.
+
 ### Data Processing
 Process data using the selected methods:
 ```matlab
@@ -167,6 +219,11 @@ pf2.data.plot.raw(myprocesseddata);                   % Plot raw intensity data
 pf2.data.plot.roi(myprocesseddata);                   % Plot region of interest data
 pf2.data.plot.auxData(myprocesseddata);               % Plot auxiliary data
 
+% Topographic activation maps (2D heatmap or 3D cortical surface)
+pf2.probe.plot.topo(myprocesseddata, 'HbO', 'Time', 30);            % 2D at t=30s
+pf2.probe.plot.topo(myprocesseddata, 'HbO', 'View', '3d');         % 3D surface
+pf2.probe.plot.topo(myprocesseddata, 'HbO', 'savePath', 'topo.png'); % headless save
+
 % Plots automatically show device, method, and DPF info in title
 % e.g., "fNIR2000C | x5_TDDR | DPF(age=25)"
 
@@ -178,6 +235,27 @@ pf2.export.asSNIRF(myprocesseddata, 'myexport.snirf');
 pf2.export.asSNIRF(allData, 'output/');                          % Flat
 pf2.export.asSNIRF(allData, 'output/', 'Dir1', 'Group');         % Subdirs from .info
 pf2.export.asSNIRF(allData, 'output/', 'Prefix', {'SubjectID'}); % Named files
+```
+
+### Group & Statistical Visualization
+Once you have a group of processed subjects, exploreFNIRS provides group plots
+and statistics. The fastest on-ramp uses the built-in synthetic group:
+```matlab
+% One-call ready group (or pass your own cell array of processed structs)
+[ex, allData] = pf2.import.sampleData.group();
+
+% Group plots
+ex.plotBar('Biomarker', 'HbO');                   % Condition bar chart
+ex.plotTemporal('Biomarkers', {'HbO','HbR'});     % Group-averaged timeseries
+[fig, results] = ex.plotLME('Biomarkers', {'HbO'});  % LME + F-stat bars
+ex.plotTopoLME('Biomarkers', {'HbO'});            % LME mapped onto the brain
+
+% Bridge computed stats to a brain projection (compute -> project)
+pCondition = nan(1, size(allData{1}.HbO, 2));
+pCondition(results.channels) = results.anova_pval.Condition;
+pf2.probe.project.pvalues(pCondition, allData{1}, 'includeSS', true);
+
+% See examples/scripts/example_group_stats_bridge.m for the full pattern.
 ```
 
 ### Processing Metadata
@@ -207,7 +285,7 @@ Define and extract experimental blocks from marker events:
 ```matlab
 % Define blocks from marker codes with 30-second duration
 blocks = pf2.data.defineBlocks(data, [49, 50], 30, ...
-    'ConditionMap', {49, 'Easy'; 50, 'Hard'});
+    'ConditionMap', {49, 'Easy'; 50, 'Hard'}, 'Embed', false);
 
 % Import per-trial behavioral data from CSV
 blocks = pf2.data.importBlockInfo(blocks, 'trial_data.csv', ...
@@ -239,7 +317,7 @@ An alternative to the epoch/average approach. The GLM keeps continuous recording
 ```matlab
 % 1. Define blocks and convert to GLM events
 blocks = pf2.data.defineBlocks(data, [49, 50], 30, ...
-    'ConditionMap', {49, 'Easy'; 50, 'Hard'});
+    'ConditionMap', {49, 'Easy'; 50, 'Hard'}, 'Embed', false);
 events = pf2.data.blocksToEvents(blocks);
 
 % 2. Build design matrix (with drift regressors)
@@ -289,6 +367,16 @@ See `examples/scripts/example_glm_analysis.m` for a complete walkthrough, or `ex
 
 ### Advanced Analysis with exploreFNIRS
 For group-level data exploration and statistical analysis, use the exploreFNIRS module:
+
+> **Input expectations.** `Experiment` computes task/baseline statistics over
+> **epoched segments**, not continuous recordings. For task-based stats, first
+> extract blocks (`pf2.data.defineBlocks` → `pf2.data.extractBlocks`, see
+> [Block Definition & Extraction](#block-definition--extraction)) and build the
+> Experiment from the resulting segments. Also make sure `settings.baseline`
+> falls **within** each segment's time range — a baseline window that precedes
+> the data (e.g. `[-5 0]` on data starting at t≈0 with `useBaseline=true`)
+> yields all-NaN aggregates and empty LME results.
+
 ```matlab
 % Load multiple processed subjects into a cell array
 allData = {subject1, subject2, subject3, ...};
@@ -340,8 +428,14 @@ interROI = ex.interROI('Method', 'pearson');
 dfc = exploreFNIRS.connectivity.computeDynamicFC(data, 'WindowSize', 30);
 states = exploreFNIRS.connectivity.detectStates(dfc, 'K', 3);
 
-% Hyperscanning analysis
-hsResults = ex.hyperscanning('PairBy', 'Dyad', 'Method', 'coherence');
+% Hyperscanning analysis (inter-brain synchrony)
+% Input: a cell array of processed subjects, each tagged with a shared
+% .info.DyadID so partners can be paired (.info.Role optionally labels them).
+subjA.info.DyadID = 1; subjA.info.Role = 'A';
+subjB.info.DyadID = 1; subjB.info.Role = 'B';
+exHS = exploreFNIRS.core.Experiment({subjA, subjB});
+hsResults = exHS.hyperscanning('Method', 'coherence');   % pairs by DyadID
+% For HB-ICA on a single dyad: exploreFNIRS.hyperscanning.hbica(subjA, subjB)
 
 % Standalone statistical analysis (no visualization)
 results = ex.statsFitLME('Biomarkers', {'HbO'}, 'Channels', 1:5);

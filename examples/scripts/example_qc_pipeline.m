@@ -354,15 +354,18 @@ fig3 = pf2.qc.pipeline.plotReport(report_1200, ...
 % close(fig3);
 
 % --- 8c. Individual SCI bar chart ---
-fig4 = pf2.qc.plotQuality(data_2000, 'Type', 'sci');
-% fig4 = pf2.qc.plotQuality(data_2000, 'Type', 'sci', 'Visible', 'off');
-% saveas(fig4, fullfile(outDir, 'sci_barchart.png'));
+% plotQuality dispatches on the result struct: pass the SCI result from
+% pf2.qc.sci (Section 2), not the raw data.
+fig4 = pf2.qc.plotQuality(sciResult_2000);
+% fig4 = pf2.qc.plotQuality(sciResult_2000, 'Visible', 'off', ...
+%     'SavePath', fullfile(outDir, 'sci_barchart.png'));
 % close(fig4);
 
 % --- 8d. PSD overlay plot ---
-fig5 = pf2.qc.plotQuality(data_2000, 'Type', 'psd');
-% fig5 = pf2.qc.plotQuality(data_2000, 'Type', 'psd', 'Visible', 'off');
-% saveas(fig5, fullfile(outDir, 'psd_overlay.png'));
+% Pass the PSD result from pf2.qc.powerSpectrum (Section 3).
+fig5 = pf2.qc.plotQuality(psdResult_2000, 'Layout', 'overlay');
+% fig5 = pf2.qc.plotQuality(psdResult_2000, 'Layout', 'overlay', 'Visible', 'off', ...
+%     'SavePath', fullfile(outDir, 'psd_overlay.png'));
 % close(fig5);
 
 %% Section 9: Customizing for Your Experiment

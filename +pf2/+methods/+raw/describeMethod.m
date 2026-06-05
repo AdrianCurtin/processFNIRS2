@@ -48,12 +48,27 @@ if nargin < 2, ctx = []; end
 methodsLib = pf2_base.resolveMethodsLib('raw', ctx);
 
 if(nargin<1)
-   rawMethod=pf2.methods.raw(true); 
+   rawMethod=pf2.methods.raw(true);
    getByIndex=false;
 elseif(isnumeric(rawMethod))
     getByIndex=true;
 else
     getByIndex=false;
+end
+
+% No current method selected (e.g. fresh install): report gracefully
+% rather than failing the cfg lookup below.
+if(~getByIndex && (isempty(rawMethod) || (ischar(rawMethod) && isempty(strtrim(rawMethod)))))
+    msg=sprintf(['No current Raw Method selected.\n' ...
+        'Use pf2.methods.raw.setMethod(...) to select one, ' ...
+        'or pf2.methods.raw.list() to see available methods.\n']);
+    if(nargout>0)
+        descrip=msg;
+        functions={};
+    else
+        fprintf(2,'%s',msg);
+    end
+    return;
 end
 
     

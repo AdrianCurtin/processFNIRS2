@@ -41,7 +41,11 @@ if(pf2_base.isnestedfield(PF2,'myOxyMethods.cfg.Sections')&&~isempty(PF2.myOxyMe
         return;
     else
         if(onlyCurrentMethod)
-            OxyMethodsList=oxyMethodsCellStr{isCurrent};
+            if(any(isCurrent))
+                OxyMethodsList=oxyMethodsCellStr{isCurrent};
+            else
+                OxyMethodsList='';   % no current method selected
+            end
         else
             OxyMethodsList=oxyMethodsCellStr;
         end
@@ -53,6 +57,6 @@ else
         fprintf(2,'%s',methodListStr);
         return;
     else
-        oxyMethodsCellStr='';
+        OxyMethodsList='';
     end
 end

@@ -273,6 +273,11 @@ end
 
 
 if(ShowGUI)
+    if pf2_base.env.isOctave()
+        error('pf2:gui:octaveUnsupported', ...
+            ['Interactive GUIs require MATLAB. Under Octave, use the ' ...
+             'programmatic API, e.g. processed = processFNIRS2(data).']);
+    end
     if(any(strcmp(p.UsingDefaults,'ShowGUI')))
        l=length(varargin);
        if(l==0)
