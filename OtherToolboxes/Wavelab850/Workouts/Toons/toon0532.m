@@ -7,7 +7,7 @@
 %
 	dctcoef  = dct_iv(trace);
 %
-	dcrev  = reverse((sort(dctcoef.^2)));
+	dcrev  = reverse_wl((sort(dctcoef.^2)));
 	thresh = sqrt(dcrev(100));
 	dctt    = dctcoef .* (abs(dctcoef) >= thresh);
 	recon  = dct_iv(dctt);

@@ -8,7 +8,7 @@
 	qmf = MakeONFilter('Coiflet',3);
 	wc  = FWT_PO(trace,4,qmf);
 %
-	wprev  = reverse((sort(wc.^2)));
+	wprev  = reverse_wl((sort(wc.^2)));
 	thresh = sqrt(wprev(100));
 	wct    = wc .* (abs(wc) >= thresh);
 	recon  = IWT_PO(wct,4,qmf);

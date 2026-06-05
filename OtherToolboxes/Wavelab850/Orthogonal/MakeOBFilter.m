@@ -38,7 +38,7 @@ if strcmp(request,'HighPass'),
              .01003722199 .1223510414 .2274281035  -.8366029193 .4830129294 ];
          REHI2 = [ -.2575129317 .8014229647 -.5398224908 0 0 ; ...
               .3717189691 -.3639069552  -.7175800176 .4010694996 .2315575756 ];
-        a = reverse(MirrorFilt(F2)); b = LEHI2; c = REHI2;
+        a = reverse_wl(MirrorFilt(F2)); b = LEHI2; c = REHI2;
      end
      if degree==3,
        LEHI3 = [ .5837810161 .7936188102 .1609551602 -.05884169984 0 0 0 0 ; ...
@@ -54,7 +54,7 @@ if strcmp(request,'HighPass'),
         REHI3(3,:)   = [ 0.2294775468   -0.4451794532  -0.2558698634  ... 
                          0.001694456403  0.7598761492   0.1391503023  ...              
                         -0.2725472621   -0.1123675794];
-        a = reverse(MirrorFilt(F3)); b = LEHI3; c = REHI3;
+        a = reverse_wl(MirrorFilt(F3)); b = LEHI3; c = REHI3;
      end
 end
 if strcmp(request,'LowPass'),

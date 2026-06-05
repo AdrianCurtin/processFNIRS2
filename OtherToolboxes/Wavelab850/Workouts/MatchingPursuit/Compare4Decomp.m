@@ -35,8 +35,8 @@ function Compare4Decomp(x,Title,qmf,wpdepth,cpdepth)
 %
 %    5. Compression Numbers
 %
-	bbwp = reverse(cumsum(sort(wpcoef.^2)));
-	bbcp = reverse(cumsum(sort(cpcoef.^2)));
+	bbwp = reverse_wl(cumsum(sort(wpcoef.^2)));
+	bbcp = reverse_wl(cumsum(sort(cpcoef.^2)));
 %
 %    6. Display Compression Numbers
 %

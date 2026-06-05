@@ -30,10 +30,10 @@ function x = UpDyad_SBS(beta,alpha,qmf,dqmf)
 	else
 	  if oddx,
 	    ebeta = extend(beta,1,2);
-	    ealpha = [alpha 0 -reverse(alpha)];
+	    ealpha = [alpha 0 -reverse_wl(alpha)];
 	  else
 	     ebeta = extend(beta,2,2);
-	     ealpha = [alpha -reverse(alpha)];
+	     ealpha = [alpha -reverse_wl(alpha)];
 	  end
 	end
 

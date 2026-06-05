@@ -35,10 +35,10 @@ function Compare4Compress(x,Title,qmf,wpdepth,cpdepth,axlim)
 %
 %    5. Compression Numbers
 %
-	wprev = reverse(cumsum(sort(wpcoef.^2)));
-	wcrev = reverse(cumsum(sort(wc    .^2)));
-	dcrev = reverse(cumsum(sort(dccoef.^2)));
-	cprev = reverse(cumsum(sort(cpcoef.^2)));
+	wprev = reverse_wl(cumsum(sort(wpcoef.^2)));
+	wcrev = reverse_wl(cumsum(sort(wc    .^2)));
+	dcrev = reverse_wl(cumsum(sort(dccoef.^2)));
+	cprev = reverse_wl(cumsum(sort(cpcoef.^2)));
 %
 %    6. Display Compression Numbers
 %

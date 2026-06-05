@@ -28,7 +28,7 @@ function y = aconv(f,x)
 	   end
 	   xpadded = [x z];
 	end
-	fflip = reverse(f);
+	fflip = reverse_wl(f);
 	ypadded = filter(fflip,1,xpadded);
 	y = ypadded(p:(n+p-1));
 

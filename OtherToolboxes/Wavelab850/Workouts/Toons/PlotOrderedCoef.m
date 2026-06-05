@@ -7,7 +7,7 @@ function PlotOrderedCoef(wc)
 %
 
 	[n,J] = dyadlength(wc);
-	ordcoef = reverse(sort(abs(wc)));
+	ordcoef = reverse_wl(sort(abs(wc)));
 %
 	semilogy(1:n,ordcoef)	
     

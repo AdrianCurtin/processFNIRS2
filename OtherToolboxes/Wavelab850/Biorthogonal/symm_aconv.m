@@ -29,7 +29,7 @@ function y = symm_aconv(sf,x)
 	   xpadded = [x z];
 	end
 
-	fflip = reverse(sf);
+	fflip = reverse_wl(sf);
 	ypadded = filter(fflip,1,xpadded);
 
 	if p < n,

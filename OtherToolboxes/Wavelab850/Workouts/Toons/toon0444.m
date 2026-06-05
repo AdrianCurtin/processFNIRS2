@@ -21,8 +21,8 @@
 	dctDoppler   = dct_iv(Doppler);
 	dctHeaviSine = dct_iv(HeaviSine);
 %
-	subplot(221); semilogy(reverse(cumsum(reverse(wcBlocks.^2))),'y--');
-	hold on; semilogy(reverse(cumsum(reverse(dctBlocks.^2))),'r-');
+	subplot(221); semilogy(reverse_wl(cumsum(reverse_wl(wcBlocks.^2))),'y--');
+	hold on; semilogy(reverse_wl(cumsum(reverse_wl(dctBlocks.^2))),'r-');
 	title('Blocks; First-m')
 	xlabel('m')
 	ylabel('d_m')
@@ -30,8 +30,8 @@
 	h = text(350,10^4,'DCT -'); set(h,'Color','Red');
 	h = text(350,10^3,'DWT --'); set(h,'Color','Yellow');
 %
-	subplot(222); semilogy(reverse(cumsum(reverse(wcBumps.^2))),'y--');
-	hold on; semilogy(reverse(cumsum(reverse(dctBumps.^2))),'r-');
+	subplot(222); semilogy(reverse_wl(cumsum(reverse_wl(wcBumps.^2))),'y--');
+	hold on; semilogy(reverse_wl(cumsum(reverse_wl(dctBumps.^2))),'r-');
 	title('Bumps; First-m')
 	xlabel('m')
 	ylabel('d_m')
@@ -39,8 +39,8 @@
 	h = text(350,10^4,'DCT -'); set(h,'Color','Red');
 	h = text(350,10^3,'DWT --'); set(h,'Color','Yellow');
 %
-	subplot(223); semilogy(reverse(cumsum(reverse(wcHeaviSine.^2))),'y--');
-	hold on; semilogy(reverse(cumsum(reverse(dctHeaviSine.^2))),'r-');
+	subplot(223); semilogy(reverse_wl(cumsum(reverse_wl(wcHeaviSine.^2))),'y--');
+	hold on; semilogy(reverse_wl(cumsum(reverse_wl(dctHeaviSine.^2))),'r-');
 	title('HeaviSine; First-m')
 	xlabel('m')
 	ylabel('d_m')
@@ -48,8 +48,8 @@
 	h = text(350,10^4,'DCT -'); set(h,'Color','Red');
 	h = text(350,10^3,'DWT --'); set(h,'Color','Yellow');
 %
-	subplot(224); semilogy(reverse(cumsum(reverse(wcDoppler.^2))),'y--');
-	hold on; semilogy(reverse(cumsum(reverse(dctDoppler.^2))),'r-');
+	subplot(224); semilogy(reverse_wl(cumsum(reverse_wl(wcDoppler.^2))),'y--');
+	hold on; semilogy(reverse_wl(cumsum(reverse_wl(dctDoppler.^2))),'r-');
 	title('Doppler; First-m')
 	xlabel('m')
 	ylabel('d_m')

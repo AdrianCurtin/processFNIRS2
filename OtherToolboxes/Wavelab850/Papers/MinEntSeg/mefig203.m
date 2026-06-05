@@ -71,13 +71,13 @@
 %		Plot Left poly
 %
 	 xx   = linspace(ord(1),eta0,100);
-	 y    = polyval(reverse(lpoly),xx);
+	 y    = polyval(reverse_wl(lpoly),xx);
 	 plot(xx,y);
 %
 %		Plot Right Poly
 %
 	 xx   = linspace(eta0,ord(6)+1,100);
-	 y    = polyval(reverse(rpoly),xx);
+	 y    = polyval(reverse_wl(rpoly),xx);
 	 plot(xx,y);
 %
 % 		Step 2. Imputation matrix Jmat

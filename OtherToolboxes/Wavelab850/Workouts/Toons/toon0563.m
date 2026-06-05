@@ -10,7 +10,7 @@
 %
 	figure;
 	worder = sort(abs(wmat(:)));
-	plot(log(reverse(worder)+eps))
+	plot(log(reverse_wl(worder)+eps))
 	title('log(sort(abs(NS[Matrix])))')
 	xlabel('Ordered Coefficient'); ylabel('log(size(coefficient))');
     

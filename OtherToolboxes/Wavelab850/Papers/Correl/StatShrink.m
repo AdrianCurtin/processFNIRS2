@@ -26,7 +26,7 @@ function [xh, table] = StatShrink(y, L, thrvec, qmf)
 
 [n,J] = dyadlength(y);
 D = J-L;
-thrwork = reverse(thrvec);
+thrwork = reverse_wl(thrvec);
 
 TITable = FWT_TI(y,L,qmf);
 for j=2:(D+1),

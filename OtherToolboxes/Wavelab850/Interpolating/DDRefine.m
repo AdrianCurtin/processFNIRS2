@@ -34,7 +34,7 @@ function a2 = DDRefine(a,D,Filter,LEF,REF)
 %
 	if D > 1,
 	  a2(1:(D-1)) = LEF * (a(1:(D+1))');
-	  a2((n2-D+2):n2) = reverse(REF * (reverse(a((n-D):n))'));
+	  a2((n2-D+2):n2) = reverse_wl(REF * (reverse_wl(a((n-D):n))'));
 	end
     
     

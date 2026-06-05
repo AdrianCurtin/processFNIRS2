@@ -127,6 +127,49 @@ elseif(isFNIRstruct&&~isfield(fNIR,'markers')||size(fNIR.markers,1)<1)
     return;
 end
 
+% --- Fast path: pure OR query (column vector of codes) -------------------
+% A column vector such as [50;51] means "markers with code 50 OR 51".
+% The general regex-based matcher below builds a separate single-code
+% pattern per row and can drop matches for multi-code OR queries, so handle
+% this common case directly with set membership. Returns onset times for any
+% of the requested codes, sorted chronologically. Scalar codes (1x1) and
+% sequence row vectors ([50,51]) fall through to the general matcher.
+isPureOR = ~iscell(markersStart) && isnumeric(markersStart) ...
+    && size(markersStart,1) > 1 && size(markersStart,2) == 1 ...
+    && isempty(markersEnd) && isempty(markerPatternIn) && ~exactMatch;
+if isPureOR
+    mVals = fNIR.markers(:, markerColumn);
+    if istable(mVals); mVals = mVals{:,1}; end
+    codes = unique(markersStart(:));
+    sel = ismember(mVals, codes);
+
+    if ~any(sel)
+        warning('pf2:getMarkers:noMatch', ...
+            'None of the requested marker codes (%s) were found in the data.', ...
+            mat2str(codes(:)'));
+        markerTimes = [];
+        tableMrkTimes = {};
+        matchedPatterns = cell(0);
+        return;
+    end
+
+    if timeColumn <= 0 || returnIndicies
+        tVals = find(sel);
+    else
+        tVals = fNIR.markers(sel, timeColumn);
+        if istable(tVals); tVals = tVals{:,1}; end
+    end
+    selCodes = mVals(sel);
+
+    [tVals, ord] = sort(tVals);
+    selCodes = selCodes(ord);
+
+    markerTimes = tVals;                 % Nx1 onset times (start-only semantics)
+    tableMrkTimes = table(tVals, selCodes, 'VariableNames', {'Time','Code'});
+    matchedPatterns = {codes(:)'};
+    return;
+end
+
 uMatchingMarkers=[];
 
 for i=1:size(markersStart,1)

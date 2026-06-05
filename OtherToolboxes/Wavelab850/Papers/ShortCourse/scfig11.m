@@ -27,7 +27,7 @@
 %
 %   Show Wavelet Compression of Seismic
 %
-	rwcseism = reverse(sort(abs(wcseism)));
+	rwcseism = reverse_wl(sort(abs(wcseism)));
 	thresh   = rwcseism(100);
 	wctseism = wcseism .* (abs(wcseism) > thresh);
 	seismhat = IWT_PO(wctseism,4,QMF_Filter);
@@ -36,7 +36,7 @@
 %
 %   Show Wavelet Compression of NMR
 %
-	rwcNMR = reverse(sort(abs(wcNMR)));
+	rwcNMR = reverse_wl(sort(abs(wcNMR)));
 	thresh = rwcNMR(100);
 	wctNMR = wcNMR .* (abs(wcNMR) > thresh);
 	NMRhat = IWT_PO(wctNMR,4,QMF_Filter);
@@ -46,7 +46,7 @@
 %   Show DCT Compression of Seismic
 %
 	fcseism = dct_iv(dad);
-	rfcseism = reverse(sort(abs(fcseism)));
+	rfcseism = reverse_wl(sort(abs(fcseism)));
 	thresh = rfcseism(100);
 	fctseism = fcseism .* (abs(fcseism) > thresh);
 	Seismfhat = dct_iv(fctseism);
@@ -55,7 +55,7 @@
 %   Show DCT Compression of NMR
 %
 	fcNMR = dct_iv(nmrsig);
-	rfcNMR = reverse(sort(abs(fcNMR)));
+	rfcNMR = reverse_wl(sort(abs(fcNMR)));
 	thresh = rfcNMR(100);
 	fctNMR = fcNMR .* (abs(fcNMR) > thresh);
 	NMRfhat = dct_iv(fctNMR);

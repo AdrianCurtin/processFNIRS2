@@ -28,13 +28,13 @@ disp('Right: Regularized estimator calculated by smoothing the periodogram.')
   logf(N/2+1:5*N/8)  = f2;
   logf(5*N/8+1:7*N/8)= f3;
   logf(7*N/8+1:N)    = f4;
-  logf(N+1:2*N,1) = reverse(logf(1:N,1));
+  logf(N+1:2*N,1) = reverse_wl(logf(1:N,1));
   f = exp(logf);
  
   tukey = ones(2*N,1);
   alphaN = 40;
   tukey(1:alphaN) = (1-cos(pi.*(1:alphaN+0.5)/alphaN))./2;
-  tukey(2*N - alphaN +1 : 2*N) = reverse(tukey(1:alphaN));
+  tukey(2*N - alphaN +1 : 2*N) = reverse_wl(tukey(1:alphaN));
 
    noiselevel = 200;
   for i = 1:NR,

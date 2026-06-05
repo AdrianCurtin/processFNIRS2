@@ -32,7 +32,7 @@ close all; pack
 	x = x./max(x);
 	q = linspace(-10,10,61);
 
-	x(n+1:2*n) = reverse(x);
+	x(n+1:2*n) = reverse_wl(x);
 
 figure(1);clf; pack
         set(gcf, 'NumberTitle','off', 'Name','Window 1')

@@ -28,7 +28,7 @@ x = (1-sqrt(i)) + i/2 -.5;
 M = 8*N;
 sig = zeros(1,M);
 sig(M-1.5.*N+1:M-.5*N) = x;
-sig(M-2.5*N+2:M-1.5.*N+1) = reverse(x);
+sig(M-2.5*N+2:M-1.5.*N+1) = reverse_wl(x);
 sig(3*N-30:3*N + N) = .5*ones(1,N+31);
 
 
@@ -43,7 +43,7 @@ m = max(sig2);
 j = find(sig2 == m);
 sig(8*N/2+1:12*N/2) =  sig2(j:j+2*N-1).*.5./m;
 sig(1:2.5*N) = sig2(M-2.5*N+1:M);
-sig(M-2.5*N+2:M-1.5.*N+1) = reverse(x);
+sig(M-2.5*N+2:M-1.5.*N+1) = reverse_wl(x);
 
   nvoice = 8;
   wavelet = 'Sombrero';

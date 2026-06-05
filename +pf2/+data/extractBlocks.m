@@ -82,6 +82,22 @@ end
 if ~isempty(varargin) && isstruct(varargin{1})
     blocks = varargin{1};
     nvArgs = varargin(2:end);
+    % Guard: a data struct carrying embedded blocks (from defineBlocks with
+    % 'Embed', true, which is the default) is easy to pass here by mistake.
+    % It has a .blocks field but no .startTime, so detect it and use its
+    % blocks, or give an actionable error instead of failing later with a
+    % cryptic "Unrecognized field 'startTime'".
+    if ~isfield(blocks, 'startTime')
+        if isfield(blocks, 'blocks')
+            blocks = blocks.blocks;
+        else
+            error('pf2:extractBlocks:badBlocks', ...
+                ['Second argument is a struct but not a block array (no ''startTime'' field). ', ...
+                 'Either pass a block array from pf2.data.defineBlocks(..., ''Embed'', false), ', ...
+                 'or pass the embedded data struct as the FIRST argument: ', ...
+                 'pf2.data.extractBlocks(data).']);
+        end
+    end
 else
     if isfield(data, 'blocks') && ~isempty(data.blocks)
         blocks = data.blocks;
@@ -112,6 +128,25 @@ skipInvalid = p.Results.SkipInvalid;
 if isempty(blocks)
     segments = {};
     return;
+end
+
+% Footgun guard: PreTime and PostTime both default to 120 s. If the user
+% leaves them at default and the resulting window dwarfs the block, warn
+% once with the resolved segment length so a "-2 to +15 s" intent does not
+% silently become a ~250 s segment. Only fires when a default is in use.
+usingDefaultPre  = ismember('PreTime',  p.UsingDefaults);
+usingDefaultPost = ismember('PostTime', p.UsingDefaults);
+if usingDefaultPre || usingDefaultPost
+    durs = [blocks.duration];
+    medDur = median(durs(isfinite(durs)));
+    if isempty(medDur) || isnan(medDur); medDur = 0; end
+    if (preTime + postTime) > max(20, 4 * max(medDur, 0))
+        warning('pf2:extractBlocks:largeWindow', ...
+            ['Using default PreTime=%g s and PostTime=%g s: each ~%.0f s block ', ...
+             'becomes a ~%.0f s segment. Pass ''PreTime''/''PostTime'' to size the ', ...
+             'epoch (e.g. ''PreTime'', 5, ''PostTime'', 15).'], ...
+            preTime, postTime, medDur, preTime + medDur + postTime);
+    end
 end
 
 % Get data time range for validation

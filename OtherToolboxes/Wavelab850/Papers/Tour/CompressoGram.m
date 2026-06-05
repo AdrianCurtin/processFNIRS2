@@ -6,13 +6,13 @@ function CompressoGram(Sig,QMF_Filter)
 	HaarQMF = MakeONFilter('Haar');
 	hSig = FWT_PO(Sig,1,HaarQMF);
 	epsilon = 1.e-16;  
-	ehSig = reverse(cumsum(sort(hSig.^2)))/sum(hSig.^2) + epsilon;
+	ehSig = reverse_wl(cumsum(sort(hSig.^2)))/sum(hSig.^2) + epsilon;
 % Cosine Transform
 	fSig = dct_iv(Sig); 
-	efSig = reverse(cumsum(sort(fSig.^2)))/sum(fSig.^2) + epsilon;
+	efSig = reverse_wl(cumsum(sort(fSig.^2)))/sum(fSig.^2) + epsilon;
 % Wavelet Transform
 	wSig = FWT_PO(Sig,5,QMF_Filter);
-	ewSig = reverse(cumsum(sort(wSig.^2)))/sum(wSig.^2) + epsilon;
+	ewSig = reverse_wl(cumsum(sort(wSig.^2)))/sum(wSig.^2) + epsilon;
 	i = 1:length(ewSig);
 %
 	LockAxes([0 length(ewSig)/2 -8 0]);

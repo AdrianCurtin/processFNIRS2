@@ -17,14 +17,14 @@
 	qmf = MakeONFilter('Coiflet',3);
 	wc  = FWT_PO(trace,4,qmf);
 %
-	wprev       = reverse((sort(wc.^2)));
+	wprev       = reverse_wl((sort(wc.^2)));
 	thresh      = sqrt(wprev(p));
 	wct         = wc .* (abs(wc) >= thresh);
 	wave_recon  = IWT_PO(wct,4,qmf);
 %
 	dctcoef     = dct_iv(trace);
 %
-	dcrev       = reverse((sort(dctcoef.^2)));
+	dcrev       = reverse_wl((sort(dctcoef.^2)));
 	thresh      = sqrt(dcrev(p));
 	dctt        = dctcoef .* (abs(dctcoef) >= thresh);
 	dct_recon   = dct_iv(dctt);

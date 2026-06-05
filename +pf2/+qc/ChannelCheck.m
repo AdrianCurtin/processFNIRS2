@@ -2696,7 +2696,7 @@ function s = defaultQCSettings()
     s.enableCardiac = true;
     s.CardiacSNR = 3;
     s.enableCoV = true;
-    s.CoVThreshold = 0.1;            % 10%
+    s.CoVThreshold = 0.2;            % 20% (raw intensity runs higher CoV than Hb)
     s.enableTakizawa = true;
     s.TakizawaStrict = false;
 end

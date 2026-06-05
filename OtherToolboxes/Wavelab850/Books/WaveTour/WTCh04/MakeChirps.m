@@ -22,7 +22,7 @@ function sig = MakeChirps(Name,N);
 		P 	= floor(M/4);
 		enveloppe = ones(1,M); % the rising cutoff function 
             enveloppe(1:P) = (1+sin(-pi/2+((1:P)-ones(1,P))./(P-1)*pi))/2;
-            enveloppe(M-P+1:M) = reverse(enveloppe(1:P));
+            enveloppe(M-P+1:M) = reverse_wl(enveloppe(1:P));
   		env 	= zeros(1,N);
   		env(ceil(N/10):M+ceil(N/10)-1) = enveloppe(1:M);
 		sig     = (f1+f2).*env;
@@ -38,7 +38,7 @@ function sig = MakeChirps(Name,N);
 		a 	= 30*N/1024;
   		t 	= (1:N)./N.*pi;  
   		f2 	= cos(a.*(t.^3));
-  		f2 	= reverse(f2);
+  		f2 	= reverse_wl(f2);
 		ix 	= (-N:N)./N.*20;
  		g 	= exp(-ix.^2*4*N/1024);
 		i1 	= (N/2+1:N/2+N);
@@ -49,7 +49,7 @@ function sig = MakeChirps(Name,N);
 		sig 	= f1+f2+f3+f4;
    	enveloppe = ones(1,N); % the rising cutoff function 
   	enveloppe(1:N/8) = (1+sin(-pi/2+((1:N/8)-ones(1,N/8))./(N/8-1)*pi))/2;
-  	enveloppe(7*N/8+1:N) = reverse(enveloppe(1:N/8));
+  	enveloppe(7*N/8+1:N) = reverse_wl(enveloppe(1:N/8));
  		sig 	= sig.*enveloppe;
 	end;
 	      

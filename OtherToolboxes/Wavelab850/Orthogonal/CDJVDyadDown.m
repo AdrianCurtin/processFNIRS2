@@ -29,7 +29,7 @@ function blo = CDJVDyadDown(bhi,F,LEF,REF)
 %    CDJV -- Cohen, Daubechies, Jawerth and Vial, 1992.
 %
 	n = length(bhi); N = length(F)/2;
-	y        = conv(reverse(F),bhi);
+	y        = conv(reverse_wl(F),bhi);
 	LEDGE    = bhi(1:(3*N-1))';
 	REDGE    = bhi(n:-1:(n-(3*N-2)))';
 	LEvals   = LEF * LEDGE;

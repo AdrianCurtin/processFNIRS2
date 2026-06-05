@@ -47,11 +47,16 @@ function report = takizawa(data, varargin)
 %   CorrThreshold        - Pearson correlation threshold for Rule 2
 %                          (default: -0.9)
 %   BodyMovementThreshold - Jump threshold in mM*mm for Rule 4
-%                          (default: 0.15)
+%                          (default: 0.5). The published 0.15 value was
+%                          calibrated for Hitachi ETG-4000 verbal-fluency
+%                          data; 0.5 generalizes better across devices and
+%                          sampling rates without rejecting normal channels.
 %   BodyMovementWindow   - Window size in seconds for Rule 4
 %                          (default: 2)
-%   ProtocolDuration     - Reference protocol length in seconds for Rule 4
-%                          max-blocks scaling (default: 90)
+%   ProtocolDuration     - Reference protocol length in seconds for Rule 4.
+%                          The number of tolerated movement events scales as
+%                          floor(recordingLength / ProtocolDuration), min 1
+%                          (default: 90)
 %   IncludeBandPower     - Compute 2008 band-power metrics (default: false)
 %
 % Inputs:
@@ -94,7 +99,7 @@ addParameter(p, 'HFNoiseWindow', 15, @(x) isnumeric(x) && isscalar(x));
 addParameter(p, 'HFNoiseFraction', 0.5, @(x) isnumeric(x) && isscalar(x));
 addParameter(p, 'LFThreshold', 0.3, @(x) isnumeric(x) && isscalar(x));
 addParameter(p, 'CorrThreshold', -0.9, @(x) isnumeric(x) && isscalar(x));
-addParameter(p, 'BodyMovementThreshold', 0.15, @(x) isnumeric(x) && isscalar(x));
+addParameter(p, 'BodyMovementThreshold', 0.5, @(x) isnumeric(x) && isscalar(x));
 addParameter(p, 'BodyMovementWindow', 2, @(x) isnumeric(x) && isscalar(x));
 addParameter(p, 'ProtocolDuration', 90, @(x) isnumeric(x) && isscalar(x));
 addParameter(p, 'IncludeBandPower', false, @islogical);
@@ -277,11 +282,18 @@ if nT > ws + 1
         overBoth = overHbO & overHbT;
     end
 
-    jumpCountHbO = sum(overHbO, 1);
-    jumpCountHbT = sum(overHbT, 1);
-    jumpCountBoth = sum(overBoth, 1);
+    % Collapse consecutive over-threshold samples into discrete movement
+    % EVENTS (count rising edges) so one sustained artifact counts once
+    % instead of once per sample. The previous per-sample sum produced
+    % counts in the thousands and, compared against an allowed-block budget
+    % of order 1, rejected every channel of normal-range data.
+    jumpCountHbO  = sum(diff([zeros(1, nCh); overHbO],  1, 1) == 1, 1);
+    jumpCountHbT  = sum(diff([zeros(1, nCh); overHbT],  1, 1) == 1, 1);
+    jumpCountBoth = sum(diff([zeros(1, nCh); overBoth], 1, 1) == 1, 1);
 
-    maxBlocks = ws / (2 * timeLength / opts.ProtocolDuration);
+    % Allowed number of movement events, scaled by recording length
+    % (one tolerated event per reference protocol window, minimum one).
+    maxBlocks = max(1, floor(timeLength / opts.ProtocolDuration));
     rule4Fail = jumpCountBoth > maxBlocks;
 else
     jumpCountHbO = zeros(1, nCh);

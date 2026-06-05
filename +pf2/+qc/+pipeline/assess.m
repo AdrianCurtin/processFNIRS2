@@ -31,7 +31,9 @@ function report = assess(data, varargin)
 %   SCIThreshold   - SCI pass threshold (default: 0.75)
 %   CardiacBand    - [1x2] cardiac frequency band in Hz (default: [0.5, 2.5])
 %   CardiacSNR     - Minimum cardiac peak SNR to pass (default: 3)
-%   CoVThreshold   - Max coefficient of variation (default: 0.1)
+%   CoVThreshold   - Max coefficient of variation of the raw signal
+%                    (default: 0.2; raw fNIR intensity naturally runs
+%                    higher CoV than filtered Hb)
 %   LPFCutoff      - Low-pass cutoff for Hb in Hz (default: 0.1)
 %   TakizawaStrict - Use strict (OR) Takizawa criteria (default: false)
 %   Wavelengths    - Override wavelength layout for SCI (default: [])
@@ -61,7 +63,7 @@ addParameter(p, 'SaturationThreshold', 0.1, @(x) isnumeric(x) && isscalar(x));
 addParameter(p, 'SCIThreshold', 0.75, @(x) isnumeric(x) && isscalar(x));
 addParameter(p, 'CardiacBand', [0.5, 2.5], @(x) isnumeric(x) && numel(x) == 2);
 addParameter(p, 'CardiacSNR', 3, @(x) isnumeric(x) && isscalar(x));
-addParameter(p, 'CoVThreshold', 0.1, @(x) isnumeric(x) && isscalar(x));
+addParameter(p, 'CoVThreshold', 0.2, @(x) isnumeric(x) && isscalar(x));
 addParameter(p, 'LPFCutoff', 0.1, @(x) isnumeric(x) && isscalar(x));
 addParameter(p, 'TakizawaStrict', false, @islogical);
 addParameter(p, 'Wavelengths', [], @isnumeric);

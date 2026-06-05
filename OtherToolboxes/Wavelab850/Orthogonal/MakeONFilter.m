@@ -262,7 +262,7 @@ if strcmp(Type,'Battle'),
         l = length(g);
         f = zeros(1,2*l-1);
         f(l:2*l-1) = g;
-        f(1:l-1) = reverse(g(2:l));
+        f(1:l-1) = reverse_wl(g(2:l));
 end
 
 f = f ./ norm(f);

@@ -555,6 +555,22 @@ for b=1:length(bioMs) % reshape and get final statistics
         end
 end
 
+% Mostly-NaN guard: when segments share a sampling rate but not a common
+% time grid (e.g. different sub-sample phases from epoching), the no-resample
+% path leaves the averaged output almost entirely NaN with no error. Warn
+% loudly with the fix rather than returning a silently-blank average. Skipped
+% for single-point data (e.g. GLM betas) where one timepoint is expected.
+if(isfield(outGA,'HbO')&&isfield(outGA.HbO,'Mean')&&numel(outGA.time)>1)
+    nanFrac=mean(isnan(outGA.HbO.Mean(:)));
+    if(nanFrac>0.5)
+        warning('pf2:grandAvgFNIRS:mostlyNaN', ...
+            ['Grand average is %.0f%% NaN. The input segments likely share a ', ...
+             'sampling rate but not a common time grid. Pass an explicit ', ...
+             'resampleSize, or use pf2.data.blockAverage which aligns the grid ', ...
+             'automatically.'], 100*nanFrac);
+    end
+end
+
 
 if(averageAux)
     for aux=1:numAuxFields

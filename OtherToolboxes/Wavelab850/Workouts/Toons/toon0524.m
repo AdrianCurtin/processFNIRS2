@@ -4,7 +4,7 @@
 %
 	global wbrain
 %
-	wcsort = reverse(sort(abs(wbrain(:))));
+	wcsort = reverse_wl(sort(abs(wbrain(:))));
 %
 	wthresh = wcsort(floor(.01*65536));
 	cw_brain = wbrain .* (abs(wbrain) > wthresh);

@@ -21,7 +21,7 @@
 	AutoImage(abs(finger-r_finger));
 	title('First 10% Reconstruction Error');
 %
-	wcsort = reverse(sort(abs(wfinger(:))));
+	wcsort = reverse_wl(sort(abs(wfinger(:))));
 	wthresh = wcsort(floor(.10*262144));
 	cw_finger = wfinger .* (abs(wfinger) > wthresh);
 	r_finger = IPT2_WP(fbi_tree,cw_finger,qmf);

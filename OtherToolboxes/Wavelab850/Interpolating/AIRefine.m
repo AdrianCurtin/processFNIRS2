@@ -30,7 +30,7 @@ function a2 = AIRefine(a,D,Filter,EdgeFilter)
 % Adjustments at edges
 %
 	a2(1:D) = EdgeFilter * (a(1:(D+1))');
-	a2((n2-D+1):n2) = reverse(EdgeFilter * (reverse(a((n-D):n))'));
+	a2((n2-D+1):n2) = reverse_wl(EdgeFilter * (reverse_wl(a((n-D):n))'));
     
     
  

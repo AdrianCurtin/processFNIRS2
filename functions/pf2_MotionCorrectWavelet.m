@@ -136,7 +136,11 @@ function [y_norm,coeff] = NormalizationNoise(y,qmf)
 
     y_downsampled = DownDyadLo(y, qmf);
 
-    medianAbsDev = mad(y_downsampled);
+    % Median absolute deviation (base MATLAB — no Statistics Toolbox).
+    % Note: mad() defaults to MEAN absolute deviation, which is inconsistent
+    % with the 1.4826 MAD->sigma constant used below; the median form is the
+    % intended robust noise estimator (Molavi & Dumont 2012 / Homer2).
+    medianAbsDev = median(abs(y_downsampled - median(y_downsampled)));
 
     if medianAbsDev ~= 0
         y_norm =  (1/1.4826).*y./medianAbsDev;

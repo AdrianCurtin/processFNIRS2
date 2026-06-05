@@ -1,7 +1,7 @@
-function r = reverse(x)
+function r = reverse_wl(x)
 % reverse -- Reverse order of elements in 1-d signal
 %  Usage
-%    r = reverse(x)
+%    r = reverse_wl(x)
 %  Inputs
 %    x     1-d signal
 %  Outputs

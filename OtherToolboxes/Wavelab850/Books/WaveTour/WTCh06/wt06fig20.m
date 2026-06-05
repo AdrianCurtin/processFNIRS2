@@ -20,7 +20,7 @@ close all;
 	q = linspace(0,5,61);
 	wavelet = 'DerGauss';
 	par = 10000000;
-	x(n+1:2*n) = reverse(x);
+	x(n+1:2*n) = reverse_wl(x);
 
 figure(1);clf
        set(gcf, 'NumberTitle','off', 'Name','Window 1')

@@ -557,7 +557,10 @@ if(~channelCheck)
     try
         fmask=load(ch_mask_file,'fmask');
         fmask=fmask.fmask;
-        fprintf('\n%i Channels marked bad\n',sum(fmask<1));
+        nBad=sum(fmask<1);
+        if(nBad>0)
+            fprintf('%i channel(s) marked bad in saved rejection mask\n',nBad);
+        end
     catch
         fprintf('\nNo channel rejection present\n');
         fmask=[];
@@ -865,7 +868,8 @@ function loginfo=importCOBIlog(log_filename)
     loginfo=[];
 
     if (logfid==-1&&~isempty(log_filename))
-        warning('COBI log file not found, loading without log file');
+        % Companion COBI log is optional; absence is the common case
+        % (e.g. sample data), so proceed silently rather than warn.
         return;
     elseif(logfid==-1)
         %no file provided so just return

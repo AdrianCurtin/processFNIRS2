@@ -81,6 +81,7 @@ The toolbox provides various functions for manipulating fNIRS data:
 - `pf2.data.split`: Split fNIRS segments based on time points
 - `pf2.data.defineBlocks`: Convert markers to block struct array
 - `pf2.data.extractBlocks`: Extract fNIRS segments by block definitions
+- `pf2.data.blockAverage` / `grandAverage`: Trial/grand average epoched segments
 - `pf2.data.plot`: Visualize fNIRS data (Oxy, Raw, ROI, AuxData)
 - `pf2.qc`: Channel quality assessment (SCI, power spectrum, QC plots)
 - `pf2.export`: Export data to NIR or SNIRF formats
@@ -269,15 +270,32 @@ myprocesseddata.processingInfo.timestamp      % When processed
 ```
 
 ### Quality Control
-Assess signal quality before or after processing:
+Assess signal quality before or after processing. The recommended workflow is
+the headless QC pipeline (`assess` → `report`/`plotReport` → `apply`), with
+`snapshot` as a one-call summary:
 ```matlab
-% Scalp Coupling Index — measures optode-scalp contact quality
-sciResult = pf2.qc.sci(data);
-pf2.qc.plotQuality(sciResult);
+% One-call headless summary — runs all checks and writes dashboard + PSD + SCI
+% PNGs to a directory, returns the report struct
+report = pf2.qc.snapshot(data, 'SaveDir', 'qc_out');
 
-% Power spectrum — detect cardiac/respiratory peaks
-psdResult = pf2.qc.powerSpectrum(data, 'Signal', 'raw');
-pf2.qc.plotQuality(psdResult, 'Layout', 'tiled');
+% Programmatic pipeline (headless, no GUI)
+report = pf2.qc.pipeline.assess(data);            % checks: saturation, sci,
+                                                  %   cardiac, cov, takizawa
+report = pf2.qc.pipeline.assess(data, ...         % override thresholds / subset
+    'SCIThreshold', 0.8, 'Checks', {'saturation','sci','cov'});
+pf2.qc.pipeline.report(report);                   % per-channel text table
+pf2.qc.pipeline.plotReport(report, 'Visible', 'off', 'SavePath', 'qc.png');
+data = pf2.qc.pipeline.apply(data, report);       % AND results into data.fchMask
+% report.pass [1×nCh]; report.<check>.pass / .values
+
+% Interactive GUI (auto-runs all checks, probe grid, PSD); headless-safe with
+% 'SkipConfirmation', true
+app = pf2.qc.ChannelCheck(data);
+
+% Individual primitives
+sciResult = pf2.qc.sci(data);                     % Scalp Coupling Index
+psdResult = pf2.qc.powerSpectrum(data, 'Signal', 'raw');  % cardiac/resp peaks
+pf2.qc.plotQuality(sciResult);
 ```
 
 ### Block Definition & Extraction
@@ -291,11 +309,17 @@ blocks = pf2.data.defineBlocks(data, [49, 50], 30, ...
 blocks = pf2.data.importBlockInfo(blocks, 'trial_data.csv', ...
     'MarkerCode', [49, 50]);
 
-% Extract fNIRS segments aligned to block onset
+% Extract fNIRS segments aligned to block onset. NOTE: PreTime and PostTime
+% both default to 120 s — always set them, or a short block becomes a very
+% long segment.
 segments = pf2.data.extractBlocks(data, blocks, ...
-    'PreTime', 10, 'SetT0', true, 'CopyInfo', true);
+    'PreTime', 5, 'PostTime', 15, 'SetT0', true);
 
-% Feed directly into Experiment
+% Single-subject trial/grand average onto a common grid (one call)
+ga = pf2.data.blockAverage(segments);             % or pf2.data.grandAverage
+plot(ga.time, ga.HbO.Mean(:,1));                  % ga.<HbO|...>.{Mean,SEM,SD,N}
+
+% Or feed segments into Experiment for multi-condition / group analysis
 ex = exploreFNIRS.core.Experiment(segments);
 ```
 
@@ -503,6 +527,7 @@ processFNIRS2 is laid out in the following manner:
   - split: Split fNIRS segment based on different input times
   - defineBlocks: Convert markers to block struct array
   - extractBlocks: Extract fNIRS segments by block definitions
+  - blockAverage / grandAverage: Trial/grand average of epoched segments
   - blocksToEvents: Convert blocks to GLM event structs
   - betasToSegments: Package GLM betas for Experiment
   - **plot**: Functions to visualize fNIRS data

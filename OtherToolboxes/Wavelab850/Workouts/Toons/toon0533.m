@@ -14,10 +14,10 @@
 %
 	dccoef = dct_iv(trace);
 %
-	wprev = reverse(cumsum(sort(wpcoef.^2)));
-	wcrev = reverse(cumsum(sort(wc    .^2)));
-	dcrev = reverse(cumsum(sort(dccoef.^2)));
-	cprev = reverse(cumsum(sort(cpcoef.^2)));
+	wprev = reverse_wl(cumsum(sort(wpcoef.^2)));
+	wcrev = reverse_wl(cumsum(sort(wc    .^2)));
+	dcrev = reverse_wl(cumsum(sort(dccoef.^2)));
+	cprev = reverse_wl(cumsum(sort(cpcoef.^2)));
 	ymax = log10(wcrev(1));
 	ymin = log10(wcrev(100));
 %

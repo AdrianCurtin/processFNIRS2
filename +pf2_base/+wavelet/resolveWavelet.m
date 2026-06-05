@@ -34,6 +34,15 @@ function [qmf, wavename, desc] = resolveWavelet(name)
 
     name = lower(strtrim(name));
 
+    % Ensure WaveLab (MakeONFilter) is on the path. The wavelet processing
+    % functions (pf2_MotionCorrectWavelet, waveClean, pf2_kbWF) bootstrap it
+    % themselves; resolveWavelet may also be called directly, so bootstrap
+    % here when needed. Guarded by exist() so the one-time setup runs at most
+    % once per session.
+    if exist('MakeONFilter', 'file') ~= 2
+        pf2_base.toolboxes.setup_wavelab();
+    end
+
     % --- Daubechies: db2..db10 ---
     tok = regexp(name, '^db(\d+)$', 'tokens');
     if ~isempty(tok)

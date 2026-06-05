@@ -32,7 +32,7 @@ function PlotCoeffComparison(wp,wp_stree,cp,cp_stree,titlestr)
 	coefwplevel = wp(:,bestwplevel)';
 	coefwplevel = coefwplevel ./max(abs(coefwplevel));
 	PlotSpikes(1,t,coefwplevel);
-	coefwplevel = reverse(sort(abs(coefwplevel))) ;
+	coefwplevel = reverse_wl(sort(abs(coefwplevel))) ;
 %
 	wtree = zeros(1,2^L);
 	for d=0:(D-1)
@@ -42,31 +42,31 @@ function PlotCoeffComparison(wp,wp_stree,cp,cp_stree,titlestr)
 	coefwpwave = UnpackBasisCoeff(wtree,wp);
 	coefwpwave = coefwpwave ./max(abs(coefwpwave));
 	PlotSpikes(2,t, coefwpwave);
-	coefwpwave = reverse(sort(abs(coefwpwave)));
+	coefwpwave = reverse_wl(sort(abs(coefwpwave)));
 %
 	btreewp    = BestBasis(wp_stree,D);
 	coefwpbest = UnpackBasisCoeff(btreewp,wp);
 	coefwpbest = coefwpbest ./max(abs(coefwpbest));
 	PlotSpikes(3,t,coefwpbest);
-	coefwpbest = reverse(sort(abs(coefwpbest)));
+	coefwpbest = reverse_wl(sort(abs(coefwpbest)));
 %
 	[n,L] = size(cp); D=L-1;
 	bestcplevel = CompareStdBases(cp_stree,D);
 	coefcplevel = cp(:,bestcplevel)';
 	coefcplevel = coefcplevel ./max(abs(coefcplevel));
 	PlotSpikes(4,t,coefcplevel);
-	coefcplevel = reverse(sort(abs(coefcplevel)));
+	coefcplevel = reverse_wl(sort(abs(coefcplevel)));
 %
 	coefcpfour = cp(:,1)';
 	coefcpfour = coefcpfour ./max(abs(coefcpfour));
 	PlotSpikes(5,t,coefcpfour);
-	coefcpfour = reverse(sort(abs(coefcpfour)));
+	coefcpfour = reverse_wl(sort(abs(coefcpfour)));
 %
 	btreecp    = BestBasis(cp_stree,D);
 	coefcpbest = UnpackBasisCoeff(btreecp,cp);
 	coefcpbest = coefcpbest ./max(abs(coefcpbest));
 	PlotSpikes(6,t,coefcpbest);
-	coefcpbest = reverse(sort(abs(coefcpbest)));
+	coefcpbest = reverse_wl(sort(abs(coefcpbest)));
 %
 	title(['Basis Comparison for signal ' titlestr]);
 	ylabel('Basis'); xlabel('Coeff Index');

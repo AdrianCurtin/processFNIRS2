@@ -21,7 +21,7 @@ function x = MakeProcess(NR,N);
   enveloppe = ones(1,N); % the rising cutoff function 
   start = (1:M);       % the rising cutoff interval
   enveloppe(start) = (1+sin(-pi/2+(start-ones(1,M))./(M-1)*pi))/2;
-  enveloppe(N-M+1:N) = reverse(enveloppe(1:M));
+  enveloppe(N-M+1:N) = reverse_wl(enveloppe(1:M));
 % ---------- the lsp (x) -----------------------------------
   beta = .3;
   for i = 1:NR,

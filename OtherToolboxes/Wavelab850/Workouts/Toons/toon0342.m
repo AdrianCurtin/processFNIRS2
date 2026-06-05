@@ -19,13 +19,13 @@
 	title('S8 Transform of Doppler Object')
 %
 	subplot(223); 
-	ordcoef = reverse(sort(abs(wcHaar)));
+	ordcoef = reverse_wl(sort(abs(wcHaar)));
 	semilogy(ordcoef)
 	title('Ordered Haar Coefficients')
 	axis([0 300 10^(-2) 10^1 ])
 %
 	subplot(224); 
-	ordcoef = reverse(sort(abs(wcS8)));
+	ordcoef = reverse_wl(sort(abs(wcS8)));
 	semilogy(ordcoef)
 	axis([0 300 10^(-2) 10^1 ])
 	title('Ordered S8 Wavelet Coefficients')

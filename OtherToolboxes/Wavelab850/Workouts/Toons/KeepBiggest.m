@@ -3,7 +3,7 @@ function sparse = KeepBiggest(dense,N)
 %  Usage
 %    sparse = KeepBiggest(dense,N)
 %
-	ordered   = reverse(sort(abs(dense(:))));
+	ordered   = reverse_wl(sort(abs(dense(:))));
 	threshold = ordered(N);
 	sparse    = dense .* (abs(dense) >= threshold);
     

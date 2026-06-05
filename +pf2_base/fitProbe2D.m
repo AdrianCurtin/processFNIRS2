@@ -42,8 +42,7 @@ end
 
 
 plotFigs=false;
-fprintf('Autoplacing Channels\n');
-    
+
 global chAxesHandles
 
 numCh=length(ChxList);

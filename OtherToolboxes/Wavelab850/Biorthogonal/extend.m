@@ -8,7 +8,7 @@ function y = extend(x,par1,par2)
 	elseif par1==2 & par2==1,
 	  y = [x x(length(x):-1:2)];
 	elseif par1==2 & par2==2,
-	  y = [x reverse(x)];
+	  y = [x reverse_wl(x)];
 	end
 
 % 

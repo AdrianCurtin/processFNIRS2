@@ -36,7 +36,7 @@ function PlotThermoPartition(sq,z,cw,scales,q)
 			fprintf('Exponent %g not found in q\n',sq(k))
 		end
 %		loglog(scales,z(j,:)); hold on;
-		plot(log2(reverse(scales)),log2(z(j,:))); hold on;
+		plot(log2(reverse_wl(scales)),log2(z(j,:))); hold on;
 %		text(scales(1)*.8,z(j,1),sprintf('q=%5.2f',sq(k)));
 		text(log2(scales(1))*.98,log2(z(j,length(z(j,:)))),sprintf('q=%5.2f',sq(k)));
 	end

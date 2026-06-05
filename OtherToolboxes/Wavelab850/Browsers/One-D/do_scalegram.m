@@ -31,8 +31,8 @@ for i = L:J-1
 end
 nsp = length( x_work )/2;
 sp = wl_spectrum( x_work, nsp );
-sg = reverse( sg );
-sp = reverse( sp )/sqrt(nx);
+sg = reverse_wl( sg );
+sp = reverse_wl( sp )/sqrt(nx);
 tsg = (L:J-1)-1;
 tsp = 1:nsp;tsp = log(tsp) ./ log(2);
 

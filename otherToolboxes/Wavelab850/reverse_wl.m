@@ -1,7 +1,7 @@
-function r = reverse(x)
+function r = reverse_wl(x)
 % reverse -- Reverse order of elements in 1-d signal
 %  Usage
-%    r = reverse(x)
+%    r = reverse_wl(x)
 %  Inputs
 %    x     1-d signal
 %  Outputs
@@ -17,11 +17,19 @@ function r = reverse(x)
 %     
     
     
+%   
+% Part of WaveLab Version 802
+% Built Sunday, October 3, 1999 8:52:27 AM
+% This is Copyrighted Material
+% For Copying permissions see COPYING.m
+% Comments? e-mail wavelab@stat.stanford.edu
+%   
+    
  
  
 %
 %  Part of Wavelab Version 850
-%  Built Tue Jan  3 13:20:41 EST 2006
+%  Built Tue Jan  3 13:20:38 EST 2006
 %  This is Copyrighted Material
 %  For Copying permissions see COPYING.m
 %  Comments? e-mail wavelab@stat.stanford.edu 

@@ -45,7 +45,7 @@ function do_wpcompress
 
 
 	% calculate sorted wavelet coefficients
-	wcsort = reverse(sort(abs(wc(:))));
+	wcsort = reverse_wl(sort(abs(wc(:))));
 	i = floor(1 + .05 * (n-1)) ;
 	thr = wcsort(i);
 

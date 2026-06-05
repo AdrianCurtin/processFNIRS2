@@ -14,7 +14,7 @@ function PlotCompressNumbers(coef,signaltitle)
 %    reconstructing with more coefficients.
 %  
 	energy = sum(coef.^2);
-	cm     = [energy (energy - cumsum(reverse(sort(coef.^2))))];
+	cm     = [energy (energy - cumsum(reverse_wl(sort(coef.^2))))];
 	plot(0:length(coef),log(cm)); xlabel('m'); ylabel('log(c_m)');
 	title(sprintf('Compression Numbers: %s',signaltitle))
 

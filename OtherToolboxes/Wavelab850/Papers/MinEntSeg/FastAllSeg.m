@@ -30,8 +30,8 @@ else
 	    leftsub  = fine(1:2:n2-1); 
 	    rightsub = fine(2:2:n2);
 	    coarse   = (leftsub + rightsub) /2;
-	    r1refine = off_filter(coarse,reverse(R2(1,:)),3);
-	    r2refine = off_filter(coarse,reverse(R2(2,:)),3);
+	    r1refine = off_filter(coarse,reverse_wl(R2(1,:)),3);
+	    r2refine = off_filter(coarse,reverse_wl(R2(2,:)),3);
 	    l1refine = off_filter(coarse,       (R2(1,:)),-1);
 	    l2refine = off_filter(coarse,       (R2(2,:)),-1);
 

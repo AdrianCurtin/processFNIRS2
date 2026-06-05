@@ -23,7 +23,7 @@
 	axis([0 11 10^(-6) 10^1 ])
 %
 	subplot(224); 
-	ordcoef = reverse(sort(abs(wc)));
+	ordcoef = reverse_wl(sort(abs(wc)));
 	semilogy(ordcoef)
 	title('Ordered DWT Coefficients')
 	axis([0 300 10^(-6) 10^1 ])

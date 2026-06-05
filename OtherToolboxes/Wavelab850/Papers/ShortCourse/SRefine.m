@@ -9,7 +9,7 @@ function a2 = SRefine(a,D,FilterTaps,EdgeFilter,Sfilter,k0,kk0)
 	temp = conv(FilterTaps,ae);
 	a2((D+1):(n2-D)) = temp((2*D+1):(n2));
 	a2(1:D) = EdgeFilter * (a(1:(D+1))');
-	a2((n2-D+1):n2) = reverse(EdgeFilter * (reverse(a((n-D):n))'));
+	a2((n2-D+1):n2) = reverse_wl(EdgeFilter * (reverse_wl(a((n-D):n))'));
 	a2((1+ 2*k0 - D):(1 + 2*k0 + D+1)) = Sfilter * (a((1+kk0-D-1):(1+kk0+D))');
     
 %  Revision History

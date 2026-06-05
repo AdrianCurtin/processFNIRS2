@@ -33,7 +33,7 @@
 %		Draw Polynomial
 %
 	 xx   = linspace(ord(1),ord(5)+1,100);
-	 y    = polyval(reverse(pol),xx);
+	 y    = polyval(reverse_wl(pol),xx);
 	 plot(xx,y,'-');
 %
 %		Impute Averages 

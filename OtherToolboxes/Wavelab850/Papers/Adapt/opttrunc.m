@@ -1,4 +1,4 @@
-function urisk = opttrunc(y)% opttrunc -- Perform Truncation%  Usage%    urisk = opttrunc(y)%tails = reverse(cumsum(reverse(abs(y).^2)));n = length(y);penalty = (-n):2:(n-2);urisk = tails + penalty;         
+function urisk = opttrunc(y)% opttrunc -- Perform Truncation%  Usage%    urisk = opttrunc(y)%tails = reverse_wl(cumsum(reverse_wl(abs(y).^2)));n = length(y);penalty = (-n):2:(n-2);urisk = tails + penalty;         
  
 %
 %  Part of Wavelab Version 850

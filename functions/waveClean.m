@@ -103,7 +103,6 @@ end
 % Resolve wavelet family
 [QMF_Filter, ~, ~] = pf2_base.wavelet.resolveWavelet(wavelet);
 
-mL=9;
 cleanOD_out=nan(size(dataIn));
 numCh=size(dataIn,2);
 sigLength=size(dataIn,1);
@@ -182,10 +181,11 @@ function cleanCol = waveCleanChannel(signalOD, level, alpha, convert2OD, QMF_Fil
 
         L=level;
 
-        dw(L,:)=FWT_PO(sig,L,QMF_Filter);
+        dwRow=FWT_PO(sig,L,QMF_Filter);
+        dwRow=dwRow(:).';   % FWT_PO may return a column; keep a row (as the old dw(L,:) layout)
 
-        cA{i}=dw(L,1:2^L);
-        cD{i}=dw(L,2^L+1:end);
+        cA{i}=dwRow(1:2^L);
+        cD{i}=dwRow(2^L+1:end);
 
         x=cD{i};
 
@@ -198,15 +198,18 @@ function cleanCol = waveCleanChannel(signalOD, level, alpha, convert2OD, QMF_Fil
         end
     end
 
-    sigma=(nanmedian(abs(cDarr))/0.6745);
+    sigma=(median(abs(cDarr),'omitnan')/0.6745);
 
     for i=1:length(s)
 
-        p=(2*(1-normcdf(abs(cD{i})/sigma)));
+        % p = 2*(1-normcdf(|cD|/sigma)) == erfc(|cD|/(sigma*sqrt(2)))
+        % (erfc is base MATLAB; avoids the Statistics Toolbox normcdf)
+        p=erfc(abs(cD{i})/(sigma*sqrt(2)));
         x=cD{i};
         x(p<alpha)=0;
         cD{i}=x;
-        iw(L,:)=IWT_PO([cA{i} cD{i}],L,QMF_Filter);
+        iwRow=IWT_PO([cA{i} cD{i}],L,QMF_Filter);
+        iwRow=iwRow(:).';   % keep a row (matches the original iw(L,:) layout)
 
         if(showPlot&&i==2)
             figure(1);
@@ -215,8 +218,8 @@ function cleanCol = waveCleanChannel(signalOD, level, alpha, convert2OD, QMF_Fil
             title(sprintf('Original Signal %d',mean(sig(1:500))));
             ylim([min(sig(1:500)),max(sig(1:500))]);
             subplot(2,1,2);
-            plot(iw(L,1:maxSize));
-            title(['Reconstructed Signal at level ' sprintf('%i %d',L,mean(iw(L,1:500)))]);
+            plot(iwRow(1:maxSize));
+            title(['Reconstructed Signal at level ' sprintf('%i %d',L,mean(iwRow(1:500)))]);
             ylim([min(sig(1:500)),max(sig(1:500))]);
         end
 
@@ -233,7 +236,7 @@ function cleanCol = waveCleanChannel(signalOD, level, alpha, convert2OD, QMF_Fil
 
         ind=[zeros(1,cutprm1),ones(1,maxSize-cutprm1-cutprm2),zeros(1,cutprm2)]==1;
         t1=t{i};
-        combinedSig(i,round(t1(ind)))=iw(L,ind);
+        combinedSig(i,round(t1(ind)))=iwRow(ind);
 
     end
 
@@ -251,7 +254,17 @@ function cleanCol = waveCleanChannel(signalOD, level, alpha, convert2OD, QMF_Fil
         hold off;
     end
 
-    cleanOD=nanmean(combinedSig);
+    cleanOD=mean(combinedSig,1,'omitnan');
+
+    % Edge samples not covered by any un-cropped window remain NaN (the first
+    % and last ~cutprm samples, and any interior gap for short signals). Fall
+    % back to the original signal there so the output is always finite —
+    % conservative: leaves the boundary samples uncleaned rather than
+    % fabricating periodization-wrapped values.
+    nanMask=~isfinite(cleanOD);
+    if any(nanMask)
+        cleanOD(nanMask)=signalOD(nanMask).';
+    end
 
     if(convert2OD)
         cleanOD=10.^cleanOD;

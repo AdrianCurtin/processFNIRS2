@@ -17,8 +17,8 @@ function Compare2(x,y,L,tit)
 %    it is the logarithms of the tail sums that are compared.
 %
     epsilon=1e-15;
-	cox = reverse(cumsum(sort(x((2^L+1):length(x)).^2)));
-	coy = reverse(cumsum(sort(y((2^L+1):length(x)).^2)));
+	cox = reverse_wl(cumsum(sort(x((2^L+1):length(x)).^2)));
+	coy = reverse_wl(cumsum(sort(y((2^L+1):length(x)).^2)));
 	LockAxes([ 0 100 log(coy(100)) log(coy(1))]);
 	plot(log(coy+epsilon)); hold on; plot(log(cox+epsilon),'--'); hold off
 	title(tit); UnlockAxes; 
