@@ -23,14 +23,26 @@ function allData = importDirectory(dirPath, pattern, varargin)
 %   'Dir2'            - Info field name for 2nd folder level (default: 'dir2')
 %   'Dir3'            - Info field name for 3rd folder level (default: 'dir3')
 %   'Dir4'            - Info field name for 4th folder level (default: 'dir4')
+%   'Filename'        - Info field name populated from each file's name
+%                       (without extension), e.g. 'Filename', 'SubjectID'.
+%                       Use for flat directories where the importer-embedded
+%                       SubjectID is identical across files. Opt-in: when
+%                       omitted, no field is overwritten.
 %   'ChannelCheck'    - Show interactive channel quality GUI (default: false)
 %   'ContinueOnError' - Skip failed files instead of stopping (default: true)
 %   'Verbose'         - Print progress and summary messages (default: true)
 %
 % Outputs:
 %   allData - Cell array of imported fNIRS data structs {1 x N}
-%             Each struct has .info fields populated from directory levels.
-%             Failed imports are omitted when ContinueOnError is true.
+%             Each struct has .info fields populated from directory levels,
+%             plus .info.sourcePath (the imported file path). Failed imports
+%             are omitted when ContinueOnError is true.
+%
+% Notes:
+%   If more than one imported file carries the same .info.SubjectID, a
+%   warning is issued: duplicate SubjectIDs break per-subject grouping and
+%   pf2.data.importInfo (which keys on SubjectID). Supply 'Filename',
+%   'SubjectID' or a 'DirN', 'SubjectID' mapping to assign unique IDs.
 %
 % Algorithm:
 %   1. Validate dirPath and resolve to absolute path
@@ -51,6 +63,10 @@ function allData = importDirectory(dirPath, pattern, varargin)
 %   allData = pf2.import.importDirectory('data/', '*.hdr', ...
 %       'Dir1', 'Group', 'Dir2', 'SubjectID');
 %
+%   % Flat folder: use each file's name as the SubjectID
+%   allData = pf2.import.importDirectory('data/', '*.snirf', ...
+%       'Filename', 'SubjectID');
+%
 %   % Feed directly into experiment
 %   ex = exploreFNIRS.core.Experiment(allData);
 %
@@ -65,6 +81,7 @@ function allData = importDirectory(dirPath, pattern, varargin)
     p.addParameter('Dir2', '', @(x) ischar(x) || isstring(x));
     p.addParameter('Dir3', '', @(x) ischar(x) || isstring(x));
     p.addParameter('Dir4', '', @(x) ischar(x) || isstring(x));
+    p.addParameter('Filename', '', @(x) ischar(x) || isstring(x));
     p.addParameter('ChannelCheck', false, @islogical);
     p.addParameter('ContinueOnError', true, @islogical);
     p.addParameter('Verbose', true, @islogical);
@@ -110,6 +127,7 @@ function allData = importDirectory(dirPath, pattern, varargin)
             dirFieldNames{k} = char(dirFieldNames{k});
         end
     end
+    filenameField = char(opts.Filename);
 
     % --- Find matching files ---
     matches = recursiveDir(dirPath, pattern);
@@ -127,9 +145,11 @@ function allData = importDirectory(dirPath, pattern, varargin)
     % --- Pre-compute paths for loop (required for parfor: no struct indexing) ---
     fullPaths = cell(1, nFiles);
     relParts = cell(1, nFiles);
+    fileBasenames = cell(1, nFiles);
     for i = 1:nFiles
         fullPaths{i} = fullfile(matches(i).folder, matches(i).name);
         relParts{i} = getRelativeParts(matches(i).folder, dirPath);
+        [~, fileBasenames{i}, ~] = fileparts(matches(i).name);
     end
 
     % --- Import loop (parallel when pool available) ---
@@ -145,16 +165,12 @@ function allData = importDirectory(dirPath, pattern, varargin)
         end
 
         continueOnError = opts.ContinueOnError;
-        nDirFields = 4;
 
         parfor i = 1:nFiles
             try
                 data = importFn(fullPaths{i});
-                parts = relParts{i};
-                for k = 1:min(numel(parts), nDirFields)
-                    data.info.(dirFieldNames{k}) = parts{k};
-                end
-                data.info.sourcePath = fullPaths{i};
+                data = applyInfoFields(data, relParts{i}, dirFieldNames, ...
+                    filenameField, fileBasenames{i}, fullPaths{i});
                 allData{i} = data;
             catch ME
                 if ~continueOnError
@@ -173,12 +189,8 @@ function allData = importDirectory(dirPath, pattern, varargin)
 
             try
                 data = importFn(fullPaths{i});
-
-                parts = relParts{i};
-                for k = 1:min(numel(parts), 4)
-                    data.info.(dirFieldNames{k}) = parts{k};
-                end
-                data.info.sourcePath = fullPaths{i};
+                data = applyInfoFields(data, relParts{i}, dirFieldNames, ...
+                    filenameField, fileBasenames{i}, fullPaths{i});
                 allData{i} = data;
 
             catch ME
@@ -218,12 +230,65 @@ function allData = importDirectory(dirPath, pattern, varargin)
         warning('pf2:importDirectory:allFailed', ...
             'All %d files failed to import.', nFiles);
     end
+
+    % --- Warn if SubjectIDs collide (breaks grouping / importInfo) ---
+    if nImported > 1
+        warnDuplicateSubjectIDs(allData, filenameField);
+    end
 end
 
 
 % =========================================================================
 % Local helper functions
 % =========================================================================
+
+function data = applyInfoFields(data, parts, dirFieldNames, filenameField, basename, fullPath)
+% APPLYINFOFIELDS Populate .info from directory levels, filename, and source path.
+%   Shared by the parfor and sequential import branches so the two paths
+%   cannot drift. Defined as a subfunction (not nested) to stay parfor-safe.
+    for k = 1:min(numel(parts), numel(dirFieldNames))
+        data.info.(dirFieldNames{k}) = parts{k};
+    end
+    data.info.sourcePath = fullPath;
+    if ~isempty(filenameField)
+        data.info.(filenameField) = basename;
+    end
+end
+
+
+function warnDuplicateSubjectIDs(allData, filenameField)
+% WARNDUPLICATESUBJECTIDS Warn when imported files share a SubjectID value.
+%   Duplicate SubjectIDs break per-subject grouping and pf2.data.importInfo
+%   (which keys on SubjectID). Silent when the field is absent on all files
+%   or when every present ID is unique.
+    ids = strings(1, numel(allData));
+    hasField = false;
+    for i = 1:numel(allData)
+        d = allData{i};
+        if isfield(d, 'info') && isfield(d.info, 'SubjectID') && ~isempty(d.info.SubjectID)
+            ids(i) = string(d.info.SubjectID);
+            hasField = true;
+        end
+    end
+    if ~hasField
+        return;
+    end
+    nonEmpty = ids(strlength(ids) > 0);
+    nUnique = numel(unique(nonEmpty));
+    if nUnique < numel(nonEmpty)
+        if strcmpi(filenameField, 'SubjectID')
+            hint = 'Check that filenames are unique.';
+        else
+            hint = ['Supply ''Filename'', ''SubjectID'' (use the filename as ID) ' ...
+                    'or a ''DirN'', ''SubjectID'' mapping to assign unique IDs.'];
+        end
+        warning('pf2:importDirectory:duplicateSubjectID', ...
+            ['%d imported file(s) share a SubjectID (%d unique value(s)). ' ...
+             'Per-subject grouping and pf2.data.importInfo keyed on SubjectID ' ...
+             'will fail. %s'], numel(nonEmpty), nUnique, hint);
+    end
+end
+
 
 function fn = getImporterForExtension(ext, channelCheck)
 % GETIMPORTERFOREXTENSION Return import function handle for a file extension

@@ -200,10 +200,15 @@ report.timestamp = datetime('now');
 report.processing = procInfo;
 report.params = opts;
 
-% Pre-initialize all check fields so isfield() always works
+% Pre-initialize only the SELECTED checks, so each check's case has sane
+% defaults (pass=true, skipped=true) if it returns early. Non-selected
+% checks are intentionally absent from the report — every consumer
+% (report, plotReport, apply, the summary table) iterates report.checkNames
+% and guards field access with isfield, so a report contains exactly the
+% checks that were run.
 emptyCheck = struct('pass', true(1, nChannels), 'skipped', true);
-for vc = 1:numel(validChecks)
-    report.(validChecks{vc}) = emptyCheck;
+for vc = 1:numel(checks)
+    report.(checks{vc}) = emptyCheck;
 end
 
 %% Run checks

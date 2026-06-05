@@ -167,8 +167,17 @@ for s = 1:nStructs
     if isempty(matchIdx)
         keyStr = strjoin(cellfun(@(k,v) sprintf('%s=%s', k, string(v)), ...
             keys, keyVals, 'UniformOutput', false), ', ');
+        hint = '';
+        nShared = countStructsWithKeyVals(dataCell, keys, keyVals);
+        if nShared > 1
+            hint = sprintf([' Note: %d of %d imported structs share these ' ...
+                'key value(s) and cannot be matched to distinct rows -- a ' ...
+                'directory import may have assigned the same key to multiple ' ...
+                'files (see the ''Filename'' option of pf2.import.importDirectory).'], ...
+                nShared, nStructs);
+        end
         error('pf2:data:importInfo:noMatch', ...
-            'No rows match struct %d (%s).', s, keyStr);
+            'No rows match struct %d (%s).%s', s, keyStr, hint);
     end
 
     if numel(matchIdx) > 1
@@ -213,4 +222,29 @@ else
     data = dataCell{1};
 end
 
+end
+
+
+function n = countStructsWithKeyVals(dataCell, keys, keyVals)
+% COUNTSTRUCTSWITHKEYVALS Count structs whose key fields all equal keyVals.
+%   Used to diagnose no-match failures caused by duplicate identifiers
+%   (e.g. several files imported with the same SubjectID).
+    n = 0;
+    for i = 1:numel(dataCell)
+        d = dataCell{i};
+        if ~isfield(d, 'info')
+            continue;
+        end
+        allEq = true;
+        for k = 1:numel(keys)
+            if ~isfield(d.info, keys{k}) || ...
+                    ~isequal(string(d.info.(keys{k})), string(keyVals{k}))
+                allEq = false;
+                break;
+            end
+        end
+        if allEq
+            n = n + 1;
+        end
+    end
 end
