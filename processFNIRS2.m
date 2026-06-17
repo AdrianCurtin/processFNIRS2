@@ -456,7 +456,11 @@ if(isstruct(data)) %treat as fNIR struct
             end
         end
     end
-    
+
+    if(isfield(data,'markers'))
+        data.markers=pf2_base.normalizeMarkers(data.markers);
+    end
+
     
     dataFields=fields(data);  % copy bio marker fields
     for i=1:length(dataFields)
@@ -525,6 +529,9 @@ end
 if(~isempty(p.Results.markers))
     fData.markers=p.Results.markers; %Overwrite markers if specified
 end
+
+% Canonical marker representation: always a table
+fData.markers=pf2_base.normalizeMarkers(fData.markers);
 
 if(isstruct(tempOxyStage))
     fData.stage{4}=tempOxyStage; %Assign stage3 if exists
@@ -665,9 +672,9 @@ if(nargout>0)
       if(isfield(fData,'markers')&&~isempty(fData.markers))
            if(PF2.OutputLegacyMarkers)
                outfNIR.markers=[];
-               outfNIR.markers.data=fData.markers;
+               outfNIR.markers.data=pf2_base.markersToArray(fData.markers);
            else
-               outfNIR.markers=fData.markers;
+               outfNIR.markers=pf2_base.normalizeMarkers(fData.markers);
            end
        end
        

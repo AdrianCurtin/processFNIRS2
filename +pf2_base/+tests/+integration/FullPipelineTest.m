@@ -187,10 +187,19 @@ classdef FullPipelineTest < matlab.unittest.TestCase
             testCase.verifyTrue(isfield(processed, 'markers'), ...
                 'Output should contain markers field');
 
-            % Verify markers content is preserved
-            if isnumeric(inputData.markers) && isnumeric(processed.markers)
-                testCase.verifyEqual(size(processed.markers), size(inputData.markers), ...
-                    'Marker array dimensions should be preserved');
+            % Verify markers content is preserved: same row count AND the
+            % canonical table schema, so a dropped Code/Amplitude column is
+            % caught (not just a count match).
+            testCase.verifyEqual(size(processed.markers, 1), size(inputData.markers, 1), ...
+                'Marker count should be preserved');
+            if istable(processed.markers) && ~isempty(processed.markers)
+                testCase.verifyEqual(processed.markers.Properties.VariableNames(1:4), ...
+                    {'Time','Code','Duration','Amplitude'}, ...
+                    'Processed markers must retain the canonical variables');
+                if istable(inputData.markers)
+                    testCase.verifyEqual(processed.markers.Code, inputData.markers.Code, ...
+                        'Marker codes should be preserved through processing');
+                end
             end
         end
 

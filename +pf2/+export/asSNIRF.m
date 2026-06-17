@@ -238,55 +238,78 @@ for n = 1:numNIRS
     % Set up stimulus data
     stim = [];
 
+    % Resolve the dataset marker dictionary (code->label) so condition names
+    % are serialized even when the markers table carries no label column.
+    dictTbl = [];
+    if isfield(curStruct, 'info') && isstruct(curStruct.info)
+        if isfield(curStruct.info, 'markerDict') && ~isempty(curStruct.info.markerDict)
+            dictTbl = pf2_base.normalizeMarkerDict(curStruct.info.markerDict);
+        elseif isfield(curStruct.info, 'eventTypes') && ~isempty(curStruct.info.eventTypes)
+            dictTbl = pf2_base.normalizeMarkerDict(curStruct.info.eventTypes);
+        end
+    end
+
     if isfield(curStruct, 'markers') && ~isempty(curStruct.markers)
         % Check if markers is a table or numeric array
         if istable(curStruct.markers)
-            % Handle table format
-            markerNames = curStruct.markers.Properties.VariableNames;
-            
-            % Find columns that could contain marker values
-            valueCol = find(contains(lower(markerNames), {'value', 'type', 'code', 'id'}), 1);
-            if isempty(valueCol), valueCol = 2; end
-            
-            % Find time column
-            timeCol = find(contains(lower(markerNames), {'time', 'onset'}), 1);
-            if isempty(timeCol), timeCol = 1; end
-            
-            % Find duration column 
-            durationCol = find(contains(lower(markerNames), {'duration', 'length'}), 1);
-            if isempty(durationCol), durationCol = 3; end
-            
-            % Convert to numeric array if possible
-            markerData = table2array(curStruct.markers);
-            [uniqueMarkers, ~, markerIndices] = unique(markerData(:, valueCol));
-            
-            % Create stim entries for each unique marker
-            for m = 1:length(uniqueMarkers)
-                markerIdx = markerData(:, valueCol) == uniqueMarkers(m);
-                stimItem = [];
-                
-                % Use name from table if available, otherwise generate
-                if isfield(curStruct.markers, 'name')
-                    stimNames = unique(curStruct.markers.name(markerIdx));
-                    stimItem.name = c2v(stimNames{1});
-                else
-                    stimItem.name = c2v(sprintf('marker%i', uniqueMarkers(m)));
+            % Canonical marker table: Time, Code, Duration, Amplitude (+extras)
+            mt = pf2_base.normalizeMarkers(curStruct.markers);
+            times = mt.Time; codes = mt.Code; durs = mt.Duration;
+
+            % Classify extra columns (everything beyond Time/Code/Duration).
+            % Numeric/logical extras (e.g. Amplitude, GameScore, isDeviceMarker)
+            % are carried as additional numeric stim-data columns labeled with
+            % their variable names. Text/categorical extras cannot live in
+            % SNIRF's numeric stim matrix, so they are skipped (no error); the
+            % first such column, if any, is used to name the stim conditions.
+            coreVars = {'Time', 'Code', 'Duration'};
+            extraVars = setdiff(mt.Properties.VariableNames, coreVars, 'stable');
+            numericExtra = {};
+            labelVar = '';
+            for v = 1:numel(extraVars)
+                col = mt.(extraVars{v});
+                if isnumeric(col) || islogical(col)
+                    numericExtra{end+1} = extraVars{v}; %#ok<AGROW>
+                elseif isempty(labelVar) && (isstring(col) || iscellstr(col) || iscategorical(col))
+                    labelVar = extraVars{v};
                 end
-                
-                % Format as [startTime, duration, value]
-                stimItem.data = markerData(markerIdx, [timeCol, durationCol, valueCol]);
-                
-                % Add labels if we have more than 3 columns
-                if size(markerData, 2) > 3
-                    stimLabels = {'startTime', 'duration', 'value'};
-                    for col = 1:size(markerData, 2)
-                        if col ~= timeCol && col ~= durationCol && col ~= valueCol
-                            stimLabels{end+1} = markerNames{col};
-                        end
+            end
+
+            uniqueMarkers = unique(codes);
+            for m = 1:length(uniqueMarkers)
+                markerIdx = codes == uniqueMarkers(m);
+                stimItem = [];
+
+                % Name from a text label column if present, else the dataset
+                % dictionary, else the bare code.
+                autoName = sprintf('marker%i', uniqueMarkers(m));
+                nameStr = autoName;
+                if ~isempty(labelVar)
+                    lbls = string(mt.(labelVar)(markerIdx));
+                    lbls = lbls(~ismissing(lbls));
+                    if ~isempty(lbls)
+                        nameStr = char(lbls(1));
                     end
+                end
+                if strcmp(nameStr, autoName)
+                    nameStr = dictLabel(dictTbl, uniqueMarkers(m), autoName);
+                end
+                stimItem.name = c2v(nameStr);
+
+                % SNIRF convention: [startTime, duration, value]
+                stimItem.data = [times(markerIdx), durs(markerIdx), codes(markerIdx)];
+                stimLabels = {'startTime', 'duration', 'value'};
+
+                % Append numeric extra columns, preserving their names
+                for v = 1:numel(numericExtra)
+                    stimItem.data = [stimItem.data, ...
+                        double(mt.(numericExtra{v})(markerIdx))];
+                    stimLabels{end+1} = numericExtra{v}; %#ok<AGROW>
+                end
+                if numel(stimLabels) > 3
                     stimItem.dataLabels = stimLabels;
                 end
-                
+
                 if m == 1
                     stim = stimItem;
                 else
@@ -300,8 +323,9 @@ for n = 1:numNIRS
             for m = 1:length(uniqueMarkers)
                 markerIdx = curStruct.markers(:, 2) == uniqueMarkers(m);
                 stimItem = [];
-                stimItem.name = c2v(sprintf('mrk%i', uniqueMarkers(m)));
-                
+                autoName = sprintf('mrk%i', uniqueMarkers(m));
+                stimItem.name = c2v(dictLabel(dictTbl, uniqueMarkers(m), autoName));
+
                 % Standard format: [time, duration, marker value]
                 stimItem.data = curStruct.markers(markerIdx, [1, 3, 2]);
                 
@@ -430,6 +454,23 @@ end
 pf2_base.external.jsnirfy.savesnirf(snirfData, filepath);
 
 fprintf('Successfully exported SNIRF file to: %s\n', filepath);
+end
+
+function name = dictLabel(dictTbl, code, fallback)
+    % DICTLABEL Look up a code's label in a normalized dictionary table
+    %   Returns FALLBACK when the dictionary is empty or has no usable label
+    %   for CODE, so callers always get a valid condition name.
+    name = fallback;
+    if isempty(dictTbl) || ~istable(dictTbl) || height(dictTbl) == 0
+        return;
+    end
+    row = dictTbl(dictTbl.Code == code, :);
+    if height(row) > 0
+        lbl = string(row.Label(1));
+        if ~ismissing(lbl) && strlength(lbl) > 0
+            name = char(lbl);
+        end
+    end
 end
 
 function charOut = c2v(str)

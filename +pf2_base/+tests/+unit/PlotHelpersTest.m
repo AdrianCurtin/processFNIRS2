@@ -11,7 +11,7 @@ classdef PlotHelpersTest < matlab.unittest.TestCase
     methods (Test)
         %% processMarkers tests
         function testProcessMarkers_showAll(testCase)
-            fNIR.markers = [1, 10, 0, 1; 2, 20, 0, 1; 3, 10, 0, 1; 4, 30, 0, 1];
+            fNIR.markers = pf2_base.normalizeMarkers([1, 10, 0, 1; 2, 20, 0, 1; 3, 10, 0, 1; 4, 30, 0, 1]);
             [codes, idx, data, counts] = pf2_base.plot.processMarkers(fNIR, true);
 
             testCase.verifyEqual(length(codes), 3);  % 10, 20, 30
@@ -20,7 +20,7 @@ classdef PlotHelpersTest < matlab.unittest.TestCase
         end
 
         function testProcessMarkers_showNone(testCase)
-            fNIR.markers = [1, 10, 0, 1; 2, 20, 0, 1];
+            fNIR.markers = pf2_base.normalizeMarkers([1, 10, 0, 1; 2, 20, 0, 1]);
             [codes, idx, data, counts] = pf2_base.plot.processMarkers(fNIR, false);
 
             testCase.verifyEmpty(codes);
@@ -28,7 +28,7 @@ classdef PlotHelpersTest < matlab.unittest.TestCase
         end
 
         function testProcessMarkers_showSpecific(testCase)
-            fNIR.markers = [1, 10, 0, 1; 2, 20, 0, 1; 3, 10, 0, 1; 4, 30, 0, 1];
+            fNIR.markers = pf2_base.normalizeMarkers([1, 10, 0, 1; 2, 20, 0, 1; 3, 10, 0, 1; 4, 30, 0, 1]);
             [codes, idx, data, counts] = pf2_base.plot.processMarkers(fNIR, [10, 30]);
 
             testCase.verifyEqual(length(codes), 2);
@@ -46,14 +46,14 @@ classdef PlotHelpersTest < matlab.unittest.TestCase
         end
 
         function testProcessMarkers_emptyMarkers(testCase)
-            fNIR.markers = [];
+            fNIR.markers = pf2_base.normalizeMarkers([]);
             [codes, idx, data, counts] = pf2_base.plot.processMarkers(fNIR, true);
 
             testCase.verifyEmpty(codes);
         end
 
         function testProcessMarkers_allString(testCase)
-            fNIR.markers = [1, 10, 0, 1; 2, 20, 0, 1];
+            fNIR.markers = pf2_base.normalizeMarkers([1, 10, 0, 1; 2, 20, 0, 1]);
             [codes, ~, ~, ~] = pf2_base.plot.processMarkers(fNIR, 'all');
 
             testCase.verifyEqual(length(codes), 2);

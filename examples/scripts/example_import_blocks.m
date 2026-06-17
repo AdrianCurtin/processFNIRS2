@@ -55,7 +55,7 @@ for s = 1:nSubjects
     onsets = [60, 200, 340, 520, 700, 880] + round(5 * randn(1, 6));
     onsets = max(onsets, 20);
 
-    d.markers = [onsets(:), codes(:), repmat(blockDuration, 6, 1)];
+    d.markers = pf2_base.normalizeMarkers([onsets(:), codes(:), repmat(blockDuration, 6, 1)]);
     subjects{s} = d;
 end
 fprintf('Created %d raw recordings\n\n', nSubjects);

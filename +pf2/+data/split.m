@@ -436,12 +436,16 @@ elseif(isfield(outfNIR,'Aux')) % don't split or touch it
 end
 
 if(isfield(outfNIR,'markers')&&~isempty(outfNIR.time))
-    if(isfield(outfNIR.markers,'data')&&~isempty(outfNIR.markers.data))
+    if(istable(outfNIR.markers)&&~isempty(outfNIR.markers))
+        mTime=outfNIR.markers.Time;
+        validIndicies=(mTime<=max(outfNIR.time)&mTime>=min(outfNIR.time));
+        outfNIR.markers=outfNIR.markers(validIndicies,:);
+    elseif(isfield(outfNIR.markers,'data')&&~isempty(outfNIR.markers.data))
         validIndicies=(outfNIR.markers.data(:,1)<=max(outfNIR.time)&outfNIR.markers.data(:,1)>=min(outfNIR.time))==1;
         outfNIR.markers.data=outfNIR.markers.data(validIndicies,:);
     elseif(isnumeric(outfNIR.markers)&&~isempty(outfNIR.markers))
-        validIndicies=(fNIR.markers(:,1)<=max(outfNIR.time)&outfNIR.markers(:,1)>=min(outfNIR.time))==1;
-        outfNIR.markers=fNIR.markers(validIndicies,:);
+        validIndicies=(outfNIR.markers(:,1)<=max(outfNIR.time)&outfNIR.markers(:,1)>=min(outfNIR.time))==1;
+        outfNIR.markers=outfNIR.markers(validIndicies,:);
     end
 end
 

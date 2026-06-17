@@ -38,14 +38,14 @@ processed = processFNIRS2(raw, ...
     'blLength', 10, 'blStartTime', 0);
 
 % Inject synthetic markers: alternating Task (10) and Rest (20)
-processed.markers = [
+processed.markers = pf2_base.normalizeMarkers([
      60, 10, 0, 1;
     120, 20, 0, 1;
     180, 10, 0, 1;
     240, 20, 0, 1;
     300, 10, 0, 1;
     360, 20, 0, 1;
-];
+]);
 
 blocks = pf2.data.defineBlocks(processed, ...
     'MarkerCode', [10, 20], 'Duration', 30, ...

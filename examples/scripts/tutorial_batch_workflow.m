@@ -93,7 +93,7 @@ for s = 1:length(subjects)
     onsets = 60 + (0:5) * 90 + round(3 * randn(1, 6));  % ~90s apart, jittered
     onsets = max(onsets, 30);
 
-    d.markers = [onsets(:), codes(:), zeros(6,1), ones(6,1)];
+    d.markers = pf2_base.normalizeMarkers([onsets(:), codes(:), zeros(6,1), ones(6,1)]);
 
     % Add a bit of per-subject noise so data aren't identical
     d.raw = d.raw + 0.01 * randn(size(d.raw)) * s;

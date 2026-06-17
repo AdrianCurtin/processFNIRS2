@@ -70,14 +70,14 @@ processed = processFNIRS2(raw, ...
 
 % Inject synthetic markers: alternating Task (10) and Rest (20)
 % Each block is 60s long to give enough temporal structure for GCA
-processed.markers = [
+processed.markers = pf2_base.normalizeMarkers([
      60, 10, 0, 1;
     180, 20, 0, 1;
     300, 10, 0, 1;
     420, 20, 0, 1;
     540, 10, 0, 1;
     660, 20, 0, 1;
-];
+]);
 
 blocks = pf2.data.defineBlocks(processed, ...
     'MarkerCode', [10, 20], 'Duration', 60, ...

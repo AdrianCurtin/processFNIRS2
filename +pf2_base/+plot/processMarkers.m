@@ -52,11 +52,8 @@ if ~isfield(fNIR, 'markers') || isempty(fNIR.markers)
     return;
 end
 
-% Get marker data
-markerData = fNIR.markers;
-if ~isnumeric(markerData) && isfield(markerData, 'data')
-    markerData = markerData.data;
-end
+% Get marker data as a numeric array [time, value, duration, amplitude]
+markerData = pf2_base.markersToArray(fNIR.markers);
 
 % Handle 'all' string input
 if ischar(showMarkers) && strcmpi(showMarkers, 'all')

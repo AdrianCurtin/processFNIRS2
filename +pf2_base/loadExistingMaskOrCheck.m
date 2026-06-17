@@ -72,13 +72,33 @@ function fNIR=loadExistingMaskOrCheck(fNIR,nirFilename,channelCheckVersion)
                     fNIR.fchMask=potentialField;
                     fprintf('Channel mask loaded from: %s\n',filestr);
                     fprintf('%i channels rejected, %i channels marked noisy\n',(sum(fNIR.fchMask==0)),sum(fNIR.fchMask==0.5));
-
+                    fNIR=setQcStatus(fNIR,'mask_loaded');
                     return;
                 end
 
             end
 
         end
+
+		% Never open a blocking GUI when it cannot/should not be shown
+		% (headless session, or running under the test framework, or the GUI
+		% disabled via pf2_base.channelCheckGUIEnabled). Default to all
+		% channels good and warn LOUDLY so the run proceeds unattended but the
+		% analyst knows channels were NOT reviewed. fNIR.info.qcStatus records
+		% this so downstream code can distinguish it from a reviewed mask.
+		if ~pf2_base.allowChannelCheckGUI()
+			if isempty(fNIR.fchMask)
+				fNIR.fchMask = defaultMask(fNIR);
+			end
+			warning('pf2:loadExistingMaskOrCheck:guiSuppressed', ...
+				['No saved channel mask for "%s" and the channel-check GUI is ', ...
+				 'unavailable/suppressed (headless, under test, or disabled): ', ...
+				 'defaulting to ALL CHANNELS GOOD. Bad/saturated channels will ', ...
+				 'NOT be rejected. Run pf2.qc.pipeline.assess + pf2.qc.pipeline.apply, ', ...
+				 'or save a *_CH.mat sidecar via pf2.qc.ChannelCheck, before analysis.'], name);
+			fNIR=setQcStatus(fNIR,'unreviewed_default');
+			return;
+		end
 
 		if channelCheckVersion == 2
 			app = pf2.qc.ChannelCheck(fNIR, ...
@@ -90,8 +110,38 @@ function fNIR=loadExistingMaskOrCheck(fNIR,nirFilename,channelCheckVersion)
 		else
 			fNIR=probeCheckGUI(fNIR,nirFilename);
 		end
+		fNIR=setQcStatus(fNIR,'gui_reviewed');
 
 	end
 
 
+end
+
+%%_Subfunctions_________________________________________________________
+
+function fNIR = setQcStatus(fNIR, status)
+% SETQCSTATUS Record how the channel mask was determined, for audit/provenance
+%   'mask_loaded'        - loaded from a saved *_CH.mat sidecar
+%   'gui_reviewed'       - reviewed interactively via the channel-check GUI
+%   'unreviewed_default' - GUI suppressed; defaulted to all channels good
+	if ~isfield(fNIR, 'info') || ~isstruct(fNIR.info)
+		fNIR.info = struct();
+	end
+	fNIR.info.qcStatus = status;
+end
+
+function mask = defaultMask(fNIR)
+% DEFAULTMASK All-good channel mask sized from the device channel count
+	mask = [];
+	try
+		if isfield(fNIR, 'device') && ~isempty(fNIR.device)
+			mask = ones(1, fNIR.device.nChannels);
+		else
+			dev = pf2.Device.load(fNIR);
+			mask = ones(1, dev.nChannels);
+		end
+	catch
+		warning('pf2:loadExistingMaskOrCheck:unknownChannelCount', ...
+			'Cannot determine channel count for default fchMask; left empty.');
+	end
 end

@@ -41,7 +41,13 @@ function outData=processStageFilterHb(method,data,fs,probeInfo,ProcessRejected,s
 %                       .channels [1 x C] - Channel identifiers
 %                       .fchMask [1 x C]  - Channel validity mask
 %                       .time [T x 1]     - Time vector
-%                       .markers [M x 4]  - Event markers (time, code, duration, amplitude)
+%                       .markers          - Event markers as a canonical
+%                                           table (.Time, .Code, .Duration,
+%                                           .Amplitude + optional extra
+%                                           columns). Note: pipeline
+%                                           functions receive the stage
+%                                           context's fMarkers as a numeric
+%                                           [M x 4] array.
 %                     Optional fields:
 %                       .Aux              - Auxiliary data struct
 %                       .ROI              - Pre-computed ROI data
@@ -80,7 +86,8 @@ function outData=processStageFilterHb(method,data,fs,probeInfo,ProcessRejected,s
 %        'fChannelNumbers'-> channel IDs
 %        'fChannelSD'     -> source-detector distances
 %        'fProbeInfo'     -> probe geometry struct
-%        'fMarkers'       -> event markers
+%        'fMarkers'       -> event markers (numeric [M x 4] array)
+%        'fMarkerTable'   -> event markers (canonical table; optional)
 %        'fAux'           -> auxiliary data
 %        'fNIRstruct'     -> full fNIRS struct
 %     3. Execute function on each biomarker field
@@ -201,7 +208,8 @@ else
                 ctx.fChannelSD = [];
             end
             ctx.fProbeInfo = probeInfo;
-            ctx.fMarkers = data.markers;
+            ctx.fMarkers = pf2_base.markersToArray(data.markers);      % numeric [M x 4]
+            ctx.fMarkerTable = pf2_base.normalizeMarkers(data.markers); % canonical table
             if isfield(data,'Aux')
                 ctx.fAux = data.Aux;
             else

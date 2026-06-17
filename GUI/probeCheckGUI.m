@@ -237,7 +237,7 @@ if(~isfield(pf2ChannelCheck.nirsData,'markers')||isempty(pf2ChannelCheck.nirsDat
     set(handles.marker_listbox,'Value',[]);
     set(handles.marker_listbox,'Enable','off');
 else
-    pf2ChannelCheck.markers=pf2ChannelCheck.nirsData.markers;
+    pf2ChannelCheck.markers=pf2_base.markersToArray(pf2ChannelCheck.nirsData.markers);
     uMrk=sort(unique(pf2ChannelCheck.markers(:,2)));
     pf2ChannelCheck.curMarkerset=uMrk;
     mrkStr=cell(length(uMrk),1);

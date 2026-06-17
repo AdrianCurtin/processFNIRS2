@@ -20,19 +20,20 @@ function blocks = defineBlocks(data, varargin)
 % Inputs:
 %   data         - fNIRS data structure with .markers field, or a cell
 %                  array of fNIRS structs (requires 'Embed', true)
-%                  Markers are normalized to [time, value, duration, amplitude]
+%                  Markers are a canonical table with variables .Time,
+%                  .Code, .Duration, .Amplitude (+ optional extra columns)
 %   markerCodes  - (Optional positional) Marker code(s) to find [numeric]
 %                  Scalar or vector; all codes are treated as separate block types.
 %   duration     - (Optional positional) Fixed block duration in seconds [scalar]
-%                  If omitted and markers have nonzero durations in column 3,
+%                  If omitted and markers have nonzero .Duration values,
 %                  those durations are used automatically.
 %
 % Name-Value Parameters:
 %   'MarkerCode'   - Marker code(s) to define blocks [scalar or vector]
 %   'Duration'     - Fixed duration in seconds for each block (default: 0)
-%                    If 0 and markers have nonzero column 3 durations, those
+%                    If 0 and markers have nonzero .Duration values, those
 %                    are used. Otherwise blocks have zero duration.
-%   'UseDuration'  - Force use of duration from markers column 3 (default: false)
+%   'UseDuration'  - Force use of duration from markers .Duration (default: false)
 %   'StartMarker'  - Start marker code(s) for paired extraction [scalar or column vector]
 %   'EndMarker'    - End marker code(s) for paired extraction [scalar or column vector]
 %                    Can be used with StartMarker or MarkerCode.
@@ -67,17 +68,18 @@ function blocks = defineBlocks(data, varargin)
 %            .duration    - endTime - startTime in seconds
 %            .markerCode  - Marker code that triggered this block
 %            .markerIndex - Row index into data.markers
-%            .amplitude   - Marker amplitude from column 4 (default 1)
+%            .amplitude   - Marker amplitude from .Amplitude (default 1)
 %            .info        - Struct with block-level metadata:
 %                           .BlockNumber - Sequential 1, 2, 3...
 %                           .(ConditionField) - From ConditionMap (default 'Condition')
 %                           ... any user fields from InfoTable/InfoFields
 %
 % Algorithm:
-%   1. Normalize markers to 4-column format
+%   1. Normalize markers to the canonical table (.Time, .Code, .Duration,
+%      .Amplitude) and read out the numeric values needed below
 %   2. Select mode: MarkerCode (fixed duration), MarkerCode+EndMarker
 %      (pair start codes with terminating marker), or StartMarker+EndMarker
-%   3. For MarkerCode: duration from fixed > marker column 3 > zero
+%   3. For MarkerCode: duration from fixed > marker .Duration > zero
 %      For MarkerCode+EndMarker or StartMarker+EndMarker: pair each start
 %      with the next available end marker to determine duration
 %   4. Build struct array with startTime, endTime, duration, markerCode, markerIndex
@@ -90,7 +92,7 @@ function blocks = defineBlocks(data, varargin)
 %   % Simple: marker codes + fixed duration
 %   blocks = pf2.data.defineBlocks(data, [49, 50], 30);
 %
-%   % Auto-detect duration from marker column 3
+%   % Auto-detect duration from marker .Duration
 %   blocks = pf2.data.defineBlocks(data, 49);
 %
 %   % Marker code + end marker (duration from terminating marker)
@@ -223,11 +225,10 @@ if hasStartMarker && ~hasEndMarker
         '''StartMarker'' requires ''EndMarker''.');
 end
 
-% Normalize markers to 4 columns [time, value, duration, amplitude]
-mrk = data.markers;
-if isnumeric(mrk)
-    mrk = pf2_base.normalizeMarkers(mrk);
-end
+% Convert markers to a numeric array [time, value, duration, amplitude]
+% for the positional column math in the block builders below. The stored
+% data.markers field remains a canonical table.
+mrk = pf2_base.markersToArray(data.markers);
 
 if isempty(mrk) || size(mrk, 1) == 0
     blocks = struct('startTime', {}, 'endTime', {}, 'duration', {}, ...
@@ -277,11 +278,12 @@ for k = 1:length(blocks)
     blocks(k).info.BlockNumber = k;
 end
 
-% Auto-populate ConditionMap from BIDS eventTypes when not explicitly provided
-if isempty(conditionMap) && ismember('ConditionMap', p.UsingDefaults) && ...
-        isstruct(data) && isfield(data, 'info') && isfield(data.info, 'eventTypes')
-    eventTypes = data.info.eventTypes;
-    if ~isempty(eventTypes) && size(eventTypes, 2) >= 2
+% Auto-populate ConditionMap from the dataset's marker dictionary when not
+% explicitly provided (markerDict -> eventTypes -> COBI MarkerDict).
+if isempty(conditionMap) && ismember('ConditionMap', p.UsingDefaults) && isstruct(data)
+    dict = pf2.data.getMarkerDict(data);
+    dict = dict(~ismissing(dict.Label), :);
+    if ~isempty(dict)
         % Determine which codes are being extracted
         if hasMarkerCode
             allCodes = markerCode(:);
@@ -291,10 +293,9 @@ if isempty(conditionMap) && ismember('ConditionMap', p.UsingDefaults) && ...
             allCodes = [];
         end
         if ~isempty(allCodes)
-            mapCodes = cell2mat(eventTypes(:, 1));
-            keep = ismember(mapCodes, allCodes);
+            keep = ismember(dict.Code, allCodes);
             if any(keep)
-                conditionMap = eventTypes(keep, :);
+                conditionMap = [num2cell(dict.Code(keep)), cellstr(dict.Label(keep))];
             end
         end
     end

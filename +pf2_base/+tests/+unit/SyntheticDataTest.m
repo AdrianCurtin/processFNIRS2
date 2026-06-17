@@ -688,7 +688,7 @@ function data = createMinimalProcessedData(nSamples, fs, nChannels, fillValue)
     data.channels = 1:nChannels;
 
     % Empty markers
-    data.markers = [];
+    data.markers = pf2_base.normalizeMarkers([]);
 
     % Raw field (required by concatenate - stores empty placeholder)
     % In real data this would be [T x C*2] for two wavelengths

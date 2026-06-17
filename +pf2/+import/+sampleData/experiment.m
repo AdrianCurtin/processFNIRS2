@@ -112,7 +112,7 @@ for s = 1:nSubjects
     blockOnsets = max(blockOnsets, 20);  % keep away from recording start
 
     % Event markers: [time, code, duration]
-    d.markers = [blockOnsets(:), blockCodes(:), repmat(blockDuration, nBlocks, 1)];
+    d.markers = pf2_base.normalizeMarkers([blockOnsets(:), blockCodes(:), repmat(blockDuration, nBlocks, 1)]);
 
     % Aux: heart rate (continuous with task-related modulation)
     nSamples = length(d.time);

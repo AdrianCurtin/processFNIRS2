@@ -80,10 +80,10 @@ classdef PipelineFunctionTest < matlab.unittest.TestCase
 
         function testAllSpecialArgs(tc)
             allSpecial = pf2_base.PipelineFunction.specialArgNames();
-            tc.verifyEqual(numel(allSpecial), 12);
+            tc.verifyEqual(numel(allSpecial), 13);
 
             pf = pf2_base.PipelineFunction('testFunc', ...
-                allSpecial, cell(1, 12), {'x'});
+                allSpecial, cell(1, numel(allSpecial)), {'x'});
 
             tc.verifyTrue(all(pf.specialMask));
             tc.verifyEmpty(pf.customIndices);
@@ -156,6 +156,38 @@ classdef PipelineFunctionTest < matlab.unittest.TestCase
 
             out = pf.execute(ctx);
             tc.verifyEqual(out{1}, [9 12]);
+        end
+
+        function testSpecialArgFMarkerTable(tc)
+            % A pipeline function may OPTIONALLY request the canonical marker
+            % table via the 'fMarkerTable' special arg (vs the numeric
+            % 'fMarkers' array). Use height() to confirm a table is passed.
+            tc.verifyTrue(ismember('fMarkerTable', ...
+                pf2_base.PipelineFunction.specialArgNames()), ...
+                'fMarkerTable should be a registered special arg');
+
+            pf = pf2_base.PipelineFunction('height', ...
+                {'fMarkerTable'}, {[]}, {'x'});
+            tc.verifyTrue(pf.hasSpecialArg('fMarkerTable'));
+
+            mt = pf2_base.normalizeMarkers([10 1; 20 2; 30 3]);
+            ctx.x = [];
+            ctx.fs = 10;
+            ctx.fTime = [];
+            ctx.fchMask = 1;
+            ctx.ftimeChMask = 1;
+            ctx.fChannelNumbers = 1;
+            ctx.fChannelSD = 1;
+            ctx.fProbeInfo = struct();
+            ctx.fMarkers = pf2_base.markersToArray(mt);
+            ctx.fMarkerTable = mt;
+            ctx.fNIRstruct = struct();
+            ctx.fAux = [];
+            ctx.fAmbient = [];
+
+            out = pf.execute(ctx);
+            tc.verifyEqual(out{1}, 3, ...
+                'fMarkerTable should pass the table through (height == 3)');
         end
 
         function testExecuteWithDefaults(tc)
@@ -316,10 +348,11 @@ classdef PipelineFunctionTest < matlab.unittest.TestCase
 
         function testSpecialArgNames(tc)
             names = pf2_base.PipelineFunction.specialArgNames();
-            tc.verifyEqual(numel(names), 12);
+            tc.verifyEqual(numel(names), 13);
             tc.verifyTrue(ismember('x', names));
             tc.verifyTrue(ismember('fs', names));
             tc.verifyTrue(ismember('fAmbient', names));
+            tc.verifyTrue(ismember('fMarkerTable', names));
         end
 
         %% pf2_unpackMethod integration

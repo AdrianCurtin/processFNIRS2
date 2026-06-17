@@ -146,7 +146,7 @@ classdef FromConfigTest < matlab.unittest.TestCase
             t = d.time;
             t1 = t(round(length(t) * 0.3));
             t2 = t(round(length(t) * 0.6));
-            d.markers = [t1, 49, 0, 0; t2, 49, 0, 0];
+            d.markers = pf2_base.normalizeMarkers([t1, 49, 0, 0; t2, 49, 0, 0]);
 
             cfg.data = d;
             cfg.blocks.markerCodes = 49;

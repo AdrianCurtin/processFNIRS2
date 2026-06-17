@@ -342,7 +342,7 @@ end
 
 
 if(channelCheck)
-        if(forceChannelCheck)
+        if(forceChannelCheck && pf2_base.allowChannelCheckGUI())
             if channelCheckVersion == 2
                 app = pf2.qc.ChannelCheck(fNIR, 'CalledFromImport', true, 'SkipConfirmation', true);
                 if isvalid(app), fNIR = app.OutputData; delete(app); end
@@ -350,6 +350,10 @@ if(channelCheck)
                 fNIR=probeCheckGUI(fNIR,filename,forceChannelCheck);
             end
         else
+            % Non-forced, or the GUI cannot/should not be shown (headless,
+            % under test, or disabled): loadExistingMaskOrCheck loads a saved
+            % mask if present and defaults all-good rather than blocking on the
+            % channel-check GUI.
             fNIR=pf2_base.loadExistingMaskOrCheck(fNIR,filename,channelCheckVersion);
         end
 else

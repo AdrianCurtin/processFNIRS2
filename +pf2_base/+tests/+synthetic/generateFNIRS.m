@@ -339,7 +339,7 @@ data.raw = raw;
 data.time = time;
 data.fs = opts.fs;
 data.fchMask = ones(1, opts.nChannels);
-data.markers = markers;
+data.markers = pf2_base.normalizeMarkers(markers);
 data.channels = 1:opts.nChannels;
 
 % Build info structure

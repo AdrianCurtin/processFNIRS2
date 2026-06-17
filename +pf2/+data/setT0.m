@@ -94,7 +94,11 @@ end
 
 
 if(isfield(outFNIR,'markers'))
-   if(isfield(outFNIR.markers,'data'))
+   if(istable(outFNIR.markers))
+      if(~isempty(outFNIR.markers))
+          outFNIR.markers.Time = outFNIR.markers.Time - tDiff;
+      end
+   elseif(isfield(outFNIR.markers,'data'))
        outFNIR.markers.data(:,1)= outFNIR.markers.data(:,1)-tDiff;
    elseif(~isempty(outFNIR.markers))
       outFNIR.markers(:,1)= outFNIR.markers(:,1)-tDiff;

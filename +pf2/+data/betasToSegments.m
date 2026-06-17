@@ -166,8 +166,8 @@ for c = 1:nCond
     % Units
     seg.units = units;
 
-    % Markers (empty)
-    seg.markers = zeros(0, 3);
+    % Markers (empty canonical table)
+    seg.markers = pf2_base.normalizeMarkers([]);
 
     % Info - copy from source data, set Condition
     if isfield(data, 'info')

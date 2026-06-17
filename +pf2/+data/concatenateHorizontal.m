@@ -103,7 +103,7 @@ for i=1:length(fNIR_objs) %use Slowest fNIR file as reference
          outFNIR.datetime=[outFNIR.datetime;appendFNIR.datetime];
     end
     outFNIR.raw=[outFNIR.raw;appendFNIR.raw];
-    outFNIR.markers=[outFNIR.markers;appendFNIR.markers];
+    outFNIR.markers=pf2_base.mergeMarkers(outFNIR.markers,appendFNIR.markers);
     
     
     outFNIR.fchMask=outFNIR.fchMask.*appendFNIR.fchMask;

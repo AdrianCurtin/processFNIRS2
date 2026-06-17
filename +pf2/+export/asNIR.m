@@ -173,7 +173,7 @@ else
     fprintf(fid,'Freq Code:\t	99999999.999999\n');
 end
 
- arr=fNIRstruct.markers;
+ arr=pf2_base.markersToArray(fNIRstruct.markers);
  numLines=size(arr,1);
  numCol=size(arr,2);
  for x=1:numLines

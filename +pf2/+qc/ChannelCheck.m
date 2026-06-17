@@ -731,10 +731,12 @@ classdef ChannelCheck < matlab.apps.AppBase
 
             % Discover unique marker codes
             app.UniqueMarkerCodes = [];
-            if isfield(dataStruct, 'markers') && ~isempty(dataStruct.markers) ...
-                    && isnumeric(dataStruct.markers) && size(dataStruct.markers, 2) >= 2
-                codes = dataStruct.markers(:, 2);
-                app.UniqueMarkerCodes = unique(codes(~isnan(codes)))';
+            if isfield(dataStruct, 'markers') && ~isempty(dataStruct.markers)
+                mrkArr = pf2_base.markersToArray(dataStruct.markers);
+                if size(mrkArr, 2) >= 2
+                    codes = mrkArr(:, 2);
+                    app.UniqueMarkerCodes = unique(codes(~isnan(codes)))';
+                end
             end
 
             % Load marker display preferences
@@ -1203,11 +1205,13 @@ classdef ChannelCheck < matlab.apps.AppBase
             end
 
             % Markers on mini-plot
-            if app.ShowMarkers && isfield(app.Data, 'markers') && ...
-                    ~isempty(app.Data.markers) && isnumeric(app.Data.markers) && ...
-                    size(app.Data.markers, 2) >= 2
-                mTimes = app.Data.markers(:, 1);
-                mCodes = app.Data.markers(:, 2);
+            mrkArr = [];
+            if isfield(app.Data, 'markers') && ~isempty(app.Data.markers)
+                mrkArr = pf2_base.markersToArray(app.Data.markers);
+            end
+            if app.ShowMarkers && ~isempty(mrkArr) && size(mrkArr, 2) >= 2
+                mTimes = mrkArr(:, 1);
+                mCodes = mrkArr(:, 2);
                 if ~isempty(app.SelectedMarkerCodes)
                     keep = ismember(mCodes, app.SelectedMarkerCodes);
                     mTimes = mTimes(keep);
@@ -1426,10 +1430,11 @@ classdef ChannelCheck < matlab.apps.AppBase
             end
 
             % Plot markers (filtered by code selection)
-            if app.ShowMarkers && isfield(app.Data, 'markers') && ...
-                    ~isempty(app.Data.markers) && isnumeric(app.Data.markers) && ...
-                    size(app.Data.markers, 2) >= 2
-                markers = app.Data.markers;
+            markers = [];
+            if isfield(app.Data, 'markers') && ~isempty(app.Data.markers)
+                markers = pf2_base.markersToArray(app.Data.markers);
+            end
+            if app.ShowMarkers && ~isempty(markers) && size(markers, 2) >= 2
                 mTimes = markers(:, 1);
                 mCodes = markers(:, 2);
                 if ~isempty(app.SelectedMarkerCodes)

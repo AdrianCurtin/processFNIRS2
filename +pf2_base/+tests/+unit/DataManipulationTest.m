@@ -40,7 +40,7 @@ classdef DataManipulationTest < matlab.unittest.TestCase
             duration = maxT - minT;
 
             % Create evenly spaced markers
-            testCase.dataWithMarkers.markers = [
+            testCase.dataWithMarkers.markers = pf2_base.normalizeMarkers([
                 minT + duration*0.05, 49, 0, 1;   % Baseline marker
                 minT + duration*0.10, 50, 0, 1;   % Task start 1
                 minT + duration*0.20, 51, 0, 1;   % Task end 1
@@ -50,7 +50,7 @@ classdef DataManipulationTest < matlab.unittest.TestCase
                 minT + duration*0.60, 50, 0, 1;   % Task start 3
                 minT + duration*0.70, 51, 0, 1;   % Task end 3
                 minT + duration*0.80, 52, 0, 1;   % Different marker
-            ];
+            ]);
         end
     end
 
@@ -271,7 +271,7 @@ classdef DataManipulationTest < matlab.unittest.TestCase
             data = testCase.dataWithMarkers;
 
             % Get all unique marker codes
-            allMarkerCodes = unique(data.markers(:, 2));
+            allMarkerCodes = unique(data.markers.Code);
 
             % Select marker code 50 (task start) - we know there are 3 of these
             targetCode = 50;
@@ -280,7 +280,7 @@ classdef DataManipulationTest < matlab.unittest.TestCase
             matchedMarkers = pf2.data.getMarkers(data, targetCode);
 
             % Verify we got results
-            expectedCount = sum(data.markers(:, 2) == targetCode);
+            expectedCount = sum(data.markers.Code == targetCode);
             testCase.verifyEqual(expectedCount, 3, ...
                 'Test setup: should have 3 markers with code 50');
 
@@ -294,7 +294,7 @@ classdef DataManipulationTest < matlab.unittest.TestCase
                 expectedCount, targetCode, actualCount));
 
             % Verify returned times are correct (first column is time)
-            expectedTimes = data.markers(data.markers(:,2) == targetCode, 1);
+            expectedTimes = data.markers.Time(data.markers.Code == targetCode);
             testCase.verifyEqual(sort(matchedMarkers(:,1)), sort(expectedTimes), 'AbsTol', 1e-6, ...
                 'Returned marker times should match expected times');
         end
@@ -306,7 +306,7 @@ classdef DataManipulationTest < matlab.unittest.TestCase
             data = testCase.dataWithMarkers;
 
             % Get all unique marker codes
-            allMarkerCodes = unique(data.markers(:, 2));
+            allMarkerCodes = unique(data.markers.Code);
 
             % Verify we have the expected marker codes (49, 50, 51, 52)
             testCase.verifyEqual(length(allMarkerCodes), 4, ...
@@ -328,7 +328,7 @@ classdef DataManipulationTest < matlab.unittest.TestCase
                 'Should return markers when searching for sequence pattern');
 
             % Verify returned times match the times of marker 50 occurrences
-            expectedStartTimes = data.markers(data.markers(:,2) == 50, 1);
+            expectedStartTimes = data.markers.Time(data.markers.Code == 50);
             testCase.verifyEqual(sort(matchedMarkers(:,1)), sort(expectedStartTimes), 'AbsTol', 1e-6, ...
                 'Sequence start times should match marker 50 times');
         end

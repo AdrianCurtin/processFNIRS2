@@ -95,14 +95,14 @@ fprintf('  Units:     %s\n', processed.units);
 fprintf('\n=== Part 3: Define Blocks ===\n');
 
 % Inject synthetic markers (skip this with real data that has markers)
-processed.markers = [
+processed.markers = pf2_base.normalizeMarkers([
      60, 10, 0, 1;   % Task A at 60s
     120, 20, 0, 1;   % Task B at 120s
     180, 10, 0, 1;   % Task A at 180s
     240, 20, 0, 1;   % Task B at 240s
     300, 10, 0, 1;   % Task A at 300s
     360, 20, 0, 1;   % Task B at 360s
-];
+]);
 
 % Define blocks: marker codes [10, 20], 30 seconds each
 % ConditionMap labels each code with a human-readable name

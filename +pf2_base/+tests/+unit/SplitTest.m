@@ -258,22 +258,21 @@ classdef SplitTest < matlab.unittest.TestCase
             timeVec = dataWithMarkers.time;
             minT = min(timeVec);
 
-            dataWithMarkers.markers = [
+            dataWithMarkers.markers = pf2_base.normalizeMarkers([
                 minT + 10, 1, 0, 1;   % Before split window
                 minT + 60, 2, 0, 1;   % Inside split window
                 minT + 70, 3, 0, 1;   % Inside split window
                 minT + 200, 4, 0, 1;  % After split window
-            ];
+            ]);
 
             startT = minT + 50;
             endT = minT + 100;
             seg = pf2.data.split(dataWithMarkers, startT, endT);
 
             if isfield(seg, 'markers') && ~isempty(seg.markers)
-                if isnumeric(seg.markers)
-                    markerTimes = seg.markers(:,1);
-                elseif isstruct(seg.markers) && isfield(seg.markers, 'data')
-                    markerTimes = seg.markers.data(:,1);
+                markerArray = pf2_base.markersToArray(seg.markers);
+                if ~isempty(markerArray)
+                    markerTimes = markerArray(:,1);
                 else
                     markerTimes = [];
                 end

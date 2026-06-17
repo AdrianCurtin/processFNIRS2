@@ -296,7 +296,12 @@ end
         if(ischar(showMarkers)&&strcmpi(showMarkers,'all'))
             showMarkers=true;
         end
-        
+
+        % Work with markers as a numeric array [time, value, duration, amplitude]
+        if(isfield(fNIR,'markers')&&~isempty(fNIR.markers))
+            fNIR.markers=pf2_base.markersToArray(fNIR.markers);
+        end
+
         if(islogical(showMarkers))
             if(~showMarkers)
                 showMarkers=[];
@@ -314,10 +319,7 @@ end
         end
         
         if(isfield(fNIR,'markers')&&~isempty(showMarkers))
-            curMarkers=fNIR.markers;
-            if(~isnumeric(curMarkers)&&isfield(curMarkers,'data'))
-                curMarkers=curMarkers.data;
-            end
+            curMarkers=fNIR.markers;   % already a numeric array (converted above)
         end
         
         

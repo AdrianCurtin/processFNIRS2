@@ -258,12 +258,8 @@ function data = generateHemoglobin(varargin)
     data.fchMask = ones(1, nChannels);
     data.channels = channels;
 
-    % Markers
-    if isempty(markers)
-        data.markers = zeros(0, 3);  % Empty but proper size
-    else
-        data.markers = markers;
-    end
+    % Markers (canonical table)
+    data.markers = pf2_base.normalizeMarkers(markers);
 
     % Metadata
     data.info = struct();

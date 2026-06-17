@@ -121,6 +121,7 @@ classdef PipelineFunction
         SPECIAL_FNIRSTRUCT      = uint8(10)
         SPECIAL_FAUX            = uint8(11)
         SPECIAL_FAMBIENT        = uint8(12)
+        SPECIAL_FMARKERTABLE    = uint8(13)
     end
 
     methods
@@ -312,6 +313,7 @@ classdef PipelineFunction
                     case 10; args{k} = ctx.fNIRstruct;
                     case 11; args{k} = ctx.fAux;
                     case 12; args{k} = ctx.fAmbient;
+                    case 13; args{k} = ctx.fMarkerTable;
                 end
             end
 
@@ -926,7 +928,8 @@ classdef PipelineFunction
 
             names = {'x', 'fs', 'fTime', 'fchMask', 'ftimeChMask', ...
                      'fChannelNumbers', 'fChannelSD', 'fProbeInfo', ...
-                     'fMarkers', 'fNIRstruct', 'fAux', 'fAmbient'};
+                     'fMarkers', 'fNIRstruct', 'fAux', 'fAmbient', ...
+                     'fMarkerTable'};
         end
 
         function T = listAvailable(stage)
@@ -1312,10 +1315,11 @@ classdef PipelineFunction
                 argMap = containers.Map(...
                     {'x', 'fs', 'fTime', 'fchMask', 'ftimeChMask', ...
                      'fChannelNumbers', 'fChannelSD', 'fProbeInfo', ...
-                     'fMarkers', 'fNIRstruct', 'fAux', 'fAmbient'}, ...
+                     'fMarkers', 'fNIRstruct', 'fAux', 'fAmbient', ...
+                     'fMarkerTable'}, ...
                     {uint8(1), uint8(2), uint8(3), uint8(4), uint8(5), ...
                      uint8(6), uint8(7), uint8(8), uint8(9), uint8(10), ...
-                     uint8(11), uint8(12)});
+                     uint8(11), uint8(12), uint8(13)});
             end
             m = argMap;
         end

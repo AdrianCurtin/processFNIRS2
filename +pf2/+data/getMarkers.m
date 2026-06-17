@@ -12,8 +12,9 @@ function [markerTimes, tableMrkTimes, matchedPatterns] = getMarkers(varargin)
 %   [markerTimes, tableMrkTimes, matchedPatterns] = pf2.data.getMarkers(...)
 %
 % Inputs:
-%   fNIR           - fNIRS data structure with .markers field [M x 4]
-%                    Or marker table/matrix directly
+%   fNIR           - fNIRS data structure with .markers field (canonical
+%                    marker table: .Time .Code .Duration .Amplitude + extras)
+%                    Or a marker table/matrix directly
 %   markerCode     - Single marker code(s) to find:
 %                    - Scalar: Find all markers with this code
 %                    - [50,51] row vector: Find sequence 50 followed by 51
@@ -62,7 +63,7 @@ function [markerTimes, tableMrkTimes, matchedPatterns] = getMarkers(varargin)
 p=inputParser;
 
 validfNIR_Input = @(x) (isstruct(x) && (isfield(x,'raw')||isfield(x,'time')||isfield(x,'info')));
-validfNIR_or_marker_Input = @(x) (istable(x)&&size(x,1)>1)||(isnumeric(x)&&length(x)>1) ||validfNIR_Input(x);
+validfNIR_or_marker_Input = @(x) (istable(x)&&size(x,1)>=1)||(isnumeric(x)&&length(x)>=1) ||validfNIR_Input(x);
 validScalarNum = @(x) isnumeric(x) && ismatrix(x)||islogical(x);
 validScalarNumOrCell = @(x) (isnumeric(x) && ismatrix(x) || iscell(x));
 isStringOrChar = @(x) isstring(x)||ischar(x);

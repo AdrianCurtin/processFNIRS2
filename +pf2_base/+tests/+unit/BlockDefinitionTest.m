@@ -42,11 +42,11 @@ classdef BlockDefinitionTest < matlab.unittest.TestCase
 
             % Markers: [time, code, duration, amplitude]
             % 3 blocks of marker 49 at t=30, 90, 180 with durations 20, 25, 30
-            data.markers = [
+            data.markers = pf2_base.normalizeMarkers([
                 30,  49, 20, 1;
                 90,  49, 25, 1;
                 180, 49, 30, 1;
-            ];
+            ]);
         end
 
         function data = makePairedMarkerData()
@@ -68,7 +68,7 @@ classdef BlockDefinitionTest < matlab.unittest.TestCase
             data.info = struct('SubjectID', 'S01');
 
             % Start/end pairs: condition A (50->52), condition B (51->53)
-            data.markers = [
+            data.markers = pf2_base.normalizeMarkers([
                 20,  50, 0, 1;   % Start A block 1
                 45,  52, 0, 1;   % End A block 1
                 60,  51, 0, 1;   % Start B block 1
@@ -77,7 +77,7 @@ classdef BlockDefinitionTest < matlab.unittest.TestCase
                 155, 52, 0, 1;   % End A block 2
                 200, 51, 0, 1;   % Start B block 2
                 240, 53, 0, 1;   % End B block 2
-            ];
+            ]);
         end
     end
 
@@ -247,7 +247,7 @@ classdef BlockDefinitionTest < matlab.unittest.TestCase
         function testEmptyMarkerArray(testCase)
             % Data with empty markers returns empty
             data = pf2_base.tests.unit.BlockDefinitionTest.makeSyntheticData();
-            data.markers = zeros(0, 4);
+            data.markers = pf2_base.normalizeMarkers([]);
             blocks = pf2.data.defineBlocks(data, 'MarkerCode', 49, 'Duration', 10, 'Embed', false);
 
             testCase.verifyEmpty(blocks);
@@ -483,10 +483,10 @@ classdef BlockDefinitionTest < matlab.unittest.TestCase
             % Add synthetic markers to real data
             timeVec = data.time;
             minT = min(timeVec);
-            data.markers = [
+            data.markers = pf2_base.normalizeMarkers([
                 minT + 30, 10, 20, 1;
                 minT + 80, 10, 20, 1;
-            ];
+            ]);
 
             blocks = pf2.data.defineBlocks(data, 'MarkerCode', 10, 'Duration', 20, 'Embed', false);
             segments = pf2.data.extractBlocks(data, blocks, 'SetT0', true);
@@ -564,7 +564,7 @@ classdef BlockDefinitionTest < matlab.unittest.TestCase
         function testMarkerCodeWithEndMarker(testCase)
             % Single start code + single end code via MarkerCode + EndMarker
             data = pf2_base.tests.unit.BlockDefinitionTest.makeSyntheticData();
-            data.markers = [10 49 0 1; 25 51 0 1; 40 49 0 1; 55 51 0 1];
+            data.markers = pf2_base.normalizeMarkers([10 49 0 1; 25 51 0 1; 40 49 0 1; 55 51 0 1]);
 
             blocks = pf2.data.defineBlocks(data, 'MarkerCode', 49, 'EndMarker', 51, 'Embed', false);
 
@@ -580,7 +580,7 @@ classdef BlockDefinitionTest < matlab.unittest.TestCase
         function testMarkerCodeWithEndMarkerPairs(testCase)
             % Per-code end markers: 49->59, 48->58
             data = pf2_base.tests.unit.BlockDefinitionTest.makeSyntheticData();
-            data.markers = [10 49 0 1; 20 59 0 1; 30 48 0 1; 45 58 0 1];
+            data.markers = pf2_base.normalizeMarkers([10 49 0 1; 20 59 0 1; 30 48 0 1; 45 58 0 1]);
 
             blocks = pf2.data.defineBlocks(data, 'MarkerCode', [49 48], ...
                 'EndMarker', [59 58], 'Embed', false);
@@ -598,7 +598,7 @@ classdef BlockDefinitionTest < matlab.unittest.TestCase
         function testPositionalCodesWithEndMarker(testCase)
             % Positional API: defineBlocks(data, 49, 'EndMarker', 51)
             data = pf2_base.tests.unit.BlockDefinitionTest.makeSyntheticData();
-            data.markers = [10 49 0 1; 30 51 0 1];
+            data.markers = pf2_base.normalizeMarkers([10 49 0 1; 30 51 0 1]);
 
             blocks = pf2.data.defineBlocks(data, 49, 'EndMarker', 51, 'Embed', false);
 
@@ -611,7 +611,7 @@ classdef BlockDefinitionTest < matlab.unittest.TestCase
         function testMarkerCodeEndMarkerSharedEnd(testCase)
             % Multiple start codes with one shared EndMarker (scalar broadcast)
             data = pf2_base.tests.unit.BlockDefinitionTest.makeSyntheticData();
-            data.markers = [10 49 0 1; 25 51 0 1; 40 50 0 1; 55 51 0 1];
+            data.markers = pf2_base.normalizeMarkers([10 49 0 1; 25 51 0 1; 40 50 0 1; 55 51 0 1]);
 
             blocks = pf2.data.defineBlocks(data, [49 50], 'EndMarker', 51, 'Embed', false);
 
@@ -627,7 +627,7 @@ classdef BlockDefinitionTest < matlab.unittest.TestCase
         function testMarkerCodeEndMarkerWithConditionMap(testCase)
             % ConditionMap works in MarkerCode+EndMarker mode
             data = pf2_base.tests.unit.BlockDefinitionTest.makeSyntheticData();
-            data.markers = [10 49 0 1; 25 51 0 1; 40 50 0 1; 55 51 0 1];
+            data.markers = pf2_base.normalizeMarkers([10 49 0 1; 25 51 0 1; 40 50 0 1; 55 51 0 1]);
 
             blocks = pf2.data.defineBlocks(data, [49 50], 'EndMarker', 51, ...
                 'ConditionMap', {49, 'CondA'; 50, 'CondB'}, 'Embed', false);
@@ -641,7 +641,7 @@ classdef BlockDefinitionTest < matlab.unittest.TestCase
             % Start marker with no subsequent end marker is skipped
             data = pf2_base.tests.unit.BlockDefinitionTest.makeSyntheticData();
             % Second start (40) has no end marker after it
-            data.markers = [10 49 0 1; 25 51 0 1; 40 49 0 1];
+            data.markers = pf2_base.normalizeMarkers([10 49 0 1; 25 51 0 1; 40 49 0 1]);
 
             blocks = pf2.data.defineBlocks(data, 49, 'EndMarker', 51, 'Embed', false);
 
@@ -827,7 +827,7 @@ classdef BlockDefinitionTest < matlab.unittest.TestCase
             raw = pf2.import.sampleData.fNIR2000();
 
             % Add markers and define blocks before processing
-            raw.markers = [30, 49, 20, 1; 90, 49, 20, 1];
+            raw.markers = pf2_base.normalizeMarkers([30, 49, 20, 1; 90, 49, 20, 1]);
             raw = pf2.data.defineBlocks(raw, 49, 20, 'Embed', true);
 
             processed = processFNIRS2(raw);

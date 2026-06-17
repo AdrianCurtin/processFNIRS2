@@ -115,16 +115,19 @@ classdef DataStructureTest < matlab.unittest.TestCase
         end
 
         function testMarkersHasExpectedColumns(testCase)
-            % Verify markers matrix has at least 3 columns when not empty
-            %
-            % Marker format: [time, value, duration, amplitude]
-            % Columns 1-3 are required; column 4 (amplitude) defaults to 1
+            % Verify markers are a canonical table with the canonical
+            % variables Time, Code, Duration, Amplitude (in that order) when
+            % not empty.
 
             data = testCase.rawData;
 
             if ~isempty(data.markers)
-                testCase.verifyGreaterThanOrEqual(size(data.markers, 2), 3, ...
-                    'Markers must have at least 3 columns: [time, value, duration]');
+                % Markers are stored as a canonical table
+                testCase.verifyTrue(istable(data.markers), ...
+                    'Markers must be a table');
+                testCase.verifyEqual(data.markers.Properties.VariableNames(1:4), ...
+                    {'Time','Code','Duration','Amplitude'}, ...
+                    'Markers must lead with the canonical variables');
             else
                 testCase.verifyTrue(true, 'Empty markers array is valid');
             end

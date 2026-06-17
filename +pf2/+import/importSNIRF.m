@@ -115,46 +115,57 @@ metaDataTags = stripStruct(data.nirs.metaDataTags);
 
 % Handle markers/stimulus data
 if isfield(data.nirs, 'stim') && ~isempty(data.nirs.stim)
-    markerArray = [];
+    markerTable = pf2_base.normalizeMarkers([]);   % empty canonical table
+    stimDict = cell(0, 2);                          % code->label from stim names
     stimArray = data.nirs.stim;
-    
+
     for m = 1:length(stimArray)
         curStim = stimArray(m);
-        
-        % Create label field if not present
+
         if ~isfield(curStim, 'data') || isempty(curStim.data)
             continue;
         end
-        
-        % Standard SNIRF stim data is [starttime, duration, value, ...]
-        % We want [time, value, duration, ...] for fNIR format
-        if size(curStim.data, 2) >= 3
-            % Reorder first 3 columns to match fNIR format [time, value, duration]
-            curMarkerData = curStim.data(:, [1, 3, 2]);
-            % Carry through extra columns (e.g., amplitude)
-            if size(curStim.data, 2) > 3
-                curMarkerData = [curMarkerData, curStim.data(:, 4:end)];
+
+        % Standard SNIRF stim data is [startTime, duration, value, ...].
+        % Map columns to the canonical table by dataLabels when present so
+        % extra columns (e.g. amplitude, GameScore) keep their names; fall
+        % back to positional order otherwise.
+        T = stimToTable(curStim);
+        if isempty(T); continue; end
+        markerTable = pf2_base.mergeMarkers(markerTable, T);
+
+        % Capture a code->label mapping from the stim condition name. asSNIRF
+        % writes a meaningful label as the condition name (falling back to an
+        % auto-generated marker<code>/mrk<code>); keep only the meaningful ones
+        % so labels survive an asSNIRF round-trip via the marker dictionary.
+        if isfield(curStim, 'name') && ~isempty(curStim.name)
+            nm = strtrim(char(string(curStim.name)));
+            codesHere = unique(T.Code(~isnan(T.Code)));
+            for ci = 1:numel(codesHere)
+                cval = codesHere(ci);
+                auto1 = sprintf('marker%g', cval);
+                auto2 = sprintf('mrk%g', cval);
+                if ~isempty(nm) && ~strcmp(nm, auto1) && ~strcmp(nm, auto2)
+                    stimDict(end+1, :) = {cval, nm}; %#ok<AGROW>
+                end
             end
-            
-            markerArray = [markerArray; curMarkerData];
         end
     end
-    
-    if ~isempty(markerArray)
-        % Sort markers by time
-        [~, sortIdx] = sort(markerArray(:, 1));
-        fNIR.markers = markerArray(sortIdx, :);
-    else
-        fNIR.markers = [];
+
+    if height(markerTable) > 0
+        markerTable = sortrows(markerTable, 'Time');
     end
+    fNIR.markers = markerTable;
 else
     fNIR.markers = [];
+    stimDict = cell(0, 2);
 end
 fNIR.markers = pf2_base.normalizeMarkers(fNIR.markers);
 
 % Load BIDS events.tsv sidecar (always check for eventTypes mapping)
 if isempty(fNIR.markers) || size(fNIR.markers, 1) == 0
     [fNIR.markers, bidsEventTypes] = loadBIDSevents(filepath);
+    fNIR.markers = pf2_base.normalizeMarkers(fNIR.markers);
 else
     [~, bidsEventTypes] = loadBIDSevents(filepath);
 end
@@ -233,9 +244,25 @@ end
 % Set metadata
 fNIR.info = metaDataTags;
 
-% Attach BIDS eventTypes mapping (trial_type ↔ value)
+% Build the canonical marker dictionary. Stim condition names provide a
+% code->label mapping (so labels survive an asSNIRF round-trip); a BIDS
+% events.tsv sidecar, when present, takes precedence and is also retained as
+% eventTypes for back-compat.
+combinedDict = [];
+if ~isempty(stimDict)
+    combinedDict = pf2_base.normalizeMarkerDict(stimDict);
+end
 if ~isempty(bidsEventTypes)
     fNIR.info.eventTypes = bidsEventTypes;
+    bidsDict = pf2_base.normalizeMarkerDict(bidsEventTypes);
+    if isempty(combinedDict)
+        combinedDict = bidsDict;
+    else
+        combinedDict = pf2_base.mergeMarkerDict(bidsDict, combinedDict);
+    end
+end
+if ~isempty(combinedDict) && height(combinedDict) > 0
+    fNIR.info.markerDict = combinedDict;
 end
 
 % Device config
@@ -839,20 +866,97 @@ else
     fmask = [];
 end
 
-% Run channel quality check if requested
-if channelCheck
+% Run channel quality check if requested and a GUI can be shown; otherwise
+% keep a saved mask or the all-good default (set above) and never block.
+if channelCheck && pf2_base.allowChannelCheckGUI()
     if channelCheckVersion == 2
         app = pf2.qc.ChannelCheck(fNIR, 'CalledFromImport', true, 'SkipConfirmation', true);
         if isvalid(app), fNIR = app.OutputData; delete(app); end
     else
         fNIR = probeCheckGUI(fNIR, filepath, forceChannelCheck);
     end
+elseif channelCheck
+    % Requested but the GUI is unavailable/suppressed (headless, under test,
+    % or disabled): honor a saved sidecar mask if present, otherwise the
+    % all-good default already in fNIR.fchMask.
+    fNIR = pf2_base.loadExistingMaskOrCheck(fNIR, filepath, channelCheckVersion);
 else
     if ~isempty(fmask)
         fNIR.fchMask = fmask;
     end
 end
 
+end
+
+function T = stimToTable(curStim)
+    % STIMTOTABLE Convert one SNIRF stim entry into a canonical marker table.
+    %
+    % Standard SNIRF stim data columns are [startTime, duration, value, ...].
+    % When dataLabels are present they are used to map columns to the
+    % canonical variables (Time, Code, Duration) and to NAME any extra
+    % columns (e.g. amplitude, GameScore), so they survive a round-trip.
+    % Without labels, the standard positional order is assumed -- EXCEPT for
+    % a 2-column block, which is treated as legacy fNIR [time, code] (column 2
+    % is the marker code, not duration), since that is what fNIR .nir/.mrk
+    % markers carry and losing the code is far worse than losing a duration.
+
+    T = [];
+    d = curStim.data;
+    if isempty(d) || size(d, 2) < 2
+        return;
+    end
+    nCol = size(d, 2);
+
+    % Resolve labels (lowercased) if available and well-sized
+    labels = {};
+    if isfield(curStim, 'dataLabels') && ~isempty(curStim.dataLabels)
+        lab = cellstr(string(curStim.dataLabels));
+        if numel(lab) >= nCol
+            labels = lab(1:nCol);
+        end
+    end
+
+    % Column indices for the canonical fields (default SNIRF positions)
+    ti = 1; di = 2; vi = 3;
+    if ~isempty(labels)
+        llab = lower(labels);
+        a = find(ismember(llab, {'starttime', 'time', 'onset'}), 1);
+        b = find(ismember(llab, {'duration', 'length'}), 1);
+        c = find(ismember(llab, {'value', 'code', 'type', 'id', 'marker'}), 1);
+        if ~isempty(a); ti = a; end
+        if ~isempty(b); di = b; end
+        if ~isempty(c); vi = c; end
+    elseif nCol == 2
+        % Legacy fNIR [time, code]: column 2 is the code, no duration column.
+        di = 0; vi = 2;
+        warning('pf2:importSNIRF:twoColumnStim', ...
+            ['2-column SNIRF stim block found; treating column 2 as the marker ', ...
+             'code (legacy [time, code]) rather than duration.']);
+    end
+
+    nRow = size(d, 1);
+    Time     = d(:, ti);
+    Duration = zeros(nRow, 1);
+    if di >= 1 && di <= nCol; Duration = d(:, di); end
+    Code     = zeros(nRow, 1);
+    if vi >= 1 && vi <= nCol; Code = d(:, vi); end
+
+    T = table(Time, Code, Duration, 'VariableNames', {'Time', 'Code', 'Duration'});
+
+    % Carry remaining columns as named extras
+    coreCols = [ti, di, vi];
+    for j = 1:nCol
+        if ismember(j, coreCols); continue; end
+        if ~isempty(labels)
+            nm = matlab.lang.makeValidName(labels{j});
+        else
+            nm = sprintf('Data%d', j);
+        end
+        if ismember(nm, T.Properties.VariableNames)
+            nm = matlab.lang.makeUniqueStrings([nm '_x'], T.Properties.VariableNames);
+        end
+        T.(nm) = d(:, j);
+    end
 end
 
 function opt_2d_coords = setUpFalse2D(numCh)

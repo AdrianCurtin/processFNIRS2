@@ -31,7 +31,8 @@ function [outDataOD,outDataRaw]=processStageRaw2OD(method,data,fs,time,rawMask,f
 %   time           - Time vector [T x 1] in seconds
 %   rawMask        - Channel validity mask [1 x C_raw]
 %                    1 = valid channel, 0 = invalid/masked
-%   fMarkers       - Event markers [M x 4] (time, code, duration, amplitude)
+%   fMarkers       - Event markers, numeric [M x 4] (time, code, duration,
+%                    amplitude); supplied to pipeline functions as an array
 %   fAux           - Auxiliary data struct (physiology, accelerometer, etc.)
 %   channelNumbers - Channel identifier mapping [1 x C_raw]
 %                    Positive values = optode numbers
@@ -65,7 +66,8 @@ function [outDataOD,outDataRaw]=processStageRaw2OD(method,data,fs,time,rawMask,f
 %        'fChannelNumbers'-> channel IDs
 %        'fChannelSD'     -> source-detector distances
 %        'fProbeInfo'     -> probe geometry struct
-%        'fMarkers'       -> event markers
+%        'fMarkers'       -> event markers (numeric [M x 4] array)
+%        'fMarkerTable'   -> event markers (canonical table; optional)
 %        'fAux'           -> auxiliary data
 %        'fAmbient'       -> dark channel data
 %        'fNIRstruct'     -> full fNIRS struct
@@ -165,7 +167,8 @@ for i=1:length(method.F)
         ctx.fChannelSD = [];
     end
     ctx.fProbeInfo = probeInfo;
-    ctx.fMarkers = fMarkers;
+    ctx.fMarkers = pf2_base.markersToArray(fMarkers);     % numeric [M x 4]
+    ctx.fMarkerTable = pf2_base.normalizeMarkers(fMarkers); % canonical table
     ctx.fNIRstruct = fNIR_input;
     ctx.fAux = fAux;
     ctx.fAmbient = data(:,validDarkChannels);

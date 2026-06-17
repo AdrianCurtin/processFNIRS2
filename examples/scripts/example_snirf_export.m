@@ -112,7 +112,7 @@ fprintf('    Session:     %s\n', data.info.Session);
 
 fprintf('\n=== 3. Add Event Markers ===\n');
 
-data.markers = [
+data.markers = pf2_base.normalizeMarkers([
      60, 10, 0;    % Task onset at 60s
     120, 20, 0;    % Rest onset at 120s
     180, 10, 0;    % Task onset at 180s
@@ -123,10 +123,10 @@ data.markers = [
     480, 20, 0;    % Rest onset at 480s
     540, 10, 0;    % Task onset at 540s
     600, 20, 0;    % Rest onset at 600s
-];
+]);
 
 fprintf('  Injected %d markers (5 task + 5 rest blocks)\n', size(data.markers, 1));
-fprintf('  Marker codes: %s\n', mat2str(unique(data.markers(:,2))'));
+fprintf('  Marker codes: %s\n', mat2str(unique(data.markers.Code)'));
 
 
 %% ========================================================================
@@ -276,7 +276,7 @@ end
 % --- Verify markers ---
 fprintf('\n  [MARKERS]\n');
 if size(reimported.markers, 1) == size(trimmed.markers, 1)
-    timeDiffs = abs(reimported.markers(:,1) - trimmed.markers(:,1));
+    timeDiffs = abs(reimported.markers.Time - trimmed.markers.Time);
     fprintf('    Count matches: %d events\n', size(reimported.markers, 1));
     fprintf('    Max time difference: %.6f seconds\n', max(timeDiffs));
 else

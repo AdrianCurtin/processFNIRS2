@@ -29,7 +29,7 @@ function [fNIR] = importNIRX(folderDIR,channelCheck,varargin)
 %          .raw       - Raw intensity data [T x C double]
 %          .time      - Time vector in seconds [T x 1 double]
 %          .fs        - Sampling frequency in Hz [double]
-%          .markers   - Event markers [M x 2: time, value]
+%          .markers   - Event marker table (.Time, .Code, .Duration, .Amplitude)
 %          .fchMask   - Channel quality mask [1 x C: 1=good, 0=bad]
 %          .info      - Recording metadata and probe information
 %          .probeinfo - Device and probe geometry structure
@@ -383,8 +383,11 @@ for i=1:size(files,1)
                 splitLine=strsplit(NIRX_mrk{l},'\t');
                 if(length(splitLine)>1)
                     numL=numL+1;
-                    fNIR.markers(numL,:)=str2double(splitLine);
+                    mrkRows(numL,:)=str2double(splitLine); %#ok<AGROW>
                 end
+            end
+            if(numL>0)
+                fNIR.markers=pf2_base.normalizeMarkers(mrkRows);
             end
         end
         
@@ -565,16 +568,21 @@ else
    fmask=[]; 
 end
 
-if(channelCheck)
+if(channelCheck && pf2_base.allowChannelCheckGUI())
     if channelCheckVersion == 2
         app = pf2.qc.ChannelCheck(fNIR, 'CalledFromImport', true, 'SkipConfirmation', true);
         if isvalid(app), fNIR = app.OutputData; delete(app); end
     else
         fNIR=probeCheckGUI(fNIR,sprintf('%s.nirs',fileroot),forceChannelCheck);
     end
+elseif(channelCheck)
+    % Requested but the GUI is unavailable/suppressed (headless, under test,
+    % or disabled): honor a saved sidecar mask if present, otherwise the
+    % all-good default already in fNIR.fchMask.
+    fNIR=pf2_base.loadExistingMaskOrCheck(fNIR,sprintf('%s.nirs',fileroot),channelCheckVersion);
 else
    if(~isempty(fmask))
-       fNIR.fchMask=fmask; 
+       fNIR.fchMask=fmask;
    end
 end
 

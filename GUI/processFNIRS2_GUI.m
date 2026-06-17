@@ -320,6 +320,11 @@ if(~isempty(p.Results.markers))
     PF2.GUIPF2.data.markers=p.Results.markers; %Overwrite markers if specified
 end
 
+% Canonical marker representation: always a table
+if(isfield(PF2.GUIPF2.data,'markers'))
+    PF2.GUIPF2.data.markers=pf2_base.normalizeMarkers(PF2.GUIPF2.data.markers);
+end
+
 if(isstruct(tempOxyStage))
     PF2.GUIPF2.data.stage{4}=tempOxyStage; %Assign stage3 if exists
 end
@@ -406,7 +411,8 @@ if(~outputData.ShowGUI)
 end
 
 if(isfield(PF2.GUIPF2.data,'markers')&&~isempty(PF2.GUIPF2.data.markers))
-    PF2.curMarkerSet=sort(unique(PF2.GUIPF2.data.markers(:,2)));
+    mrkArr=pf2_base.markersToArray(PF2.GUIPF2.data.markers);
+    PF2.curMarkerSet=sort(unique(mrkArr(:,2)));
     mrkStr=cell(length(PF2.curMarkerSet),1);
     for i=1:length(PF2.curMarkerSet)
        mrkStr{i}=sprintf('%i',PF2.curMarkerSet(i));
@@ -978,9 +984,9 @@ if(nargout>0)
            
            if(PF2.OutputLegacyMarkers)
                outfNIR.markers=[];
-               outfNIR.markers.data=PF2.GUIPF2.data.markers;
+               outfNIR.markers.data=pf2_base.markersToArray(PF2.GUIPF2.data.markers);
            else
-               outfNIR.markers=PF2.GUIPF2.data.markers;
+               outfNIR.markers=pf2_base.normalizeMarkers(PF2.GUIPF2.data.markers);
            end
        end
        
@@ -2649,7 +2655,8 @@ global PF2
 if(isfield(PF2,'curMarkerSet')&&~isempty(PF2.curMarkerSet))
     curMarkersInd=get(handles.listbox_markers,'Value');
     PF2.curMarkers=PF2.curMarkerSet(curMarkersInd);
-    reducedMarkers=PF2.GUIPF2.data.markers(ismember(PF2.GUIPF2.data.markers(:,2),PF2.curMarkers),:);
+    mrkArr=pf2_base.markersToArray(PF2.GUIPF2.data.markers);
+    reducedMarkers=mrkArr(ismember(mrkArr(:,2),PF2.curMarkers),:);
     PF2.curMarkersPlot=reducedMarkers;
 
     if(~isempty(PF2.curMarkersPlot))

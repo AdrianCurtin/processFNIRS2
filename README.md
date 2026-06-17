@@ -75,13 +75,15 @@ Use functions in the `pf2.import` module to load data from various fNIRS devices
 ### Data Manipulation
 The toolbox provides various functions for manipulating fNIRS data:
 - `pf2.data.applyChannelMask`: Set bad channels to NaN
-- `pf2.data.getMarkers`: Find specific markers in the data
+- `pf2.data.getMarkers`: Find specific markers in the data (markers are a table with `.Time`/`.Code`/`.Duration`/`.Amplitude` + extras)
 - `pf2.data.resample`: Resample or average fNIRS data
 - `pf2.data.setT0`: Shift time to align with experiment start
 - `pf2.data.split`: Split fNIRS segments based on time points
 - `pf2.data.defineBlocks`: Convert markers to block struct array
 - `pf2.data.extractBlocks`: Extract fNIRS segments by block definitions
 - `pf2.data.blockAverage` / `grandAverage`: Trial/grand average epoched segments
+- `pf2.data.getMarkerDict` / `setMarkerDict`: Get/set the per-dataset code→label marker dictionary (`data.info.markerDict`)
+- `pf2.data.labelMarkers`: Stamp a categorical `.Label` on markers from the dictionary or an explicit map
 - `pf2.data.plot`: Visualize fNIRS data (Oxy, Raw, ROI, AuxData)
 - `pf2.qc`: Channel quality assessment (SCI, power spectrum, QC plots)
 - `pf2.export`: Export data to NIR or SNIRF formats
@@ -299,9 +301,19 @@ pf2.qc.plotQuality(sciResult);
 ```
 
 ### Block Definition & Extraction
-Define and extract experimental blocks from marker events:
+Markers are stored as a table (`data.markers` with `.Time`/`.Code`/`.Duration`/`.Amplitude` + any
+extra columns you add). Codes get meaning from the per-dataset marker dictionary
+(`data.info.markerDict`), which importers populate from BIDS `events.tsv`/COBI logs and which
+`defineBlocks` reads to auto-label blocks:
 ```matlab
-% Define blocks from marker codes with 30-second duration
+% Optional: name your codes once, dataset-wide (importers may set this for you)
+data = pf2.data.setMarkerDict(data, {49, 'Easy'; 50, 'Hard'});
+data = pf2.data.labelMarkers(data);   % adds a categorical .Label per marker row
+
+% Define blocks; Conditions are auto-labeled from the dictionary
+blocks = pf2.data.defineBlocks(data, [49, 50], 30, 'Embed', false);
+
+% (Equivalent without a dictionary: pass the mapping inline)
 blocks = pf2.data.defineBlocks(data, [49, 50], 30, ...
     'ConditionMap', {49, 'Easy'; 50, 'Hard'}, 'Embed', false);
 
@@ -528,6 +540,8 @@ processFNIRS2 is laid out in the following manner:
   - defineBlocks: Convert markers to block struct array
   - extractBlocks: Extract fNIRS segments by block definitions
   - blockAverage / grandAverage: Trial/grand average of epoched segments
+  - getMarkerDict / setMarkerDict: Per-dataset code→label marker dictionary
+  - labelMarkers: Categorical labels on markers from the dictionary or a map
   - blocksToEvents: Convert blocks to GLM event structs
   - betasToSegments: Package GLM betas for Experiment
   - **plot**: Functions to visualize fNIRS data

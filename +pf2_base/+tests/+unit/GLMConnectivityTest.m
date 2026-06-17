@@ -29,7 +29,7 @@ classdef GLMConnectivityTest < matlab.unittest.TestCase
             onsets = [60, 150, 250, 350, 450, 550];
             codes  = [10, 20, 10, 20, 10, 20];
             dur    = 30;
-            d.markers = [onsets(:), codes(:), repmat(dur, 6, 1)];
+            d.markers = pf2_base.normalizeMarkers([onsets(:), codes(:), repmat(dur, 6, 1)]);
 
             testCase.data = d;
 

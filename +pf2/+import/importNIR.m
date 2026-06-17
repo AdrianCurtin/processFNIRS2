@@ -488,6 +488,18 @@ end
 
 if(~isempty(log_info))
     fNIR.info.log_info=log_info;
+    % Fold the COBI Marker Dictionary into the canonical marker dictionary
+    if(isstruct(log_info)&&isfield(log_info,'MarkerDict')&&~isempty(log_info.MarkerDict))
+        try
+            fNIR.info.markerDict=pf2_base.normalizeMarkerDict(log_info.MarkerDict);
+        catch normErr
+            % Leave markerDict unset if the COBI table can't be normalized,
+            % but warn so the cause is visible (the column layout is parsed
+            % from the .nir log header and may be unexpected).
+            warning('pf2:importNIR:markerDictFailed', ...
+                'Could not normalize COBI MarkerDict: %s', normErr.message);
+        end
+    end
 end
     
 %clear count;
@@ -570,7 +582,7 @@ else
 end
 
 if(channelCheck)
-    if(forceChannelCheck)
+    if(forceChannelCheck && pf2_base.allowChannelCheckGUI())
         if channelCheckVersion == 2
             app = pf2.qc.ChannelCheck(fNIR, 'CalledFromImport', true, 'SkipConfirmation', true);
             if isvalid(app), fNIR = app.OutputData; delete(app); end
@@ -578,6 +590,10 @@ if(channelCheck)
             fNIR=probeCheckGUI(fNIR,nir_filename,forceChannelCheck);
         end
     else
+        % Non-forced, or the GUI cannot/should not be shown (headless, under
+        % test, or disabled): load a saved mask if present; otherwise
+        % loadExistingMaskOrCheck defaults all-good instead of blocking on the
+        % channel-check window.
         fNIR=pf2_base.loadExistingMaskOrCheck(fNIR,nir_filename,channelCheckVersion);
     end
 else

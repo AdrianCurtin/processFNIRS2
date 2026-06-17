@@ -212,7 +212,7 @@ fprintf('  Plotted topographic maps\n');
 fprintf('\n=== 6. Inspect Event Markers ===\n');
 
 % Inject synthetic markers for demonstration
-processed.markers = [
+processed.markers = pf2_base.normalizeMarkers([
      60, 10, 0;    % Task onset at 60s (code 10)
     120, 20, 0;    % Rest onset at 120s (code 20)
     180, 10, 0;    % Task onset at 180s
@@ -221,14 +221,14 @@ processed.markers = [
     360, 20, 0;    % Rest onset at 360s
     420, 10, 0;    % Task onset at 420s
     480, 20, 0;    % Rest onset at 480s
-];
+]);
 fprintf('  Injected %d synthetic markers\n', size(processed.markers, 1));
 
 % --- 6a: See all markers in the data ---
 fprintf('\n  All markers:\n');
 fprintf('    Time(s)   Code\n');
 for i = 1:size(processed.markers, 1)
-    fprintf('    %7.1f   %4d\n', processed.markers(i, 1), processed.markers(i, 2));
+    fprintf('    %7.1f   %4d\n', processed.markers.Time(i), processed.markers.Code(i));
 end
 
 % --- 6b: Find specific marker times ---
