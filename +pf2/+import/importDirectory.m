@@ -301,9 +301,11 @@ function fn = getImporterForExtension(ext, channelCheck)
             fn = @(f) pf2.import.importHitachiMES(f, [], channelCheck);
         case {'.hdr', '.wl1', '.wl2'}
             fn = @(f) pf2.import.importNIRX(f, channelCheck);
+        case '.oxy3'
+            fn = @(f) pf2.import.importOxy3(f, channelCheck);
         otherwise
             error('pf2:importDirectory:unsupportedFormat', ...
-                'Unsupported file extension ''%s''. Supported: .nir, .snirf, .csv, .hdr', ext);
+                'Unsupported file extension ''%s''. Supported: .nir, .snirf, .csv, .hdr, .oxy3', ext);
     end
 end
 
@@ -358,6 +360,8 @@ function name = getFormatName(ext)
             name = 'Hitachi MES (.csv)';
         case {'.hdr', '.wl1', '.wl2'}
             name = 'NIRx (.hdr)';
+        case '.oxy3'
+            name = 'Artinis OxySoft (.oxy3)';
         otherwise
             name = ext;
     end

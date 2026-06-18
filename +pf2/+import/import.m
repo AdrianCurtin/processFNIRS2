@@ -19,6 +19,7 @@ function data = import(filepath, varargin)
 %                .csv     - Hitachi ETG-4000 format
 %                .hdr     - NIRx format (header file)
 %                .wl1     - NIRx format (wavelength file)
+%                .oxy3    - Artinis OxySoft format
 %              Directory: scans for supported files and batch-imports.
 %              Omitted: opens file browser dialog.
 %
@@ -59,6 +60,7 @@ if nargin < 1 || isempty(filepath)
         '*.csv', 'Hitachi ETG-4000 (*.csv)'; ...
         '*.hdr', 'NIRx Format (*.hdr)'; ...
         '*.wl1', 'NIRx Wavelength (*.wl1)'; ...
+        '*.oxy3', 'Artinis OxySoft (*.oxy3)'; ...
         '*.*', 'All Files (*.*)'}, ...
         'Select fNIRS Data File');
 
@@ -105,9 +107,11 @@ switch ext
         data = pf2.import.importHitachiMES(filepath);
     case {'.hdr', '.wl1', '.wl2'}
         data = pf2.import.importNIRX(filepath);
+    case '.oxy3'
+        data = pf2.import.importOxy3(filepath);
     otherwise
         error('pf2:import:UnknownFormat', ...
-            'Unknown file format: %s\nSupported formats: .nir, .snirf, .csv, .hdr, .wl1', ext);
+            'Unknown file format: %s\nSupported formats: .nir, .snirf, .csv, .hdr, .wl1, .oxy3', ext);
 end
 
 fprintf('Imported: %s\n', filepath);
@@ -128,7 +132,7 @@ function pattern = detectPattern(dirPath)
 %   Checks for each supported extension in priority order and returns the
 %   first pattern that has matching files.
 
-    extPriority = {'.snirf', '.nir', '.hdr', '.csv'};
+    extPriority = {'.snirf', '.nir', '.hdr', '.csv', '.oxy3'};
     for k = 1:numel(extPriority)
         testPattern = ['*' extPriority{k}];
         found = dir(fullfile(dirPath, '**', testPattern));
@@ -155,6 +159,8 @@ switch lower(ext)
         name = 'Hitachi ETG-4000';
     case {'.hdr', '.wl1', '.wl2'}
         name = 'NIRx';
+    case '.oxy3'
+        name = 'Artinis OxySoft';
     otherwise
         name = 'Unknown';
 end
