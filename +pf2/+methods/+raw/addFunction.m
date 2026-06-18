@@ -49,7 +49,7 @@ addRequired(p, 'funcName', @(x) ischar(x) || isstring(x));
 addOptional(p, 'args', {}, @iscell);
 addOptional(p, 'argvals', {}, @iscell);
 addParameter(p, 'Output', 'x', @(x) ischar(x) || isstring(x));
-addParameter(p, 'Position', 0, @(x) isnumeric(x) || strcmpi(x, 'end'));
+addParameter(p, 'Position', 0, @isValidPosition);
 addParameter(p, 'Context', [], @(x) isempty(x) || isstruct(x) || isobject(x));
 parse(p, methodName, funcName, varargin{:});
 
@@ -59,8 +59,8 @@ outputVar = p.Results.Output;
 position = p.Results.Position;
 ctx = p.Results.Context;
 
-% Handle 'end' position
-if ischar(position) && strcmpi(position, 'end')
+% Handle 'end' position (char or string); 0 means append at end
+if (ischar(position) || isstring(position)) && strcmpi(position, 'end')
     position = 0;
 end
 
@@ -144,6 +144,22 @@ for i = 1:length(myMethods.cfg.Sections)
     end
 
     myMethods.cfg.(myMethods.cfg.Sections{i}) = x;
+end
+
+end
+
+
+function tf = isValidPosition(x)
+% Position must be 'end' (char/string) or a nonnegative integer scalar
+% (0 means append at end). Rejects negative or fractional values that
+% would otherwise break cell indexing downstream.
+
+if (ischar(x) || isstring(x)) && isscalar(string(x)) && strcmpi(x, 'end')
+    tf = true;
+elseif isnumeric(x) && isscalar(x) && isfinite(x) && x >= 0 && x == floor(x)
+    tf = true;
+else
+    tf = false;
 end
 
 end

@@ -151,6 +151,8 @@ end
 function plotRadar(ax, roiNames, meanVals, nROIs, ~)
 % Radar/spider plot with ROI names around the circumference
 
+    sty = pf2_base.plot.PlotStyle.getDefault();
+
     % Compute angles for each ROI
     angles = linspace(0, 2*pi, nROIs + 1);
     angles = angles(1:end-1);

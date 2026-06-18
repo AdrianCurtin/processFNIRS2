@@ -28,23 +28,23 @@ function export(data, filepath, varargin)
 %
 % Example:
 %   % Process and export with auto-detected format
-%   data = pf2.import('subject01.nir');
+%   data = pf2.import.import('subject01.nir');
 %   processed = processFNIRS2(data);
-%   pf2.export(processed, 'subject01_processed.snirf');
+%   pf2.export.export(processed, 'subject01_processed.snirf');
 %
 %   % Interactive save dialog
-%   pf2.export(processed);
+%   pf2.export.export(processed);
 %
 %   % Batch export cell array to directory
-%   pf2.export(allData, 'output/', 'Format', 'snirf', 'Dir1', 'Group');
+%   pf2.export.export(allData, 'output/', 'Format', 'snirf', 'Dir1', 'Group');
 %
 %   % Explicit format (bypasses auto-detect)
 %   pf2.export.asSNIRF(processed, 'output.snirf');
 %
-% See also: pf2.export.asSNIRF, pf2.export.asNIR, pf2.import
+% See also: pf2.export.asSNIRF, pf2.export.asNIR, pf2.import.import
 
 if nargin < 1
-    error('pf2:export:NoData', 'No data provided. Usage: pf2.export(data) or pf2.export(data, filepath)');
+    error('pf2:export:NoData', 'No data provided. Usage: pf2.export.export(data) or pf2.export.export(data, filepath)');
 end
 
 if nargin < 2 || isempty(filepath)
