@@ -797,8 +797,8 @@ for chIdx=1:numOpt
                     
                     
                     if(~isempty(xVals)&&~isempty(yVals))
-                        [rho,pval] = corr(xVals,yVals,'Type','Spearman');
-                        [r,p]=corr(xVals,yVals,'Type','Pearson');
+                        [rho,pval] = pf2_base.compat.corr(xVals,yVals,'Type','Spearman');
+                        [r,p]=pf2_base.compat.corr(xVals,yVals,'Type','Pearson');
                         
                         curData=topoData{curFigIdx(1),curFigIdx(2)}.subH{curSy,curSx};
                         
@@ -1129,10 +1129,10 @@ for chIdx=1:numOpt
                         
                         set(gaH.Annotation.LegendInformation,'IconDisplayStyle','off');
                         
-                        [rho,pval] = corr(xVals,yVals,'Type','Spearman');
+                        [rho,pval] = pf2_base.compat.corr(xVals,yVals,'Type','Spearman');
                         
                         
-                        [r,p]=corr(xVals,yVals,'Type','Pearson');
+                        [r,p]=pf2_base.compat.corr(xVals,yVals,'Type','Pearson');
                         
                         if(~plotGroupByBioM)
                             fitStr=gbyStrs{g};

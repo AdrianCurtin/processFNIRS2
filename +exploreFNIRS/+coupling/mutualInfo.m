@@ -141,8 +141,8 @@ function [miVal, pval, nBins] = computeMI(x, y, opts)
     % Determine number of bins
     if ischar(opts.NBins) || isstring(opts.NBins)
         % Freedman-Diaconis rule: bin width = 2 * IQR * n^(-1/3)
-        iqrX = iqr(x);
-        iqrY = iqr(y);
+        iqrX = pf2_base.compat.iqr(x);
+        iqrY = pf2_base.compat.iqr(y);
         avgIQR = (iqrX + iqrY) / 2;
         if avgIQR > 0
             binWidth = 2 * avgIQR * T^(-1/3);

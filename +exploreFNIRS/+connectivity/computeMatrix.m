@@ -376,7 +376,7 @@ function [matrix, pmatrix] = computeBatchCorrelation(signal, channels, nCh, nSam
     % For spearman: convert to ranks (handles ties via tiedrank)
     if strcmp(method, 'spearman')
         for col = 1:nCh
-            S(:, col) = tiedrank(S(:, col));
+            S(:, col) = pf2_base.compat.tiedrank(S(:, col));
         end
     end
 
@@ -417,7 +417,7 @@ function [matrix, pmatrix] = computeBatchCorrelation(signal, channels, nCh, nSam
     r_off = matrix(offDiag);
     r2_off = min(r_off .^ 2, 1 - eps);
     tstat_off = r_off .* sqrt((n - 2) ./ (1 - r2_off));
-    pmatrix(offDiag) = 2 * tcdf(-abs(tstat_off), n - 2);
+    pmatrix(offDiag) = 2 * pf2_base.compat.tcdf(-abs(tstat_off), n - 2);
 
     % NaN for zero-variance
     pmatrix(zeroVar, :) = NaN;
@@ -477,7 +477,7 @@ function [matrix, pmatrix] = computeBatchPartialCorr(signal, channels, nCh, nSam
     df = n - nCh;
     if df > 0
         tStat = pcorr .* sqrt(df ./ (1 - pcorr.^2 + eps));
-        pmatrix = 2 * (1 - tcdf(abs(tStat), df));
+        pmatrix = 2 * (1 - pf2_base.compat.tcdf(abs(tStat), df));
         pmatrix(logical(eye(nCh))) = 0;
     else
         pmatrix = nan(nCh, nCh);

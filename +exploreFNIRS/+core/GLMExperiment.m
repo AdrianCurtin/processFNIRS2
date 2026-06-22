@@ -811,7 +811,7 @@ classdef GLMExperiment < exploreFNIRS.core.Experiment
 
             % Group-level significance: one-sample t-test on betas
             if nSubjects > 1
-                [~, pGroup] = ttest(alignedBetas');
+                [~, pGroup] = pf2_base.compat.ttest(alignedBetas');
             else
                 pGroup = alignedPvals';
             end

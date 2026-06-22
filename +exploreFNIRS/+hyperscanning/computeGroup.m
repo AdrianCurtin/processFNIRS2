@@ -181,7 +181,7 @@ function result = computeGroup(data, pairs, varargin)
 
     df = max(nVals - 1, 1);
     % Two-tailed p-value from t-distribution
-    pvalue = 2 * (1 - tcdf(abs(tstat), df));
+    pvalue = 2 * (1 - pf2_base.compat.tcdf(abs(tstat), df));
     % Handle edge cases
     pvalue(nVals < 2) = NaN;
 

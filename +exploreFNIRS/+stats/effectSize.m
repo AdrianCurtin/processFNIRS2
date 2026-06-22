@@ -248,7 +248,7 @@ function results = effectSize(groups, groupByVars, varargin)
             results.observed(bIdx, chI) = computeES(meansA, meansB, opts.Method);
 
             % Parametric p-value (two-sample t-test)
-            [~, pval] = ttest2(meansA, meansB);
+            [~, pval] = pf2_base.compat.ttest2(meansA, meansB);
             results.p(bIdx, chI) = pval;
 
             % Bootstrap CI
@@ -263,8 +263,8 @@ function results = effectSize(groups, groupByVars, varargin)
             end
 
             results.bootstrap_dist{bIdx, chI} = bootDist;
-            results.ci_lower(bIdx, chI) = quantile(bootDist, alpha / 2);
-            results.ci_upper(bIdx, chI) = quantile(bootDist, 1 - alpha / 2);
+            results.ci_lower(bIdx, chI) = pf2_base.compat.quantile(bootDist, alpha / 2);
+            results.ci_upper(bIdx, chI) = pf2_base.compat.quantile(bootDist, 1 - alpha / 2);
         end
 
         if opts.Verbose

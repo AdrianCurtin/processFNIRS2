@@ -59,6 +59,8 @@ function [outfNIR] = split(varargin)
 % See also: pf2.data.resample, pf2.data.getMarkers, pf2.data.setT0
 
 
+pf2_base.ensureStatsFallbacks();  % ensure stats-toolbox fallbacks (nan*) are on the path before use
+
 p=inputParser;
 
 validfNIRInput = @(x) (isnumeric(x)&&length(x)>1) || (isstruct(x) && (isfield(x,'raw')||isfield(x,'time')||isfield(x,'info')));

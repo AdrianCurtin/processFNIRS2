@@ -62,6 +62,8 @@ function [fNIR] = importSNIRF(filepath, channelCheck, varargin)
 % See also: pf2.import.importNIR, pf2.import.importNIRX, pf2.export.asSNIRF,
 %           pf2_base.external.jsnirfy.loadsnirf
 
+pf2_base.ensureStatsFallbacks();  % ensure stats-toolbox fallbacks (nan*) are on the path before use
+
 if nargin < 2
    channelCheck = true;
    forceChannelCheck = false;
@@ -585,23 +587,17 @@ for p = 1:1 % Just one probe for now
     device.Probe{p}.OptPosZ = mean([device.Probe{p}.SrcPosZ(:, 1), device.Probe{p}.DetPosZ(:, 1)], 2);
     device.Probe{p}.NumOptodes = numOpt;
     
-    % Create optode position table
+    % Canonical optode positions live in TableOpt; the OptPos view is derived
+    % from it via pf2_base.syncOptodeCoords (single source of truth).
+    device.Probe{p}.TableOpt.Pos2D_x = device.Probe{p}.OptPosX(:);
+    device.Probe{p}.TableOpt.Pos2D_y = device.Probe{p}.OptPosY(:);
+    device.Probe{p}.TableOpt.Pos2D_z = device.Probe{p}.OptPosZ(:);
+    device.Probe{p}.TableOpt.Pos3D_x = device.Probe{p}.OptPosX(:);
+    device.Probe{p}.TableOpt.Pos3D_y = device.Probe{p}.OptPosY(:);
+    device.Probe{p}.TableOpt.Pos3D_z = device.Probe{p}.OptPosZ(:);
+
     device.Probe{p}.OptPos = table();
-    device.Probe{p}.OptPos.x_2d = device.Probe{p}.OptPosX(:);
-    device.Probe{p}.OptPos.y_2d = device.Probe{p}.OptPosY(:);
-    device.Probe{p}.OptPos.z_2d = device.Probe{p}.OptPosZ(:);
-    device.Probe{p}.OptPos.x = device.Probe{p}.OptPosX(:);
-    device.Probe{p}.OptPos.y = device.Probe{p}.OptPosY(:);
-    device.Probe{p}.OptPos.z = device.Probe{p}.OptPosZ(:);
-    
-    % Add positions to optode table
-    device.Probe{p}.TableOpt.Pos2D_x = device.Probe{p}.OptPos.x_2d;
-    device.Probe{p}.TableOpt.Pos2D_y = device.Probe{p}.OptPos.y_2d;
-    device.Probe{p}.TableOpt.Pos2D_z = device.Probe{p}.OptPos.z_2d;
-    
-    device.Probe{p}.TableOpt.Pos3D_x = device.Probe{p}.OptPos.x;
-    device.Probe{p}.TableOpt.Pos3D_y = device.Probe{p}.OptPos.y;
-    device.Probe{p}.TableOpt.Pos3D_z = device.Probe{p}.OptPos.z;
+    device.Probe{p} = pf2_base.syncOptodeCoords(device.Probe{p});
     
     device.Probe{p}.DetPos3D = detPos3D;
     device.Probe{p}.SrcPos3D = srcPos3D;

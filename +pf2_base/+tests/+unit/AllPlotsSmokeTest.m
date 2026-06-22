@@ -300,4 +300,36 @@ classdef AllPlotsSmokeTest < matlab.unittest.TestCase
 
     end
 
+    %% imageValues regression: probe geometry edge cases
+
+    methods (Test)
+
+        function testImageValuesNonContiguousChannels(testCase)
+            % Merged probe has non-contiguous OptodeNum (5..42 over 34 rows).
+            % Indexing the layout by OptodeNum value used to overflow.
+            pf2.Device.clearCache();
+            data.device = pf2.Device.load('fNIR_Hitachi_3x5_merged');
+            data.info.probename = 'fNIR_Hitachi_3x5_merged';
+            n = data.device.nChannels;
+            fig = figure('Visible', 'off');
+            cleanup = onCleanup(@() close(fig)); %#ok<NASGU>
+            h = pf2.probe.plot.imageValues(1:n, data, [], [], 'merged', 'ch');
+            testCase.verifyNotEmpty(h);
+        end
+
+        function testImageValuesLayoutOnlyDevice(testCase)
+            % Layout-only (grid) device renders via the schematic grid.
+            pf2.Device.clearCache();
+            data.device = pf2.Device.load('NIRX_Sport_8x8_frontal');
+            data.info.probename = 'NIRX_Sport_8x8_frontal';
+            n = data.device.nChannels;
+            fig = figure('Visible', 'off');
+            cleanup = onCleanup(@() close(fig)); %#ok<NASGU>
+            h = pf2.probe.plot.imageValues(1:n, data, [], [], 'nirx', 'ch', ...
+                'Layout', 'schematic');
+            testCase.verifyNotEmpty(h);
+        end
+
+    end
+
 end

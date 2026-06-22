@@ -58,7 +58,7 @@ function outSig=getPCAcomponent(x,componentNumber)
 	end
 
 	fprintf('Calculating PCA...\n');
-	[~,score,~,~,explained]=pca(x,'Algorithm','svd');
+	[~,score,~,~,explained]=pf2_base.compat.pca(x,'Algorithm','svd');
 
     if(~isempty(score) && size(score,2) >= componentNumber)
         outSig=score(:,componentNumber);

@@ -143,7 +143,7 @@ end
 
 % --- Compute statistics ---
 tstat = beta ./ se;
-pval = 2 * tcdf(-abs(tstat), dof);
+pval = 2 * pf2_base.compat.tcdf(-abs(tstat), dof);
 
 % R-squared
 SSres = sum(residuals.^2, 1);
@@ -422,7 +422,7 @@ for k = 1:K
 end
 
 cTstat = cBeta ./ cSe;
-cPval = 2 * tcdf(-abs(cTstat), dof);
+cPval = 2 * pf2_base.compat.tcdf(-abs(cTstat), dof);
 
 % Default contrast names
 if isempty(contrastNames) || length(contrastNames) ~= K

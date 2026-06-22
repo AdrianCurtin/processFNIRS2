@@ -687,6 +687,16 @@ else
     end
 end
 
+% 3D rendering needs physical MNI optode coordinates. Layout-only devices
+% (schematic grid, no positions) have no Pos3D columns -- fail with a clear
+% message instead of an opaque "Unrecognized variable name 'Pos3D_x'" later.
+if ~p.Results.useEEG && isfield(probeInfo, 'TableOpt') && istable(probeInfo.TableOpt) ...
+        && ~ismember('Pos3D_x', probeInfo.TableOpt.Properties.VariableNames)
+    error('pf2:interpolateValues3D:noGeometry', ...
+        ['This device has no 3D optode coordinates (layout-only montage). ' ...
+         'Use pf2.probe.plot.topo / imageValues for a 2D view instead.']);
+end
+
 if(show1020)
     c1020=pf2_base.getAsset('cerebro_1020'); %estimation of 10-20 coordinates
     
@@ -788,13 +798,11 @@ if isfield(probeInfo, 'TableOpt') && ~p.Results.useEEG
             srcMNI = T.s * (srcCoords * T.R) + T.t;
             detMNI = T.s * (detCoords * T.R) + T.t;
 
-            % Update probeInfo with transformed coordinates
+            % Update canonical TableOpt and sync the OptPos view from it.
             probeInfo.TableOpt.Pos3D_x = optMNI(:, 1);
             probeInfo.TableOpt.Pos3D_y = optMNI(:, 2);
             probeInfo.TableOpt.Pos3D_z = optMNI(:, 3);
-            probeInfo.OptPos.x = optMNI(:, 1);
-            probeInfo.OptPos.y = optMNI(:, 2);
-            probeInfo.OptPos.z = optMNI(:, 3);
+            probeInfo = pf2_base.syncOptodeCoords(probeInfo);
 
             srcIdx = probeInfo.TableSD.Type == 'Src';
             probeInfo.TableSD.Pos3D_x(srcIdx) = srcMNI(:, 1);
@@ -841,6 +849,33 @@ if(isfield(probeInfo, 'TableOpt'))
     optPos = [probeInfo.TableOpt.Pos3D_x, probeInfo.TableOpt.Pos3D_y, probeInfo.TableOpt.Pos3D_z];
     
     if(p.Results.useTalairach)
+        % icbm_fsl2tal is the MNI152->Talairach (Lancaster/Brett) transform; it
+        % is only valid for true MNI152 input. The 'MNI' label alone is not
+        % enough: an idealized-template montage with an unverified reference
+        % head is not MNI152, so warn on that too (once per session).
+        talFnir = p.Results.fNIR;
+        if iscell(talFnir) && ~isempty(talFnir), talFnir = talFnir{1}; end
+        talCoordSys = ''; refHead = ''; prov = '';
+        if isstruct(talFnir) && isfield(talFnir, 'device') && isa(talFnir.device, 'pf2.Device')
+            talCoordSys = talFnir.device.CoordinateSystem;
+            refHead = talFnir.device.ReferenceHead;
+            prov = talFnir.device.CoordinateProvenance;
+        end
+        notMNI = ~isempty(talCoordSys) && ~strcmpi(strtrim(char(talCoordSys)), 'MNI');
+        unverifiedHead = isempty(refHead) || ~strcmpi(strtrim(char(refHead)), 'MNI152');
+        isTemplate = ~isempty(prov) && contains(lower(char(prov)), 'template');
+        if notMNI
+            iWarnOnce('pf2:interpolateValues3D:talFromNonMNI', ...
+                ['useTalairach applies the MNI152->Talairach transform, but ' ...
+                 'coordinates declare CoordinateSystem=''%s''. Result is invalid ' ...
+                 'unless coordinates are MNI152.'], char(talCoordSys));
+        elseif unverifiedHead || isTemplate
+            iWarnOnce('pf2:interpolateValues3D:talUnverifiedHead', ...
+                ['useTalairach applies the MNI152->Talairach transform, but these ' ...
+                 'coordinates are not verified MNI152 (ReferenceHead=''%s'', ' ...
+                 'provenance=''%s''). Talairach output may be biased.'], ...
+                char(refHead), char(prov));
+        end
         optPos=pf2_base.external.icbm_fsl2tal(optPos);
         detPos=pf2_base.external.icbm_fsl2tal(detPos);
         srcPos=pf2_base.external.icbm_fsl2tal(srcPos);
@@ -2241,32 +2276,44 @@ end
 
 function distSq = iLocalGeodesicDistSq(ax, V, F, controlPoints)
 % Graph-geodesic squared distance from each mesh vertex to each control
-% point. Mesh graph is cached per-axes keyed on F (faces), so repeated
-% calls on the same probe/mesh reuse the graph build.
+% point. The mesh graph (the expensive graph() build over ~100k faces) is
+% cached PERSISTENTLY across calls keyed on mesh identity, so repeated
+% renders (time series, multiple subjects, successive figures) reuse it.
+% The per-control-point Dijkstra below is NOT cached here -- it is cheap once
+% the graph exists and must vary with the (per-subject) control points.
 %
 % Falls back to Euclidean (with warning) if MATLAB's graph/distances is
 % unavailable or the mesh is empty.
+
+    persistent meshGraphCache
+    if isempty(meshGraphCache)
+        meshGraphCache = containers.Map('KeyType', 'char', 'ValueType', 'any');
+    end
 
     nV = size(V, 1);
     K = size(controlPoints, 1);
 
     try
-        % Build-or-retrieve mesh graph
-        meshCache = getappdata(ax, 'iv3d_meshGraph');
-        rebuild = isempty(meshCache) ...
-                  || ~isfield(meshCache, 'faces') ...
-                  || ~isequal(size(meshCache.faces), size(F)) ...
-                  || ~isequal(meshCache.faces, F);
-        if rebuild
+        % Build-or-retrieve mesh graph. The brain mesh is static atlas data,
+        % so a cheap signature (vertex/face counts + coordinate/index
+        % checksums) uniquely identifies it without an O(nF) isequal compare.
+        sig = sprintf('%d_%d_%.12g_%d', nV, size(F, 1), sum(V(:)), sum(F(:)));
+        if isKey(meshGraphCache, sig)
+            G = meshGraphCache(sig);
+        else
             E = [F(:, [1 2]); F(:, [2 3]); F(:, [3 1])];
             E = sort(E, 2);
             E = unique(E, 'rows');
             w = sqrt(sum((V(E(:, 1), :) - V(E(:, 2), :)).^2, 2));
             G = graph(E(:, 1), E(:, 2), w, nV);
-            meshCache = struct('faces', F, 'G', G);
-            setappdata(ax, 'iv3d_meshGraph', meshCache);
+            meshGraphCache(sig) = G;
         end
-        G = meshCache.G;
+
+        % Per-axes breadcrumb: record which cached mesh this axes used (the
+        % heavy graph lives in the persistent cache above, not here).
+        if ~isempty(ax) && isgraphics(ax)
+            setappdata(ax, 'iv3d_meshGraph', sig);
+        end
 
         % Snap each control point to its nearest mesh vertex
         seedDistSq = sum(V.^2, 2) + sum(controlPoints.^2, 2)' ...
@@ -2286,4 +2333,13 @@ function distSq = iLocalGeodesicDistSq(ax, V, F, controlPoints)
         distSq = sum(V.^2, 2) + sum(controlPoints.^2, 2)' ...
                  - 2 * (V * controlPoints');
     end
+end
+
+function iWarnOnce(id, varargin)
+% IWARNONCE Emit a warning with the given id at most once per MATLAB session.
+    persistent seen
+    if isempty(seen), seen = {}; end
+    if any(strcmp(seen, id)), return; end
+    seen{end+1} = id; %#ok<AGROW>
+    warning(id, varargin{:});
 end

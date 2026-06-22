@@ -37,6 +37,9 @@ classdef Device
         CoordinateSystem % Coordinate system name (e.g., 'MNI', 'Head', 'MCAspace')
         CoordinateSystemDescription % Detailed description of coordinate system
         CoordinateUnits % Units for coordinates (e.g., 'mm', 'cm', 'm')
+        RegistrationMethod % How positions were obtained (e.g., 'template', 'CapTrak-digitized')
+        ReferenceHead   % Reference head/template for 3D coords (e.g., 'MNI152', 'unspecified')
+        CoordinateProvenance % 'idealized-template' vs 'subject-digitized'
         Landmarks       % Table of landmark positions (e.g., fiducials, 10-20 electrodes)
     end
 
@@ -53,6 +56,10 @@ classdef Device
         %               CoordinateSystemDescription - System description
         %               CoordinateUnits - Units (mm, cm, m, etc.)
         %               Landmarks - Landmark table
+
+            % Backstop: ensure stats-toolbox fallbacks (nan*) are reachable
+            % for any device-building path on a toolbox-less machine.
+            pf2_base.ensureStatsFallbacks();
 
             obj.probeInfo = probeInfo;
             obj.name = name;
@@ -101,17 +108,26 @@ classdef Device
                 obj.rawMin = NaN;
             end
 
-            % Parse optional coordinate system and landmarks
+            % Parse optional coordinate system and landmarks. Defaults are
+            % drawn from probeInfo.Info (the .cfg path declares them there);
+            % name-value pairs override (the in-memory import path passes them
+            % explicitly, e.g. CapTrak coords from SNIRF).
             p = inputParser;
-            addParameter(p, 'CoordinateSystem', '', @ischar);
-            addParameter(p, 'CoordinateSystemDescription', '', @ischar);
-            addParameter(p, 'CoordinateUnits', '', @ischar);
+            addParameter(p, 'CoordinateSystem', iInfoStr(info, 'CoordinateSystem'), @ischar);
+            addParameter(p, 'CoordinateSystemDescription', iInfoStr(info, 'CoordinateSystemDescription'), @ischar);
+            addParameter(p, 'CoordinateUnits', iInfoStr(info, 'CoordinateUnits'), @ischar);
+            addParameter(p, 'RegistrationMethod', iInfoStr(info, 'RegistrationMethod'), @ischar);
+            addParameter(p, 'ReferenceHead', iInfoStr(info, 'ReferenceHead'), @ischar);
+            addParameter(p, 'CoordinateProvenance', iInfoStr(info, 'CoordinateProvenance'), @ischar);
             addParameter(p, 'Landmarks', [], @(x) istable(x) || isempty(x));
             parse(p, varargin{:});
 
             obj.CoordinateSystem = p.Results.CoordinateSystem;
             obj.CoordinateSystemDescription = p.Results.CoordinateSystemDescription;
             obj.CoordinateUnits = p.Results.CoordinateUnits;
+            obj.RegistrationMethod = p.Results.RegistrationMethod;
+            obj.ReferenceHead = p.Results.ReferenceHead;
+            obj.CoordinateProvenance = p.Results.CoordinateProvenance;
             obj.Landmarks = p.Results.Landmarks;
         end
 
@@ -184,11 +200,50 @@ classdef Device
             end
         end
 
+        function lay = layoutSchematic(obj)
+        % LAYOUTSCHEMATIC Clean flat "schematic" grid layout (standard channels)
+        %
+        % Tidy grid montage for explanatory 2D plotting, independent of the
+        % affine 3D->2D projection returned by layout2D(). Falls back to
+        % layout2D() if no schematic layout is present.
+            P = obj.probeInfo.Probe{1};
+            if isfield(P, 'OptPos') && istable(P.OptPos) && ...
+                    ismember('subplot_layout_schematic', P.OptPos.Properties.VariableNames)
+                lay = P.OptPos.subplot_layout_schematic;
+            else
+                lay = obj.layout2D();
+            end
+        end
+
+        function tf = hasDeclaredLayout(obj)
+        % HASDECLAREDLAYOUT True if the device declares an explicit flat montage
+        %
+        % True when the .cfg supplies LayoutRows/LayoutCols or Layout2D_x/y.
+        % False when the schematic layout is only an auto-generated grid.
+            P = obj.probeInfo.Probe{1};
+            tf = isfield(P, 'LayoutDeclared') && logical(P.LayoutDeclared);
+        end
+
+        function tf = hasGeometry(obj)
+        % HASGEOMETRY True if the device has physical optode coordinates
+        %
+        % False for "layout-only" devices that carry only a schematic grid for
+        % plotting (no 2D/3D optode positions). Use this to gate code that
+        % needs real geometry (3D rendering, atlas lookup, SNIRF geometry).
+            if obj.hasMNI()
+                tf = true;
+                return;
+            end
+            tbl = obj.probeInfo.Probe{1}.TableOpt;
+            tf = all(ismember({'Pos2D_x','Pos2D_y'}, tbl.Properties.VariableNames)) ...
+                && ~isempty(tbl.Pos2D_x) && any(~isnan(tbl.Pos2D_x));
+        end
+
         function tf = hasMNI(obj)
         % HASMNI True if 3D MNI positions are available
             tbl = obj.probeInfo.Probe{1}.TableOpt;
             tf = all(ismember({'Pos3D_x','Pos3D_y','Pos3D_z'}, tbl.Properties.VariableNames)) ...
-                && ~isempty(tbl.Pos3D_x) && any(tbl.Pos3D_x ~= 0);
+                && ~isempty(tbl.Pos3D_x) && any(~isnan(tbl.Pos3D_x) & tbl.Pos3D_x ~= 0);
         end
 
         function tf = isShortSep(obj)
@@ -293,4 +348,15 @@ classdef Device
 
     end
 
+end
+
+function v = iInfoStr(info, field)
+% IINFOSTR Safely read a string field from probeInfo.Info ('' if absent)
+    if isstruct(info) && isfield(info, field) ...
+            && (ischar(info.(field)) || isstring(info.(field))) ...
+            && ~isempty(info.(field))
+        v = char(info.(field));
+    else
+        v = '';
+    end
 end

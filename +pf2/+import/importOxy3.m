@@ -110,6 +110,8 @@ function [fNIR] = importOxy3(file, channelCheck, varargin)
 %           pf2.import.importHitachiMES, pf2.import.importNIR
 
 % --- option parsing -------------------------------------------------------
+pf2_base.ensureStatsFallbacks();  % ensure stats-toolbox fallbacks (nan*) are on the path before use
+
 forceChannelCheck = false;
 channelCheckVersion = pf2_base.channelCheckVersion();
 optodeTemplate = '';
@@ -707,6 +709,11 @@ if startsWith(string(geomLabel), 'placeholder')
     zsd = zeros(height(p.TableSD), 1);
     p.TableSD.Pos3D_x = zsd; p.TableSD.Pos3D_y = zsd; p.TableSD.Pos3D_z = zsd;
 end
+
+% TableOpt is canonical; mirror its (possibly placeholder-nulled) coordinates
+% into the OptPos view so the renderer's OptPos.x reads the same 3D positions
+% the atlas/Device code sees -- consistent with the cfg and SNIRF paths.
+p = pf2_base.syncOptodeCoords(p);
 
 device.Probe{1} = p;
 end

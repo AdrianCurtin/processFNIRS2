@@ -387,7 +387,7 @@ function row = pairedTest(tbl, varName, opts, g1, g2, compName, compLabel, varLa
     sdDiff = std(d);
     tStat = meanDiff / (sdDiff / sqrt(n));
     df = n - 1;
-    pVal = 2 * (1 - tcdf(abs(tStat), df));
+    pVal = 2 * (1 - pf2_base.compat.tcdf(abs(tStat), df));
     dz = meanDiff / sdDiff;  % paired Cohen's d_z
 
     % 95% CI on the mean difference
@@ -449,7 +449,7 @@ function row = unpairedTest(tbl, varName, opts, g1, g2, compName, compLabel, var
     den = (s1^2/n1)^2/(n1-1) + (s2^2/n2)^2/(n2-1);
     df = num / den;
 
-    pVal = 2 * (1 - tcdf(abs(tStat), df));
+    pVal = 2 * (1 - pf2_base.compat.tcdf(abs(tStat), df));
 
     % Cohen's d (pooled SD)
     sp = sqrt(((n1-1)*s1^2 + (n2-1)*s2^2) / (n1+n2-2));
@@ -538,7 +538,7 @@ function T = buildCorrelationsOneToMany(tbl, opts)
             continue;
         end
 
-        [rho, pVal] = corr(x, y, 'Type', opts.CorrMethod, 'Rows', 'complete');
+        [rho, pVal] = pf2_base.compat.corr(x, y, 'Type', opts.CorrMethod, 'Rows', 'complete');
 
         row = struct();
         row.Variable = getLabel(vars{v}, opts.Labels);
@@ -582,7 +582,7 @@ function T = buildCorrelationsMatrix(tbl, opts)
         X(:, v) = tbl.(vars{v});
     end
 
-    [R, P] = corr(X, 'Type', opts.CorrMethod, 'Rows', 'pairwise');
+    [R, P] = pf2_base.compat.corr(X, 'Type', opts.CorrMethod, 'Rows', 'pairwise');
 
     % Count pairwise N
     N = zeros(nVars);

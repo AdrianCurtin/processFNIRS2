@@ -113,6 +113,10 @@ if(~isfield(ExFNIRS,'defaultRootPath'))
     cd(curdir);
 end
 
+% Self-healing: ensure stats-toolbox fallbacks (nan*) are on the path when
+% the toolbox is absent (END of path, so the toolbox wins when present).
+pf2_base.ensureStatsFallbacks();
+
 set(handles.text_versInfo,'String',exploreFNIRS.versInfo());
 
 warning('OFF','MATLAB:table:RowsAddedExistingVars')

@@ -396,7 +396,7 @@ function s = numericStat(groupVals, paired)
         d = x - y;
         tStat = mean(d) / (std(d) / sqrt(n));
         df = n - 1;
-        p = 2 * (1 - tcdf(abs(tStat), df));
+        p = 2 * (1 - pf2_base.compat.tcdf(abs(tStat), df));
         s = sprintf('t(%d) = %.2f, p %s', df, tStat, formatP(p));
     else
         % Unpaired (Welch's) t-test
@@ -416,7 +416,7 @@ function s = numericStat(groupVals, paired)
         num = (s1^2/n1 + s2^2/n2)^2;
         den = (s1^2/n1)^2/(n1-1) + (s2^2/n2)^2/(n2-1);
         df = num / den;
-        p = 2 * (1 - tcdf(abs(tStat), df));
+        p = 2 * (1 - pf2_base.compat.tcdf(abs(tStat), df));
         s = sprintf('t(%.1f) = %.2f, p %s', df, tStat, formatP(p));
     end
 end

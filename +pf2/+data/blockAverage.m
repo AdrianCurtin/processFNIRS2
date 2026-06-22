@@ -66,6 +66,8 @@ function ga = blockAverage(segments, varargin)
 % See also: pf2.data.extractBlocks, pf2.data.defineBlocks,
 %           exploreFNIRS.core.Experiment, grandAvgFNIRS
 
+pf2_base.ensureStatsFallbacks();  % ensure stats-toolbox fallbacks (nan*) are on the path before use
+
 if ~iscell(segments)
     error('pf2:blockAverage:badInput', ...
         ['SEGMENTS must be a cell array of fNIRS structs ', ...

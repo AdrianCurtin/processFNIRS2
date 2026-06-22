@@ -377,8 +377,8 @@ function curStats = plotGroupAuxScatter(ax, group, auxField, ch, tIdx, opts, clr
     curStats.N = N;
 
     if N >= 3
-        [curStats.r, curStats.p] = corr(xVals, yVals, 'Type', 'Pearson');
-        [curStats.rho, curStats.pval] = corr(xVals, yVals, 'Type', 'Spearman');
+        [curStats.r, curStats.p] = pf2_base.compat.corr(xVals, yVals, 'Type', 'Pearson');
+        [curStats.rho, curStats.pval] = pf2_base.compat.corr(xVals, yVals, 'Type', 'Spearman');
     end
 
     % Apply Spearman rank transform if requested

@@ -422,7 +422,7 @@ for chIdx=1:numOpt
 
                 elseif(strcmp(errorFeature,'IQR')||strcmp(errorFeature,'IQR-NoOutliers')||strcmp(errorFeature,'Violin'))
                     numErrFeatures=5; %min and max) and median
-                    gaQuant=quantile(ga2plot.data(timeIdx,ch,:),3);
+                    gaQuant=pf2_base.compat.quantile(ga2plot.data(timeIdx,ch,:),3);
                     iqr=gaQuant(end)-gaQuant(1);
 
                     gaPlotMin=min(ga2plot.Min(timeIdx,ch));

@@ -823,7 +823,17 @@ function [probe, measurementList, deviceMetaDataTags, rawMax, strippedChannelsMa
     % optode-indexed (height == TableOpt), compress by DetIdx/SrcIdx value
     % and pad missing IDs with NaN (devices with non-contiguous numbering,
     % e.g., merged-probe configs, otherwise produce scrambled positions).
-    if height(probeStruct.DetPos) == height(probeStruct.SrcPos) && ...
+    if ~isfield(probeStruct, 'DetPos') || ~isfield(probeStruct, 'SrcPos')
+        % Layout-only device (grid montage, no physical optode coordinates):
+        % SNIRF has no place for a schematic grid, so write empty geometry.
+        warning('pf2:asSNIRF:noGeometry', ...
+            ['Device has no optode coordinates (layout-only); writing empty ' ...
+             'source/detector positions to SNIRF.']);
+        probe.detectorPos2D = zeros(0, 2);
+        probe.detectorPos3D = zeros(0, 3);
+        probe.sourcePos2D   = zeros(0, 2);
+        probe.sourcePos3D   = zeros(0, 3);
+    elseif height(probeStruct.DetPos) == height(probeStruct.SrcPos) && ...
             height(probeStruct.TableOpt) == height(probeStruct.DetPos)
         detIds = probeStruct.TableOpt.DetIdx;
         srcIds = probeStruct.TableOpt.SrcIdx;

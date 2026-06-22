@@ -176,7 +176,7 @@ function fig = plotGroupTemporal(result, varargin)
         for w = 1:nWin
             vals = dyadTimeSeries(w, :);
             if nDyads >= 3
-                [~, pVal] = ttest(vals);
+                [~, pVal] = pf2_base.compat.ttest(vals);
             else
                 pVal = 1;
             end

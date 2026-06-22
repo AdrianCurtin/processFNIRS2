@@ -69,6 +69,8 @@ function [fNIR] = importHitachiMES(file,pathname,channelCheck,varargin)
 %
 % See also: pf2.import.importSNIRF, pf2.import.importNIRX, pf2.import.importNIR
 
+pf2_base.ensureStatsFallbacks();  % ensure stats-toolbox fallbacks (nan*) are on the path before use
+
 forceChannelCheck=false;
 channelCheckVersion=pf2_base.channelCheckVersion();
 for vi_=1:2:numel(varargin)

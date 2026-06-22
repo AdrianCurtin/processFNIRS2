@@ -62,6 +62,8 @@ function [fNIR] = importNIRX(folderDIR,channelCheck,varargin)
 %
 % See also: pf2.import.importSNIRF, pf2.import.importNIR, pf2.import.importHitachiMES
 
+pf2_base.ensureStatsFallbacks();  % ensure stats-toolbox fallbacks (nan*) are on the path before use
+
 if(nargin<2)
    channelCheck=true;
    forceChannelCheck=false;
@@ -536,7 +538,7 @@ if(isempty(fNIR.raw))
 
     switch(numRawChannels)
         case 49
-            fNIR.info.probename='NIRX_Sport_8x8_Frontal';
+            fNIR.info.probename='NIRX_Sport_8x8_frontal';
         otherwise
             warning('Unidentified Probe\n');
             fNIR.info.probename='Unidentified .nirx file';

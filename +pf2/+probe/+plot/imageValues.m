@@ -29,6 +29,12 @@ function [ imgOut ] = imageValues(varargin)
 %   clrBarTitle - Title for the colorbar (default: '')
 %   'includeSS' - Include short separation channels (default: true)
 %                 Set to false to exclude short separation channels.
+%   'Layout'    - 2D layout to draw (default: 'auto'):
+%                 'schematic' (or 'flat') - clean declared/auto grid montage
+%                     (e.g. a 2x8), tidy for explanatory plots.
+%                 'anatomical' (or 'projected') - affine 3D->2D projection.
+%                 'auto' - schematic when the device DECLARES a montage
+%                     (LayoutRows/Cols or Layout2D_x/y), else anatomical.
 %
 % Outputs:
 %   imgOut - Handle to the image object (optional)
@@ -60,6 +66,8 @@ addOptional(p, 'titleString', '', isStringOrChar);
 addOptional(p, 'clrBarTitle', '', isStringOrChar);
 
 addParameter(p, 'includeSS', true, @islogical);
+addParameter(p, 'Layout', 'auto', @(x) (ischar(x) || isstring(x)) && ...
+    any(strcmpi(char(x), {'auto','schematic','flat','anatomical','projected'})));
 addParameter(p, 'savePath', '', @(x) ischar(x) || isstring(x));
 addParameter(p, 'saveWidth', [], @(x) isempty(x) || isnumeric(x));
 addParameter(p, 'saveHeight', [], @(x) isempty(x) || isnumeric(x));
@@ -97,14 +105,46 @@ if(include_ss&&size(probeInfo.OptPos,1)>length(data2plot)&&sum(~probeInfo.TableO
    warning('Not enough data for all channels, ignoring short separation channels');
 end
 
+% Resolve which 2D layout to draw: the clean declared/auto "schematic" grid
+% or the affine 3D->2D "anatomical" projection.
+layoutMode = lower(char(p.Results.Layout));
+if any(strcmp(layoutMode, {'flat'})),       layoutMode = 'schematic';  end
+if any(strcmp(layoutMode, {'projected'})),  layoutMode = 'anatomical'; end
+hasSchem = ismember('subplot_layout_schematic', probeInfo.OptPos.Properties.VariableNames);
+declared = isfield(probeInfo, 'LayoutDeclared') && logical(probeInfo.LayoutDeclared);
+switch layoutMode
+    case 'auto'
+        useSchematic = hasSchem && declared;   % only auto-prefer a real montage
+    case 'schematic'
+        useSchematic = hasSchem;
+        if ~hasSchem
+            warning('pf2:imageValues:noSchematic', ...
+                'No schematic layout for this device; using anatomical projection.');
+        end
+    otherwise % 'anatomical'
+        useSchematic = false;
+end
+
+% rowIdx maps each data value to its OptPos/TableOpt ROW (the layout cells are
+% row-indexed). Indexing by OptodeNum value breaks for devices with
+% non-contiguous channel numbers (e.g. merged probes where OptodeNum spans
+% 5..42 across 34 rows).
 if(include_ss)
     numOptodes=size(probeInfo.TableOpt,1);
-    channelList=probeInfo.TableOpt.OptodeNum;
-    optLayout=probeInfo.OptPos.subplot_layout_ss;
+    rowIdx=(1:numOptodes)';
+    if useSchematic
+        optLayout=probeInfo.OptPos.subplot_layout_schematic_ss;
+    else
+        optLayout=probeInfo.OptPos.subplot_layout_ss;
+    end
 else
     numOptodes=sum(~probeInfo.TableOpt.IsShortSeparation);
-    channelList=probeInfo.TableOpt.OptodeNum(~probeInfo.TableOpt.IsShortSeparation);
-    optLayout=probeInfo.OptPos.subplot_layout;
+    rowIdx=find(~probeInfo.TableOpt.IsShortSeparation);
+    if useSchematic
+        optLayout=probeInfo.OptPos.subplot_layout_schematic;
+    else
+        optLayout=probeInfo.OptPos.subplot_layout;
+    end
 end
 
 if(length(data2plot)~=numOptodes)
@@ -126,9 +166,9 @@ imgData=nan(imgSize,imgSize);
 
 
 for(optIdx=1:length(data2plot))
-    optNum=channelList(optIdx);
+    optPos=optLayout{rowIdx(optIdx)};
 
-    optPos=optLayout{optNum};
+    if(isempty(optPos)), continue; end   % short-sep / unplaced channel
 
     optPos([2])=1-optPos([2])-optPos([4]); %flips y vertical axis
     

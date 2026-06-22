@@ -292,7 +292,7 @@ for g=1:numGroups
             barChartData(cBarSec,curBarGroup,2)=curHerr*errMultiply;
         elseif(strcmp(errorFeature,'IQR')||strcmp(errorFeature,'IQR-NoOutliers')||strcmp(errorFeature,'Violin'))
             numErrFeatures=5; %min and max) and median
-            gaQuant=quantile(curDataH,3);
+            gaQuant=pf2_base.compat.quantile(curDataH,3);
             iqr=gaQuant(end)-gaQuant(1);
             
             gaPlotMin=min(curDataH);

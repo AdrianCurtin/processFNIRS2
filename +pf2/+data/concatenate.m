@@ -47,6 +47,8 @@ function outFNIR = concatenate(fNIR_objs, varargin)
 %
 % See also: pf2.data.concatenateHorizontal, pf2.data.resample, pf2.data.split
 
+pf2_base.ensureStatsFallbacks();  % ensure stats-toolbox fallbacks (nan*) are on the path before use
+
 centerOnT0=true;
 
 if(nargin>1)

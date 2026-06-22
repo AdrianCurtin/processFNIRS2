@@ -271,7 +271,7 @@ classdef INI < hgsetget & dynamicprops
                                fseek(ID,fieldEndLine,'bof'); %rewind
                                
                                if(isString)
-                                    Struct_section.(Field) = strTrimStrip(Value);
+                                    Struct_section.(Field) = strTrimStrip(stripStringComment(Value));
                                else
                                    try  %Try to convert to number or cell
                                        Struct_section.(Field) = eval(strTrimStrip(Value));
@@ -591,13 +591,48 @@ Name2 = matlab.lang.makeValidName(Name2);
 end
 
 function str_trimmed=strTrimStrip(str)
-    
+
     str_trimmed=strtrim(str);
-    
+
     if(~isempty(str_trimmed)&&length(str_trimmed)>2)
         if(str_trimmed(1)==''''&&str_trimmed(end)=='''')||(str_trimmed(end)=='"'&&str_trimmed(1)=='"')
             str_trimmed=str_trimmed(2:end-1);
         end
     end
 
+end
+
+function out=stripStringComment(value)
+% STRIPSTRINGCOMMENT Drop a trailing inline comment from a quoted value.
+%
+% For a value that begins with a quote (e.g. "'name' % comment"), returns the
+% quoted literal only, discarding anything after the closing quote. A '%' that
+% falls INSIDE the quotes is preserved, and a doubled quote ('') is treated as
+% an escaped quote (not the terminator), so values like 'O''Brien' survive
+% intact. Non-quoted or unterminated values are returned unchanged.
+
+    out = value;
+    v = strtrim(value);
+    if isempty(v)
+        return;
+    end
+    q = v(1);
+    if q ~= '''' && q ~= '"'
+        return;  % not a quoted string; leave for the eval/number path
+    end
+    i = 2;
+    n = numel(v);
+    while i <= n
+        if v(i) == q
+            if i < n && v(i + 1) == q
+                i = i + 2;          % doubled quote = escaped, skip both
+            else
+                out = v(1:i);        % real closing quote; drop trailing comment
+                return;
+            end
+        else
+            i = i + 1;
+        end
+    end
+    % no closing quote found (e.g. multi-line); leave unchanged
 end

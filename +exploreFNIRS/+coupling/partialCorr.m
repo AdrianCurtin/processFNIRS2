@@ -145,7 +145,7 @@ function [r, pval] = computePartialCorr(x, y, Z)
 
     if isempty(Z)
         % No confounds: standard Pearson
-        [r, pval] = corr(xv, yv, 'Type', 'Pearson');
+        [r, pval] = pf2_base.compat.corr(xv, yv, 'Type', 'Pearson');
         return;
     end
 
@@ -169,7 +169,7 @@ function [r, pval] = computePartialCorr(x, y, Z)
     yRes = yv - Q * (Q' * yv);
 
     % Pearson correlation of residuals
-    r = corr(xRes, yRes, 'Type', 'Pearson');
+    r = pf2_base.compat.corr(xRes, yRes, 'Type', 'Pearson');
 
     % p-value via t-distribution with df = n - nConf - 2
     df = n - nConf - 2;
@@ -177,6 +177,6 @@ function [r, pval] = computePartialCorr(x, y, Z)
         pval = NaN;
     else
         tStat = r * sqrt(df / (1 - r^2 + eps));
-        pval = 2 * (1 - tcdf(abs(tStat), df));
+        pval = 2 * (1 - pf2_base.compat.tcdf(abs(tStat), df));
     end
 end

@@ -172,7 +172,7 @@ for j=1:N-L-1
         sr = StatWT(b*l_blocks+1:b*l_blocks+l_blocks,j+1);
 
         sr_temp = sr(1:SignalLength_tmp); % compute statistics only on original data
-        quants = quantile(sr_temp,[.25 .50 .75]);  % compute quantiles
+        quants = pf2_base.compat.quantile(sr_temp,[.25 .50 .75]);  % compute quantiles
         IQR = quants(3)-quants(1);  % compute interquartile range
         prob1 = quants(3)+IQR*iqr;
         prob2 = quants(1)-IQR*iqr;

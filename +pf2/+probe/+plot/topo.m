@@ -26,6 +26,9 @@ function [h, imgOut] = topo(data, biomarker, varargin)
 %             [t1 t2]    -> mean over the window t1..t2 seconds.
 %             []         -> mean over all time.
 %   'View'  - '2d' (default) renders a flat probe heatmap via imageValues.
+%   'Layout'- (2D only) 'schematic'/'flat' for a clean declared grid montage,
+%             'anatomical' for the affine projection, 'auto' (default) to pick
+%             schematic when the device declares one. Forwarded to imageValues.
 %             '3d' renders a cortical-surface projection via
 %             pf2.probe.project.biomarker (requires MNI coordinates).
 %   'Title'    - Title string (default: auto from biomarker + time).

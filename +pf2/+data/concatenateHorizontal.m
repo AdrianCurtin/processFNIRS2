@@ -57,6 +57,8 @@ function outFNIR = concatenateHorizontal(fNIR_objs, varargin)
 
 %centerOnT0=true;
 
+pf2_base.ensureStatsFallbacks();  % ensure stats-toolbox fallbacks (nan*) are on the path before use
+
 if(nargin>1)
    if(isstruct(varargin{1}))
       fNIR_objs={fNIR_objs,varargin{1}}; 

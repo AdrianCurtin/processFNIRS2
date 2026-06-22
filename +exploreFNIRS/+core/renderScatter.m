@@ -116,8 +116,8 @@ function [legendHandles, legendEntries, stats] = renderScatter(ax, groups, group
         curStats = struct('r', NaN, 'p', NaN, 'rho', NaN, 'pval', NaN, ...
             'N', N, 'coefficients', []);
         if N >= 3
-            [curStats.r, curStats.p] = corr(xVals, yVals, 'Type', 'Pearson');
-            [curStats.rho, curStats.pval] = corr(xVals, yVals, 'Type', 'Spearman');
+            [curStats.r, curStats.p] = pf2_base.compat.corr(xVals, yVals, 'Type', 'Pearson');
+            [curStats.rho, curStats.pval] = pf2_base.compat.corr(xVals, yVals, 'Type', 'Spearman');
         end
         stats(i) = curStats;
 

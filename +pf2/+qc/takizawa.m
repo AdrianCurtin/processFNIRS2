@@ -229,7 +229,7 @@ stdHbR = std(fHbR, 0, 1, 'omitnan');
 LF = abs(1 - (stdHbR ./ stdHbO));
 
 % Per-channel correlation using diag(corr(...))
-rMatrix = corr(fHbO, fHbR, 'Rows', 'pairwise');
+rMatrix = pf2_base.compat.corr(fHbO, fHbR, 'Rows', 'pairwise');
 r = diag(rMatrix)';
 
 if opts.Strict

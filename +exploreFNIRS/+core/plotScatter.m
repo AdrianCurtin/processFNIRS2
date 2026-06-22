@@ -552,8 +552,8 @@ function curStats = plotGroupScatter(ax, group, bioM, ch, tIdx, opts, clr, gIdx,
     curStats.N = N;
 
     if N >= 3
-        [curStats.r, curStats.p] = corr(xVals, yVals, 'Type', 'Pearson');
-        [curStats.rho, curStats.pval] = corr(xVals, yVals, 'Type', 'Spearman');
+        [curStats.r, curStats.p] = pf2_base.compat.corr(xVals, yVals, 'Type', 'Pearson');
+        [curStats.rho, curStats.pval] = pf2_base.compat.corr(xVals, yVals, 'Type', 'Spearman');
     end
 
     % Apply Spearman rank transform if requested
@@ -703,8 +703,8 @@ function [fig, stats] = plotTopoCorrelation(groups, opts, allChannels, tIdx)
 
                 nVals(chI) = length(xV);
                 if nVals(chI) >= 3
-                    [rVals(chI), pVals(chI)] = corr(xV, yV, 'Type', 'Pearson');
-                    [rhoVals(chI), pvalVals(chI)] = corr(xV, yV, 'Type', 'Spearman');
+                    [rVals(chI), pVals(chI)] = pf2_base.compat.corr(xV, yV, 'Type', 'Pearson');
+                    [rhoVals(chI), pvalVals(chI)] = pf2_base.compat.corr(xV, yV, 'Type', 'Spearman');
                 end
             end
 

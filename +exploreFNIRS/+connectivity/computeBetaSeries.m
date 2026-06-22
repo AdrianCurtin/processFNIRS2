@@ -148,7 +148,7 @@ switch estMethod
 end
 
 % --- Correlate trial betas across channels ---
-[R, P] = corr(trialBetas, 'Type', corrType, 'Rows', 'pairwise');
+[R, P] = pf2_base.compat.corr(trialBetas, 'Type', corrType, 'Rows', 'pairwise');
 
 % --- Build output struct (computeMatrix-compatible) ---
 result.matrix = R;

@@ -37,6 +37,16 @@ classdef ImportOxy3Test < matlab.unittest.TestCase
 
     methods (Test)
 
+        function testOptPosMatchesTableOpt(testCase)
+            % Dedup invariant: importOxy3 must sync the OptPos coordinate view
+            % to canonical TableOpt (OptPos.x was previously left at 2D values).
+            P = testCase.Data.device.probeInfo.Probe{1};
+            testCase.verifyEqual(P.OptPos.x, P.TableOpt.Pos3D_x);
+            testCase.verifyEqual(P.OptPos.y, P.TableOpt.Pos3D_y);
+            testCase.verifyEqual(P.OptPos.z, P.TableOpt.Pos3D_z);
+            testCase.verifyEqual(P.OptPos.x_2d, P.TableOpt.Pos2D_x);
+        end
+
         function testCoreFields(testCase)
             d = testCase.Data;
             testCase.verifyTrue(isstruct(d));

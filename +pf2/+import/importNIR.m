@@ -69,6 +69,8 @@ function [fNIR] = importNIR(nir_filename, mrk_filename, channelCheck, varargin)
 %   3/29/2019 - Cell array marker support, strsplit parsing
 %   2/1/2019 - Output as fNIR struct, continuous baseline
 
+pf2_base.ensureStatsFallbacks();  % ensure stats-toolbox fallbacks (nan*) are on the path before use
+
 fNIR=[]; % placeholder initializations
 data=[]; 
 markers=[];

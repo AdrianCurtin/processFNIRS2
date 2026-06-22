@@ -212,8 +212,8 @@ function [fig, stats] = plotNeuralEfficiencyCore(plotGroups, varargin)
             'meanNE', mean(neVals, 'omitnan'), ...
             'label', lbl);
         if N >= 3
-            [s.r, s.p] = corr(xZ, yZ, 'Type', 'Pearson');
-            [s.rho, s.pval] = corr(xZ, yZ, 'Type', 'Spearman');
+            [s.r, s.p] = pf2_base.compat.corr(xZ, yZ, 'Type', 'Pearson');
+            [s.rho, s.pval] = pf2_base.compat.corr(xZ, yZ, 'Type', 'Spearman');
         end
 
         % --- Error crosshairs ---

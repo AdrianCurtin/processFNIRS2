@@ -62,7 +62,7 @@ function result = pearson(x, y, fs, varargin)
             result.windowed = false;
             return;
         end
-        [r, pval] = corr(x(valid), y(valid), 'Type', 'Pearson');
+        [r, pval] = pf2_base.compat.corr(x(valid), y(valid), 'Type', 'Pearson');
 
         result.value = r;
         result.pvalue = pval;
@@ -89,7 +89,7 @@ function result = pearson(x, y, fs, varargin)
             yw = y(idx);
             valid = ~isnan(xw) & ~isnan(yw);
             if sum(valid) >= 3
-                [rVals(w), pVals(w)] = corr(xw(valid), yw(valid), 'Type', 'Pearson');
+                [rVals(w), pVals(w)] = pf2_base.compat.corr(xw(valid), yw(valid), 'Type', 'Pearson');
             end
             winTimes(w) = (starts(w) + winSamples/2 - 1) / fs;
         end

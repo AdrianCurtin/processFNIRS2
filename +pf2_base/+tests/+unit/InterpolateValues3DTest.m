@@ -87,7 +87,29 @@ classdef InterpolateValues3DTest < matlab.unittest.TestCase
                 testCase.processed, -1, 1);  % UseGeodesic default = true
             meshCache = getappdata(ax, 'iv3d_meshGraph');
             testCase.verifyNotEmpty(meshCache, ...
-                'Geodesic path should cache the mesh graph.');
+                'Geodesic path should record the cached mesh signature.');
+        end
+
+        function testGeodesicCacheReuseIsConsistent(testCase)
+            % Two successive geodesic renders (the second reuses the persistent
+            % mesh graph) must produce identical images, and the per-axes mesh
+            % signature breadcrumb must match across calls (same mesh).
+            f1 = figure('Visible', 'off');
+            c1 = onCleanup(@() close(f1)); %#ok<NASGU>
+            [~, img1] = pf2.probe.plot.interpolateValues3D(testCase.hbo, ...
+                testCase.processed, 'useGeodesic', true);
+            sig1 = getappdata(gca, 'iv3d_meshGraph');
+
+            f2 = figure('Visible', 'off');
+            c2 = onCleanup(@() close(f2)); %#ok<NASGU>
+            [~, img2] = pf2.probe.plot.interpolateValues3D(testCase.hbo, ...
+                testCase.processed, 'useGeodesic', true);
+            sig2 = getappdata(gca, 'iv3d_meshGraph');
+
+            testCase.verifyEqual(img2, img1, ...
+                'Cached mesh-graph reuse must not change the render.');
+            testCase.verifyEqual(sig2, sig1, ...
+                'Same mesh should resolve to the same cache signature.');
         end
 
         function testEuclideanOptOut(testCase)

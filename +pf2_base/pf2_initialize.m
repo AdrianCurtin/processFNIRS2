@@ -74,6 +74,11 @@ global PF2
 hObject=1;
 handles=1;
 
+% Self-healing: ensure stats-toolbox fallbacks (nanmean/nansum/...) are on
+% the path whenever the toolbox is absent. Called unconditionally (outside
+% the one-time init block below) so it re-adds the shims even if the path
+% was reset after PF2 was already initialized.
+pf2_base.ensureStatsFallbacks();
 
 if(~isfield(PF2,'defaultRootPath'))
     [pF2_folder,~,~] = fileparts(mfilename('fullpath'));

@@ -144,7 +144,7 @@ function fig = plotBlockComparison(blockResults, varargin)
                         pVals = ones(nPairs, 1);
                         for pi = 1:nPairs
                             vals = cellfun(@(m) m(ri(pi), ci(pi)), grp.matrices);
-                            [~, pVals(pi)] = ttest(vals);
+                            [~, pVals(pi)] = pf2_base.compat.ttest(vals);
                         end
                         blockMeans(b) = mean(pVals < opts.PThreshold);
                         blockSEMs(b) = 0;

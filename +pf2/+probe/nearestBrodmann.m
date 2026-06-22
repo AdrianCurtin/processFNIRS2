@@ -57,6 +57,25 @@ p.parse(data, varargin{:});
 N = round(p.Results.N);
 maxDist = p.Results.MaxDistance;
 
+% --- Frame check: BA lookup uses a 1mm MNI atlas, so it is only valid for
+%     MNI-space coordinates. Warn (don't block) on a declared non-MNI system,
+%     and flag idealized-template coordinates as a group-level approximation. ---
+if isstruct(data) && isfield(data, 'device') && isa(data.device, 'pf2.Device')
+    cs = char(data.device.CoordinateSystem);
+    prov = char(data.device.CoordinateProvenance);
+    if ~isempty(cs) && ~strcmpi(strtrim(cs), 'MNI')
+        iWarnOnce('pf2:probe:nearestBrodmann:notMNI', ...
+            ['Coordinates declare CoordinateSystem=''%s'', not MNI. Brodmann ' ...
+             'lookup assumes MNI space and results may be wrong. Register with ' ...
+             'pf2.probe.transformToMNI first.'], cs);
+    elseif ~isempty(prov) && (contains(lower(prov), 'template') || contains(lower(prov), 'idealized'))
+        iWarnOnce('pf2:probe:nearestBrodmann:templateCoords', ...
+            ['Coordinates are an idealized template (provenance=''%s''), not ' ...
+             'subject-digitized. Brodmann assignments are a group-level ' ...
+             'approximation; treat reported distances as indicative.'], prov);
+    end
+end
+
 % --- Get channel MNI positions ---
 chPos = getChannelPositions(data);
 nCh = size(chPos, 1);
@@ -162,7 +181,8 @@ if ~isfield(probe, 'TableOpt') || ...
    ~ismember('Pos3D_x', probe.TableOpt.Properties.VariableNames) || ...
    isempty(probe.TableOpt.Pos3D_x)
     error('pf2:probe:nearestBrodmann:no3D', ...
-        'No 3D MNI positions found. Device config must include 3D coordinates.');
+        ['No 3D MNI positions found (layout-only device?). Brodmann lookup ' ...
+         'requires a device config with 3D MNI coordinates.']);
 end
 
 chPos = [probe.TableOpt.Pos3D_x(:), ...
@@ -260,5 +280,15 @@ m(44) = 'Broca''s Area (pars opercularis)';
 m(45) = 'Broca''s Area (pars triangularis)';
 m(46) = 'Dorsolateral PFC';
 m(47) = 'Inferior PFC';
+
+end
+
+function iWarnOnce(id, varargin)
+% IWARNONCE Emit a warning with the given id at most once per MATLAB session.
+persistent seen
+if isempty(seen), seen = {}; end
+if any(strcmp(seen, id)), return; end
+seen{end+1} = id; %#ok<AGROW>
+warning(id, varargin{:});
 
 end

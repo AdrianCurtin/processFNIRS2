@@ -278,4 +278,101 @@ classdef DeviceTest < matlab.unittest.TestCase
 
     end
 
+    %% Coordinate-system metadata
+
+    methods (Test)
+
+        function testCoordinateMetadataFromCfg(testCase)
+            dev = pf2.Device.load('fNIR_Devices_fNIR2000');
+            testCase.verifyEqual(dev.CoordinateSystem, 'MNI');
+            testCase.verifyEqual(dev.CoordinateUnits, 'mm');
+            testCase.verifyEqual(dev.RegistrationMethod, 'template');
+            testCase.verifyEqual(dev.CoordinateProvenance, 'idealized-template');
+        end
+
+        function testCoordinateMetadataOverride(testCase)
+            % Name-value pairs (import path) override cfg Info defaults.
+            probeInfo = pf2_base.loadDeviceCfg('fNIR_Devices_fNIR2000', true, false);
+            dev = pf2.Device.fromProbeInfo(probeInfo, 'capdev', ...
+                'CoordinateSystem', 'CapTrak');
+            testCase.verifyEqual(dev.CoordinateSystem, 'CapTrak');
+        end
+
+        function testHasGeometryTrueForPositioned(testCase)
+            dev = pf2.Device.load('fNIR_Devices_fNIR2000');
+            testCase.verifyTrue(dev.hasGeometry());
+            testCase.verifyTrue(dev.hasMNI());
+        end
+
+        function testHasMNIFalseForAllNaN(testCase)
+            % An all-NaN Pos3D column must NOT count as MNI (NaN ~= 0 is true).
+            probeInfo = pf2_base.loadDeviceCfg('fNIR_Devices_fNIR2000', true, false);
+            n = height(probeInfo.Probe{1}.TableOpt);
+            probeInfo.Probe{1}.TableOpt.Pos3D_x = nan(n, 1);
+            probeInfo.Probe{1}.TableOpt.Pos3D_y = nan(n, 1);
+            probeInfo.Probe{1}.TableOpt.Pos3D_z = nan(n, 1);
+            dev = pf2.Device.fromProbeInfo(probeInfo, 'nandev');
+            testCase.verifyFalse(dev.hasMNI());
+        end
+
+        function testOptPosMatchesTableOptInvariant(testCase)
+            % Dedup invariant: the OptPos coordinate view must equal the
+            % canonical TableOpt coordinates (synced via syncOptodeCoords).
+            for nm = {'fNIR_Devices_fNIR2000','Hitachi_ETG4000_3x5', ...
+                      'fNIR_Hitachi_3x5_merged'}
+                pf2.Device.clearCache();
+                P = pf2.Device.load(nm{1}).probeInfo.Probe{1};
+                testCase.verifyEqual(P.OptPos.x, P.TableOpt.Pos3D_x, ...
+                    sprintf('%s: OptPos.x must equal TableOpt.Pos3D_x', nm{1}));
+                testCase.verifyEqual(P.OptPos.z, P.TableOpt.Pos3D_z);
+                testCase.verifyEqual(P.OptPos.x_2d, P.TableOpt.Pos2D_x);
+            end
+        end
+
+    end
+
+    %% Layout-only (position-less) devices
+
+    methods (Test)
+
+        function testLayoutOnlyDeviceLoads(testCase)
+            % NIRX 8x8 is a grid-only montage (no optode coordinates).
+            dev = pf2.Device.load('NIRX_Sport_8x8_frontal');
+            testCase.verifyClass(dev, 'pf2.Device');
+            testCase.verifyEqual(dev.nChannels, 64);
+            testCase.verifyFalse(dev.hasMNI());
+            testCase.verifyFalse(dev.hasGeometry());
+        end
+
+        function testLayoutOnlyHasSchematicGrid(testCase)
+            dev = pf2.Device.load('NIRX_Sport_8x8_frontal');
+            % PlotStructure yields a declared 8x8 grid.
+            testCase.verifyTrue(dev.hasDeclaredLayout());
+            lay = dev.layoutSchematic();
+            testCase.verifyEqual(sum(~cellfun(@isempty, lay)), 64);
+        end
+
+        function testLayoutOnlyAutoGrid(testCase)
+            % Rogue has no PlotStructure -> auto grid, not "declared".
+            dev = pf2.Device.load('Rogue_BrainSight');
+            testCase.verifyEqual(dev.nChannels, 44);
+            testCase.verifyFalse(dev.hasDeclaredLayout());
+            testCase.verifyFalse(dev.hasMNI());
+        end
+
+        function testAllDeviceCfgsLoad(testCase)
+            % Every shipped cfg must load without error (regression for the
+            % previously-crashing layout-only configs).
+            root = pf2_base.pf2_defaultRootPath();
+            d = dir(fullfile(root, 'devices', '*.cfg'));
+            for i = 1:numel(d)
+                [~, nm] = fileparts(d(i).name);
+                pf2.Device.clearCache();
+                dev = pf2.Device.load(nm);
+                testCase.verifyClass(dev, 'pf2.Device');
+            end
+        end
+
+    end
+
 end
