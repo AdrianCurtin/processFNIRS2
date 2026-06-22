@@ -76,7 +76,7 @@ tempLoadEx=load(filename,'ExFNIRS');
 
 
 if(~isfield(tempLoadEx,'ExFNIRS')||isempty(tempLoadEx))
-    error('No data found');
+    error('exploreFNIRS:loadEx:noData', 'No data found');
 end
 
 

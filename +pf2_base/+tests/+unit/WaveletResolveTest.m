@@ -2,7 +2,7 @@ classdef WaveletResolveTest < matlab.unittest.TestCase
 % WAVELETRESOLVETEST Unit tests for pf2_base.wavelet.resolveWavelet
 %
 % Validates that wavelet shorthand names resolve to the correct
-% MakeONFilter outputs and MATLAB Wavelet Toolbox names.
+% makeONFilter outputs and MATLAB Wavelet Toolbox names.
 
     methods (Test)
 
@@ -10,7 +10,7 @@ classdef WaveletResolveTest < matlab.unittest.TestCase
 
         function testDb2(testCase)
             [qmf, wn, desc] = pf2_base.wavelet.resolveWavelet('db2');
-            expected = MakeONFilter('Daubechies', 4);
+            expected = pf2_base.wavelet.makeONFilter('Daubechies', 4);
             testCase.verifyEqual(qmf, expected, 'AbsTol', 1e-12);
             testCase.verifyEqual(wn, 'db2');
             testCase.verifySubstring(desc, 'Daubechies');
@@ -18,21 +18,21 @@ classdef WaveletResolveTest < matlab.unittest.TestCase
 
         function testDb4(testCase)
             [qmf, wn, ~] = pf2_base.wavelet.resolveWavelet('db4');
-            expected = MakeONFilter('Daubechies', 8);
+            expected = pf2_base.wavelet.makeONFilter('Daubechies', 8);
             testCase.verifyEqual(qmf, expected, 'AbsTol', 1e-12);
             testCase.verifyEqual(wn, 'db4');
         end
 
         function testDb6(testCase)
             [qmf, wn, ~] = pf2_base.wavelet.resolveWavelet('db6');
-            expected = MakeONFilter('Daubechies', 12);
+            expected = pf2_base.wavelet.makeONFilter('Daubechies', 12);
             testCase.verifyEqual(qmf, expected, 'AbsTol', 1e-12);
             testCase.verifyEqual(wn, 'db6');
         end
 
         function testDb10(testCase)
             [qmf, wn, ~] = pf2_base.wavelet.resolveWavelet('db10');
-            expected = MakeONFilter('Daubechies', 20);
+            expected = pf2_base.wavelet.makeONFilter('Daubechies', 20);
             testCase.verifyEqual(qmf, expected, 'AbsTol', 1e-12);
             testCase.verifyEqual(wn, 'db10');
         end
@@ -40,7 +40,7 @@ classdef WaveletResolveTest < matlab.unittest.TestCase
         function testAllDaubechies(testCase)
             for vm = 2:10
                 [qmf, ~, ~] = pf2_base.wavelet.resolveWavelet(sprintf('db%d', vm));
-                expected = MakeONFilter('Daubechies', vm*2);
+                expected = pf2_base.wavelet.makeONFilter('Daubechies', vm*2);
                 testCase.verifyEqual(qmf, expected, 'AbsTol', 1e-12);
             end
         end
@@ -49,14 +49,14 @@ classdef WaveletResolveTest < matlab.unittest.TestCase
 
         function testSym4(testCase)
             [qmf, wn, ~] = pf2_base.wavelet.resolveWavelet('sym4');
-            expected = MakeONFilter('Symmlet', 4);
+            expected = pf2_base.wavelet.makeONFilter('Symmlet', 4);
             testCase.verifyEqual(qmf, expected, 'AbsTol', 1e-12);
             testCase.verifyEqual(wn, 'sym4');
         end
 
         function testSym8(testCase)
             [qmf, wn, ~] = pf2_base.wavelet.resolveWavelet('sym8');
-            expected = MakeONFilter('Symmlet', 8);
+            expected = pf2_base.wavelet.makeONFilter('Symmlet', 8);
             testCase.verifyEqual(qmf, expected, 'AbsTol', 1e-12);
             testCase.verifyEqual(wn, 'sym8');
         end
@@ -64,7 +64,7 @@ classdef WaveletResolveTest < matlab.unittest.TestCase
         function testAllSymmlets(testCase)
             for par = 4:10
                 [qmf, ~, ~] = pf2_base.wavelet.resolveWavelet(sprintf('sym%d', par));
-                expected = MakeONFilter('Symmlet', par);
+                expected = pf2_base.wavelet.makeONFilter('Symmlet', par);
                 testCase.verifyEqual(qmf, expected, 'AbsTol', 1e-12);
             end
         end
@@ -73,14 +73,14 @@ classdef WaveletResolveTest < matlab.unittest.TestCase
 
         function testCoif1(testCase)
             [qmf, wn, ~] = pf2_base.wavelet.resolveWavelet('coif1');
-            expected = MakeONFilter('Coiflet', 1);
+            expected = pf2_base.wavelet.makeONFilter('Coiflet', 1);
             testCase.verifyEqual(qmf, expected, 'AbsTol', 1e-12);
             testCase.verifyEqual(wn, 'coif1');
         end
 
         function testCoif3(testCase)
             [qmf, wn, desc] = pf2_base.wavelet.resolveWavelet('coif3');
-            expected = MakeONFilter('Coiflet', 3);
+            expected = pf2_base.wavelet.makeONFilter('Coiflet', 3);
             testCase.verifyEqual(qmf, expected, 'AbsTol', 1e-12);
             testCase.verifyEqual(wn, 'coif3');
             testCase.verifySubstring(desc, 'Coiflet');
@@ -89,7 +89,7 @@ classdef WaveletResolveTest < matlab.unittest.TestCase
         function testAllCoiflets(testCase)
             for par = 1:5
                 [qmf, ~, ~] = pf2_base.wavelet.resolveWavelet(sprintf('coif%d', par));
-                expected = MakeONFilter('Coiflet', par);
+                expected = pf2_base.wavelet.makeONFilter('Coiflet', par);
                 testCase.verifyEqual(qmf, expected, 'AbsTol', 1e-12);
             end
         end
@@ -98,7 +98,7 @@ classdef WaveletResolveTest < matlab.unittest.TestCase
 
         function testHaar(testCase)
             [qmf, wn, desc] = pf2_base.wavelet.resolveWavelet('haar');
-            expected = MakeONFilter('Haar');
+            expected = pf2_base.wavelet.makeONFilter('Haar');
             testCase.verifyEqual(qmf, expected, 'AbsTol', 1e-12);
             testCase.verifyEqual(wn, 'haar');
             testCase.verifySubstring(desc, 'Haar');
@@ -108,7 +108,7 @@ classdef WaveletResolveTest < matlab.unittest.TestCase
 
         function testBeylkin(testCase)
             [qmf, wn, ~] = pf2_base.wavelet.resolveWavelet('beylkin');
-            expected = MakeONFilter('Beylkin');
+            expected = pf2_base.wavelet.makeONFilter('Beylkin');
             testCase.verifyEqual(qmf, expected, 'AbsTol', 1e-12);
             testCase.verifyEqual(wn, '');
         end
@@ -117,7 +117,7 @@ classdef WaveletResolveTest < matlab.unittest.TestCase
 
         function testVaidyanathan(testCase)
             [qmf, wn, ~] = pf2_base.wavelet.resolveWavelet('vaidyanathan');
-            expected = MakeONFilter('Vaidyanathan');
+            expected = pf2_base.wavelet.makeONFilter('Vaidyanathan');
             testCase.verifyEqual(qmf, expected, 'AbsTol', 1e-12);
             testCase.verifyEqual(wn, '');
         end
@@ -126,20 +126,20 @@ classdef WaveletResolveTest < matlab.unittest.TestCase
 
         function testBattle1(testCase)
             [qmf, wn, ~] = pf2_base.wavelet.resolveWavelet('battle1');
-            expected = MakeONFilter('Battle', 1);
+            expected = pf2_base.wavelet.makeONFilter('Battle', 1);
             testCase.verifyEqual(qmf, expected, 'AbsTol', 1e-12);
             testCase.verifyEqual(wn, '');
         end
 
         function testBattle3(testCase)
             [qmf, ~, ~] = pf2_base.wavelet.resolveWavelet('battle3');
-            expected = MakeONFilter('Battle', 3);
+            expected = pf2_base.wavelet.makeONFilter('Battle', 3);
             testCase.verifyEqual(qmf, expected, 'AbsTol', 1e-12);
         end
 
         function testBattle5(testCase)
             [qmf, ~, desc] = pf2_base.wavelet.resolveWavelet('battle5');
-            expected = MakeONFilter('Battle', 5);
+            expected = pf2_base.wavelet.makeONFilter('Battle', 5);
             testCase.verifyEqual(qmf, expected, 'AbsTol', 1e-12);
             testCase.verifySubstring(desc, 'Battle');
         end

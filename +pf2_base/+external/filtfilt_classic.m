@@ -1,335 +1,254 @@
-function y = filtfilt_classic(b,a,x)
-% Old version of filtfilt from Matlab 2018a
-%	Matlab 2019a does not allow Nans in the x function
+function y = filtfilt_classic(b, a, x)
+% FILTFILT_CLASSIC Zero-phase forward-and-reverse digital filtering
+%
+% Applies the filter described by coefficient vectors B and A (or by a
+% second-order-section matrix and gain) to the data in X, first forward and
+% then in reverse, so the cascaded operation has exactly zero phase
+% distortion. Startup and ending transients are suppressed by reflecting the
+% signal about its endpoints and by initializing the filter to the
+% steady-state response of the reflected edge. This is a clean-room
+% reimplementation of the classic forward-backward filtering routine,
+% provided so the toolbox does not depend on the Signal Processing Toolbox
+% and so it tolerates the calling conventions used across processFNIRS2
+% (both transfer-function and SOS inputs). Operates column-wise; a row vector
+% input is treated as a single column and returned as a row vector.
+%
+% Reference:
+%   Gustafsson, F. (1996). Determining the initial states in forward-backward
+%   filtering. IEEE Transactions on Signal Processing, 44(4), 988-992.
+%   DOI: 10.1109/78.492552
+%
+% Syntax:
+%   y = filtfilt_classic(b, a, x)
+%   y = filtfilt_classic(sos, g, x)
+%
+% Inputs:
+%   b - Numerator coefficients [1 x nb double], OR a second-order-section
+%       matrix [L x 6 double] with rows [b0 b1 b2 a0 a1 a2].
+%   a - Denominator coefficients [1 x na double] matching b, OR (when b is an
+%       SOS matrix) a scalar/vector of section gains. A scalar gain of 1
+%       leaves the SOS coefficients unscaled.
+%   x - Input signal [T x C double]. Filtering is applied independently to
+%       each column. A [1 x T] row vector is accepted and returned as a row.
+%
+% Outputs:
+%   y - Zero-phase filtered signal, same size and orientation as x.
+%
+% Algorithm:
+%   1. Resolve inputs to one or more biquad/transfer-function stages and the
+%      edge-transient length nfact = 3*(filter order).
+%   2. For each stage compute the steady-state initial state zi by solving the
+%      linear system (I - A_state) * zi = B_state - b0*A_state derived from the
+%      Direct-Form-II-transposed state-space realization.
+%   3. Reflect-pad each column by nfact samples at both ends
+%      (xpad = [2*x(1)-x(nfact+1:-1:2); x; 2*x(end)-x(end-1:-1:end-nfact)]).
+%   4. Filter forward (initial state zi*xpad(1)), reverse, filter again
+%      (initial state zi*y(1)), reverse, and discard the nfact pad samples.
+%
+% Example:
+%   [b, a] = butter(4, 0.2);
+%   t = (0:199).';
+%   x = sin(2*pi*0.02*t) + 0.3*randn(200,1);
+%   y = pf2_base.external.filtfilt_classic(b, a, x);
+%
+% Notes:
+%   - The input length must exceed 3*(filter order) or an error is raised, as
+%     in the standard routine.
+%   - SOS stages are applied sequentially; gains are folded into the numerator
+%     of their section (a trailing extra gain multiplies the last section).
+%
+% See also: filter, butter, pf2_lpf, pf2_hpf, pf2_bpf_butter
 
-%FILTFILT Zero-phase forward and reverse digital IIR filtering.
-%   Y = FILTFILT(B, A, X) filters the data in vector X with the filter
-%   described by vectors A and B to create the filtered data Y.  The filter
-%   is described by the difference equation:
-%
-%     a(1)*y(n) = b(1)*x(n) + b(2)*x(n-1) + ... + b(nb+1)*x(n-nb)
-%                           - a(2)*y(n-1) - ... - a(na+1)*y(n-na)
-%
-%   The length of the input X must be more than three times the filter
-%   order, defined as max(length(B)-1,length(A)-1).
-%
-%   Y = FILTFILT(SOS, G, X) filters the data in vector X with the
-%   second-order section (SOS) filter described by the matrix SOS and the
-%   vector G.  The coefficients of the SOS matrix must be expressed using
-%   an Lx6 matrix where L is the number of second-order sections. The scale
-%   values of the filter must be expressed using the vector G. The length
-%   of G must be between 1 and L+1, and the length of input X must be more
-%   than three times the filter order (input length must be greater than
-%   one when the order is zero). You can use filtord(SOS) to get the
-%   order of the filter. The SOS matrix should have the following form:
-%
-%   SOS = [ b01 b11 b21 a01 a11 a21
-%           b02 b12 b22 a02 a12 a22
-%           ...
-%           b0L b1L b2L a0L a1L a2L ]
-%
-%   Y = FILTFILT(D, X) filters the data in vector X with the digital filter
-%   D. You design a digital filter, D, by calling the <a href="matlab:help designfilt">designfilt</a> function.
-%   The length of the input X must be more than three times the filter
-%   order. You can use filtord(D) to get the order of the digital filter D.
-%
-%   After filtering in the forward direction, the filtered sequence is then
-%   reversed and run back through the filter; Y is the time reverse of the
-%   output of the second filtering operation.  The result has precisely
-%   zero phase distortion, and magnitude modified by the square of the
-%   filter's magnitude response. Startup and ending transients are
-%   minimized by matching initial conditions.
-%
-%   Note that FILTFILT should not be used when the intent of a filter is to
-%   modify signal phase, such as differentiators and Hilbert filters.
-%
-%   % Example 1:
-%   %   Zero-phase filter a noisy ECG waveform using an IIR filter.
-%  
-%   load noisysignals x;                    % noisy waveform
-%   [b,a] = butter(12,0.2,'low');           % IIR filter design
-%   y = filtfilt(b,a,x);                    % zero-phase filtering
-%   y2 = filter(b,a,x);                     % conventional filtering
-%   plot(x,'k-.'); grid on ; hold on
-%   plot([y y2],'LineWidth',1.5);
-%   legend('Noisy ECG','Zero-phase Filtering','Conventional Filtering');
-%
-%   % Example 2:
-%   %   Use the designfilt function to design a highpass IIR digital filter 
-%   %   with order 4, passband frequency of 75 KHz, and a passband ripple 
-%   %   of 0.2 dB. Sample rate is 200 KHz. Apply zero-phase filtering to a
-%   %   vector of data. 
-%  
-%   D = designfilt('highpassiir', 'FilterOrder', 4, ...
-%            'PassbandFrequency', 75e3, 'PassbandRipple', 0.2,...
-%            'SampleRate', 200e3);
-%
-%   x = rand(1000,1);
-%   y = filtfilt(D,x);
-%
-%   See also FILTER, SOSFILT.
+narginchk(3, 3);
 
-%   References:
-%     [1] Sanjit K. Mitra, Digital Signal Processing, 2nd ed.,
-%         McGraw-Hill, 2001
-%     [2] Fredrik Gustafsson, Determining the initial states in forward-
-%         backward filtering, IEEE Transactions on Signal Processing,
-%         pp. 988-992, April 1996, Volume 44, Issue 4
-
-%   Copyright 1988-2014 The MathWorks, Inc.
-
-narginchk(3,3)
-
-% Only double precision is supported
-if ~isa(b,'double') || ~isa(a,'double') || ~isa(x,'double')
-    error(message('signal:filtfilt:NotSupported'));
-end
 if isempty(b) || isempty(a) || isempty(x)
     y = [];
-    return
+    return;
 end
 
-% If input data is a row vector, convert it to a column
-isRowVec = size(x,1)==1;
+% Treat a row vector as a single column; restore orientation on output.
+isRowVec = (size(x, 1) == 1);
 if isRowVec
     x = x(:);
 end
-[Npts,Nchans] = size(x);
+Npts = size(x, 1);
 
-% Parse SOS matrix or coefficients vectors and determine initial conditions
-[b,a,zi,nfact,L] = getCoeffsAndInitialConditions(b,a,Npts);
+% Resolve coefficients into a set of stages, each with its own b, a, and the
+% corresponding steady-state initial condition zi.
+[bStages, aStages, ziStages, nfact] = resolveStages(b, a);
 
-% Filter the data
-if Nchans==1
-    if Npts<10000
-        y = ffOneChanCat(b,a,x,zi,nfact,L);
-    else
-        y = ffOneChan(b,a,x,zi,nfact,L);
-    end
-else
-    y = ffMultiChan(b,a,x,zi,nfact,L);
+if Npts <= nfact
+    error('pf2_base:filtfilt_classic:dataTooShort', ...
+        'Input data length (%d) must be greater than 3*order (%d).', ...
+        Npts, nfact);
+end
+
+y = x;
+for s = 1:numel(bStages)
+    y = applyStage(bStages{s}, aStages{s}, y, ziStages{s}, nfact);
 end
 
 if isRowVec
-    y = y.';   % convert back to row if necessary
+    y = y.';
 end
 
-%--------------------------------------------------------------------------
-function [b,a,zi,nfact,L] = getCoeffsAndInitialConditions(b,a,Npts)
-
-[L, ncols] = size(b);
-na = numel(a);
-
-% Rules for the first two inputs to represent an SOS filter:
-% b is an Lx6 matrix with L>1 or,
-% b is a 1x6 vector, its 4th element is equal to 1 and a has less than 2
-% elements. 
-if ncols==6 && L==1 && na<=2,
-    if b(4)==1,
-        warning(message('signal:filtfilt:ParseSOS', 'SOS', 'G'));
-    else
-        warning(message('signal:filtfilt:ParseB', 'a01', 'SOS'));
-    end
 end
-issos = ncols==6 && (L>1 || (b(4)==1 && na<=2));
-if issos,
-    %----------------------------------------------------------------------
-    % b is an SOS matrix, a is a vector of scale values
-    %----------------------------------------------------------------------
+
+%%_Subfunctions_____________________________________________________________
+
+function [bStages, aStages, ziStages, nfact] = resolveStages(b, a)
+% RESOLVESTAGES Normalize coefficient inputs into per-stage b, a, zi
+%
+% Inputs:
+%   b - Numerator vector or [L x 6] SOS matrix
+%   a - Denominator vector or scalar/vector SOS gain
+%
+% Outputs:
+%   bStages  - Cell array of numerator column vectors, one per stage
+%   aStages  - Cell array of denominator column vectors, one per stage
+%   ziStages - Cell array of steady-state initial-condition vectors
+%   nfact    - Edge-transient length = 3*(total filter order)
+
+isSOS = (size(b, 2) == 6) && (size(b, 1) >= 1) && (numel(a) <= size(b, 1) + 1);
+% Disambiguate a genuine 1x6 transfer function from a single-section SOS:
+% a true SOS section has a0 == 1 (the 4th element) and a scalar gain.
+if isSOS && size(b, 1) == 1
+    isSOS = (numel(a) <= 2) && (abs(b(4) - 1) < eps(b(4)) + eps);
+end
+
+if isSOS
+    L = size(b, 1);
     g = a(:);
-    ng = na;
-    if ng>L+1,
-        error(message('signal:filtfilt:InvalidDimensionsScaleValues', L + 1));
-    elseif ng==L+1,
-        % Include last scale value in the numerator part of the SOS Matrix
-        b(L,1:3) = g(L+1)*b(L,1:3);
-        ng = ng-1;
+    % Fold the section gains into the numerators. A trailing (L+1)-th gain
+    % multiplies the last section's numerator.
+    if numel(g) == L + 1
+        b(L, 1:3) = g(L + 1) * b(L, 1:3);
+        g(L + 1) = [];
     end
-    for ii=1:ng,
-        % Include scale values in the numerator part of the SOS Matrix
-        b(ii,1:3) = g(ii)*b(ii,1:3);
+    for ii = 1:numel(g)
+        b(ii, 1:3) = g(ii) * b(ii, 1:3);
     end
-    
-    ord = filtord(b);
-    
-    a = b(:,4:6).';
-    b = b(:,1:3).';
-         
-    nfact = max(1,3*ord); % length of edge transients    
-    if Npts <= nfact % input data too short
-        error(message('signal:filtfilt:InvalidDimensionsDataShortForFiltOrder',num2str(nfact)))
+
+    bStages = cell(1, L);
+    aStages = cell(1, L);
+    ziStages = cell(1, L);
+    ord = 0;
+    for ii = 1:L
+        bb = b(ii, 1:3).';
+        aa = b(ii, 4:6).';
+        [bb, aa] = trimStage(bb, aa);
+        bStages{ii} = bb;
+        aStages{ii} = aa;
+        ziStages{ii} = steadyStateIC(bb, aa);
+        ord = ord + (numel(aa) - 1);
     end
-    
-    % Compute initial conditions to remove DC offset at beginning and end of
-    % filtered sequence.  Use sparse matrix to solve linear system for initial
-    % conditions zi, which is the vector of states for the filter b(z)/a(z) in
-    % the state-space formulation of the filter.
-    zi = zeros(2,L);
-    for ii=1:L,
-        rhs  = (b(2:3,ii) - b(1,ii)*a(2:3,ii));
-        zi(:,ii) = ( eye(2) - [-a(2:3,ii),[1;0]] ) \ rhs;
-    end
-    
+    nfact = max(1, 3 * ord);
 else
-    %----------------------------------------------------------------------
-    % b and a are vectors that define the transfer function of the filter
-    %----------------------------------------------------------------------
-    L = 1;
-    % Check coefficients
-    b = b(:);
-    a = a(:);
-    nb = numel(b);
-    nfilt = max(nb,na);   
-    nfact = max(1,3*(nfilt-1));  % length of edge transients
-    if Npts <= nfact      % input data too short
-        error(message('signal:filtfilt:InvalidDimensionsDataShortForFiltOrder',num2str(nfact)));
+    bb = b(:);
+    aa = a(:);
+    nfilt = max(numel(bb), numel(aa));
+    if numel(bb) < nfilt
+        bb(nfilt, 1) = 0;
+    elseif numel(aa) < nfilt
+        aa(nfilt, 1) = 0;
     end
-    % Zero pad shorter coefficient vector as needed
-    if nb < nfilt
-        b(nfilt,1)=0;
-    elseif na < nfilt
-        a(nfilt,1)=0;
-    end
-    
-    % Compute initial conditions to remove DC offset at beginning and end of
-    % filtered sequence.  Use sparse matrix to solve linear system for initial
-    % conditions zi, which is the vector of states for the filter b(z)/a(z) in
-    % the state-space formulation of the filter.
-    if nfilt>1
-        rows = [1:nfilt-1, 2:nfilt-1, 1:nfilt-2];
-        cols = [ones(1,nfilt-1), 2:nfilt-1, 2:nfilt-1];
-        vals = [1+a(2), a(3:nfilt).', ones(1,nfilt-2), -ones(1,nfilt-2)];
-        rhs  = b(2:nfilt) - b(1)*a(2:nfilt);
-        zi   = sparse(rows,cols,vals) \ rhs;
-        % The non-sparse solution to zi may be computed using:
-        %      zi = ( eye(nfilt-1) - [-a(2:nfilt), [eye(nfilt-2); ...
-        %                                           zeros(1,nfilt-2)]] ) \ ...
-        %          ( b(2:nfilt) - b(1)*a(2:nfilt) );
-    else
-        zi = zeros(0,1);
-    end
-end
-%--------------------------------------------------------------------------
-function y = ffOneChanCat(b,a,y,zi,nfact,L)
-
-for ii=1:L
-    % Single channel, data explicitly concatenated into one vector
-    y = [2*y(1)-y(nfact+1:-1:2); y; 2*y(end)-y(end-1:-1:end-nfact)]; %#ok<AGROW>
-    
-    % filter, reverse data, filter again, and reverse data again
-    y = filter(b(:,ii),a(:,ii),y,zi(:,ii)*y(1));
-    y = y(end:-1:1);
-    y = filter(b(:,ii),a(:,ii),y,zi(:,ii)*y(1));
-    
-    % retain reversed central section of y
-    y = y(end-nfact:-1:nfact+1);
+    bStages = {bb};
+    aStages = {aa};
+    ziStages = {steadyStateIC(bb, aa)};
+    nfact = max(1, 3 * (nfilt - 1));
 end
 
-%--------------------------------------------------------------------------
-function y = ffOneChan(b,a,xc,zi,nfact,L)
-% Perform filtering of input data with no phase distortion
-%
-% xc: one column of input data
-% yc: one column of output, same dimensions as xc
-% a,b: IIR coefficients, both of same order/length
-% zi: initial states
-% nfact: scalar
-% L: scalar
-
-% Extrapolate beginning and end of data sequence using reflection.
-% Slopes of original and extrapolated sequences match at end points,
-% reducing transients.
-%
-% yc is length numel(x)+2*nfact
-%
-% We wish to filter the appended sequence:
-% yc = [2*xc(1)-xc(nfact+1:-1:2); xc; 2*xc(end)-xc(end-1:-1:end-nfact)];
-%
-% We would use the following code:
-% Filter the input forwards then again in the backwards direction
-%   yc = filter(b,a,yc,zi*yc(1));
-%   yc = yc(length(yc):-1:1); % reverse the sequence
-%
-% Instead of reallocating and copying, just do filtering in pieces
-% Filter the first part, then xc, then the last part
-% Retain each piece, feeding final states as next initial states
-% Output is yc = [yc1 yc2 yc3]
-%
-% yc2 can be long (matching user input length)
-% yc3 is short (nfilt samples)
-%
-for ii=1:L
-    
-    xt = -xc(nfact+1:-1:2) + 2*xc(1);
-    [~,zo] = filter(b(:,ii),a(:,ii), xt, zi(:,ii)*xt(1)); % yc1 not needed
-    [yc2,zo] = filter(b(:,ii),a(:,ii), xc, zo);
-    xt = -xc(end-1:-1:end-nfact) + 2*xc(end);
-    yc3 = filter(b(:,ii),a(:,ii), xt, zo);
-    
-    % Reverse the sequence
-    %   yc = [flipud(yc3) flipud(yc2) flipud(yc1)]
-    % which we can do as
-    %   yc = [yc3(end:-1:1); yc2(end:-1:1); yc1(end:-1:1)];
-    %
-    % But we don't do that explicitly.  Instead, we wish to filter this
-    % reversed result as in:
-    %   yc = filter(b,a,yc,zi*yc(1));
-    % where yc(1) is now the last sample of the (unreversed) yc3
-    %
-    % Once again, we do this in pieces:
-    [~,zo] = filter(b(:,ii),a(:,ii), yc3(end:-1:1), zi(:,ii)*yc3(end));
-    yc5 = filter(b(:,ii),a(:,ii), yc2(end:-1:1), zo);
-    
-    % Conceptually restore the sequence by reversing the last pieces
-    %    yc = yc(length(yc):-1:1); % restore the sequence
-    % which is done by
-    %    yc = [yc6(end:-1:1); yc5(end:-1:1); yc4(end:-1:1)];
-    %
-    % However, we only need to retain the reversed central samples of filtered
-    % output for the final result:
-    %    y = yc(nfact+1:end-nfact);
-    %
-    % which is the reversed yc5 piece only.
-    %
-    % This means we don't need yc4 or yc6.  We need to compute yc4 only because
-    % the final states are needed for yc5 computation.  However, we can omit
-    % yc6 entirely in the above filtering step.
-    xc = yc5(end:-1:1);
 end
-y = xc;
 
-%--------------------------------------------------------------------------
-function y = ffMultiChan(b,a,xc,zi,nfact,L)
-% Perform filtering of input data with no phase distortion
+function [b, a] = trimStage(b, a)
+% TRIMSTAGE Drop trailing-zero coefficients common to b and a
 %
-% xc: matrix of input data
-% yc: matrix of output data, same dimensions as xc
-% a,b: IIR coefficients, both of same order/length
-% zi: initial states
-% nfact: scalar
-% L: scalar
+% Inputs:
+%   b - Numerator column vector
+%   a - Denominator column vector
+%
+% Outputs:
+%   b - Trimmed numerator (length matches a)
+%   a - Trimmed denominator
 
-% Same comments as in ffOneChan, except here we need to use bsxfun.
-% Instead of doing scalar subtraction with a vector, we are doing
-% vector addition with a matrix.  bsxfun replicates the vector
-% for us.
-%
-% We also take care to preserve column dimensions
-%
-sz = size(xc);
-xc = reshape(xc,sz(1),[]);%converting N-D matrix to 2-D.
-
-for ii=1:L
-    xt = bsxfun(@minus, 2*xc(1,:), xc(nfact+1:-1:2,:));
-    [~,zo] = filter(b(:,ii),a(:,ii),xt,zi(:,ii)*xt(1,:)); % outer product
-    [yc2,zo] = filter(b(:,ii),a(:,ii),xc,zo);
-    xt = bsxfun(@minus, 2*xc(end,:), xc(end-1:-1:end-nfact,:));
-    yc3 = filter(b(:,ii),a(:,ii),xt,zo);
-    
-    [~,zo] = filter(b(:,ii),a(:,ii),yc3(end:-1:1,:),zi(:,ii)*yc3(end,:)); % outer product
-    yc5 = filter(b(:,ii),a(:,ii),yc2(end:-1:1,:), zo);
-    
-    xc = yc5(end:-1:1,:);
+n = max(numel(b), numel(a));
+b(end + 1:n, 1) = 0;
+a(end + 1:n, 1) = 0;
+% Remove trailing rows where both b and a are zero (first-order section).
+while numel(a) > 1 && a(end) == 0 && b(end) == 0
+    a(end) = [];
+    b(end) = [];
 end
-y = xc;
-y = reshape(y,sz);% To match the input size.
+
+end
+
+function zi = steadyStateIC(b, a)
+% STEADYSTATEIC Steady-state initial conditions for forward-backward filtering
+%
+% Solves (I - A_state) * zi = B_state - b0 * A_state derived from the
+% Direct-Form-II-transposed state-space realization, giving the filter state
+% that produces a constant (DC) output equal to the constant input. This is
+% the standard Gustafsson (1996) initialization that minimizes edge
+% transients.
+%
+% Inputs:
+%   b - Numerator column vector [nfilt x 1], normalized so a(1) ~= 0
+%   a - Denominator column vector [nfilt x 1]
+%
+% Outputs:
+%   zi - Initial state vector [(nfilt-1) x 1]
+
+% Normalize by a(1).
+if a(1) ~= 1
+    b = b / a(1);
+    a = a / a(1);
+end
+
+nfilt = numel(a);
+if nfilt <= 1
+    zi = zeros(0, 1);
+    return;
+end
+
+n = nfilt - 1;
+% A_state is the companion-form transition matrix for the DF-II-transposed
+% realization: first column is -a(2:nfilt), and a superdiagonal identity.
+Astate = [-a(2:nfilt), [eye(n - 1); zeros(1, n - 1)]];
+rhs = b(2:nfilt) - b(1) * a(2:nfilt);
+zi = (eye(n) - Astate) \ rhs;
+
+end
+
+function y = applyStage(b, a, x, zi, nfact)
+% APPLYSTAGE Reflect-pad and zero-phase filter every column of x for one stage
+%
+% Inputs:
+%   b     - Numerator column vector
+%   a     - Denominator column vector
+%   x     - Signal matrix [T x C]
+%   zi    - Steady-state initial condition for this stage
+%   nfact - Edge-transient (reflection) length
+%
+% Outputs:
+%   y - Filtered signal matrix [T x C], same size as x
+
+C = size(x, 2);
+y = zeros(size(x), 'like', x);
+for col = 1:C
+    xc = x(:, col);
+    % Reflect padding about the endpoints.
+    pre = 2 * xc(1) - xc(nfact + 1:-1:2);
+    post = 2 * xc(end) - xc(end - 1:-1:end - nfact);
+    xp = [pre; xc; post];
+
+    % Forward pass.
+    yp = filter(b, a, xp, zi * xp(1));
+    % Reverse, second pass.
+    yp = yp(end:-1:1);
+    yp = filter(b, a, yp, zi * yp(1));
+    % Reverse back and strip the pad.
+    yp = yp(end:-1:1);
+    y(:, col) = yp(nfact + 1:end - nfact);
+end
+
+end

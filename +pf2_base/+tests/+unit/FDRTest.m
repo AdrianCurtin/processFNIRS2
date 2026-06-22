@@ -161,9 +161,18 @@ classdef FDRTest < matlab.unittest.TestCase
             testCase.verifyEqual(sum(passed), 0, ...
                 'Expected no p-values to pass with all large inputs');
 
-            % Q-values should all be 1 (capped)
-            testCase.verifyEqual(qvalues, ones(size(pvals)), ...
-                'Q-values should all be 1 when no tests pass');
+            % Q-values are valid BH-adjusted p-values: bounded by 1 and never
+            % smaller than the raw p-values. They are NOT all forced to 1 --
+            % standard Benjamini-Hochberg caps at 1 only when m/i * p exceeds
+            % 1, so with all-large p the q-values collapse to the largest p
+            % (here 0.9) via the monotonicity step.
+            testCase.verifyLessThanOrEqual(qvalues, 1, ...
+                'Q-values must be capped at 1');
+            testCase.verifyGreaterThanOrEqual(qvalues, pvals, ...
+                'BH-adjusted q-values must be >= the raw p-values');
+            testCase.verifyEqual(qvalues, max(pvals) * ones(size(pvals)), ...
+                'AbsTol', 1e-12, ...
+                'With all-large p, q-values collapse to the maximum p-value');
         end
 
         function testPerformFDRNaNHandling(testCase)

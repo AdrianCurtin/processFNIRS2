@@ -17,6 +17,13 @@ function resetDefaults(varargin)
 % Use this when the stored methods cfg has become corrupted, or after
 % upgrading pf2 and wanting the latest shipped defaults.
 %
+% Example:
+%   % Restore the shipped defaults for both stages (prompts to confirm)
+%   pf2.methods.resetDefaults();
+%
+%   % Reset only the raw stage without a confirmation prompt
+%   pf2.methods.resetDefaults('Stage', 'raw', 'Confirm', false);
+%
 % See also: pf2.methods.seeds.list
 
 ip = inputParser;

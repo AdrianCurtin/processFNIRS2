@@ -11,7 +11,7 @@ function result = sci(data, varargin)
 %   & Oghalai, J. S. (2014). Auditory cortex activation to natural speech
 %   and simulated cochlear implant speech measured with functional
 %   near-infrared spectroscopy. Hearing Research, 309, 84-93.
-%   DOI: 10.1016/j.hearres.2013.11.007
+%   DOI: 10.1016/j.heares.2013.11.007
 %
 % Syntax:
 %   result = pf2.qc.sci(data)

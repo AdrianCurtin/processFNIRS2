@@ -72,21 +72,27 @@ if(~getByIndex && (isempty(rawMethod) || (ischar(rawMethod) && isempty(strtrim(r
 end
 
     
-if(isfield(methodsLib,'cfg')&&isfield(methodsLib.cfg,'Sections')&&~isempty(methodsLib.cfg.Sections))
+% methodsLib.cfg may be a struct or a pf2_base.external.INI object; the
+% latter exposes Sections as a property (isfield is false for objects), so
+% probe with a struct-or-object safe check before reading it.
+cfgHasSections = isfield(methodsLib,'cfg') && ...
+    ((isstruct(methodsLib.cfg) && isfield(methodsLib.cfg,'Sections')) || ...
+     (isobject(methodsLib.cfg) && isprop(methodsLib.cfg,'Sections')));
+if(cfgHasSections&&~isempty(methodsLib.cfg.Sections))
     rawMethods=methodsLib.cfg.Sections;
     
     if(getByIndex)
         if(rawMethod>0&&rawMethod<=length(rawMethods))
             rawMethod=rawMethods{rawMethod};
         else
-            error('Unable to find Raw Method at Index %i',rawMethod);
+            error('pf2:methods:raw:describeMethod:badIndex', 'Unable to find Raw Method at Index %i',rawMethod);
         end
     end
     
     if(ismember(rawMethod,rawMethods)&&~isempty(methodsLib.cfg.(rawMethod)))
         rawMethodCfg=methodsLib.cfg.(rawMethod);
     else
-       error('Unable to find current Raw Method name %s',rawMethod); 
+       error('pf2:methods:raw:describeMethod:methodNotFound', 'Unable to find current Raw Method name %s',rawMethod);
     end
     
     
@@ -95,6 +101,11 @@ if(isfield(methodsLib,'cfg')&&isfield(methodsLib.cfg,'Sections')&&~isempty(metho
     descripStr=sprintf('Raw Method: %s\n',rawMethod);
     for f=1:length(funcs)
         curFunc=funcs{f};
+        % Function entries may be plain structs or PipelineFunction objects;
+        % normalize to the struct shape (.f/.args/.argvals/.output) below.
+        if(isa(curFunc,'pf2_base.PipelineFunction'))
+            curFunc=curFunc.toStruct();
+        end
         funcDescripStr=sprintf('%i. Function: %s\n',f,curFunc.f);
         for a=1:length(curFunc.args)
             if(iscell(curFunc.args))
@@ -124,6 +135,16 @@ if(isfield(methodsLib,'cfg')&&isfield(methodsLib.cfg,'Sections')&&~isempty(metho
         functions=funcs;
     else
         fprintf(descripStr);
+    end
+else
+    % No methods library / Sections available: report gracefully rather than
+    % returning with unassigned outputs.
+    msg=sprintf('No Raw Methods available to describe.\n');
+    if(nargout>0)
+        descrip=msg;
+        functions={};
+    else
+        fprintf(2,'%s',msg);
     end
 end
 

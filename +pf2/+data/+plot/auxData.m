@@ -110,13 +110,13 @@ saveDPI = p.Results.saveDPI;
 rejectLevel = p.Results.rejectLevel;
 
 if(~isfield(fNIR,'ROI')||~isfield(fNIR.ROI,'info'))
-   error('No ROI information present');
+   error('pf2:data:plot:auxData:noROI', 'No ROI information present');
 end
 
 
 if(~iscell(bioMlist))
     if(any(~ischar(bioMlist)))
-       error('Must specify biomarkers');
+       error('pf2:data:plot:auxData:badBiomarkers', 'Must specify biomarkers');
     end
     if(strcmpi(bioMlist,'all'))
         bioMlist={'HbO','HbR','HbDiff','HbTotal','CBSI'};
@@ -157,19 +157,19 @@ end
 
 for i=1:length(bioMlist)
    if(~isfield(fNIR,bioMlist{i}))
-       error('Biomarker %s does not exist',bioMlist{i});
+       error('pf2:data:plot:auxData:missingBiomarker', 'Biomarker %s does not exist',bioMlist{i});
    end
 
    if(isempty(fNIR.(bioMlist{i})))
-       error('Biomarker %s is empty, please build ROI first',bioMlist{i});
+       error('pf2:data:plot:auxData:emptyBiomarker', 'Biomarker %s is empty, please build ROI first',bioMlist{i});
    end
 end
 
 
 if(any(rois2plot>size(fNIR.ROI.info,1)))
-    error('Some indexes are higher than number of ROIs');
+    error('pf2:data:plot:auxData:roiOutOfRange', 'Some indexes are higher than number of ROIs');
 elseif(any(rois2plot<0))
-    error('ROI index can not be negative');
+    error('pf2:data:plot:auxData:negativeROI', 'ROI index can not be negative');
 end
 
 
@@ -181,7 +181,7 @@ if(isfield(fNIR,'time'))
     tmax=nanmax(t);
     tmean=nanmean(t)-tmin;
 else
-    error('Must have valid time field');
+    error('pf2:data:plot:auxData:noTime', 'Must have valid time field');
 end
 
 idx2plot=ismember(probeInfo.ChannelList,rois2plot);

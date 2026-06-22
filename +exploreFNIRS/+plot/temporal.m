@@ -6,8 +6,8 @@ function [] = temporal(gbyData,gbyVars,exSettings, handles)
 % Supports multiple grouping variables, error shading, and marker overlays.
 %
 % Reference:
-%   Internal exploreFNIRS visualization. Uses shadedErrorBar for error
-%   visualization (Rob Campbell, 2009, MATLAB File Exchange).
+%   Internal exploreFNIRS visualization. Shaded error regions are drawn
+%   with native MATLAB patch/fill primitives.
 %
 % Syntax:
 %   temporal(gbyData, gbyVars, exSettings, handles)
@@ -39,7 +39,7 @@ function [] = temporal(gbyData,gbyVars,exSettings, handles)
 %
 % Notes:
 %   - Typically called from exploreFNIRS GUI, not directly
-%   - Uses shadedErrorBar for visualization
+%   - Draws shaded error bands with native MATLAB patch/fill
 %   - Supports hierarchical averaging within subjects
 %
 % See also: exploreFNIRS.plot.barchart, exploreFNIRS.plot.scatter
@@ -72,11 +72,10 @@ numBioM=length(selBioM);
 optStrs=cellstr(get(handles.listbox_optode,'String'));
 selOpt=get(handles.listbox_optode,'Value');
 selectedOptStr=optStrs(selOpt);
-%selectedOpt=str2num(selectedOpt);
 
 if(strcmp(exSettings.ChannelMode,'Aux'))
     if(length(selectedBioM)>1)
-        error('Not supported yet!')
+        error('exploreFNIRS:plot:temporal:notSupported', 'Not supported yet!')
     end
     auxTable=get(handles.listbox_optode,'UserData');
     selectedOpt=nan(length(selOpt));
@@ -343,7 +342,7 @@ for chIdx=1:numOpt
                            dataTime=curFNIRS{i}.time;
                        case 'ROI'
                            if(~pf2_base.isnestedfield(curGrand,'ROI.HbO.data'))
-                              error('ROI data must be calculated using a build ROI step');
+                              error('exploreFNIRS:plot:temporal:roiNotBuilt', 'ROI data must be calculated using a build ROI step');
                            end
                           if(~isempty(curFNIRS{i})&&isfield(curFNIRS{i},'ROI'))
                             data2plot=curFNIRS{i}.ROI;

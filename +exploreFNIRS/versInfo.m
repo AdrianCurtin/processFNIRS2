@@ -12,7 +12,7 @@ function versInfoString=versInfo()
 %   None
 %
 % Outputs:
-%   versInfoString - Version string (e.g., 'Explore fNIRS v0.3a')
+%   versInfoString - Version string (e.g., 'Explore fNIRS v1.0.0')
 %                    Only returned if output argument is requested.
 %
 % Example:
@@ -25,7 +25,7 @@ function versInfoString=versInfo()
 %
 % See also: pf2version, exploreFNIRS
 
-vers='0.3a';
+vers='1.0.0';
 versInfo=sprintf('Explore fNIRS v%s\n',vers);
 
 if(nargout==0)

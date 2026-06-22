@@ -1,5 +1,5 @@
 function varargout = processFNIRS2(varargin)
-% PROCESSFNIR2 MATLAB code for faster non-GUI pipeline
+% PROCESSFNIRS2 MATLAB code for faster non-GUI pipeline
 %      2nd generation preprocessing pipleline for fNIRS datasets
 %      Uses device configuration files to allow for more repeatable and 
 %      more flexible situations

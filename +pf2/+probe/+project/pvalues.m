@@ -43,6 +43,9 @@ function [h, imgOut] = pvalues(pvals, fNIR, varargin)
 %   pf2.probe.project.pvalues(pvals, processed, ...
 %       'pThreshold', 0.05, 'FDR', false, 'initCamPosition', 'front');
 %
+%   % Headless save (use 'savePath' for 3D renders)
+%   pf2.probe.project.pvalues(pvals, processed, 'savePath', 'pvals.png');
+%
 % See also: pf2.probe.plot.interpolateValues3D,
 %           pf2.probe.project.fstats, pf2.probe.project.correlation,
 %           exploreFNIRS.fx.performFDR

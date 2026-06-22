@@ -136,7 +136,7 @@ if(relative) % Convert to absolute units here
     if(isnan(startTime))
         startTime=min(fNIR.time);
     elseif(startTime<0)
-        error('Relative time cannot have a negative startTime');
+        error('pf2:split:negativeRelativeStart', 'Relative time cannot have a negative startTime');
     else
         startTime=min(fNIR.time)+startTime;  %Start time is X seconds from beginning
     end
@@ -170,13 +170,13 @@ if(endTime>max(fNIR.time))
 end
 
 if(endTime<startTime)
-   error('End Time (%.1f) precedes Start Time (%.1f). Use ''segmentLength'' argument to allow relative from startTime',endTime,startTime); 
+   error('pf2:split:endBeforeStart', 'End Time (%.1f) precedes Start Time (%.1f). Use ''segmentLength'' argument to allow relative from startTime',endTime,startTime);
 end
 
 if(~isnan(blStartTime)&&~isnan(blEndTime))
     blLength=blEndTime-blStartTime;
     if(blLength<=0)
-       error('Baseline end must come after baseline start'); 
+       error('pf2:split:invalidBaselineWindow', 'Baseline end must come after baseline start');
     end
 end
 
@@ -345,7 +345,7 @@ else
                     outfNIR.ROI.HbTotal=outfNIR.ROI.HbTotal-nanmean(blfNIR.ROI.HbTotal,1);
                     outfNIR.ROI.CBSI=outfNIR.ROI.CBSI-nanmean(blfNIR.ROI.CBSI,1);
                 else
-                    error('Baseline has no Build ROI data');
+                    error('pf2:split:noBaselineROI', 'Baseline has no Build ROI data');
                 end
          
              elseif(exist('blIndexStart'))
@@ -420,7 +420,7 @@ if(isfield(outfNIR,'Aux')&&splitAux)
                                 maxftime=fNIR.t0+duration(0,0,endTime);
                              end
                         else
-                            error('Mismatched data');
+                            error('pf2:split:mismatchedAuxTime', 'Mismatched data');
                         end
     
                         t2trim_idx=t2trim>=minftime&t2trim<=maxftime;

@@ -44,7 +44,7 @@ if ~isstruct(fNIR)
 end
 
 if(~isempty(fNIR)&&~pf2_base.isnestedfield(fNIR,'ROI.info')&&~isempty(fNIR.info))
-    error('No ROI information in the fNIR struct, unable to plot data');
+    error('pf2:probe:imageROIvalues:noROIInfo', 'No ROI information in the fNIR struct, unable to plot data');
 end
 
 % Parse name-value pairs
@@ -94,7 +94,7 @@ if(~isempty(fNIR)&&(isempty(cfgFilePath)||~contains(cfgFilePath,'.cfg')))
     disp('No device specified. Please load device configuration');
     probeInfo=pf2_base.loadDeviceCfg([],true);
     if(isempty(probeInfo))
-        error('No valid devices selected');
+        error('pf2:probe:imageROIvalues:noDevice', 'No valid devices selected');
     end
 
 elseif(~isempty(fNIR)&&~isempty(cfgFilePath)) % If we're not looking at the GUI, doesn't matter
@@ -108,13 +108,13 @@ if(~isempty(fNIR)&&pf2_base.isnestedfield(probeInfo,'Probe'))
     end
     probeInfo=probeInfo.Probe{probeNum};
 elseif(~isempty(fNIR))
-   error('Unable to identify probe');
+   error('pf2:probe:imageROIvalues:noProbe', 'Unable to identify probe');
 end
 
 numROI=size(fNIR.ROI.info,1);
 
 if(~isempty(fNIR)&&length(data2plot)>numROI)
-    error('Must have a value for all ROIs');
+    error('pf2:probe:imageROIvalues:roiCountMismatch', 'Must have a value for all ROIs');
 end
 
 
@@ -148,7 +148,7 @@ for roiIdx=1:numROI
 
     allCh=[allCh,curCh];
     if(length(unique(allCh))>length(allCh))
-        error('ROIs contain duplicate channels');
+        error('pf2:probe:imageROIvalues:duplicateChannels', 'ROIs contain duplicate channels');
     end
 end
 imgData=imgData(end:-1:1,:);

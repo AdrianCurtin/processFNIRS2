@@ -48,7 +48,13 @@ end
 
 if(isnumeric(oxy_method)) % Lookup method based on index
 	methodsLib = pf2_base.resolveMethodsLib('oxy', ctx);
-	if(isfield(methodsLib,'cfg')&&isfield(methodsLib.cfg,'Sections'))
+	% methodsLib.cfg may be a struct or a pf2_base.external.INI object; the
+	% latter exposes Sections as a property (isfield is false for objects), so
+	% probe with a struct-or-object safe check before reading it.
+	cfgHasSections = isfield(methodsLib,'cfg') && ...
+	    ((isstruct(methodsLib.cfg) && isfield(methodsLib.cfg,'Sections')) || ...
+	     (isobject(methodsLib.cfg) && isprop(methodsLib.cfg,'Sections')));
+	if(cfgHasSections)
         if(oxy_method<=length(methodsLib.cfg.Sections))
             if(oxy_method==0)
                 oxy_method=1;
@@ -58,7 +64,7 @@ if(isnumeric(oxy_method)) % Lookup method based on index
 	end
 	
 	if(isnumeric(oxy_method))
-		error('Unable to find method %i',oxy_method);
+		error('pf2:methods:oxy:setMethod:methodNotFound', 'Unable to find method %i',oxy_method);
 	end
 end
 

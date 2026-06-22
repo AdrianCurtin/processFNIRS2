@@ -46,7 +46,7 @@ baselineWindow = [];
 
 % Get time bounds
 if ~isfield(fNIR, 'time')
-    error('fNIRS data must have time field');
+    error('pf2_base:plot:processBaseline:missingTime', 'fNIRS data must have time field');
 end
 
 t = fNIR.time;

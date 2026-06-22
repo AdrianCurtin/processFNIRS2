@@ -1,0 +1,38 @@
+FastICA for MATLAB — License Notice
+===================================
+
+Package:    FastICA for MATLAB, Version 2.5 (October 19, 2005)
+Authors:    Hugo Gavert, Jarmo Hurri, Jaakko Sarela, and Aapo Hyvarinen
+Origin:     Laboratory of Computer and Information Science,
+            Helsinki University of Technology (now part of Aalto University),
+            Finland
+Homepage:   https://research.ics.aalto.fi/ica/fastica/
+            (formerly http://www.cis.hut.fi/projects/ica/fastica/)
+
+Copyright (C) 1996-2005 by Hugo Gavert, Jarmo Hurri, Jaakko Sarela,
+and Aapo Hyvarinen.
+
+License
+-------
+
+The FastICA package for MATLAB is free software: you can redistribute it
+and/or modify it under the terms of the GNU General Public License as
+published by the Free Software Foundation, either version 2 of the
+License, or (at your option) any later version. This matches the license
+stated for the upstream FastICA distribution.
+
+This bundled copy of FastICA carries its copyright notice in Contents.m
+but the individual source files (fastica.m, fpica.m, pcamat.m, etc.) do
+not contain per-file license headers. This notice is provided to make the
+applicable license explicit for the copy redistributed inside the
+processFNIRS2 toolbox.
+
+Because FastICA is offered under "GPL version 2 or any later version," it
+may be redistributed under the terms of the GNU General Public License,
+version 3, which is the license of the processFNIRS2 toolbox that bundles
+it. The full text of the GNU General Public License, Version 3, is in the
+LICENSE file at the root of the processFNIRS2 repository.
+
+THIS SOFTWARE IS PROVIDED "AS IS" WITHOUT WARRANTY OF ANY KIND, to the
+extent permitted by applicable law. See the GNU General Public License for
+more details.

@@ -190,5 +190,122 @@ classdef PlotHelpersTest < matlab.unittest.TestCase
                 pf2_base.external.vline(5, {'Color', [0 0 0], 'LineWidth', 2}, ...
                     'lab', 0.5));
         end
+
+        %% suptitle (clean-room reimplementation)
+        function testSuptitleSingleOverlay(testCase)
+            % Creates exactly one axes tagged 'suptitle' and returns a valid
+            % handle to a text object living in that overlay.
+            fig = figure('Visible', 'off');
+            cleanup = onCleanup(@() close(fig)); %#ok<NASGU>
+            subplot(2, 1, 1); plot(1:10);
+            subplot(2, 1, 2); plot(10:-1:1);
+
+            h = pf2_base.external.suptitle(fig, 'My Super Title');
+
+            testCase.verifyTrue(isgraphics(h));
+            overlays = findobj(fig, 'Type', 'axes', 'Tag', 'suptitle');
+            testCase.verifyNumElements(overlays, 1);
+            testCase.verifyEqual(get(h, 'String'), 'My Super Title');
+        end
+
+        function testSuptitleReplaces(testCase)
+            % A second call must REPLACE the prior super-title, leaving
+            % exactly one tagged overlay axes.
+            fig = figure('Visible', 'off');
+            cleanup = onCleanup(@() close(fig)); %#ok<NASGU>
+            subplot(1, 2, 1); plot(rand(1, 5));
+            subplot(1, 2, 2); plot(rand(1, 5));
+
+            pf2_base.external.suptitle(fig, 'First');
+            h2 = pf2_base.external.suptitle(fig, 'Second');
+
+            overlays = findobj(fig, 'Type', 'axes', 'Tag', 'suptitle');
+            testCase.verifyNumElements(overlays, 1);
+            testCase.verifyEqual(get(h2, 'String'), 'Second');
+        end
+
+        %% barweb (clean-room reimplementation)
+        function testBarwebPositionalForm(testCase)
+            % Classic positional call: barweb(vals, errs, width, names, NV...)
+            fig = figure('Visible', 'off');
+            cleanup = onCleanup(@() close(fig)); %#ok<NASGU>
+            vals = [1 2; 3 1; 2 2];          % 3 groups, 2 series
+            errs = 0.2 * ones(3, 2);         % symmetric
+            h = pf2_base.external.barweb(vals, errs, 0.8, {'A', 'B', 'C'}, ...
+                'Legend', {'Pre', 'Post'});
+
+            testCase.verifyTrue(isstruct(h));
+            testCase.verifyTrue(all(isfield(h, {'ax', 'bars', 'errors', 'legend'})));
+            testCase.verifyNumElements(h.bars, 2);
+            testCase.verifyTrue(isgraphics(h.ax));
+        end
+
+        function testBarwebNameValueForm(testCase)
+            % Name-value call: 'Width', 'GroupNames', ...
+            fig = figure('Visible', 'off');
+            cleanup = onCleanup(@() close(fig)); %#ok<NASGU>
+            vals = [4 5; 6 7];
+            errs = 0.3 * ones(2, 2);
+            h = pf2_base.external.barweb(vals, errs, 'Width', 0.8, ...
+                'GroupNames', {'G1', 'G2'}, 'Legend', {'X', 'Y'}, ...
+                'LegendType', 'hide');
+
+            testCase.verifyTrue(isstruct(h));
+            testCase.verifyNumElements(h.bars, 2);
+        end
+
+        function testBarwebNoErrors(testCase)
+            % [] error spec: no error bars drawn, struct still returned.
+            fig = figure('Visible', 'off');
+            cleanup = onCleanup(@() close(fig)); %#ok<NASGU>
+            vals = [1 2 3];                  % single group, 3 series
+            h = pf2_base.external.barweb(vals, [], 0.8, {'Only'});
+            testCase.verifyTrue(isstruct(h));
+            testCase.verifyTrue(all(isfield(h, {'ax', 'bars', 'errors', 'legend'})));
+        end
+
+        function testBarwebLowerUpperPages(testCase)
+            % [M x N x 2] error encoding: page 1 lower, page 2 upper bounds.
+            fig = figure('Visible', 'off');
+            cleanup = onCleanup(@() close(fig)); %#ok<NASGU>
+            vals = [2 3; 4 5];
+            err = zeros(2, 2, 2);
+            err(:, :, 1) = vals - 0.5;       % lower
+            err(:, :, 2) = vals + 0.5;       % upper
+            h = pf2_base.external.barweb(vals, err, 0.8, {'A', 'B'}, ...
+                'Legend', {'S1', 'S2'});
+            testCase.verifyTrue(isstruct(h));
+            testCase.verifyNumElements(h.bars, 2);
+        end
+
+        function testBarwebBoxIQRPages(testCase)
+            % >=3 pages: box/IQR rendering (whiskers + box rectangles).
+            fig = figure('Visible', 'off');
+            cleanup = onCleanup(@() close(fig)); %#ok<NASGU>
+            vals = [3 4; 5 6];
+            err = zeros(2, 2, 5);
+            err(:, :, 1) = vals - 1.0;       % lower whisker
+            err(:, :, 2) = vals + 1.0;       % upper whisker
+            err(:, :, 3) = vals - 0.5;       % box low
+            err(:, :, 4) = vals + 0.5;       % box high
+            err(:, :, 5) = vals;             % median
+            h = pf2_base.external.barweb(vals, err, 0.8, {'A', 'B'});
+            testCase.verifyTrue(isstruct(h));
+            testCase.verifyNotEmpty(h.rectangles);
+        end
+
+        function testBarwebReturnsExpectedFields(testCase)
+            % All fields callers read must be present.
+            fig = figure('Visible', 'off');
+            cleanup = onCleanup(@() close(fig)); %#ok<NASGU>
+            h = pf2_base.external.barweb([1 2; 3 4], 0.1*ones(2, 2), 0.8, ...
+                {'A', 'B'}, 'Legend', {'P', 'Q'});
+            for f = {'ax', 'bars', 'errors', 'legend', 'points', ...
+                     'violins', 'rectangles'}
+                testCase.verifyTrue(isfield(h, f{1}), ...
+                    sprintf('missing field %s', f{1}));
+            end
+        end
+
     end
 end

@@ -39,7 +39,7 @@ function [ varargout ] = plot(fNIR,varargin)
 % See also: pf2.data.plot.oxy, pf2.data.plot.raw, pf2.data.plot.roi
 
 if(nargin<1)
-   error('Must provide an fNIR struct to plot'); 
+   error('pf2:data:plot:noInput', 'Must provide an fNIR struct to plot');
 end
 
 if(isfield(fNIR,'HbO')&&~isempty(fNIR.HbO))

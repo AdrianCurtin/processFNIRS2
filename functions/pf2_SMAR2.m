@@ -79,7 +79,7 @@ function [Xcorr, maskCV, MA_idx]=pf2_SMAR2(x,N,chNum,tauArtifact,tauClean,minSeg
 % See also: pf2_SMAR, pf2_fnirs_MARA, pf2_MotionCorrectTDDR, calcLocalCV
 
 if nargin<1
-    error('Not enough Input arguments');
+    error('pf2:smar2:notEnoughInputs', 'Not enough Input arguments');
 elseif nargin==1
      N=10;  %Default Window Length
 end
@@ -100,7 +100,7 @@ if(nargin<6)
 end
 
 if(N<1)
-    error('Invalid Window Length');
+    error('pf2:smar2:invalidWindowLength', 'Invalid Window Length');
 end
 len=size(x,1);
 
@@ -217,16 +217,26 @@ end
 
 %__________________________________________________________________________
 function [CVx, dCVx] = calcLocalCV(x,N)
-% Function to calculate coefficient of variation for use in SMAR technique
-% x:	input signal
-% N:	window length for SMAR
+% CALCLOCALCV Calculate local coefficient of variation and its derivative
+%
+% Computes the coefficient of variation (CV = std/mean) within a sliding
+% window centered at each sample, plus its first temporal derivative (dCV).
+% Used internally by pf2_SMAR2 for adaptive motion artifact detection.
+%
+% Inputs:
+%   x - Input signal matrix [T x C] where T=samples, C=channels
+%   N - Window length in samples for SMAR (will be made odd if even)
+%
+% Outputs:
+%   CVx  - Coefficient of variation matrix [T x C]
+%   dCVx - First temporal derivative of CVx [T x C], leading sample = 0
 
 if nargin<1
-    error('Not enough Input arguments');
+    error('pf2:smar2:notEnoughInputs', 'Not enough Input arguments');
 end
 
 if(N<1)
-    error('Invalid Window Length');
+    error('pf2:smar2:invalidWindowLength', 'Invalid Window Length');
 end
 
 l=size(x);

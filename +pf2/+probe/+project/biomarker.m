@@ -31,6 +31,9 @@ function [h, imgOut] = biomarker(vals, fNIR, varargin)
 %   pf2.probe.project.biomarker(vals, processed, 'Range', [-1, 1], ...
 %       'ForceLightMode', true);
 %
+%   % Headless save (use 'savePath' for 3D renders)
+%   pf2.probe.project.biomarker(vals, processed, 'savePath', 'hbo.png');
+%
 % See also: pf2.probe.plot.interpolateValues3D,
 %           pf2.probe.project.correlation
 

@@ -96,7 +96,7 @@ numOpt=length(selOpt);
 
 if(strcmp(exSettings.ChannelMode,'Aux'))
     if(length(selectedBioM)>1)
-        error('Not supported yet!')
+        error('exploreFNIRS:plot:scatter:notSupported', 'Not supported yet!')
     end
     auxTable=get(handles.listbox_optode,'UserData');
     selectedOpt=nan(length(selOpt));
@@ -622,12 +622,12 @@ for chIdx=1:numOpt
                 [curHAvg,outH]=pf2_base.hierarchicalAverage(curData,curTable(:,dataH),@nanmedian);
                 
             else
-                error('Unknown parameter');
+                error('exploreFNIRS:plot:scatter:unknownParameter', 'Unknown parameter');
                 %curHAvg=nanmedian(hierarchicalAverage(curData,curTable(:,dataH),@nanmedian));
             end
             
             if(numChartTimes==0)
-                error('No data in selected time range!');
+                error('exploreFNIRS:plot:scatter:noData', 'No data in selected time range!');
             end
             
             for t=1:numChartTimes
@@ -657,7 +657,7 @@ for chIdx=1:numOpt
                         dataHierarchy=curGrand.info.Hierarchy;
                     case 'ROI'
                         if(~pf2_base.isnestedfield(curGrand,'ROI.HbO.data'))
-                            error('ROI data must be calculated using a build ROI step');
+                            error('exploreFNIRS:plot:scatter:roiNotBuilt', 'ROI data must be calculated using a build ROI step');
                         end
                         
                         data2plot=curGrand.ROI.(bioM);
@@ -675,7 +675,7 @@ for chIdx=1:numOpt
                 elseif(strcmp(plotFeature,'Median'))
                     [curFeatureY]=pf2_base.hierarchicalAverage(curFeatureY,dataHierarchy,@nanmedian);
                 else
-                    error('Unknown parameter');
+                    error('exploreFNIRS:plot:scatter:unknownParameter', 'Unknown parameter');
                     %curHAvg=nanmedian(hierarchicalAverage(curData,curTable(:,dataH),@nanmedian));
                 end
                 
@@ -1090,7 +1090,7 @@ for chIdx=1:numOpt
                                 lineWidth=0.5;
                                 plotShaded=true;
                             otherwise
-                                error('Unspecified error style');
+                                error('exploreFNIRS:plot:scatter:unknownErrorStyle', 'Unspecified error style');
                         end
                         
                         errColor=sColor+(1-sColor)*0.55;

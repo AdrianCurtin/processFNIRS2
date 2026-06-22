@@ -67,10 +67,10 @@ elseif(isdatetime(t0time))
             tDiff=seconds(t0time-fnirStruct.t0);
             
         else
-            error('All datetimes must be the same size as times');
+            error('pf2:setT0:datetimeSizeMismatch', 'All datetimes must be the same size as times');
         end
     else
-        error('t0 cannot be set as a datetime if fnirs struct does not have datetime measures');
+        error('pf2:setT0:noDatetime', 't0 cannot be set as a datetime if fnirs struct does not have datetime measures');
     end
 else
     tDiff=t0time;

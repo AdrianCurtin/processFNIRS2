@@ -15,7 +15,8 @@ function info = isGPUAvailable(varargin)
 % Outputs:
 %   info - Struct with fields:
 %     .available   - logical, true if a usable GPU was found
-%     .backend     - char: 'metal', 'cuda', or 'none'
+%     .backend     - char: 'cuda' or 'none' in practice ('metal' is an
+%                    aspirational, non-wired hook — see note below)
 %     .deviceName  - char: GPU device name or 'none'
 %     .totalMemory - double: total GPU memory in bytes (0 if none)
 %
@@ -53,7 +54,18 @@ function info = isGPUAvailable(varargin)
             info.deviceName = dev.Name;
             info.totalMemory = dev.TotalMemory;
 
-            % Detect backend from device name
+            % Detect backend from device name.
+            %
+            % ASPIRATIONAL — the 'metal' branch is NOT wired up. MATLAB's
+            % gpuArray (Parallel Computing Toolbox) is CUDA-only and is
+            % unsupported on macOS, so gpuDevice() throws on Apple hardware
+            % and execution never reaches this point with a Metal device. In
+            % practice info.backend is only ever 'cuda' here. Honoring a Metal
+            % backend would require a non-gpuArray path (e.g. the third-party
+            % "Metal for MATLAB" toolbox) plus reworking pf2_base.accel.toGPU/
+            % gather and the GPU hot loops against that API. The branch is
+            % retained only as a forward-looking hook; do not treat a 'metal'
+            % result as a usable compute backend.
             nameLower = lower(dev.Name);
             if contains(nameLower, 'apple') || contains(nameLower, 'metal')
                 info.backend = 'metal';

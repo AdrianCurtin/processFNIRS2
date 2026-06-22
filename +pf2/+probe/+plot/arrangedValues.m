@@ -108,7 +108,7 @@ end
 
 
 if(length(data2plot)~=numOptodes)
-    error('Must have a value for all optodes');
+    error('pf2:probe:arrangedValues:optodeCountMismatch', 'Must have a value for all optodes');
 end
 
 

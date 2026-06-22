@@ -23,6 +23,9 @@ function [h, imgOut] = counts(Nvals, fNIR, varargin)
 %   N = randi([5 30], 1, size(processed.HbO, 2));
 %   pf2.probe.project.counts(N, processed, 'ForceLightMode', true);
 %
+%   % Headless save (use 'savePath' for 3D renders)
+%   pf2.probe.project.counts(N, processed, 'savePath', 'counts.png');
+%
 % See also: pf2.probe.plot.interpolateValues3D
 
 p = inputParser;

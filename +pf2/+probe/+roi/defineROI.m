@@ -81,7 +81,7 @@ else
 end
 
 if(nargin<2)
-    error('No optode list provided!');
+    error('pf2:probe:defineROI:noOptodeList', 'No optode list provided!');
 end
 
 if(isempty(optodeList))

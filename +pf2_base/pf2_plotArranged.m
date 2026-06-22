@@ -190,7 +190,7 @@ end
                 disp('No device specified. Please load device configuration');
                 probeInfo=pf2_base.loadDeviceCfg([],true);
                 if(~isempty(probeInfo))
-                    error('No valid devices selected');
+                    error('pf2_base:pf2_plotArranged:noValidDevices', 'No valid devices selected');
                 end
                 
             elseif(~isempty(cfgFilePath)) % If we're not looking at the GUI, doesn't matter
@@ -205,7 +205,7 @@ end
             end
             probeInfo=probeInfo.Probe{probeNum};
         else
-            error('Unable to identify probe');
+            error('pf2_base:pf2_plotArranged:unidentifiedProbe', 'Unable to identify probe');
         end
         
         
@@ -235,14 +235,14 @@ end
                 fprintf(2,'%i ',wavelengths(i));
             end
             fprintf('\n');
-            error('No Wavelengths to plot');
+            error('pf2_base:pf2_plotArranged:noWavelengths', 'No Wavelengths to plot');
         end
         
         
         if(any(channels>probeInfo.NumOptodes))
-            error('Some channels are higher than probe optode count');
+            error('pf2_base:pf2_plotArranged:channelOutOfRange', 'Some channels are higher than probe optode count');
         elseif(any(channels<0))
-            error('Channels can not be negative');
+            error('pf2_base:pf2_plotArranged:negativeChannel', 'Channels can not be negative');
         end
         
         
@@ -252,7 +252,7 @@ end
             tmax=nanmax(t);
             tmean=nanmean(t)-tmin;
         else
-            error('Must have valid time field');
+            error('pf2_base:pf2_plotArranged:noTimeField', 'Must have valid time field');
         end
         
         idx2plot=ismember(probeInfo.ChannelNumbers,channels);

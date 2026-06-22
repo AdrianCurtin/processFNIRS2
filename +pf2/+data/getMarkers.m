@@ -75,7 +75,7 @@ addParameter(p,'markerPattern',[],validScalarNumOrCell);
 addParameter(p,'markerColumn',2,validScalarNum);
 addParameter(p,'markerVariableName',[],isStringOrChar);
 addParameter(p,'timeColumn',1,validScalarNum);
-addParameter(p,'returnIndicies',false,validScalarNum);
+addParameter(p,'returnIndices',false,validScalarNum);
 addParameter(p,'exactMatch',false,validScalarNum);
 addParameter(p,'sortTimes',false,validScalarNum);
 
@@ -91,7 +91,7 @@ markerPatternIn=p.Results.markerPattern;
 markerColumn=p.Results.markerColumn;
 markerVariableName=p.Results.markerVariableName;
 timeColumn=p.Results.timeColumn;
-returnIndicies=p.Results.returnIndicies;
+returnIndices=p.Results.returnIndices;
 exactMatch=p.Results.exactMatch;
 sortTimes=p.Results.sortTimes;
 
@@ -102,7 +102,7 @@ end
 
 
 if(timeColumn<=0)
-    returnIndicies=true;
+    returnIndices=true;
 end
 
 isFNIRstruct=validfNIR_Input(fNIR);
@@ -154,7 +154,7 @@ if isPureOR
         return;
     end
 
-    if timeColumn <= 0 || returnIndicies
+    if timeColumn <= 0 || returnIndices
         tVals = find(sel);
     else
         tVals = fNIR.markers(sel, timeColumn);
@@ -324,7 +324,7 @@ if(isempty(markerPatternIn))
                matchedPatterns{j,2}=markersEndStr(j,:);
            end
        else
-          error('Marker mismatch\nPlease supply 1 start marker for each end marker or only one start/end marker'); 
+          error('pf2:getMarkers:markerMismatch', 'Marker mismatch\nPlease supply 1 start marker for each end marker or only one start/end marker');
        end
         
     end
@@ -395,7 +395,7 @@ if(isempty(markerTimes))
    return; 
 end
 
-if(returnIndicies)
+if(returnIndices)
    markerTimes=markerTimes(:,[4,5,3,1,2,6]);
 end
 
@@ -431,7 +431,7 @@ function regMrkIdx=uValsToString(uVals)
     regMrkIdx(reg_upper_idx)=uVals(reg_upper_idx)+64;
     regMrkIdx(reg_lower_idx)=uVals(reg_lower_idx)+96;
     if(max(uVals>63))
-        error('Too many unique markers');
+        error('pf2:getMarkers:tooManyMarkers', 'Too many unique markers');
     end
 end
 

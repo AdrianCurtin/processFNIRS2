@@ -91,22 +91,22 @@ buildProbeLayout = true;
 if nargin < 1
    [filename, pathname] = uigetfile({'*.snirf;*.jsnirf','snirf files (*.snirf,*.jsnirf)';'*.*','All files (*.*)'},'Open SNIRF file');
    if isequal(filename, 0) || isequal(pathname, 0)
-       error('File selection canceled.');
+       error('pf2:importSNIRF:selectionCanceled', 'File selection canceled.');
    end
    filepath = fullfile(pathname, filename);
 elseif ~ischar(filepath) && ~isstring(filepath)
-   error('Input must be a string representing a filename');
+   error('pf2:importSNIRF:badInput', 'Input must be a string representing a filename');
 end
 
 % Load SNIRF data using jsnirfy loader
 try
     data = pf2_base.external.jsnirfy.loadsnirf(filepath, varargin{:});
 catch e
-    error('Failed to load SNIRF file: %s', e.message);
+    error('pf2:importSNIRF:loadFailed', 'Failed to load SNIRF file: %s', e.message);
 end
 
 if ~isfield(data, 'nirs')
-    error('No nirs struct contained in file');
+    error('pf2:importSNIRF:noNirsStruct', 'No nirs struct contained in file');
 end
 
 % Initialize fNIR structure
@@ -180,7 +180,7 @@ data = nirs.data;
 
 % Process measurement list
 if ~isfield(data, 'measurementList') || isempty(data.measurementList)
-    error('No measurement list found in SNIRF file');
+    error('pf2:importSNIRF:noMeasurementList', 'No measurement list found in SNIRF file');
 end
 
 % Convert measurement list to table for easier handling

@@ -91,7 +91,7 @@ end
 uCh=unique([ChxList,ChyList],'rows');
 
 if(size(uCh,1)<length(ChxList))
-    error('Duplicate Channel Locations Present');
+    error('pf2_base:fitProbe2D:duplicateLocations', 'Duplicate Channel Locations Present');
 end
 
 
@@ -99,7 +99,7 @@ end
 uCh=unique([ChxList(:),ChyList(:)],'rows');
 
 if(size(uCh,1)<length(ChxList))
-    error('Duplicate Channel Locations Present');
+    error('pf2_base:fitProbe2D:duplicateLocations', 'Duplicate Channel Locations Present');
 end
 
 startStepSize=10;

@@ -117,7 +117,7 @@ rejectLevel = p.Results.rejectLevel;
 
 if(~iscell(bioMlist))
     if(any(~ischar(bioMlist)))
-       error('Must specify biomarkers');
+       error('pf2:data:plot:oxy:badBiomarkers', 'Must specify biomarkers');
     end
     if(strcmpi(bioMlist,'all'))
         bioMlist={'HbO','HbR','HbDiff','HbTotal','CBSI'};
@@ -155,9 +155,9 @@ end
     
     
 if(any(channels>probeInfo.NumOptodes))
-    error('Some channels are higher than probe optode count');
+    error('pf2:data:plot:oxy:channelOutOfRange', 'Some channels are higher than probe optode count');
 elseif(any(channels<0))
-    error('Channels can not be negative');
+    error('pf2:data:plot:oxy:negativeChannel', 'Channels can not be negative');
 end
 
 
@@ -167,7 +167,7 @@ if(isfield(fNIR,'time'))
     tmax=nanmax(t);
     tmean=nanmean(t)-tmin;
 else
-    error('Must have valid time field');
+    error('pf2:data:plot:oxy:noTime', 'Must have valid time field');
 end
 
 idx2plot=ismember(probeInfo.TableOpt.OptodeNum,channels);

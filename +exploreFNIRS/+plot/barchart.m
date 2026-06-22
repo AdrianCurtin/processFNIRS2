@@ -112,7 +112,7 @@ numOpt=length(selOpt);
 
 if(strcmp(exSettings.ChannelMode,'Aux'))
     if(length(selectedBioM)>1)
-        error('Not supported yet!')
+        error('exploreFNIRS:plot:barchart:notSupported', 'Not supported yet!')
     end
     auxTable=get(handles.listbox_optode,'UserData');
     selectedOpt=nan(length(selOpt));
@@ -358,7 +358,7 @@ for chIdx=1:numOpt
                     data2plot=curGrand.(bioM);
                 case 'ROI'
                     if(~pf2_base.isnestedfield(curGrand,'ROI.HbO.data'))
-                        error('ROI data must be calculated using a build ROI step');
+                        error('exploreFNIRS:plot:barchart:roiNotBuilt', 'ROI data must be calculated using a build ROI step');
                     end
 
                     data2plot=curGrand.ROI.(bioM);
@@ -567,7 +567,7 @@ for chIdx=1:numOpt
 
 
         if(exSettings.plot_bar_err&&~plotCount)
-            pf2_base.external.barweb(barChartData{curChart}(:,:,1),barChartData{curChart}(:,:,2:1+numErrFeatures),1,xBarLabels, 'ColorMap', cIndex,'Legend',gAStrs,'LegendType','hide','DataPoints',barChartDataPoints{curChart},'PlotViolin',strcmp(errorFeature,'Violin'));
+            pf2_base.external.barweb(barChartData{curChart}(:,:,1),barChartData{curChart}(:,:,2:1+numErrFeatures),0.8,xBarLabels, 'ColorMap', cIndex,'Legend',gAStrs,'LegendType','hide','DataPoints',barChartDataPoints{curChart},'PlotViolin',strcmp(errorFeature,'Violin'));
 
 
             if(plottingDataPoints||strcmp(errorFeature,'MaxMin')||strcmp(errorFeature,'IQR')||strcmp(errorFeature,'Violin'))
@@ -605,7 +605,7 @@ for chIdx=1:numOpt
             maxValFromBarChart=max(max(barChartData{curChart}(:,:,1)));
             minValFromBarChart=min(min(barChartData{curChart}(:,:,1)));
 
-            pf2_base.external.barweb(barChartData{curChart}(:,:,1),[],1,xBarLabels, 'ColorMap', cIndex,'Legend',gAStrs,'LegendType','hide', 'DataPoints',barChartDataPoints{curChart});
+            pf2_base.external.barweb(barChartData{curChart}(:,:,1),[],0.8,xBarLabels, 'ColorMap', cIndex,'Legend',gAStrs,'LegendType','hide', 'DataPoints',barChartDataPoints{curChart});
 
             ylimLower=minValFromBarChart;
             ylimUpper=maxValFromBarChart;

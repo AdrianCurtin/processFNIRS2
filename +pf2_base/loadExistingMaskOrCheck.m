@@ -44,7 +44,7 @@ function fNIR=loadExistingMaskOrCheck(fNIR,nirFilename,channelCheckVersion)
 		if(pf2_base.isnestedfield(fNIR,'info.filename'))
 		   nirFilename=fNIR.info.filename;
 		else
-		   error('No filename found');
+		   error('pf2_base:loadExistingMaskOrCheck:noFilename', 'No filename found');
 		end
 	end
 	if nargin < 3 || isempty(channelCheckVersion)

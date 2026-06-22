@@ -155,7 +155,7 @@ if(isstring(nir_filename))
 end
 
 if ~ischar(nir_filename)
-	error('Input must be a string representing a filename');
+	error('pf2:importNIR:badInput', 'Input must be a string representing a filename');
 end
 
 if(~isempty(nir_filename))
@@ -163,7 +163,7 @@ if(~isempty(nir_filename))
 end
 
 if fid==-1
-	error('Data nir_filename not found or permission denied');
+	error('pf2:importNIR:fileNotFound', 'Data nir_filename not found or permission denied');
 end
 
 

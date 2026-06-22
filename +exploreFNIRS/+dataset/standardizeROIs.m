@@ -87,7 +87,7 @@ numDevROI = length(standardDevRoiNames);
 if(height(b)>numDevROI)
     % This shouldnt be called because we only add ROI names
     % when they are not members of current or currentDevNames
-    error('duplicate ROI names present');
+    error('exploreFNIRS:dataset:standardizeROIs:duplicateROI', 'duplicate ROI names present');
 end
 
 % Assign linear index to all ROIs with same original name

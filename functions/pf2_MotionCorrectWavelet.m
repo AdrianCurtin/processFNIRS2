@@ -4,7 +4,7 @@ function [dodWavelet] = pf2_MotionCorrectWavelet(dod,iqr,turnon,wavelet,accelera
 % Performs a wavelet decomposition of the signal and removes coefficients
 % that exceed iqr times the interquartile range, as these are likely due
 % to motion artifacts. Uses a shift-invariant discrete wavelet transform
-% via WaveLab850 (no Wavelet Toolbox required).
+% via the built-in pf2_base.wavelet transforms (no Wavelet Toolbox required).
 %
 % Reference:
 %   Molavi, B. & Dumont, G. A. (2012). Wavelet-based motion artifact
@@ -63,11 +63,6 @@ if iqr<0
     return;
 end
 
-global WAVELABPATH
-if(isempty(WAVELABPATH))
-    pf2_base.toolboxes.setup_wavelab();
-end
-
 % Resolve wavelet family — only the QMF filter is needed (no Wavelet Toolbox)
 [qmfilter, ~, ~] = pf2_base.wavelet.resolveWavelet(wavelet);
 
@@ -117,8 +112,8 @@ function col = processChannel(channelData, SignalLength, N, L, qmfilter, iqr, ch
     [yn, NormCoef] = NormalizationNoise(DataPadded', qmfilter);
 
     try
-        % Forward shift-invariant DWT using WaveLab
-        StatWT = FWT_TI(yn, L, qmfilter);
+        % Forward shift-invariant DWT (clean-room pf2_base.wavelet)
+        StatWT = pf2_base.wavelet.fwtTI(yn, L, qmfilter);
 
         % Threshold wavelet coefficients and reconstruct
         [ARSignal, ~] = WaveletAnalysis(StatWT, L, qmfilter, iqr, SignalLength);
@@ -132,9 +127,9 @@ function col = processChannel(channelData, SignalLength, N, L, qmfilter, iqr, ch
 
 function [y_norm,coeff] = NormalizationNoise(y,qmf)
 % Estimate noise level and normalize so MAD of finest-level coefficients = 1
-% Uses WaveLab's DownDyadLo instead of cconv + dyaddown (no Wavelet Toolbox)
+% Uses pf2_base.wavelet.downDyadLo instead of cconv + dyaddown (no Wavelet Toolbox)
 
-    y_downsampled = DownDyadLo(y, qmf);
+    y_downsampled = pf2_base.wavelet.downDyadLo(y, qmf);
 
     % Median absolute deviation (base MATLAB — no Statistics Toolbox).
     % Note: mad() defaults to MEAN absolute deviation, which is inconsistent
@@ -155,7 +150,7 @@ function [ARSignal,StatWT]  = WaveletAnalysis(StatWT,L,qmf,iqr,SignalLength)
 % Threshold wavelet coefficients and reconstruct via inverse TI-DWT
 %
 % Sets coefficients exceeding iqr times the interquartile range to zero
-% (likely motion artifacts), then reconstructs using WaveLab's IWT_TI.
+% (likely motion artifacts), then reconstructs using pf2_base.wavelet.iwtTI.
 %
 % Original script by Behnam Molavi (bmolavi@ece.ubc.ca), adapted for
 % Homer2 by RJC, modified 10/17/2012 by S. Brigadoi.
@@ -184,5 +179,5 @@ for j=1:N-L-1
     end
 end
 
-% Inverse shift-invariant DWT using WaveLab
-ARSignal = IWT_TI(StatWT, qmf);
+% Inverse shift-invariant DWT (clean-room pf2_base.wavelet)
+ARSignal = pf2_base.wavelet.iwtTI(StatWT, qmf);

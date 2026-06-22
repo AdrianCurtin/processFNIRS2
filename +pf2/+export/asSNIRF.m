@@ -75,7 +75,7 @@ function [snirfData] = asSNIRF(fNIRcells, filepath, varargin)
 % See also: pf2.import.importSNIRF, pf2.export.asNIR, savesnirf
 
 if(nargin < 1)
-    error('No fnir file specified!');
+    error('pf2:asSNIRF:noData', 'No fnir file specified!');
 end
 
 if nargin < 2
@@ -134,7 +134,7 @@ snirfData.formatVersion = c2v('1.1');
 if(~iscell(fNIRcells) && isstruct(fNIRcells))
     fNIRcells = {fNIRcells};
 elseif ~iscell(fNIRcells) || isempty(fNIRcells)
-    error('Invalid fnirs data: Must be a structure or non-empty cell array of structures');
+    error('pf2:asSNIRF:invalidInput', 'Invalid fnirs data: Must be a structure or non-empty cell array of structures');
 end
 
 curNIR_fieldname = 'nirs';

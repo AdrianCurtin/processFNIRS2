@@ -74,21 +74,27 @@ if(~getByIndex && (isempty(oxyMethod) || (ischar(oxyMethod) && isempty(strtrim(o
 end
 
     
-if(isfield(methodsLib,'cfg')&&isfield(methodsLib.cfg,'Sections')&&~isempty(methodsLib.cfg.Sections))
+% methodsLib.cfg may be a struct or a pf2_base.external.INI object; the
+% latter exposes Sections as a property (isfield is false for objects), so
+% probe with a struct-or-object safe check before reading it.
+cfgHasSections = isfield(methodsLib,'cfg') && ...
+    ((isstruct(methodsLib.cfg) && isfield(methodsLib.cfg,'Sections')) || ...
+     (isobject(methodsLib.cfg) && isprop(methodsLib.cfg,'Sections')));
+if(cfgHasSections&&~isempty(methodsLib.cfg.Sections))
     oxyMethods=methodsLib.cfg.Sections;
     
     if(getByIndex)
         if(oxyMethod>0&&oxyMethod<=length(oxyMethods))
             oxyMethod=oxyMethods{oxyMethod};
         else
-            error('Unable to find Oxy Method at Index %i',oxyMethod);
+            error('pf2:methods:oxy:describeMethod:badIndex', 'Unable to find Oxy Method at Index %i',oxyMethod);
         end
     end
     
     if(ismember(oxyMethod,oxyMethods)&&~isempty(methodsLib.cfg.(oxyMethod)))
         oxyMethodCfg=methodsLib.cfg.(oxyMethod);
     else
-       error('Unable to find current Oxy Method name %s',oxyMethod); 
+       error('pf2:methods:oxy:describeMethod:methodNotFound', 'Unable to find current Oxy Method name %s',oxyMethod);
     end
     
     
@@ -97,6 +103,11 @@ if(isfield(methodsLib,'cfg')&&isfield(methodsLib.cfg,'Sections')&&~isempty(metho
     descripStr=sprintf('Oxy Method: %s\n',oxyMethod);
     for f=1:length(funcs)
         curFunc=funcs{f};
+        % Function entries may be plain structs or PipelineFunction objects;
+        % normalize to the struct shape (.f/.args/.argvals/.output) below.
+        if(isa(curFunc,'pf2_base.PipelineFunction'))
+            curFunc=curFunc.toStruct();
+        end
         funcDescripStr=sprintf('%i. Function: %s\n',f,curFunc.f);
         for a=1:length(curFunc.args)
             if(~iscell(curFunc.args))
@@ -128,6 +139,16 @@ if(isfield(methodsLib,'cfg')&&isfield(methodsLib.cfg,'Sections')&&~isempty(metho
         functions=funcs;
     else
         fprintf(descripStr);
+    end
+else
+    % No methods library / Sections available: report gracefully rather than
+    % returning with unassigned outputs.
+    msg=sprintf('No Oxy Methods available to describe.\n');
+    if(nargout>0)
+        descrip=msg;
+        functions={};
+    else
+        fprintf(2,'%s',msg);
     end
 end
 

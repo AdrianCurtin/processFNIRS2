@@ -254,10 +254,12 @@ classdef ReportTest < matlab.unittest.TestCase
         end
 
         function testDemographicsTable_numericFormat(testCase)
-            tbl = table([25; 30; 28], 'VariableNames', {'Age'});
+            tbl = table({'S1'; 'S2'; 'S3'}, [25; 30; 28], ...
+                'VariableNames', {'SubjectID', 'Age'});
             T = exploreFNIRS.report.demographicsTable(tbl, 'Variables', {'Age'});
-            % Should contain M (SD) format
-            val = T{1, 1}{1};
+            % The Age row should contain M (SD) format. Row 1 is the N count,
+            % so look up the Age row by name.
+            val = T{'Age', 1}{1};
             testCase.verifyTrue(contains(val, '('));
         end
 

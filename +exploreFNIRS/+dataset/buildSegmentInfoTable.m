@@ -33,7 +33,7 @@ function outTable = buildSegmentInfoTable(FNIRS_array)
 % See also: exploreFNIRS.dataset.standardizeROIs, exploreFNIRS
 
 if isempty(FNIRS_array)
-    error('No Data to build exploreFNIRS data table!\n')
+    error('exploreFNIRS:dataset:buildSegmentInfoTable:noData', 'No Data to build exploreFNIRS data table!\n')
 end
 
 numF = length(FNIRS_array);

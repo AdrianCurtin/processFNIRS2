@@ -160,7 +160,7 @@ wvArray=nan(numOpt,numWv);
 chArray=nan(numOpt,numWv+1);
 
 if(numWv>2)
-    error('MultiWavelengths are not supported yet');
+    error('pf2_base:fnirs:bvoxy:multiWavelengthUnsupported', 'MultiWavelengths are not supported yet');
 end
 
 wv700=wavelengths<805; %Split so wavelength under isobestic point is first column
@@ -211,7 +211,7 @@ HbO=zeros(len,numOpt);
 HbR=zeros(len,numOpt);
 
 if(numWv~=2)
-    error('Sorry I don''t support this yet');
+    error('pf2_base:fnirs:bvoxy:unsupportedWavelengthCount', 'Sorry I don''t support this yet');
 end
 
 %Note w1~700nm w2~830nm
@@ -555,6 +555,6 @@ elseif(isempty(oxy))
     cOxy=[];
     warning('CBSI error: Oxy arrays and Deoxy arrays are empty');
 else
-    error('Oxy and Deoxy size mismatch');
+    error('pf2_base:fnirs:bvoxy:dimensionMismatch', 'Oxy and Deoxy size mismatch');
 end
 end

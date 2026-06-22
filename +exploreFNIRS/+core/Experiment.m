@@ -707,6 +707,14 @@ classdef Experiment < handle
                 hasCachedPP = ~isempty(obj.groups(g).cache) && ...
                               isfield(obj.groups(g).cache, 'ppKey') && ...
                               strcmp(obj.groups(g).cache.ppKey, ppKey);
+
+                % Persist the preprocessing cache on the group so that
+                % subsequent aggregate() calls that only change the averaging
+                % mode (not a preprocessing setting) can detect a cache hit.
+                obj.groups(g).cache.ppKey  = ppKey;
+                obj.groups(g).cache.ppData = allPPData{g};
+                obj.groups(g).cache.barData = allBarData{g};
+
                 if hasCachedPP
                     fprintf('  [%d] %s: re-averaged (%s mode)\n', ...
                         g, obj.groups(g).label, mode);
@@ -1247,7 +1255,7 @@ classdef Experiment < handle
             end
 
             bwHandles = pf2_base.external.barweb(meanMatrix, errInput, ...
-                1, groupLabels, barwebArgs{:}, 'ErrorColor', sty.ForegroundColor);
+                0.8, groupLabels, barwebArgs{:}, 'ErrorColor', sty.ForegroundColor);
             hold(ax, 'on');
 
             % Color each bar individually
@@ -3513,7 +3521,7 @@ function hVars = buildHierarchyVars(curTable, validHierarchy, mode)
             hVars = (1:size(curTable, 1))';
 
         otherwise
-            error('Unknown averaging mode: %s. Use ''hierarchy'', ''flat'', or ''none''.', mode);
+            error('exploreFNIRS:core:Experiment:buildHierarchyVars', 'Unknown averaging mode: %s. Use ''hierarchy'', ''flat'', or ''none''.', mode);
     end
 end
 

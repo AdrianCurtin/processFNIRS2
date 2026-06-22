@@ -23,6 +23,9 @@ processFNIRS2 is a modular MATLAB toolbox designed for processing functional Nea
 
 ## Getting Started
 
+### Requirements
+- MATLAB R2025b (recommended). The Statistics and Machine Learning Toolbox is required for LME-based group statistics in exploreFNIRS.
+
 ### Installation
 1. Clone or download this repository
 2. Add the main processFNIRS2 folder and the following subdirectories to your MATLAB path:
@@ -596,11 +599,16 @@ help pf2.import.importNIR
 ```
 
 ## License
-processFNIRS2 is free for academic and non-commercial use, but some included code may have other licenses.
+processFNIRS2 is licensed under the GNU General Public License, Version 3 (GPLv3); see [LICENSE](LICENSE). Bundled third-party components and their licenses are documented in [THIRD_PARTY_LICENSES.md](THIRD_PARTY_LICENSES.md).
 
 ## Citation
-If you use processFNIRS2 in your research, please cite:
-[Citation information to be added]
+If you use processFNIRS2 in your research, please cite the software (machine-readable
+metadata is in [CITATION.cff](CITATION.cff)):
+
+> Curtin, A., DeFilippis, N., Goldblum, Z., & Topoglu, Y. (2026). *processFNIRS2*
+> (version 1.0.0) [Computer software]. https://github.com/AdrianCurtin/processFNIRS2
+
+A companion publication and archival DOI will be added here when available.
 
 ## Contact
 For questions or support, contact Dr. Adrian Curtin at adrian.b.curtin@drexel.edu

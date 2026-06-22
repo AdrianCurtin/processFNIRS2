@@ -162,7 +162,7 @@ end
 
 if(~isfield(fNIR,'HbR')&&isfield(fNIR,'raw'))
     % out of principle we don't resample the raw data
-    error('Raw data averaging not supported');
+    error('pf2:resample:rawNotSupported', 'Raw data averaging not supported');
 elseif(~isfield(fNIR,'HbR')&&~isfield(fNIR,'raw'))
     warning('No fNIRS data');
     outFNIR=fNIR;
@@ -465,7 +465,7 @@ if(isfield(fNIR,'Aux')&&~isempty(fNIR.Aux)&&length(fields(fNIR.Aux))>1)
             end
             
         else
-             error('Trimming requires Aux series to be flattened first!');
+             error('pf2:resample:trimRequiresFlatten', 'Trimming requires Aux series to be flattened first!');
         end
     
     end
@@ -1148,7 +1148,7 @@ function [fTimeInd,timeSeries]=getTimeIdx(times_in,segLength,centerTime)
         % samples around that time were collected
 
     if(any(diff(times_in)<0))
-        error('Time series should be increasing in order to resample!');
+        error('pf2:resample:timeNotIncreasing', 'Time series should be increasing in order to resample!');
     end
 
 
@@ -1240,7 +1240,7 @@ if(size(x,1)==1&&size(x,2)>1)
 end
 
 if(size(y,1)~=size(x,1))
-   error('Size of x and y matricies must be the same'); 
+   error('pf2:resample:xySizeMismatch', 'Size of x and y matricies must be the same');
 end
     m = size(x,2); % number of polynomials to fit
     c = zeros(n+1,m); 

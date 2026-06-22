@@ -32,6 +32,9 @@ function [h, imgOut] = fstats(Fvals, fNIR, varargin)
 %   p = 1 - fcdf(F, 1, 30);
 %   pf2.probe.project.fstats(F, processed, 'pvalues', p, 'pThreshold', 0.05);
 %
+%   % Headless save (use 'savePath' for 3D renders)
+%   pf2.probe.project.fstats(F, processed, 'savePath', 'fstats.png');
+%
 % See also: pf2.probe.plot.interpolateValues3D, pf2.probe.project.pvalues
 
 p = inputParser;

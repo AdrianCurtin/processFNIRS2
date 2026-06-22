@@ -34,6 +34,9 @@ function [h, imgOut] = correlation(rho, fNIR, varargin)
 %   pf2.probe.project.correlation(rho, processed, ...
 %       'pvalues', p, 'pThreshold', 0.05, 'DeadZone', 0.05);
 %
+%   % Headless save (use 'savePath' for 3D renders)
+%   pf2.probe.project.correlation(rho, processed, 'savePath', 'rho.png');
+%
 % See also: pf2.probe.plot.interpolateValues3D,
 %           pf2.probe.project.biomarker
 

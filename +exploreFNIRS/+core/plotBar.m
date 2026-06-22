@@ -223,7 +223,7 @@ function fig = plotBar(groups, varargin)
                 barwebArgs = [barwebArgs, {'DataPoints', indivData}];
             end
 
-            bwHandles = pf2_base.external.barweb(meanMatrix, errInput, 1, pf2_base.plot.escapeTeX(uniqueWithin), ...
+            bwHandles = pf2_base.external.barweb(meanMatrix, errInput, 0.8, pf2_base.plot.escapeTeX(uniqueWithin), ...
                 barwebArgs{:});
             hold(ax, 'on');
 
@@ -273,7 +273,7 @@ function fig = plotBar(groups, varargin)
                 barwebArgs = [barwebArgs, {'DataPoints', indivData}];
             end
 
-            bwHandles = pf2_base.external.barweb(meanMatrix, errInput, 1, pf2_base.plot.escapeTeX(groupLabels), ...
+            bwHandles = pf2_base.external.barweb(meanMatrix, errInput, 0.8, pf2_base.plot.escapeTeX(groupLabels), ...
                 barwebArgs{:});
             hold(ax, 'on');
 

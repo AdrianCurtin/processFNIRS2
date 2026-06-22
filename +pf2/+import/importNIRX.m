@@ -86,7 +86,7 @@ if nargin < 1
    [folderDIR,pathname] = uigetfile({'*.hdr;*.nirs';'*.*'},'Open NIRX Config file');
   %error('Function requires at least one input argument');
 elseif ~ischar(folderDIR)
-  error('Input must be a string representing a filename');
+  error('pf2:importNIRX:badInput', 'Input must be a string representing a filename');
 else
    pathname=''; 
 end
@@ -114,7 +114,7 @@ d=dir;
 if(length(d)>2)
     files=cell(length(d)-2,2);
 else
-    error('No files found');
+    error('pf2:importNIRX:noFilesFound', 'No files found');
 end
 
 x=0;
@@ -504,7 +504,7 @@ if(isempty(fNIR.raw))
        sampleNum=size(wvCell{1},1);
        numCh=size(wvCell{1},2);
     else
-       error('Unable to find any .wv* files'); 
+       error('pf2:importNIRX:noWavelengthFiles', 'Unable to find any .wv* files');
     end
 
     fNIR.raw=nan(sampleNum,numCh*numWv+1);
@@ -519,7 +519,7 @@ if(isempty(fNIR.raw))
     if(isfield(fNIR,'fs'))
         fNIR.raw(:,1)=[1:sampleNum]'./fNIR.fs;
     else
-       error('Sampling Frequency is missing'); 
+       error('pf2:importNIRX:missingSamplingRate', 'Sampling Frequency is missing');
     end
     
     

@@ -98,7 +98,7 @@ if nargin < 1
   fid = fopen([pathname file]);
 
 elseif ~ischar(file) && ~isstring(file)
-  error('Input must be a string representing a filename');
+  error('pf2:importHitachiMES:badInput', 'Input must be a string representing a filename');
 elseif nargin<2
     fid=fopen(file);
     filename=file;
@@ -117,7 +117,7 @@ end
 [filepath,fileroot,ext]=fileparts(filename);
 
 if fid==-1
-  error('Data file not found or permission denied');
+  error('pf2:importHitachiMES:fileNotFound', 'Data file not found or permission denied');
 end
 fidCleanup = onCleanup(@() fcloseIfOpen(fid));
 
@@ -156,7 +156,7 @@ if(isempty(header))
 end
 
 if(isempty(header))
-    error('Unknown delimiter or file type');
+    error('pf2:importHitachiMES:unknownFormat', 'Unknown delimiter or file type');
 end
 
 
@@ -180,7 +180,7 @@ markCol=find(strcmp(dataLineParts,'Mark'));
 fprintf('Importing %s...\n',filename);
 fid=fopen(filename,'r');
 if fid==-1
-  error('Unable to reopen file for data read: %s', filename);
+  error('pf2:importHitachiMES:reopenFailed', 'Unable to reopen file for data read: %s', filename);
 end
 fidCleanup = onCleanup(@() fcloseIfOpen(fid));
 for i=1:startLineNum
@@ -255,7 +255,7 @@ if(isfield(header,'Wave_nm'))
    fNIR.info.curWv=str2double(strsplit(header.Wave_nm,delimiter)); 
    numWv=length(fNIR.info.curWv);
 else
-   error('Missing number of wavelengths'); 
+   error('pf2:importHitachiMES:missingWavelengths', 'Missing number of wavelengths');
 end
 
 if(isfield(header,'Date'))

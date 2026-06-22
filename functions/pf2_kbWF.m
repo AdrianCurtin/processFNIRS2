@@ -49,11 +49,6 @@
 
 function signal_out=pf2_kbWF(signal,varargin)
 
-global WAVELABPATH
-if(isempty(WAVELABPATH))
-    pf2_base.toolboxes.setup_wavelab();
-end
-
 % Parse varargin: (kurtosis, minlvl, wavelet, accelerate)
 th_kurt = 3.3;
 minlvl = 3;
@@ -109,7 +104,7 @@ function col = kbWFChannel(channelData, nSamples, th_kurt, minlvl, qmf)
     L=nextpow2(nSamples);
     y=zeros(2^L,1);
     y(1:nSamples)=channelData;
-    wc = FWT_PO(y,1,qmf);                       %%%% DWT
+    wc = pf2_base.wavelet.fwtPO(y,1,qmf);       %%%% DWT
     wc1=zeros(length(wc),1);
     for i=minlvl:L-1                             %%%% apply on coefficients from level 'minlvl' to end-1
 
@@ -127,6 +122,6 @@ function col = kbWFChannel(channelData, nSamples, th_kurt, minlvl, qmf)
 
         wc1(2^i+1:2^(i+1)) =values;
     end
-    xc1 = IWT_PO(wc1,1,qmf);                        %%%% apply IDWT
+    xc1 = pf2_base.wavelet.iwtPO(wc1,1,qmf);        %%%% apply IDWT
     col = xc1(1:nSamples);
 end

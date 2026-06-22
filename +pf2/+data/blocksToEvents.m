@@ -1,5 +1,5 @@
 function events = blocksToEvents(blocks, varargin)
-% BLOCKSTOEEVENTS Convert block definitions to GLM event structs
+% BLOCKSTOEVENTS Convert block definitions to GLM event structs
 %
 % Groups blocks by condition and collects onset times, durations, and
 % amplitudes into the events struct format expected by buildDesignMatrix.

@@ -192,7 +192,7 @@ function [probeInfo, name] = loadDeviceConfig(deviceCfgFilename, pF2_folder)
                                      'Select Device Configuration File', ...
                                      fullfile(pF2_folder, 'devices'));
         if isequal(file, 0)
-            error('User cancelled file selection');
+            error('pf2_base:loadDeviceCfg:userCancelled', 'User cancelled file selection');
         end
         deviceCfgFilename = fullfile(pathname, file);
     elseif(~contains(lower(deviceCfgFilename),'.cfg'))
@@ -208,7 +208,7 @@ function [probeInfo, name] = loadDeviceConfig(deviceCfgFilename, pF2_folder)
         if exist(altPath, 'file')
             deviceCfgFilename = altPath;
         else
-            error('Configuration file not found: %s', deviceCfgFilename);
+            error('pf2_base:loadDeviceCfg:fileNotFound', 'Configuration file not found: %s', deviceCfgFilename);
         end
     end
 
@@ -216,7 +216,7 @@ function [probeInfo, name] = loadDeviceConfig(deviceCfgFilename, pF2_folder)
     try
         probeInfo.cfg = pf2_base.external.INI('File', deviceCfgFilename);
     catch ME
-        error('Error loading configuration file: %s', ME.message);
+        error('pf2_base:loadDeviceCfg:loadFailed', 'Error loading configuration file: %s', ME.message);
     end
 end
 
@@ -304,7 +304,7 @@ function p = initializeProbeStructure(p)
       if(~isfield(p,'ChannelList'))
             p.ChannelList=tempChannels(tempChannels>0);
         elseif(length(tempChannels(tempChannels>0))~=length(p.ChannelList))
-            error('Manually defined channel list different number of channels than found in Channel Numbers list');
+            error('pf2_base:loadDeviceCfg:channelCountMismatch', 'Manually defined channel list different number of channels than found in Channel Numbers list');
       end
     p.NumOptodes = length(p.ChannelList);
     p.TableOpt = table('Size', [p.NumOptodes, 1], 'VariableTypes', {'double'}, 'VariableNames', {'OptodeNum'});
@@ -346,7 +346,7 @@ function p = processChannelInfo(p)
                     if isKey(channelMap, channelIdx(i))
                         mappedIndices(i) = channelMap(channelIdx(i));
                     else
-                        error('Channel %d not found in channelList', channelIdx(i));
+                        error('pf2_base:loadDeviceCfg:channelNotFound', 'Channel %d not found in channelList', channelIdx(i));
                     end
                 end
 
@@ -416,7 +416,7 @@ function p = processPositionInfo(p, coordUnits, devLabel)
     xyz=(hasX+hasY+hasZ);
 
     if(xyz<1)
-       error('No position information provided for device');
+       error('pf2_base:loadDeviceCfg:noPositionInfo', 'No position information provided for device');
     end
 
     if(xyz==1)
@@ -453,7 +453,7 @@ function p = processPositionInfo(p, coordUnits, devLabel)
     if isfield(p, 'DetPosX') && isfield(p, 'SrcPosX')
         return;
     else
-        error('No position info is available');
+        error('pf2_base:loadDeviceCfg:noPositionInfo', 'No position info is available');
     end
 end
 

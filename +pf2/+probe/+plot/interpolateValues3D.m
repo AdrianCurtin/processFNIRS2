@@ -10,7 +10,9 @@ function [ h, imgOut ] = interpolateValues3D(varargin)
 % Reference:
 %   Brain mesh coordinates based on MNI/ICBM templates.
 %   10-20 EEG positions from: Koessler, L. et al. (2009). Automated cortical
-%   projection of EEG sensors. NeuroImage, 46(1), 64-72.
+%   projection of EEG sensors: Anatomical correlation via the international
+%   10-10 system. NeuroImage, 46(1), 64-72.
+%   DOI: 10.1016/j.neuroimage.2009.02.006
 %
 % Syntax:
 %   InterpolateValues3D(data2plot)
@@ -318,7 +320,7 @@ end
 
 if isempty(fNIR) && ~p.Results.useEEG
     if multiprobe
-        error("Must specify FNIRS devices when using Multi-probe plotting")
+        error('pf2:probe:interpolateValues3D:noMultiprobeDevice', "Must specify FNIRS devices when using Multi-probe plotting")
     end
 end
 
@@ -418,7 +420,7 @@ end
 
 if(p.Results.logScale)
     if(any(data2plot_concat<=0))
-        error("Cannot use logscale when data contains negative values")
+        error('pf2:probe:interpolateValues3D:negativeLogScale', "Cannot use logscale when data contains negative values")
     end
     data2plot_concat = log(data2plot_concat);
     cbarLower_minmax=log(cbarUpper_minmax);
@@ -586,15 +588,15 @@ if(multiprobe)
             maxDetIdx=maxDetIdx+max(probeInfos{i}.TableOpt.DetIdx);
             probeInfos{i}.TableOpt.HasData(:,1)=~dataEmpty(i);
         else
-            error('Unable to identify probe');
+            error('pf2:probe:interpolateValues3D:noProbe', 'Unable to identify probe');
         end
-        
+
         nData=length(data2plot{i});
         nOpt=probeInfos{i}.NumOptodes;
         nSS=probeInfos{i}.NumShortSeparation;
         if(~dataEmpty(i) && (include_ss&&nData~=nOpt...
                 || (~include_ss&&nData~=(nOpt-nSS))))
-            error('Must have a value for all optodes');
+            error('pf2:probe:interpolateValues3D:optodeCountMismatch', 'Must have a value for all optodes');
         end
         clear nData nOpt nSS
     end
@@ -663,7 +665,7 @@ else
         disp('No device specified. Please load device configuration');
         probeInfo=pf2_base.loadDeviceCfg('',false);
         if(isempty(probeInfo))
-            error('No valid devices selected');
+            error('pf2:probe:interpolateValues3D:noDevice', 'No valid devices selected');
         end
         
         
@@ -683,7 +685,7 @@ else
         probeInfo.TableOpt.ProbeNum(:,1)=1;
         
     elseif(~p.Results.useEEG)
-        error('Unable to identify probe');
+        error('pf2:probe:interpolateValues3D:noProbe', 'Unable to identify probe');
     end
 end
 
@@ -918,7 +920,7 @@ if(~include_ss && isfield(probeInfo, 'TableOpt'))
 end
 
 if(~all(dataEmpty) && length(data2plot_concat)~=numOptodes)
-    error('Must have a value for all optodes');
+    error('pf2:probe:interpolateValues3D:optodeCountMismatch', 'Must have a value for all optodes');
 end
 
 %clf(gcf)

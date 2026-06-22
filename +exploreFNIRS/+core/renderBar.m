@@ -94,7 +94,7 @@ function renderBar(ax, groups, groupIdx, xVar, colorVar, biomarker, channels, op
             end
 
             sty = pf2_base.plot.PlotStyle.getDefault();
-            pf2_base.external.barweb(meanMatrix, errInput, 1, uniqueX, barwebArgs{:}, ...
+            pf2_base.external.barweb(meanMatrix, errInput, 0.8, uniqueX, barwebArgs{:}, ...
                 'ErrorColor', sty.ForegroundColor);
             hold(ax, 'on');
         end

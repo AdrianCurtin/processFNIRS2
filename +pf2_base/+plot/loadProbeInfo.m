@@ -72,7 +72,7 @@ else
             disp('No device specified. Please load device configuration');
             probeInfo = pf2_base.loadDeviceCfg([], true);
             if isempty(probeInfo)
-                error('No valid devices selected');
+                error('pf2_base:plot:loadProbeInfo:noDevice', 'No valid devices selected');
             end
         else
             probeInfo = pf2_base.loadDeviceCfg(cfgFilePath, loadLayout);
@@ -90,7 +90,7 @@ if pf2_base.isnestedfield(probeInfo, 'Probe')
     end
     probeInfo = probeInfo.Probe{probeNum};
 elseif isempty(probeInfo)
-    error('Unable to identify probe');
+    error('pf2_base:plot:loadProbeInfo:noProbe', 'Unable to identify probe');
 end
 
 end

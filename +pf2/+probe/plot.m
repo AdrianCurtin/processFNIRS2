@@ -21,6 +21,18 @@ function varargout = plot(data, biomarker, timeIdx, varargin)
 %               [start, end]: average over range
 %               Default: middle of recording
 %
+% Outputs:
+%   varargout{1} - (optional) Handle returned by the selected renderer
+%                  (showProbe3D / interpolateValues / arrangedValues). Only
+%                  populated when an output is requested.
+%
+% Algorithm:
+%   1. Auto-detect a plottable biomarker if none supplied (HbO > HbR > raw)
+%   2. Default timeIdx to the middle sample when unspecified
+%   3. Inspect probeinfo / attached device for 3D MNI or 2D layout coverage
+%   4. Dispatch to the best renderer: 3D brain (showProbe3D) if 3D positions
+%      exist, else 2D interpolated topography, else arranged channel values
+%
 % Example:
 %   % Auto-select best visualization
 %   data = pf2.import.sampleData.fNIR2000();

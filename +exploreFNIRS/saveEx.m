@@ -73,7 +73,7 @@ end
 global ExFNIRS
 
 if(~isfield(ExFNIRS,'data'))
-    error('No data present in ExFNIRS');
+    error('exploreFNIRS:saveEx:noData', 'No data present in ExFNIRS');
 end
 
 if(~isempty(pathname))

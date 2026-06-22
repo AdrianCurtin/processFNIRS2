@@ -48,7 +48,7 @@ for f = 1:nFuncs
     if ischar(funcAvgs{f}) && exist(funcAvgs{f}, 'file') == 2
         funcAvgs{f} = str2func(funcAvgs{f});
     elseif ~isa(funcAvgs{f}, 'function_handle')
-        error('Each element of funcAvgs must be a function handle or valid function name');
+        error('pf2_base:hierarchicalAverageMulti:invalidFunction', 'Each element of funcAvgs must be a function handle or valid function name');
     end
 end
 
@@ -67,7 +67,7 @@ if size(arr, 1) ~= numObservations && size(arr, 2) == numObservations
 end
 
 if size(arr, 1) ~= numObservations
-    error('Hierarchy does not match input data');
+    error('pf2_base:hierarchicalAverageMulti:dimensionMismatch', 'Hierarchy does not match input data');
 end
 
 % --- Encode hierarchy to numeric indices (done ONCE) ---
@@ -87,7 +87,7 @@ for i = 1:numLevels
         curLevel = hierachy(:, i);
         [uVals, ~, uIdx] = unique(curLevel);
     else
-        error('unknown structure');
+        error('pf2_base:hierarchicalAverageMulti:unknownStructure', 'unknown structure');
     end
     if i == 1
         highestTier = uVals;

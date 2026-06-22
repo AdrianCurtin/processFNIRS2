@@ -38,12 +38,16 @@ function [ varargout ] = showProbe3D(fNIR,varargin)
 %   % Show source/detector labels
 %   pf2.probe.plot.showProbe3D(processed, 'SDLabels', true);
 %
+%   % Headless render (use savePath; the off-screen figure + saveas pattern
+%   % is unreliable for 3D)
+%   pf2.probe.plot.showProbe3D(processed, 'savePath', 'probe3d.png');
+%
 % See also: pf2.probe.plot.interpolateValues3D, pf2.probe.plot.interpolateValues,
 %           pf2.probe.plot.arrangedValues, pf2.settings.selectDevice
 
 
 if(nargin<1)
-   error('Must provide an fNIR struct to plot'); 
+   error('pf2:probe:showProbe3D:noInput', 'Must provide an fNIR struct to plot');
 end
 
 if(isfield(fNIR,'HbO')||isfield(fNIR,'raw'))

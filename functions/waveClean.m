@@ -49,7 +49,7 @@ function [cleanOD_out] = waveClean(dataIn, level, alpha, convert2OD, showPlot, w
 %   5. Average overlapping reconstructions for signals > 2^level samples
 %
 % Notes:
-%   - Requires WaveLab toolbox (automatically initialized via setup_wavelab)
+%   - Uses the built-in pf2_base.wavelet transforms (no external toolbox)
 %   - Beta version - use with caution and validate results
 %   - Signal length must be at least 2^level samples
 %   - Processing time increases with signal length and number of channels
@@ -65,12 +65,6 @@ function [cleanOD_out] = waveClean(dataIn, level, alpha, convert2OD, showPlot, w
 %   cleanedOD = waveClean(odData, 6, 0.05, 0, false, 'sym8');
 %
 % See also: pf2_MotionCorrectWavelet, pf2_SMAR, pf2_MotionCorrectTDDR, pf2_base.wavelet.resolveWavelet
-
-
-global WAVELABPATH
-if(isempty(WAVELABPATH))
-    pf2_base.toolboxes.setup_wavelab();
-end
 
 
 if(nargin<2) || isempty(level)
@@ -108,7 +102,7 @@ numCh=size(dataIn,2);
 sigLength=size(dataIn,1);
 
 if(sigLength<2^level)
-   error('Unable to reconstruct signal at Level %i\nSignal has %i samples and must have at least %i',level,sigLength,2^level);
+   error('pf2:waveClean:signalTooShort', 'Unable to reconstruct signal at Level %i\nSignal has %i samples and must have at least %i',level,sigLength,2^level);
 end
 
 % Determine whether to use parfor
@@ -181,8 +175,8 @@ function cleanCol = waveCleanChannel(signalOD, level, alpha, convert2OD, QMF_Fil
 
         L=level;
 
-        dwRow=FWT_PO(sig,L,QMF_Filter);
-        dwRow=dwRow(:).';   % FWT_PO may return a column; keep a row (as the old dw(L,:) layout)
+        dwRow=pf2_base.wavelet.fwtPO(sig,L,QMF_Filter);
+        dwRow=dwRow(:).';   % fwtPO may return a column; keep a row (as the old dw(L,:) layout)
 
         cA{i}=dwRow(1:2^L);
         cD{i}=dwRow(2^L+1:end);
@@ -208,7 +202,7 @@ function cleanCol = waveCleanChannel(signalOD, level, alpha, convert2OD, QMF_Fil
         x=cD{i};
         x(p<alpha)=0;
         cD{i}=x;
-        iwRow=IWT_PO([cA{i} cD{i}],L,QMF_Filter);
+        iwRow=pf2_base.wavelet.iwtPO([cA{i} cD{i}],L,QMF_Filter);
         iwRow=iwRow(:).';   % keep a row (matches the original iw(L,:) layout)
 
         if(showPlot&&i==2)

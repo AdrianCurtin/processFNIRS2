@@ -170,7 +170,7 @@ elseif(isempty(cfgFilePath)||~contains(cfgFilePath,'.cfg'))
     disp('No device specified. Please load device configuration');
     probeInfo=pf2_base.loadDeviceCfg([],true);
     if(~isempty(probeInfo))
-        error('No valid devices selected');
+        error('pf2:probe:interpolateValues:noDevice', 'No valid devices selected');
     end
     
 elseif(~isempty(cfgFilePath)) % If we're not looking at the GUI, doesn't matter
@@ -184,7 +184,7 @@ if(pf2_base.isnestedfield(probeInfo,'Probe'))
     end
     probeInfo=probeInfo.Probe{probeNum};
 else
-    error('Unable to identify probe');
+    error('pf2:probe:interpolateValues:noProbe', 'Unable to identify probe');
 end
 
 include_ss=false;
@@ -200,7 +200,7 @@ end
 
 
 if(length(data2plot)~=numOptodes)
-    error('Must have a value for all optodes');
+    error('pf2:probe:interpolateValues:optodeCountMismatch', 'Must have a value for all optodes');
 end
 
 %clf(gcf)

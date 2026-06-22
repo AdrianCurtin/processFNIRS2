@@ -150,7 +150,7 @@ switch m(pos)
     case 134
         [v,pos] = deserialize_object(m,pos);
     otherwise
-        error('Unknown class');
+        error('pf2_base:quickopen:unknownClass', 'Unknown class');
 end
 end
 
@@ -356,7 +356,7 @@ switch kind
             case 128 % struct - struct()
                 prot = struct();
             otherwise
-                error('Unsupported type tag.');
+                error('pf2_base:quickopen:unsupportedType', 'Unsupported type tag.');
         end
         % Number of dims
         ndms = double(m(pos));
@@ -393,7 +393,7 @@ switch kind
         [v{empty}] = deal('');
         v=string(v);
     otherwise
-        error('Unsupported cell array type.');
+        error('pf2_base:quickopen:unsupportedCellType', 'Unsupported cell array type.');
 end
 end
 

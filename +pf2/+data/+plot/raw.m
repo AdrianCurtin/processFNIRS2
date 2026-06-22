@@ -151,14 +151,14 @@ if(isempty(wavelengths))
        fprintf(2,'%i ',wavelengths(i)); 
     end
     fprintf('\n');
-    error('No Wavelengths to plot');
+    error('pf2:data:plot:raw:noWavelengths', 'No Wavelengths to plot');
 end
     
     
 if(any(channels>probeInfo.NumOptodes))
-    error('Some channels are higher than probe optode count');
+    error('pf2:data:plot:raw:channelOutOfRange', 'Some channels are higher than probe optode count');
 elseif(any(channels<0))
-    error('Channels can not be negative');
+    error('pf2:data:plot:raw:negativeChannel', 'Channels can not be negative');
 end
 
 
@@ -168,7 +168,7 @@ if(isfield(fNIR,'time'))
     tmax=nanmax(t);
     tmean=nanmean(t)-tmin;
 else
-    error('Must have valid time field');
+    error('pf2:data:plot:raw:noTime', 'Must have valid time field');
 end
 
 idx2plot=ismember(probeInfo.TableCh.OptodeNumber,channels);

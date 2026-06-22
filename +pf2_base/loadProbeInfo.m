@@ -96,7 +96,7 @@ else
             disp('No device specified. Please load device configuration');
             probeInfo=pf2_base.loadDeviceCfg([],true);
             if(~isempty(probeInfo))
-                error('No valid devices selected');
+                error('pf2_base:loadProbeInfo:noValidDevices', 'No valid devices selected');
             end
             
         elseif(~isempty(cfgFilePath)) % If we're not looking at the GUI, doesn't matter
@@ -111,6 +111,6 @@ else
         end
         probeInfo=probeInfo.Probe{probeNum};
     else
-        error('Unable to identify probe');
+        error('pf2_base:loadProbeInfo:unidentifiedProbe', 'Unable to identify probe');
     end
 end

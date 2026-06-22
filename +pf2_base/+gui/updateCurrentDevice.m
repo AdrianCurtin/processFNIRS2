@@ -75,7 +75,7 @@ if mergedProbe
         end
     end
 else
-    error('Not Yet Implemented for seperate probe data,\nAssumes concatenated datasets with unique channels in the config file');
+    error('pf2_base:gui:updateCurrentDevice:notImplemented', 'Not Yet Implemented for seperate probe data,\nAssumes concatenated datasets with unique channels in the config file');
 end
 
 % Build unique channel list

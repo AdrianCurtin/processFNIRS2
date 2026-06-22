@@ -208,7 +208,7 @@ function fig = plotAuxBar(groups, auxField, varargin)
                 barwebArgs = [barwebArgs, {'DataPoints', indivData}];
             end
 
-            bwHandles = pf2_base.external.barweb(meanMatrix, errInput, 1, pf2_base.plot.escapeTeX(uniqueWithin), ...
+            bwHandles = pf2_base.external.barweb(meanMatrix, errInput, 0.8, pf2_base.plot.escapeTeX(uniqueWithin), ...
                 barwebArgs{:}, 'ErrorColor', sty.ForegroundColor);
             hold(ax, 'on');
 
@@ -257,7 +257,7 @@ function fig = plotAuxBar(groups, auxField, varargin)
                 barwebArgs = [barwebArgs, {'DataPoints', indivData}];
             end
 
-            bwHandles = pf2_base.external.barweb(meanMatrix, errInput, 1, pf2_base.plot.escapeTeX(groupLabels), ...
+            bwHandles = pf2_base.external.barweb(meanMatrix, errInput, 0.8, pf2_base.plot.escapeTeX(groupLabels), ...
                 barwebArgs{:}, 'ErrorColor', sty.ForegroundColor);
             hold(ax, 'on');
 

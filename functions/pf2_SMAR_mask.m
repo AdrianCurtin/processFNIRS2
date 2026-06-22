@@ -25,7 +25,7 @@ function [maskCV]=pf2_SMAR_mask(x,N,tauUp,tauLow)
 % See also: pf2_SMAR, pf2_SMAR2, pf2_thresholdValues_mask
 
 if nargin<1
-    error('Not enough Input arguments');
+    error('pf2:smarMask:notEnoughInputs', 'Not enough Input arguments');
 elseif nargin==1
      N=10;
 end
@@ -39,7 +39,7 @@ if(nargin<4)
 end
 
 if(N<1)
-    error('Invalid Window Length');
+    error('pf2:smarMask:invalidWindowLength', 'Invalid Window Length');
 end
 
 CVx=calcLocalCV(x,N);
@@ -52,13 +52,25 @@ end
 %%_Subfunctions_________________________________________________________
 
 function [CVx] = calcLocalCV(x,N)
+% CALCLOCALCV Calculate local coefficient of variation for SMAR masking
+%
+% Computes the coefficient of variation (CV = std/mean) within a sliding
+% window centered at each sample. Used internally by pf2_SMAR_mask.
+%
+% Inputs:
+%   x - Input signal matrix [T x C] where T=samples, C=channels
+%   N - Window length in samples (will be made odd if even)
+%
+% Outputs:
+%   CVx - Coefficient of variation matrix [T x C]
+%         First and last wSize samples are NaN where wSize = (N-1)/2
 
 if nargin<1
-    error('Not enough Input arguments');
+    error('pf2:smarMask:notEnoughInputs', 'Not enough Input arguments');
 end
 
 if(N<1)
-    error('Invalid Window Length');
+    error('pf2:smarMask:invalidWindowLength', 'Invalid Window Length');
 end
 
 l=size(x);

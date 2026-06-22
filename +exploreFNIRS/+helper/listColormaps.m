@@ -58,6 +58,6 @@ switch(colormapType)
     case 'all'
         colormapNames=[qualitativeTypes,divergingTypes,sequentialTypes];
     otherwise
-        error('Please specify: qualitative, diverging, sequential, or all');
+        error('exploreFNIRS:helper:listColormaps:invalidCategory', 'Please specify: qualitative, diverging, sequential, or all');
 end
 

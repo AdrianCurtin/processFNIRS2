@@ -1,21 +1,53 @@
 function [ ] = asNIR( fNIRstruct, filepath, varargin )
-%Takes fNIR struct and writes the basic nir file
-%   Use to construct artificial .nir files for future analysis
+% ASNIR Export fNIRS data to fNIR Devices/Biopac .nir format
 %
-%   For batch export of a cell array, pass a directory path instead of a
-%   file path. Optional name-value pairs control subdirectory mapping and
-%   filename construction:
+% Writes a pf2 fNIRS data structure back out as the fNIR Devices/COBI Studio
+% .nir text format, along with its companion marker (.mrk) and log (.log)
+% files. Useful for constructing artificial .nir files for later analysis or
+% for round-tripping data through tools that expect the native fNIR format.
+% A cell array of structs can be batch-exported to a directory.
 %
-%   pf2.export.asNIR(allData, 'output/')
-%   pf2.export.asNIR(allData, 'output/', 'Dir1', 'Group', 'Prefix', {'SubjectID'})
+% Reference:
+%   fNIR Devices / COBI Studio .nir text file format.
 %
-%   Name-Value Parameters (batch mode only):
-%     'Dir1'..'Dir4'  - Info field names mapped to subdirectories
-%     'Prefix'        - Cell array of info field names for filename
-%     'Verbose'       - Print progress messages (default: true)
+% Syntax:
+%   pf2.export.asNIR(fNIRstruct)                 % GUI save dialog
+%   pf2.export.asNIR(fNIRstruct, filepath)       % Write to a specific path
+%   pf2.export.asNIR(allData, 'output/')         % Batch to a directory
+%   pf2.export.asNIR(allData, 'output/', Name, Value, ...)
+%
+% Inputs:
+%   fNIRstruct - fNIRS data structure (.raw, .time, .markers, .info) or a
+%                cell array of such structures for batch export.
+%   filepath   - Output .nir file path, or a directory path for batch export
+%                (optional). If omitted in single mode, a save dialog opens.
+%
+% Name-Value Parameters (batch mode only):
+%   'Dir1'..'Dir4' - Info field names mapped to subdirectory levels
+%   'Prefix'       - Cell array of info field names used to build filenames
+%   'Verbose'      - Print progress messages (default: true)
+%
+% Outputs:
+%   (none) - Writes .nir, .mrk, and .log files to disk.
+%
+% Algorithm:
+%   1. In batch mode, build per-element paths and recurse on each struct.
+%   2. Write the .nir header (start time, codes, gains) then raw samples.
+%   3. Write the companion .mrk marker file from the markers table.
+%   4. Write the companion .log file from .info metadata.
+%
+% Example:
+%   % Export a processed sample dataset to a .nir file
+%   data = pf2.import.sampleData();
+%   pf2.export.asNIR(data, 'sample_out.nir');
+%
+%   % Batch export a cell array to a directory with subdir mapping
+%   pf2.export.asNIR(allData, 'output/', 'Dir1', 'Group', 'Prefix', {'SubjectID'});
+%
+% See also: pf2.export.asSNIRF, pf2.export.export, pf2.import.importNIR
 
 if(nargin<1)
-    error('No fnirs specified!');
+    error('pf2:asNIR:noData', 'No fnirs specified!');
 end
 
 % --- Batch mode: cell array input ---
@@ -59,7 +91,7 @@ end
  fid=fopen(filepath,'wt');
 
  if(fid<0)
-    error('Unable to access file for writing!');
+    error('pf2:asNIR:writeFailed', 'Unable to access file for writing!');
  end
 
  fprintf(fid,'fnirUSB.dll log file\n');

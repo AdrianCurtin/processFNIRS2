@@ -243,7 +243,7 @@ for g=1:numGroups
         curDataH=pf2_base.hierarchicalAverage(curData,curTable(:,dataH),@nanmedian);
         curHAvg=nanmedian(curDataH);
     else
-        error('Unknown parameter');
+        error('exploreFNIRS:plot:barchart_infogroup:unknownParameter', 'Unknown parameter');
         %curHAvg=nanmedian(hierarchicalAverage(curData,curTable(:,dataH),@nanmedian));
     end
     
@@ -355,7 +355,7 @@ elseif(all(all(isnan(barChartData(:,:,1))))&&~plotPoints)
 end
 
 if(exSettings.plot_bar_err&&~strcmp(plotFeature,'Count'))
-    pf2_base.external.barweb(barChartData(:,:,1),barChartData(:,:,2:1+numErrFeatures),'Width',1,'GroupNames',uCurInfoG, 'ColorMap',cIndex,'Legend',gAStrs,'LegendType','hide','DataPoints',barChartDataPoints,'PlotViolin',strcmp(errorFeature,'Violin'));
+    pf2_base.external.barweb(barChartData(:,:,1),barChartData(:,:,2:1+numErrFeatures),'Width',0.8,'GroupNames',uCurInfoG, 'ColorMap',cIndex,'Legend',gAStrs,'LegendType','hide','DataPoints',barChartDataPoints,'PlotViolin',strcmp(errorFeature,'Violin'));
     
     if(strcmp(errorFeature,'SEM')||strcmp(errorFeature,'SD'))&&~plotPoints
         ylimLower=min(min(barChartData(:,:,1)))-max(max(barChartData(:,:,2)));
@@ -399,7 +399,7 @@ if(exSettings.plot_bar_err&&~strcmp(plotFeature,'Count'))
         xlabel_with_space(xLabGby);
     end
 else
-    pf2_base.external.barweb(barChartData(:,:,1),[],'Width',1,'GroupNames',uCurInfoG, 'ColorMap',cIndex,'Legend',gAStrs,'LegendType','hide','DataPoints',barChartDataPoints);
+    pf2_base.external.barweb(barChartData(:,:,1),[],'Width',0.8,'GroupNames',uCurInfoG, 'ColorMap',cIndex,'Legend',gAStrs,'LegendType','hide','DataPoints',barChartDataPoints);
     
     
     if(~plotPoints||strcmp(plotFeature,'Count'))
