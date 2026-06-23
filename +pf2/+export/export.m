@@ -22,9 +22,10 @@ function export(data, filepath, varargin)
 %              If omitted, opens save dialog for selection.
 %
 % Name-Value Parameters (batch mode):
-%   'Format'  - Output format: 'snirf' or 'nir' (required for batch)
+%   'Format'  - Output format: 'snirf', 'nir', or 'bids' (required for batch)
 %   All other name-value pairs are passed through to the format exporter
-%   (Dir1-Dir4, Prefix, Verbose, NormalizeRaw, StripExtraRawChannels).
+%   (Dir1-Dir4, Prefix, Verbose, NormalizeRaw, StripExtraRawChannels for
+%   snirf/nir; Task, Name, Authors, Participants, ... for bids).
 %
 % Example:
 %   % Process and export with auto-detected format
@@ -94,9 +95,11 @@ if iscell(data) && (isempty(ext) || ~ismember(lower(ext), {'.snirf', '.nir'}))
             pf2.export.asSNIRF(data, filepath, passArgs{:});
         case 'nir'
             pf2.export.asNIR(data, filepath, passArgs{:});
+        case 'bids'
+            pf2.export.asBIDS(data, filepath, passArgs{:});
         otherwise
             error('pf2:export:UnknownFormat', ...
-                'Unknown format: ''%s''. Supported: ''snirf'', ''nir''.', fmt);
+                'Unknown format: ''%s''. Supported: ''snirf'', ''nir'', ''bids''.', fmt);
     end
     return;
 end

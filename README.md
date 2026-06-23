@@ -19,7 +19,8 @@ processFNIRS2 is a modular MATLAB toolbox designed for processing functional Nea
 - **Channel quality assessment** with Scalp Coupling Index (SCI), power spectrum analysis, and artifact rejection
 - **Region-of-Interest (ROI) analysis** support
 - **Statistical analysis** with LME models integrated in exploreFNIRS
-- **Data export** in various formats including NIR, SNIRF, CSV and MATLAB formats
+- **Data export** in various formats including NIR, SNIRF, BIDS, CSV and MATLAB formats
+- **Machine-learning interchange**: export self-describing tensors for foundation/transformer models (`pf2.export.asTensor`) and re-import learned embeddings (`pf2.import.importEmbeddings`)
 
 ## Getting Started
 
