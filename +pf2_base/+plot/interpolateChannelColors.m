@@ -24,11 +24,19 @@ function [Cs, fadeAlpha] = interpolateChannelColors(distSquared, cNorm, cmap, op
 % Options (name-value):
 %   'MaxDistance2' - Squared-distance cutoff. Vertices farther than this from
 %                    every channel are marked out-of-range.
-%   'ProjectMode'  - 'nearest' | 'linear' | 'quadratic' | 'cubic'
+%   'ProjectMode'  - 'nearest' | 'linear' | 'quadratic' | 'cubic' |
+%                    'sensitivity'
 %                    IDW powers on squared distance: linear=0.5, quadratic=1,
 %                    cubic=1.5. Names kept for backward compatibility with
 %                    interpolateValues3D; these are NOT true linear/quadratic
-%                    barycentric schemes.
+%                    barycentric schemes. 'sensitivity' instead weights each
+%                    channel by a Gaussian optical-sensitivity profile,
+%                    w = exp(-d^2 / (2*sigma^2)) with sigma^2 = MaxDistance2/4
+%                    (weight ~0.14 at the buffer edge), giving a smooth,
+%                    physically-motivated falloff. It approximates the LATERAL
+%                    sensitivity profile of a channel; it is not a full
+%                    Monte-Carlo photon measurement density ("banana") and does
+%                    not model source/detector elongation or depth.
 %   'ChanMask'     - [K x 1] logical. True entries are rendered as background
 %                    (e.g. values in the two-sided dead zone).
 %   'FadeFraction' - Fraction of the buffer over which to fade to background
@@ -98,6 +106,18 @@ switch pm
         distIdw = distSquared;
         distIdw(distIdw >= opts.MaxDistance2 | isnan(distIdw)) = Inf;
         w = 1 ./ (distIdw.^beta + 1e-8);
+        wSum = sum(w, 2);
+        vVal = (w * cNorm) ./ wSum;
+        vVal(~isfinite(wSum) | wSum == 0) = NaN;
+        if any(opts.ChanMask)
+            vMask = (w * double(opts.ChanMask)) ./ wSum > 0.5;
+            vVal(vMask) = NaN;
+        end
+    case "sensitivity"
+        % Gaussian optical-sensitivity profile (lateral PMDF approximation).
+        sigma2 = opts.MaxDistance2 / 4;
+        w = exp(-distSquared / (2 * sigma2));
+        w(distSquared > opts.MaxDistance2 | isnan(distSquared)) = 0;
         wSum = sum(w, 2);
         vVal = (w * cNorm) ./ wSum;
         vVal(~isfinite(wSum) | wSum == 0) = NaN;

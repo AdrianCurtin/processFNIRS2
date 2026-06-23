@@ -26,11 +26,14 @@ function [h, imgOut] = topo(data, biomarker, varargin)
 %             [t1 t2]    -> mean over the window t1..t2 seconds.
 %             []         -> mean over all time.
 %   'View'  - '2d' (default) renders a flat probe heatmap via imageValues.
+%             '3d' renders a cortical-surface projection via
+%             pf2.probe.project.biomarker (requires MNI coordinates).
+%             'movie' animates the biomarker over time via
+%             pf2.probe.plot.movie (pass 'savePath','*.mp4'/'*.gif', 'FPS',
+%             'NFrames', etc.; a two-element 'Time' sets the TimeRange).
 %   'Layout'- (2D only) 'schematic'/'flat' for a clean declared grid montage,
 %             'anatomical' for the affine projection, 'auto' (default) to pick
 %             schematic when the device declares one. Forwarded to imageValues.
-%             '3d' renders a cortical-surface projection via
-%             pf2.probe.project.biomarker (requires MNI coordinates).
 %   'Title'    - Title string (default: auto from biomarker + time).
 %   'Colorbar' - Colorbar label (default: data.units if present, else '').
 %
@@ -39,8 +42,9 @@ function [h, imgOut] = topo(data, biomarker, varargin)
 % For headless 3D saving, use 'savePath' (see pf2.probe.plot.interpolateValues3D).
 %
 % Outputs:
-%   h      - Handle to the image (2D) or axes (3D).
-%   imgOut - For '3d', RGB capture of the render. Empty for '2d'.
+%   h      - Handle to the image (2D) or axes (3D). For View='movie', the
+%            path to the written movie file (char).
+%   imgOut - For '3d', RGB capture of the render. Empty for '2d' and 'movie'.
 %
 % Example:
 %   data = pf2.import.sampleData.fNIR2000();
@@ -56,14 +60,35 @@ p.KeepUnmatched = true;
 addRequired(p, 'data', @isstruct);
 addRequired(p, 'biomarker', @(x) ischar(x) || isstring(x));
 addParameter(p, 'Time', [], @(x) isnumeric(x) && (isempty(x) || numel(x) <= 2));
-addParameter(p, 'View', '2d', @(x) any(strcmpi(char(x), {'2d','3d'})));
+addParameter(p, 'View', '2d', @(x) any(strcmpi(char(x), {'2d','3d','movie'})));
 addParameter(p, 'Title', '', @(x) ischar(x) || isstring(x));
 addParameter(p, 'Colorbar', '', @(x) ischar(x) || isstring(x));
 parse(p, data, biomarker, varargin{:});
 
 bio = char(p.Results.biomarker);
 tSel = p.Results.Time;
-view3d = strcmpi(char(p.Results.View), '3d');
+viewMode = lower(char(p.Results.View));
+view3d = strcmp(viewMode, '3d');
+
+% 'movie' shortcut: delegate to pf2.probe.plot.movie (time animation). A
+% two-element Time maps to the movie's TimeRange; all other options are
+% forwarded. Returns the movie file path in h (imgOut is empty).
+if strcmp(viewMode, 'movie')
+    movieArgs = iLocalUnmatched(p.Unmatched);
+    if numel(tSel) == 2
+        movieArgs = [{'TimeRange', tSel}, movieArgs];
+    elseif isscalar(tSel)
+        warning('pf2:probe:plot:topo:scalarTimeForMovie', ...
+            ['Scalar ''Time'' is ignored for View=''movie''; pass a two-element ', ...
+             '[t1 t2] to set the TimeRange.']);
+    end
+    h = pf2.probe.plot.movie(data, bio, movieArgs{:});
+    imgOut = [];
+    if nargout == 0
+        clear h imgOut;
+    end
+    return;
+end
 titleStr = char(p.Results.Title);
 cbarStr = char(p.Results.Colorbar);
 

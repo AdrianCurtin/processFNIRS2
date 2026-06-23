@@ -58,10 +58,16 @@ function [ h, imgOut ] = interpolateValues3D(varargin)
 %                         'back-left', 'back-right', or numeric [x, y, z].
 %   'logScale'          - Use logarithmic color scale (default: false)
 %   'interpolateType'   - Interpolation method (default: 'nearest')
-%                         Options: 'nearest', 'linear', 'quadratic', 'cubic'.
+%                         Options: 'nearest', 'linear', 'quadratic', 'cubic',
+%                         'sensitivity'.
 %                         Note: 'linear'/'quadratic'/'cubic' are IDW powers
 %                         (0.5/1/1.5) applied to squared distance, not true
-%                         polynomial interpolation schemes.
+%                         polynomial interpolation schemes. 'sensitivity'
+%                         weights channels by a Gaussian optical-sensitivity
+%                         profile (smooth falloff tied to the buffer); it
+%                         approximates the LATERAL sensitivity of a channel
+%                         and is NOT a full Monte-Carlo photon measurement
+%                         density ("banana").
 %   'UseGeodesic'       - Use graph-geodesic distance on the cortical mesh
 %                         instead of Euclidean (default: true). Prevents
 %                         value bleed across sulci and the interhemispheric
@@ -152,7 +158,7 @@ validFnirs = @(x) isStructOrEmpty(x) || iscell(x);
 %validColorList = @(x) validColor(x) || all(arrayfun(validColor, x));
 
 defaultInterpolateType = 'nearest';
-validInterpolateTypes = {'nearest', 'linear', 'quadratic', 'cubic'};
+validInterpolateTypes = {'nearest', 'linear', 'quadratic', 'cubic', 'sensitivity'};
 validInterpolateType = @(x) any(validatestring(x, validInterpolateTypes));
 
 defaultCamPosition = 'auto';
@@ -2274,7 +2280,9 @@ function va = iLocalInterpScalar(distSquared, cAlpha, maxDist2, projectMode)
 % Interpolate a per-channel scalar in [0,1] onto mesh vertices using the
 % same kernel that interpolateChannelColors uses for values. Returns zero
 % for out-of-range vertices. Used to build per-vertex alpha in transparent
-% AlphaMode.
+% AlphaMode. NOTE: unlike interpolateChannelColors this helper has no
+% ChanMask argument; callers must pre-zero masked-channel entries in cAlpha
+% before calling so the two paths stay consistent.
     [d, ind] = min(distSquared, [], 2);
     outOfRange = d > maxDist2 | ~isfinite(d);
     ind(outOfRange) = 0;
@@ -2294,6 +2302,13 @@ function va = iLocalInterpScalar(distSquared, cAlpha, maxDist2, projectMode)
             d2 = distSquared;
             d2(d2 >= maxDist2 | isnan(d2)) = Inf;
             w = 1 ./ (d2.^beta + 1e-8);
+            wSum = sum(w, 2);
+            va = (w * cAlpha) ./ wSum;
+            va(~isfinite(wSum) | wSum == 0) = 0;
+        case "sensitivity"
+            sigma2 = maxDist2 / 4;
+            w = exp(-distSquared / (2 * sigma2));
+            w(distSquared > maxDist2 | isnan(distSquared)) = 0;
             wSum = sum(w, 2);
             va = (w * cAlpha) ./ wSum;
             va(~isfinite(wSum) | wSum == 0) = 0;
