@@ -21,6 +21,6 @@ function data = gather(data)
 % See also: gather, pf2_base.accel.toGPU
 
     if isa(data, 'gpuArray')
-        data = builtin('gather', data);
+        data = gather(data);
     end
 end
