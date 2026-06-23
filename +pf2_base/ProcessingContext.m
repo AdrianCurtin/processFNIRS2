@@ -8,8 +8,17 @@ classdef ProcessingContext < handle
     %   - Reproducible analyses by saving/loading contexts
     %   - Explicit dependency injection into processing functions
     %
-    % For backward compatibility, functions that accept a Context parameter
-    % will fall back to reading from globals when no context is provided.
+    % Isolation guarantee:
+    %   When a context is passed to processFNIRS2 (via 'Context', ctx), the
+    %   processing path is fully isolated from global state: PF2 and setF are
+    %   neither initialized nor written. Every setting, method, and the device
+    %   are threaded as locals sourced from the context. After such a call the
+    %   globals are byte-identical to their pre-call state, so context-based
+    %   processing is reproducible and safe for parallel/worker use.
+    %
+    % For backward compatibility, the legacy (no-context) path continues to
+    % read and write globals, and functions that accept a Context parameter
+    % fall back to reading from globals when no context is provided.
     %
     % Syntax:
     %   ctx = ProcessingContext()           % Create with defaults

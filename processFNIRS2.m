@@ -98,30 +98,10 @@ end
 if ~hasContextArg
     pf2_base.pf2_initialize() % Loads methods, sets DPF factors, default age, baseline values
                 %Also sets default root path
-else
-    % Populate PF2 from Context so existing code continues to work
-    % This bridges Context-based processing with legacy code that reads PF2
-    PF2.dpf_mode = providedContext.dpfMode;
-    PF2.curDPF_fixed = providedContext.dpfFixedValue;
-    PF2.curDPF_age = providedContext.subjectAge;
-    PF2.baseline.startTime = providedContext.baselineStartTime;
-    PF2.baseline.blLength = providedContext.baselineLength;
-    PF2.baseline.useAbsoluteTime = providedContext.useAbsoluteTime;
-    PF2.baseline.windowStartTime = providedContext.windowStartTime;
-    PF2.RejectLevel = providedContext.rejectLevel;
-    PF2.OutputLegacyMarkers = providedContext.outputLegacyMarkers;
-    PF2.myRawMethods = providedContext.rawMethodsLib;
-    PF2.myOxyMethods = providedContext.oxyMethodsLib;
-    if ~isempty(providedContext.rawMethod) && isfield(providedContext.rawMethod, 'name')
-        PF2.stageRawMethod = providedContext.rawMethod;
-    end
-    if ~isempty(providedContext.oxyMethod) && isfield(providedContext.oxyMethod, 'name')
-        PF2.stageOxyMethod = providedContext.oxyMethod;
-    end
-    if ~isempty(fieldnames(providedContext.device))
-        setF.device = providedContext.device;
-    end
 end
+% When a Context is provided, processing is fully isolated: globals PF2/setF
+% are NOT initialized or written. All settings, methods, and the device are
+% threaded as locals from the context (see useContext branch below).
 
 % Set defaults - use Context values if available, otherwise use globals (or hardcoded defaults)
 if hasContextArg
@@ -220,7 +200,14 @@ if(outputData.OutputPreProcessedRaw)
 end
 
 outputData.ProcessRejected=p.Results.ProcessRejectedChannels;
-PF2.OutputLegacyMarkers=p.Results.OutputLegacyMarkers;
+
+% Output-marker format threaded as a local. On the legacy path it is also
+% mirrored into the global for backward compatibility; on the context path
+% globals are left untouched.
+outputLegacyMarkers=p.Results.OutputLegacyMarkers;
+if(~useContext)
+    PF2.OutputLegacyMarkers=outputLegacyMarkers;
+end
 
 
 data=p.Results.data;
@@ -241,34 +228,39 @@ end
 % Don't show GUI if Context is provided (context implies headless processing)
 ShowGUI=p.Results.ShowGUI||isempty(varargin)||(nargout==0&&~isempty(data)&&isempty(p.Results.Context));
 
-if(isfield(data,'probeinfo')&&~isempty(data.probeinfo))
-    setF.device=data.probeinfo;
-else
+% Device acquisition. On the context path the device is supplied by the
+% context (threaded locally below); the legacy/GUI device-loading logic that
+% reads/writes global setF.device is skipped to keep processing isolated.
+if(~useContext)
+    if(isfield(data,'probeinfo')&&~isempty(data.probeinfo))
+        setF.device=data.probeinfo;
+    else
 
-    if(isempty(cfgFilePath)||~contains(cfgFilePath,'.cfg'))&&(~ShowGUI&&~isempty(data)) %if nothing, invalid, or no data
+        if(isempty(cfgFilePath)||~contains(cfgFilePath,'.cfg'))&&(~ShowGUI&&~isempty(data)) %if nothing, invalid, or no data
 
-        warning('Missing or invalid configuration file path\n')
+            warning('Missing or invalid configuration file path\n')
 
-        disp('No device specified. Please load device configuration');
-        pf2_base.loadDeviceCfg();
-        if(~isfield(setF,'device'))
-            error('No valid devices selected');
-        end
+            disp('No device specified. Please load device configuration');
+            pf2_base.loadDeviceCfg();
+            if(~isfield(setF,'device'))
+                error('No valid devices selected');
+            end
 
-    elseif(~isempty(cfgFilePath)) 
+        elseif(~isempty(cfgFilePath))
 
-        if(pf2_base.isnestedfield(setF,'device.cfg.Info.CfgName')&&length(setF)==1) % look to see if they match,...
+            if(pf2_base.isnestedfield(setF,'device.cfg.Info.CfgName')&&length(setF)==1) % look to see if they match,...
 
-            curProbeName=sprintf('%s.cfg',setF.device.cfg.Info.CfgName);
+                curProbeName=sprintf('%s.cfg',setF.device.cfg.Info.CfgName);
 
-            if(~strcmp(curProbeName,cfgFilePath)&&~skipCFG) %if they do don't bother loading
+                if(~strcmp(curProbeName,cfgFilePath)&&~skipCFG) %if they do don't bother loading
+                    pf2_base.loadDeviceCfg(cfgFilePath);
+                end
+            else
                 pf2_base.loadDeviceCfg(cfgFilePath);
             end
-        else
-            pf2_base.loadDeviceCfg(cfgFilePath);
         end
-    end
 
+    end
 end
 
 
@@ -353,9 +345,22 @@ if useContext
         ctxOxyMethod.name = 'None';
     end
 
-    % Use device from context if available
-    if ~isempty(fieldnames(ctx.device))
-        setF.device = ctx.device;
+    % Resolve the device as a local (no global write). Prefer the context's
+    % device; if the context carries no usable device, load the cfg locally
+    % WITHOUT touching global setF (loadFromGlobal=false so the cached-device
+    % branch that assigns setF is bypassed and the parsed probeInfo is simply
+    % returned).
+    if isstruct(ctx.device) && isfield(ctx.device, 'Probe') && ~isempty(ctx.device.Probe)
+        procDevice = ctx.device;
+    elseif isfield(data,'probeinfo') && ~isempty(data.probeinfo)
+        procDevice = data.probeinfo;
+    elseif ~isempty(cfgFilePath) && contains(cfgFilePath,'.cfg')
+        procDevice = pf2_base.loadDeviceCfg(cfgFilePath, true, false);
+    else
+        error('pf2:processFNIRS2:noContextDevice', ...
+            ['No device available for context-based processing. Provide a ' ...
+             'device on the ProcessingContext, embed probeinfo, or supply a ' ...
+             'resolvable probename/UseDeviceCFG.']);
     end
 else
     % Original behavior - use globals
@@ -402,6 +407,16 @@ else
 
     ctxRawMethod = PF2.stageRawMethod;
     ctxOxyMethod = PF2.stageOxyMethod;
+
+    % Legacy path: the device lives in global setF; mirror it locally so the
+    % shared downstream code reads the same threaded variable as the context
+    % path. Device acquisition (above) may not have populated setF.device yet
+    % (e.g. settings-only calls), so guard the access.
+    if isstruct(setF) && isfield(setF, 'device')
+        procDevice = setF.device;
+    else
+        procDevice = struct();
+    end
 end
 
 
@@ -521,9 +536,9 @@ if(isstruct(data)) %treat as fNIR struct
     end
 end
 
-if isempty(fData.info.Age) && strcmp(PF2.dpf_mode, 'Calc')
+if isempty(fData.info.Age) && strcmp(ctxDPF_mode, 'Calc')
     warning('pf2:processFNIRS2:noAge', ...
-        'fData.info.Age is empty. DPF calculations will use age=%i. Assign subject age for accurate chromophore calculations.', PF2.curDPF_age);
+        'fData.info.Age is empty. DPF calculations will use age=%i. Assign subject age for accurate chromophore calculations.', ctxDPF_age);
 end
 
 if(~isempty(p.Results.markers))
@@ -537,12 +552,15 @@ if(isstruct(tempOxyStage))
     fData.stage{4}=tempOxyStage; %Assign stage3 if exists
 end
 
-fData=updateCurrentDevice(fData);
+% Thread the device locally. On the context path (useContext) globals are
+% left untouched; on the legacy path procDevice mirrors setF.device and the
+% globals are updated as before for backward compatibility.
+[fData, procDevice]=updateCurrentDevice(fData, procDevice, useContext);
 
 [numDataRows,numDataCols]=size(fData.stage{1});
 
 probeIdx=1;
-curProbe=setF.device.Probe{probeIdx};
+curProbe=procDevice.Probe{probeIdx};
 numDevCols=size(curProbe.TableCh,1);
 while(numDataCols~=numDevCols)
     if(numDataCols==numDataRows)
@@ -551,10 +569,39 @@ while(numDataCols~=numDevCols)
     else
        fprintf('Data size %i x %i: Expected %i columns in loaded device',numDevCols);
        warning('Channel/Device mismatch, please load new configuration file');
-       pf2_base.loadDeviceCfg();
+       if(useContext)
+           % The data's own geometry is authoritative. The context-supplied
+           % device does not match the data (e.g. a polluted/snapshotted
+           % global device of a different channel count). Re-resolve the
+           % device from the data's own cfg non-interactively and WITHOUT
+           % touching globals (loadFromGlobal=false). Only error if no
+           % matching device can be resolved from the data's cfg at all.
+           if(~isempty(cfgFilePath) && contains(cfgFilePath,'.cfg'))
+               resolvedDevice=pf2_base.loadDeviceCfg(cfgFilePath, true, false);
+               resolvedCols=size(resolvedDevice.Probe{probeIdx}.TableCh,1);
+               if(resolvedCols==numDataCols || numDataCols==numDataRows)
+                   procDevice=resolvedDevice;
+               else
+                   error('pf2:processFNIRS2:contextChannelMismatch', ...
+                       ['Channel/Device mismatch: data has %d columns but ' ...
+                        'neither the supplied ProcessingContext device (%d ' ...
+                        'columns) nor the data cfg ''%s'' (%d columns) match.'], ...
+                       numDataCols, numDevCols, cfgFilePath, resolvedCols);
+               end
+           else
+               error('pf2:processFNIRS2:contextChannelMismatch', ...
+                   ['Channel/Device mismatch with the supplied ' ...
+                    'ProcessingContext device (%d columns vs %d data ' ...
+                    'columns) and no data cfg available to resolve it.'], ...
+                   numDevCols, numDataCols);
+           end
+       else
+           pf2_base.loadDeviceCfg();
+           procDevice=setF.device;
+       end
     end
     [numDataRows,numDataCols]=size(fData.stage{1});
-    curProbe=setF.device.Probe{probeIdx};
+    curProbe=procDevice.Probe{probeIdx};
     numDevCols=size(curProbe.TableCh,1);
 
 end
@@ -670,7 +717,7 @@ if(nargout>0)
        end
        
       if(isfield(fData,'markers')&&~isempty(fData.markers))
-           if(PF2.OutputLegacyMarkers)
+           if(outputLegacyMarkers)
                outfNIR.markers=[];
                outfNIR.markers.data=pf2_base.markersToArray(fData.markers);
            else
@@ -685,12 +732,12 @@ if(nargout>0)
        % Store processing context for reproducibility and plot enhancement
        outfNIR.processingInfo = buildProcessingInfo(PF2, setF, ctx);
 
-       % Attach Device object for self-describing output
+       % Attach Device object for self-describing output. procDevice is the
+       % locally-threaded device (ctx.device on the context path, setF.device
+       % on the legacy path) so no global read is needed here.
        deviceSource = [];
-       if useContext && ~isempty(ctx.device) && isfield(ctx.device, 'cfg')
-           deviceSource = ctx.device;
-       elseif isstruct(setF) && isfield(setF, 'device') && isfield(setF.device, 'cfg')
-           deviceSource = setF.device;
+       if isstruct(procDevice) && isfield(procDevice, 'cfg')
+           deviceSource = procDevice;
        end
        if ~isempty(deviceSource)
            outfNIR.device = pf2.Device.fromProbeInfo(deviceSource);
@@ -699,10 +746,8 @@ if(nargout>0)
        % Ensure probe cfg reference is stored for later reloading
        % Full probeinfo is NOT stored to save memory - loadProbeInfo can reload from cfg
        deviceSource = [];
-       if useContext && ~isempty(ctx.device) && isfield(ctx.device, 'cfg')
-           deviceSource = ctx.device;
-       elseif isstruct(setF) && isfield(setF, 'device') && isfield(setF.device, 'cfg')
-           deviceSource = setF.device;
+       if isstruct(procDevice) && isfield(procDevice, 'cfg')
+           deviceSource = procDevice;
        end
        if ~isempty(deviceSource) && isfield(deviceSource.cfg, 'File')
            if ~isfield(outfNIR, 'info')
@@ -727,7 +772,11 @@ if(nargout>0)
    
 end
 
-clearVarsOnClose();
+% On the context path globals are never mutated, so the global cleanup is
+% skipped to keep PF2 byte-identical to its pre-call state.
+if(~useContext)
+    clearVarsOnClose();
+end
 
 end
 
@@ -740,33 +789,50 @@ end
 
 % UIWAIT makes processFNIRS2 wait for user response (see UIRESUME)
 % uiwait(handles.figure1);
-function fData=updateCurrentDevice(fData)
+function [fData, device]=updateCurrentDevice(fData, device, isolated)
+% UPDATECURRENTDEVICE Build merged probe tables and resolve timing.
+%
+% Threads the device locally. When ISOLATED is true (a ProcessingContext is
+% in play) the global PF2/setF caches are NOT written, keeping context-based
+% processing free of side effects. On the legacy path (ISOLATED false) the
+% device is sourced from / synced with global setF and the PF2 caches are
+% updated as before for backward compatibility.
 
 global setF
 global PF2
 
-if(length(setF)>1)
-    setF=setF(1);
+if nargin < 3 || isempty(isolated)
+    isolated = false;
 end
 
-if(isfield(fData,'probeInfo'))
-    setF.device=probeInfo;
+if ~isolated
+    if(length(setF)>1)
+        setF=setF(1);
+    end
+
+    if(isfield(fData,'probeInfo'))
+        setF.device=probeInfo;
+    end
+
+    device = setF.device;
 end
 
-% Delegate to shared function
-result = pf2_base.gui.updateCurrentDevice(setF.device, fData);
+% Delegate to shared function (pure: reads device, returns merged tables/time)
+result = pf2_base.gui.updateCurrentDevice(device, fData);
 
-% Write results to globals
-PF2.curCh = result.curCh;
-PF2.curOpt = result.curOpt;
-PF2.curSD = result.curSD;
-PF2.curChList = result.curChList;
-PF2.timeIndex = result.timeIndex;
-PF2.mergedProbe = result.mergedProbe;
-PF2.curChSet = [];
-PF2.curWvSet = [];
-PF2.curSDSet = [];
-PF2.curProbeInd = [];
+% Write probe caches to globals only on the legacy path.
+if ~isolated
+    PF2.curCh = result.curCh;
+    PF2.curOpt = result.curOpt;
+    PF2.curSD = result.curSD;
+    PF2.curChList = result.curChList;
+    PF2.timeIndex = result.timeIndex;
+    PF2.mergedProbe = result.mergedProbe;
+    PF2.curChSet = [];
+    PF2.curWvSet = [];
+    PF2.curSDSet = [];
+    PF2.curProbeInd = [];
+end
 
 % Write resolved time/fs back to fData
 if ~isempty(result.time)

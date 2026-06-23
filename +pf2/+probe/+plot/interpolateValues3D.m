@@ -221,6 +221,9 @@ addParameter(p, 'useHighRes', true, @islogical);
 addParameter(p, 'cmap', defaultColormap, validColormap);
 addParameter(p, 'cmap_lower', defaultColormapLow, validColormap);
 addParameter(p, 'labelfontsize', 10, validScalarPosNum);
+addParameter(p, 'LabelLift', 1, @(x) isnumeric(x) && isscalar(x) && x>=0); % mm to lift S/D/channel labels toward the camera so they sit on top of neighbouring marker spheres (0 disables)
+addParameter(p, 'MarkerScale', 1, @(x) isnumeric(x) && isscalar(x) && x>0); % multiplier on optode/source/detector marker size (1 = default)
+addParameter(p, 'ShowAxes', true, @islogical); % show the x/y/z axes, ticks and box (false drops them for a clean probe render)
 addParameter(p, 'labelfontcolor', [], validColor);  % [] => PlotStyle theme-aware default
 addParameter(p, 'labelspherecolors', ["r", "y","w"]);
 addParameter(p, 'brainColor', [0.92, 0.68, 0.68], validColor);
@@ -1726,7 +1729,7 @@ if(showChannels&&isfield(probeInfo, 'TableOpt')&&~contains('ProbeOpt',itemsToSki
                 if(~include_ss)
                     selOpt(probeInfo.TableOpt.IsShortSeparation)=[];
                 end
-                h(i) = scatter3(optPosInset(selOpt,1), optPosInset(selOpt,2), optPosInset(selOpt,3),20*p.Results.labelfontsize,'filled',optColor,'MarkerEdgeColor' ,probe_colors(i,:),'LineWidth',1.5);
+                h(i) = scatter3(optPosInset(selOpt,1), optPosInset(selOpt,2), optPosInset(selOpt,3),20*p.Results.labelfontsize*p.Results.MarkerScale,'filled',optColor,'MarkerEdgeColor' ,probe_colors(i,:),'LineWidth',1.5);
 
                 probe_string{i}=sprintf('Probe %i',uDevices(i));
 
@@ -1735,7 +1738,7 @@ if(showChannels&&isfield(probeInfo, 'TableOpt')&&~contains('ProbeOpt',itemsToSki
             end
             legend(h,probe_string);
         else
-            h = scatter3(optPosInset(:,1), optPosInset(:,2), optPosInset(:,3),20*p.Results.labelfontsize,'filled',optColor,'MarkerEdgeColor' ,'k');
+            h = scatter3(optPosInset(:,1), optPosInset(:,2), optPosInset(:,3),20*p.Results.labelfontsize*p.Results.MarkerScale,'filled',optColor,'MarkerEdgeColor' ,'k');
             h.Tag='ProbeOpt';
             h.DisplayName='Optode';
         end
@@ -1764,7 +1767,7 @@ if(plotFNIRS_SD&&isfield(probeInfo,'TableSD'))
     
     srcPosInset = insetPos(srcPos);
     if(~isempty(srcColor) && (isnumeric(srcColor) && ~any(isnan(srcColor)) || ~ismissing(srcColor)))
-        h = scatter3(srcPosInset(:,1),srcPosInset(:,2),srcPosInset(:,3),mrkScaleFactor*p.Results.labelfontsize,'filled',srcColor);
+        h = scatter3(srcPosInset(:,1),srcPosInset(:,2),srcPosInset(:,3),mrkScaleFactor*p.Results.labelfontsize*p.Results.MarkerScale,'filled',srcColor);
         h.Tag=sprintf('ProbeSrc');
         h.DisplayName='Source';
     end
@@ -1776,7 +1779,7 @@ if(plotFNIRS_SD&&isfield(probeInfo,'TableSD'))
 
     detPosInset = insetPos(detPos);
     if(~isempty(detColor) && (isnumeric(detColor) && ~any(isnan(detColor)) || ~ismissing(detColor)))
-        h = scatter3(detPosInset(:,1), detPosInset(:,2), detPosInset(:,3), mrkScaleFactor*p.Results.labelfontsize, 'filled', detColor);
+        h = scatter3(detPosInset(:,1), detPosInset(:,2), detPosInset(:,3), mrkScaleFactor*p.Results.labelfontsize*p.Results.MarkerScale, 'filled', detColor);
         h.Tag=sprintf('ProbeDet');
         h.DisplayName='Detector';
     end
@@ -1794,10 +1797,10 @@ if(plot1020&&~contains('Scatter1020',itemsToSkipPlot))
             ePos = [c1020.x(i), c1020.y(i), c1020.z(i)];
             ePosInset = insetPos(ePos);
             if(numColors == 4 || numColors == 1)
-                h = scatter3(ePosInset(1),ePosInset(2),ePosInset(3),mrkScaleFactor*1.5*p.Results.labelfontsize, 'filled', color1020);
+                h = scatter3(ePosInset(1),ePosInset(2),ePosInset(3),mrkScaleFactor*1.5*p.Results.labelfontsize*p.Results.MarkerScale, 'filled', color1020);
 
             else
-                h = scatter3(ePosInset(1),ePosInset(2),ePosInset(3),mrkScaleFactor*1.5*p.Results.labelfontsize, 'filled');
+                h = scatter3(ePosInset(1),ePosInset(2),ePosInset(3),mrkScaleFactor*1.5*p.Results.labelfontsize*p.Results.MarkerScale, 'filled');
             end
             h.Tag=sprintf('Scatter1020');
             hold on
@@ -2211,6 +2214,33 @@ if(p.Results.showReference&&(isempty(itemsToSkipPlot)))
     text(-85,55,-50,'L');
     text(85,55,-50,'R');
     
+end
+
+% --- Keep optode / channel labels on top of marker spheres -------------
+% In dense montages a label can be occluded by a NEIGHBOURING optode's
+% sphere (e.g. S28 hidden behind D29). Lift each label along the view axis
+% toward the camera: because the shift is parallel to the line of sight, the
+% on-screen position is essentially unchanged (near-orthographic, distant
+% camera) while the label's depth now beats nearby marker spheres. Labels on
+% the far side of the head remain correctly hidden behind the opaque brain.
+labelLift = p.Results.LabelLift;
+if labelLift > 0
+    viewVec = campos(ax) - camtarget(ax);
+    nv = norm(viewVec);
+    if nv > 0
+        viewVec = viewVec / nv;
+        lbls = findobj(ax, 'Type', 'text');
+        keep = ismember(get(lbls, {'Tag'}), {'OptLabel','ProbeSrcLabel','ProbeDetLabel'});
+        for ti = find(keep(:))'
+            lbls(ti).Position = lbls(ti).Position + labelLift * viewVec;
+        end
+    end
+end
+
+% Drop the x/y/z axes, ticks and box for a clean probe render (children such
+% as the brain surface, optode markers and labels are unaffected).
+if ~p.Results.ShowAxes
+    axis(ax, 'off');
 end
 
 h=ax;
