@@ -110,6 +110,10 @@ function fig = plotTemporal(groups, varargin)
     addParameter(p, 'TightLayout', false, @islogical);
     addParameter(p, 'Colors', [], @(x) isempty(x) || isnumeric(x) || ischar(x) || isstring(x) || isa(x, 'function_handle') || isa(x, 'exploreFNIRS.core.ColorScheme'));
     addParameter(p, 'VLines', [], @(x) isempty(x) || isnumeric(x) || isstruct(x));
+    % Overlay trial-averaged auxiliary signal(s) on a right y-axis, time-locked
+    % to the same epoch grid (e.g. {'heartRate'}). Requires aggregate() to have
+    % averaged the Aux (AverageAux). Drawn as dashed lines per group.
+    addParameter(p, 'AuxOverlay', {}, @(x) ischar(x) || isstring(x) || iscell(x));
     parse(p, groups, varargin{:});
     opts = p.Results;
 
@@ -480,6 +484,73 @@ function [legendHandles, legendEntries] = plotChannelOnAxes(ax, curGroups, bioM,
             lbl = [lbl, nStr]; %#ok<AGROW>
         end
         legendEntries{end+1} = lbl; %#ok<AGROW>
+    end
+
+    % Optional: overlay trial-averaged auxiliary signal(s) on a right y-axis
+    if isfield(opts, 'AuxOverlay') && ~isempty(opts.AuxOverlay)
+        overlayAuxOnAxes(ax, curGroups, opts.AuxOverlay, groupColors, sty);
+    end
+end
+
+
+function overlayAuxOnAxes(ax, curGroups, auxOverlay, groupColors, sty)
+% OVERLAYAUXONAXES Draw trial-averaged aux signal(s) on the right y-axis
+    if ischar(auxOverlay) || isstring(auxOverlay)
+        auxOverlay = cellstr(auxOverlay);
+    end
+
+    % Gather drawable series first; only switch the axes into dual-y mode if
+    % there is something to draw (otherwise leave the axes untouched so
+    % linkaxes/YLim behave identically to a plain plot).
+    series = struct('t', {}, 'm', {}, 'clr', {});
+    drawnNames = {};
+    for a = 1:numel(auxOverlay)
+        auxName = auxOverlay{a};
+        nameDrawn = false;
+        for g = 1:numel(curGroups)
+            ga = curGroups(g).gbyGrand;
+            if ~isfield(ga, 'Aux') || isempty(ga.Aux) || ~isstruct(ga.Aux)
+                continue;
+            end
+            src = resolveAuxAvg(ga.Aux, auxName);
+            if isempty(src) || ~isfield(src, 'Mean') || isempty(src.Mean)
+                continue;
+            end
+            series(end+1) = struct('t', ga.time(:), 'm', src.Mean(:, 1), ...
+                'clr', groupColors(g, :)); %#ok<AGROW>
+            nameDrawn = true;
+        end
+        if nameDrawn
+            drawnNames{end+1} = auxName; %#ok<AGROW>
+        end
+    end
+
+    if isempty(series)
+        return;   % nothing resolvable: do not alter the axes
+    end
+
+    yyaxis(ax, 'right');
+    for s = 1:numel(series)
+        plot(ax, series(s).t, series(s).m, '--', 'Color', series(s).clr, ...
+            'LineWidth', sty.LineWidth, 'HandleVisibility', 'off');
+    end
+    ylabel(ax, pf2_base.plot.escapeTeX(strjoin(drawnNames, ', ')));
+    yyaxis(ax, 'left');   % restore so subsequent left-axis ops are correct
+end
+
+
+function src = resolveAuxAvg(auxStruct, name)
+% RESOLVEAUXAVG Find the averaged aux struct (Mean/SEM/N) for a base name
+%   Tries the flattened '<name>_data' field first, then '<name>'.
+    src = [];
+    fn = fieldnames(auxStruct);
+    cand = {[lower(name) '_data'], lower(name)};
+    for c = 1:numel(cand)
+        hit = find(strcmpi(fn, cand{c}), 1);
+        if ~isempty(hit) && isstruct(auxStruct.(fn{hit}))
+            src = auxStruct.(fn{hit});
+            return;
+        end
     end
 end
 

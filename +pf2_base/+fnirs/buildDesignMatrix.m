@@ -42,13 +42,21 @@ function [X, regressorNames] = buildDesignMatrix(time, fs, events, varargin)
 %                          modeled by the DCT basis. Only used when DriftType='dct'.
 %   'ShortChannels'      - Short-channel time series [T x S] to add as regressors
 %                          (default: [])
+%   'Nuisance'           - Arbitrary nuisance regressors [T x K] (default: [])
+%                          e.g. auxiliary physiology (respiration, cardiac,
+%                          accelerometer norm) aligned to the time vector via
+%                          pf2.data.auxOnGrid. Added as confound columns; not
+%                          HRF-convolved. NaN-containing columns are dropped
+%                          with a warning.
+%   'NuisanceNames'      - Cell array of labels for the nuisance columns
+%                          (default: nuis1..nuisK)
 %   'IncludeDerivative'  - Include temporal derivative of HRF (default: false)
 %   'IncludeDispersion'  - Include dispersion derivative of HRF (default: false)
 %   'IncludeConstant'    - Include constant (intercept) column (default: true)
 %
 % Outputs:
 %   X              - Design matrix [T x P] where P = nConditions*(1 + nDerivatives)
-%                    + nDriftRegressors + nShortChannels
+%                    + nDriftRegressors + nShortChannels + nNuisance
 %   regressorNames - Cell array {1 x P} of regressor labels
 %
 % Algorithm:
@@ -80,6 +88,8 @@ p.addParameter('DriftOrder', 3, @(x) isnumeric(x) && isscalar(x));
 p.addParameter('DriftType', 'legendre', @(x) ismember(lower(char(x)), {'legendre', 'dct'}));
 p.addParameter('DriftCutoff', 128, @(x) isnumeric(x) && isscalar(x) && x > 0);
 p.addParameter('ShortChannels', [], @isnumeric);
+p.addParameter('Nuisance', [], @isnumeric);
+p.addParameter('NuisanceNames', {}, @iscell);
 p.addParameter('IncludeDerivative', false, @islogical);
 p.addParameter('IncludeDispersion', false, @islogical);
 p.addParameter('IncludeConstant', true, @islogical);
@@ -90,6 +100,8 @@ driftOrder = p.Results.DriftOrder;
 driftType = lower(char(p.Results.DriftType));
 driftCutoff = p.Results.DriftCutoff;
 shortCh = p.Results.ShortChannels;
+nuisance = p.Results.Nuisance;
+nuisanceNames = p.Results.NuisanceNames;
 includeDerivative = p.Results.IncludeDerivative;
 includeDispersion = p.Results.IncludeDispersion;
 includeConstant = p.Results.IncludeConstant;
@@ -223,9 +235,35 @@ if ~isempty(shortCh)
     end
 end
 
+% --- Nuisance regressors ---
+nuisColumns = {};
+nuisNames = {};
+
+if ~isempty(nuisance)
+    if size(nuisance, 1) ~= T
+        error('pf2:buildDesignMatrix:sizeMismatch', ...
+            'Nuisance must have %d rows (same as time vector).', T);
+    end
+    nNuis = size(nuisance, 2);
+    for s = 1:nNuis
+        col = nuisance(:, s);
+        if any(isnan(col))
+            warning('pf2:buildDesignMatrix:nuisanceNaN', ...
+                'Nuisance column %d contains NaN; dropping it.', s);
+            continue;
+        end
+        nuisColumns{end+1} = col; %#ok<AGROW>
+        if numel(nuisanceNames) >= s && ~isempty(nuisanceNames{s})
+            nuisNames{end+1} = nuisanceNames{s}; %#ok<AGROW>
+        else
+            nuisNames{end+1} = sprintf('nuis%d', s); %#ok<AGROW>
+        end
+    end
+end
+
 % --- Assemble design matrix ---
-allColumns = [stimColumns, driftColumns, scColumns];
-allNames = [stimNames, driftNames, scNames];
+allColumns = [stimColumns, driftColumns, scColumns, nuisColumns];
+allNames = [stimNames, driftNames, scNames, nuisNames];
 
 X = zeros(T, length(allColumns));
 for j = 1:length(allColumns)

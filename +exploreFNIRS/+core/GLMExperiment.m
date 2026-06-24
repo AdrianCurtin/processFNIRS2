@@ -106,6 +106,7 @@ classdef GLMExperiment < exploreFNIRS.core.Experiment
                 'fitMethod',         'OLS', ...
                 'biomarkers',        {{'HbO', 'HbR'}}, ...
                 'auxFields',         {{}}, ...
+                'auxNuisance',       {{}}, ...
                 'conditions',        {{}}, ...
                 'conditionMap',      {{}}, ...
                 'groupBy',           'Condition', ...
@@ -186,6 +187,19 @@ classdef GLMExperiment < exploreFNIRS.core.Experiment
                 if ~isempty(obj.glm.hrf)
                     dmArgs = [dmArgs, {'HRF', obj.glm.hrf}]; %#ok<AGROW>
                 end
+
+                % Auxiliary nuisance regressors: align each named Aux signal to
+                % the fNIRS time base and append as confound columns (not
+                % HRF-convolved). Used to regress out systemic physiology
+                % (respiration, cardiac) or motion.
+                if ~isempty(obj.glm.auxNuisance)
+                    [nuis, nuisNames] = collectAuxNuisance(d, obj.glm.auxNuisance);
+                    if ~isempty(nuis)
+                        dmArgs = [dmArgs, {'Nuisance', nuis, ...
+                            'NuisanceNames', nuisNames}]; %#ok<AGROW>
+                    end
+                end
+
                 [X, names] = pf2_base.fnirs.buildDesignMatrix(dmArgs{:});
 
                 % Fit each biomarker
@@ -858,6 +872,10 @@ function h = buildFitHash(obj)
         obj.glm.groupBy, ...
         strjoin(obj.glm.auxFields, '+'));
 
+    if ~isempty(obj.glm.auxNuisance)
+        key = [key '_auxnuis=' strjoin(obj.glm.auxNuisance, '+')];
+    end
+
     if ~isempty(obj.glm.hrf)
         key = [key '_hrf=' mat2str(obj.glm.hrf(:)')];
     end
@@ -869,6 +887,42 @@ function h = buildFitHash(obj)
     end
 
     h = key;
+end
+
+
+function [nuis, names] = collectAuxNuisance(d, auxNuisance)
+% COLLECTAUXNUISANCE Align named Aux signals to the fNIRS grid as nuisance cols
+%
+% Pulls each requested Aux signal onto d.time via pf2.data.auxOnGrid, expanding
+% multichannel signals into one column per channel. Columns are mean-centered;
+% missing signals are skipped with a warning. Returns the [T x K] matrix and
+% matching {1 x K} regressor names (aux_<signal>_<channel>).
+
+    nuis = [];
+    names = {};
+    if ~isfield(d, 'Aux') || isempty(d.Aux)
+        return;
+    end
+    for a = 1:numel(auxNuisance)
+        nm = auxNuisance{a};
+        if ~isfield(d.Aux, nm)
+            warning('exploreFNIRS:GLMExperiment:auxNuisanceMissing', ...
+                'Aux nuisance signal "%s" not found; skipping.', nm);
+            continue;
+        end
+        [vals, info] = pf2.data.auxOnGrid(d, nm);
+        for c = 1:size(vals, 2)
+            col = vals(:, c);
+            col = col - mean(col, 'omitnan');
+            col(isnan(col)) = 0;            % keep design matrix finite
+            nuis = [nuis, col]; %#ok<AGROW>
+            chName = sprintf('ch%d', c);
+            if numel(info.channels) >= c && ~isempty(info.channels{c})
+                chName = info.channels{c};
+            end
+            names{end+1} = sprintf('aux_%s_%s', nm, chName); %#ok<AGROW>
+        end
+    end
 end
 
 

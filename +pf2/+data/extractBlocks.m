@@ -35,6 +35,14 @@ function segments = extractBlocks(data, varargin)
 %                      parent fields are preserved and block.info only adds
 %                      new fields.
 %   'SkipInvalid'    - Skip blocks outside data time range (default: true)
+%   'RejectByAux'    - Reject epochs overlapping accelerometer-flagged motion.
+%                      Pass the accelerometer Aux signal name, or true to
+%                      auto-detect an ACCEL-type signal (default: '' = off).
+%   'AuxMotionFraction' - Max tolerated fraction of a block's samples that may
+%                      fall in flagged motion before the epoch is dropped
+%                      (default: 0.2). Only used with RejectByAux.
+%   'AuxMotionThresh' - Absolute motion-metric threshold passed to
+%                      accelMotionDetect (default: [] = adaptive MAD threshold).
 %
 % Outputs:
 %   segments - Cell array {1 x N} of fNIRS structs, one per valid block
@@ -116,6 +124,12 @@ p.addParameter('SetT0', true, @islogical);
 p.addParameter('OverwriteInfo', true, @islogical);
 p.addParameter('CopyInfo', true, @islogical);  % Kept for backward compat, ignored
 p.addParameter('SkipInvalid', true, @islogical);
+% Aux-conditioned trial rejection: drop epochs overlapping accelerometer-flagged
+% motion. RejectByAux names the accelerometer signal (or true for auto-detect);
+% AuxMotionFraction is the max tolerated fraction of flagged samples in a block.
+p.addParameter('RejectByAux', '', @(x) ischar(x) || isstring(x) || islogical(x));
+p.addParameter('AuxMotionFraction', 0.2, @(x) isnumeric(x) && isscalar(x) && x >= 0 && x <= 1);
+p.addParameter('AuxMotionThresh', [], @(x) isempty(x) || (isnumeric(x) && isscalar(x)));
 p.parse(nvArgs{:});
 
 preTime = p.Results.PreTime;
@@ -124,6 +138,29 @@ blWindow = p.Results.BaselineWindow;
 doSetT0 = p.Results.SetT0;
 overwriteInfo = p.Results.OverwriteInfo;
 skipInvalid = p.Results.SkipInvalid;
+
+% --- Resolve aux motion mask for trial rejection (computed once) ----------
+rejectByAux = p.Results.RejectByAux;
+auxMotionFraction = p.Results.AuxMotionFraction;
+doRejectAux = false;
+auxMotionMask = [];
+if (islogical(rejectByAux) && rejectByAux) || ...
+        (~islogical(rejectByAux) && ~isempty(char(string(rejectByAux))))
+    detectArgs = {};
+    if ~islogical(rejectByAux)
+        detectArgs = {'Signal', char(string(rejectByAux))};
+    end
+    if ~isempty(p.Results.AuxMotionThresh)
+        detectArgs = [detectArgs, {'Threshold', p.Results.AuxMotionThresh}]; %#ok<AGROW>
+    end
+    try
+        auxMotionMask = pf2_base.fnirs.accelMotionDetect(data, detectArgs{:});
+        doRejectAux = true;
+    catch ME
+        warning('pf2:extractBlocks:auxRejectFailed', ...
+            'Aux motion rejection skipped: %s', ME.message);
+    end
+end
 
 if isempty(blocks)
     segments = {};
@@ -164,6 +201,16 @@ for k = 1:length(blocks)
     % Validate time range
     if skipInvalid
         if extractStart > dataTimeMax || extractEnd < dataTimeMin
+            continue;
+        end
+    end
+
+    % Aux-conditioned rejection: drop this epoch if too many of its samples
+    % fall in accelerometer-flagged motion windows (the block interval itself,
+    % not the padded extraction window).
+    if doRejectAux
+        inBlock = data.time >= blk.startTime & data.time <= blk.endTime;
+        if any(inBlock) && mean(auxMotionMask(inBlock)) > auxMotionFraction
             continue;
         end
     end

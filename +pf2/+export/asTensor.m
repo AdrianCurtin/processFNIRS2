@@ -61,6 +61,12 @@ function outPath = asTensor(data, path, varargin)
 %   'QC'              - Include the QC manifest (default: false). Either a
 %                       logical (true runs pf2.qc.pipeline.assess) or a
 %                       precomputed report struct from that function.
+%   'Aux'             - Auxiliary signals (and derived features) to align onto
+%                       the tensor time grid and write to /aux. A cellstr of
+%                       aux base names (e.g. {'heartRate','accelerometer'}) or
+%                       true / 'all' for every aux signal present (default: {}).
+%                       Multichannel signals expand to one /aux column each;
+%                       windowed exports align per window.
 %   'ContractVersion' - Contract version string written to the root attribute
 %                       (default: the module default '1.0').
 %
@@ -77,11 +83,15 @@ function outPath = asTensor(data, path, varargin)
 %     units              - biomarker units [string]
 %     featureNames       - selected feature names [string array]
 %     nWindows           - number of windows (0 when unwindowed) [int]
+%     nAux               - number of aux columns written to /aux [int]
 %   /tensor          - float32, read by h5py as (T, C, F) or (W, T, C, F)
 %                      matching `dims` (stored axis-reversed on disk so the
 %                      row-major reader sees the forward order)
 %   /time            - double [T x 1]
 %   /windowOnsets    - double [W] (only when windowed)
+%   /aux             - float32 [T x K] or [W x T x K] (only when 'Aux' given),
+%                      with /aux attributes auxNames and auxUnits [string array]
+%                      and dims; aligned to /time
 %   /montage         - string, jsonencode of pf2.probe.montage descriptor
 %   /manifest/qc            - string, JSON of QC report (when 'QC' requested)
 %   /manifest/markers       - string, JSON of the canonical marker table
@@ -137,6 +147,10 @@ addRequired(p, 'path', @(x) ischar(x) || (isstring(x) && isscalar(x)));
 addParameter(p, 'Features', {}, @(x) iscell(x) || ischar(x) || isstring(x));
 addParameter(p, 'Windows', [], @(x) iscell(x) || isstruct(x));
 addParameter(p, 'QC', false, @(x) islogical(x) || isstruct(x));
+% Auxiliary signals (and derived features) to align onto the tensor time grid
+% and write to /aux. Pass a cellstr of aux base names, or true / 'all' for
+% every aux signal present (default: {} = none).
+addParameter(p, 'Aux', {}, @(x) iscell(x) || ischar(x) || isstring(x) || islogical(x));
 addParameter(p, 'ContractVersion', DEFAULT_CONTRACT_VERSION, ...
     @(x) ischar(x) || (isstring(x) && isscalar(x)));
 parse(p, data, path, varargin{:});
@@ -257,6 +271,78 @@ else
     fs = NaN;
 end
 
+%% Aligned auxiliary signals (+ derived features) -> /aux
+% Each requested aux signal is aligned (anti-aliased) onto the tensor time
+% grid via pf2.data.auxOnGrid and expanded to one column per channel. For
+% windowed exports the alignment is per-window.
+auxMat = [];        % [T x K] continuous, or [W x T x K] windowed
+auxNames = {};
+auxUnits = {};
+if isWindowed
+    auxSource = segs{1};
+else
+    auxSource = data;
+end
+auxRequested = i_resolveAuxNames(auxSource, opts.Aux);
+if ~isempty(auxRequested)
+    try
+        if ~isWindowed
+            cols = {}; nm = {}; un = {};
+            for s = 1:numel(auxRequested)
+                nameS = auxRequested{s};
+                vals = pf2.data.auxOnGrid(data, nameS, 'Time', timeVec);
+                sig = pf2_base.resolveAux(data.Aux, nameS);
+                for c = 1:size(vals, 2)
+                    cols{end+1} = single(vals(:, c)); %#ok<AGROW>
+                    nm{end+1} = i_auxColName(nameS, sig, c, size(vals, 2)); %#ok<AGROW>
+                    un{end+1} = char(string(sig.unit)); %#ok<AGROW>
+                end
+            end
+            if ~isempty(cols)
+                auxMat = cell2mat(cols);     % [T x K]
+                auxNames = nm; auxUnits = un;
+            end
+        else
+            % Per-window alignment -> [W x T x K]
+            kCols = {}; nm = {}; un = {};
+            for s = 1:numel(auxRequested)
+                nameS = auxRequested{s};
+                wstack = [];
+                nCh = 0; sig = [];
+                for w = 1:W
+                    % Align onto THIS window's own time grid (windows may carry
+                    % absolute, non-shared time bases when SetT0 was not used).
+                    winT = segs{w}.time(:);
+                    winT = winT(1:T);
+                    vals = pf2.data.auxOnGrid(segs{w}, nameS, 'Time', winT);
+                    if w == 1
+                        nCh = size(vals, 2);
+                        sig = pf2_base.resolveAux(segs{w}.Aux, nameS);
+                        wstack = zeros(W, T, nCh, 'single');
+                    end
+                    wstack(w, :, :) = single(vals(:, 1:nCh));
+                end
+                for c = 1:nCh
+                    kCols{end+1} = wstack(:, :, c); %#ok<AGROW>
+                    nm{end+1} = i_auxColName(nameS, sig, c, nCh); %#ok<AGROW>
+                    un{end+1} = char(string(sig.unit)); %#ok<AGROW>
+                end
+            end
+            if ~isempty(kCols)
+                auxMat = zeros(W, T, numel(kCols), 'single');
+                for c = 1:numel(kCols)
+                    auxMat(:, :, c) = kCols{c};
+                end
+                auxNames = nm; auxUnits = un;
+            end
+        end
+    catch ME
+        warning('pf2:export:asTensor:auxFailed', ...
+            'Aux alignment failed; /aux omitted: %s', ME.message);
+        auxMat = []; auxNames = {}; auxUnits = {};
+    end
+end
+
 %% Montage descriptor (reuse pf2.probe.montage verbatim)
 montageJson = '';
 try
@@ -323,6 +409,20 @@ if isWindowed
     h5write(path, '/windowOnsets', windowOnsets);
 end
 
+% Aligned auxiliary signals (reverse dims for row-major like /tensor)
+if ~isempty(auxMat)
+    auxDisk = permute(auxMat, ndims(auxMat):-1:1);
+    h5create(path, '/aux', size(auxDisk), 'Datatype', 'single');
+    h5write(path, '/aux', auxDisk);
+    if isWindowed
+        h5writeatt(path, '/aux', 'dims', 'window x time x auxChannel');
+    else
+        h5writeatt(path, '/aux', 'dims', 'time x auxChannel');
+    end
+    h5writeatt(path, '/aux', 'auxNames', string(auxNames));
+    h5writeatt(path, '/aux', 'auxUnits', string(auxUnits));
+end
+
 % Metadata as UTF-8 JSON string datasets
 i_writeStringDataset(path, '/montage', montageJson);
 i_writeStringDataset(path, '/manifest/markers', markersJson);
@@ -345,6 +445,7 @@ h5writeatt(path, '/', 'samplingRate', fs);
 h5writeatt(path, '/', 'units', units);
 h5writeatt(path, '/', 'featureNames', string(features));
 h5writeatt(path, '/', 'nWindows', int32(nWindows));
+h5writeatt(path, '/', 'nAux', int32(numel(auxNames)));
 
 %% Return absolute path
 fileInfo = dir(path);
@@ -354,6 +455,37 @@ end
 
 
 %%_Subfunctions_____________________________________________________________
+
+function names = i_resolveAuxNames(src, auxOpt)
+% I_RESOLVEAUXNAMES Resolve the requested aux base names from the 'Aux' option
+%   auxOpt: cellstr of names, or true / 'all' for every aux signal present.
+names = {};
+if ~isfield(src, 'Aux') || isempty(src.Aux) || ~isstruct(src.Aux)
+    return;
+end
+includeAll = (islogical(auxOpt) && auxOpt) || ...
+    ((ischar(auxOpt) || isstring(auxOpt)) && strcmpi(char(string(auxOpt)), 'all'));
+if includeAll
+    fn = fieldnames(src.Aux);
+    fn = fn(~strcmpi(fn, 'flattened'));
+    names = unique(regexprep(fn, '_(data|time|unit)$', ''), 'stable')';
+elseif iscell(auxOpt)
+    names = auxOpt(:)';
+elseif (ischar(auxOpt) || isstring(auxOpt)) && ~isempty(char(string(auxOpt)))
+    names = cellstr(auxOpt)';
+end
+end
+
+function nm = i_auxColName(sigName, sig, c, nCh)
+% I_AUXCOLNAME Per-column aux name: <signal> or <signal>_<channelLabel>
+if nCh <= 1
+    nm = sigName;
+elseif isfield(sig, 'varNames') && numel(sig.varNames) >= c && ~isempty(sig.varNames{c})
+    nm = sprintf('%s_%s', sigName, sig.varNames{c});
+else
+    nm = sprintf('%s_%d', sigName, c);
+end
+end
 
 function features = i_defaultFeatures(data)
 % I_DEFAULTFEATURES Pick the biomarker fields present, else OD/raw fallback

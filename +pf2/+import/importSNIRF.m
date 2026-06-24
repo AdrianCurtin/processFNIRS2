@@ -52,8 +52,10 @@ function [fNIR] = importSNIRF(filepath, channelCheck, varargin)
 %
 % Notes:
 %   - Normalized data is automatically de-normalized if RawMax is available
-%   - Length units are converted to mm internally (cm input is multiplied by 10)
-%   - Short-separation channels (SD < 20mm) are automatically detected
+%   - Optode positions are converted to mm internally (cm input is multiplied
+%     by 10); source-detector distances (TableOpt.SD) are stored in cm to match
+%     the toolbox convention (bvoxy/Beer-Lambert and other import paths)
+%   - Short-separation channels (SD < 2 cm, i.e. ~20 mm) are automatically detected
 %   - Probe layout is automatically generated from 3D optode positions
 %   - BIDS events.tsv sidecar is auto-detected alongside the SNIRF file.
 %     When present, the trial_type-to-value mapping is stored in
@@ -629,10 +631,15 @@ for p = 1:1 % Just one probe for now
     
     device.Probe{p}.OptPos3D = (srcPos3D + detPos3D) / 2;
     
-    % Calculate source-detector distances
+    % Calculate source-detector distances. Optode positions are kept in mm
+    % internally (to match the declared CoordinateUnits and round-trip BIDS
+    % export), but TableOpt.SD follows the toolbox-wide convention of cm so
+    % the modified Beer-Lambert law (pf2_base.fnirs.bvoxy, whose extinction
+    % coefficients are in 1/(cm*M)) and short-separation detection match every
+    % other import path (loadDeviceCfg, importNIRX, importOxy3 all store cm).
     device.Probe{p}.SD = sqrt((device.Probe{p}.SrcPosX - device.Probe{p}.DetPosX).^2 + ...
-        (device.Probe{p}.SrcPosY - device.Probe{p}.DetPosY).^2 + (device.Probe{p}.SrcPosZ - device.Probe{p}.DetPosZ).^2)';
-    device.Probe{p}.IsShortSeparation = device.Probe{p}.SD < 20;
+        (device.Probe{p}.SrcPosY - device.Probe{p}.DetPosY).^2 + (device.Probe{p}.SrcPosZ - device.Probe{p}.DetPosZ).^2)' / 10;  % mm -> cm
+    device.Probe{p}.IsShortSeparation = device.Probe{p}.SD < 2;  % cm threshold (~20 mm)
     device.Probe{p}.NumShortSeparation = sum(device.Probe{p}.IsShortSeparation);
     
     device.Probe{p}.TableOpt.SD = device.Probe{p}.SD(:);

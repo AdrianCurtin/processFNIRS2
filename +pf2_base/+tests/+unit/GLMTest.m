@@ -90,6 +90,86 @@ classdef GLMTest < matlab.unittest.TestCase
             testCase.verifyEqual(sum(contains(names, 'short_ch')), 3);
         end
 
+        function testNuisanceColumns(testCase)
+            events(1).name = 'TaskA';
+            events(1).onsets = [10 60 110];
+            events(1).duration = 15;
+
+            nuis = randn(testCase.T, 2);   % e.g. respiration + cardiac
+
+            [X, names] = pf2_base.fnirs.buildDesignMatrix(testCase.time, testCase.fs, events, ...
+                'Nuisance', nuis);
+
+            % 1 condition + 4 drift + 2 nuisance = 7
+            testCase.verifyEqual(size(X, 2), 7);
+            testCase.verifyEqual(sum(contains(names, 'nuis')), 2);
+            % Nuisance columns are appended verbatim (not convolved)
+            testCase.verifyEqual(X(:, end-1), nuis(:, 1), 'AbsTol', 1e-12);
+            testCase.verifyEqual(X(:, end), nuis(:, 2), 'AbsTol', 1e-12);
+        end
+
+        function testNuisanceCustomNames(testCase)
+            events(1).name = 'TaskA';
+            events(1).onsets = 10;
+            events(1).duration = 20;
+
+            nuis = randn(testCase.T, 2);
+            [~, names] = pf2_base.fnirs.buildDesignMatrix(testCase.time, testCase.fs, events, ...
+                'Nuisance', nuis, 'NuisanceNames', {'resp', 'cardiac'});
+
+            testCase.verifyTrue(any(strcmp(names, 'resp')));
+            testCase.verifyTrue(any(strcmp(names, 'cardiac')));
+        end
+
+        function testNuisanceNaNDropped(testCase)
+            events(1).name = 'TaskA';
+            events(1).onsets = 10;
+            events(1).duration = 20;
+
+            nuis = randn(testCase.T, 2);
+            nuis(5, 1) = NaN;   % first column has a NaN -> dropped
+
+            warnState = warning('off', 'pf2:buildDesignMatrix:nuisanceNaN');
+            cleanup = onCleanup(@() warning(warnState));
+            [X, names] = pf2_base.fnirs.buildDesignMatrix(testCase.time, testCase.fs, events, ...
+                'Nuisance', nuis);
+
+            % Only the clean nuisance column survives: 1 stim + 4 drift + 1 = 6
+            testCase.verifyEqual(size(X, 2), 6);
+            testCase.verifyEqual(sum(contains(names, 'nuis')), 1);
+        end
+
+        function testNuisanceRecoversTaskBeta(testCase)
+            % A confound correlated with the task biases the task beta when
+            % omitted; including it as a nuisance regressor recovers the beta.
+            rng(42);
+            events(1).name = 'TaskA';
+            events(1).onsets = [10 40 70 100 130 160 190 220 250 280];
+            events(1).duration = 10;
+
+            [Xbase, ~] = pf2_base.fnirs.buildDesignMatrix(testCase.time, testCase.fs, events);
+            taskCol = Xbase(:, 1);
+            confound = taskCol + 0.2 * randn(testCase.T, 1);   % correlated nuisance
+
+            betaTask = 2.0;
+            y = betaTask * taskCol + 5.0 * confound + 0.01 * randn(testCase.T, 1);
+
+            Xwith = pf2_base.fnirs.buildDesignMatrix(testCase.time, testCase.fs, events, ...
+                'Nuisance', confound);
+            Xwithout = Xbase;
+
+            bWith = Xwith \ y;
+            bWithout = Xwithout \ y;
+
+            errWith = abs(bWith(1) - betaTask);
+            errWithout = abs(bWithout(1) - betaTask);
+
+            testCase.verifyLessThan(errWith, 0.2, ...
+                'Task beta should be recovered with the nuisance regressor');
+            testCase.verifyLessThan(errWith, errWithout, ...
+                'Including the nuisance should reduce task-beta bias');
+        end
+
         function testNoDriftRegressors(testCase)
             events(1).name = 'TaskA';
             events(1).onsets = [10];

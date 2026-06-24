@@ -52,11 +52,19 @@ end
 
 function [bidsSys, desc] = mapSystem(sysName, sysDesc)
 % Map a device coordinate-system string to a BIDS-recognized identifier.
+%
+% Only exact, specific BIDS template identifiers are passed through. A generic
+% 'MNI' tag (as pf2 device cfgs declare) is NOT promoted to a specific MNI
+% template — doing so would assert a registration the montage coordinates were
+% never computed against. Such cases become 'Other' with a description, which
+% is faithful and still validator-legal.
 desc = sysDesc;
 key = lower(strtrim(sysName));
 switch key
-    case {'mni', 'mni152', 'mni152nlin2009casym', 'mnicolin27', 'icbm'}
+    case {'mni152nlin2009casym'}
         bidsSys = 'MNI152NLin2009cAsym';
+    case {'mni152nlin6asym'}
+        bidsSys = 'MNI152NLin6Asym';
     case {'fsaverage'}
         bidsSys = 'fsaverage';
     case {'captrak'}
@@ -66,6 +74,10 @@ switch key
         if isempty(desc)
             if isempty(sysName)
                 desc = 'Probe-specific coordinate system (unspecified).';
+            elseif any(strcmp(key, {'mni', 'mni152', 'icbm', 'mnicolin27'}))
+                desc = sprintf(['Generic MNI atlas template coordinates ' ...
+                    '(device tag: %s); not registered to a specific MNI ' ...
+                    'template version.'], sysName);
             else
                 desc = sprintf('Device coordinate system: %s.', sysName);
             end

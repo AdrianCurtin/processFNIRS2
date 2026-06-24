@@ -28,6 +28,12 @@ function result = computeDyad(dataA, dataB, varargin)
 %   UseROI          - Use ROI-level data instead of channels (default: false)
 %   Accelerate      - Acceleration mode: 'auto' (default), 'gpu', 'parfor', 'none'
 %                     For 'all' pairing with parfor available, parallelizes pairwise loop.
+%   PhysioQC        - Assess shared-physiology confound risk for the dyad
+%                     (default: false). When true, runs
+%                     exploreFNIRS.hyperscanning.physioConfoundQC and stores the
+%                     result in result.physioQC.
+%   PhysioQCArgs    - Extra args forwarded to physioConfoundQC, e.g.
+%                     {'Aux','heartRate','Band',[0.04 0.15]} (default: {}).
 %
 % Outputs:
 %   result - Struct with fields:
@@ -41,6 +47,8 @@ function result = computeDyad(dataA, dataB, varargin)
 %     .pairing    - 'same' or 'all'
 %     .nSamples   - Number of time samples used
 %     .useROI     - Whether ROI mode was used
+%     .physioQC   - (only when PhysioQC=true) shared-physiology confound report
+%                   from exploreFNIRS.hyperscanning.physioConfoundQC
 %
 % References:
 %   Czeszumski, A., Ebers, S., Greshake Tzovaras, B., Gianotti, L. R. R.,
@@ -66,6 +74,8 @@ function result = computeDyad(dataA, dataB, varargin)
     addParameter(p, 'CouplingArgs', {}, @iscell);
     addParameter(p, 'UseROI', false, @islogical);
     addParameter(p, 'Accelerate', 'auto', @(x) ischar(x) && ismember(lower(x), {'auto','gpu','parfor','none'}));
+    addParameter(p, 'PhysioQC', false, @(x) islogical(x) && isscalar(x));
+    addParameter(p, 'PhysioQCArgs', {}, @iscell);
     parse(p, dataA, dataB, varargin{:});
     opts = p.Results;
 
@@ -366,6 +376,21 @@ function result = computeDyad(dataA, dataB, varargin)
     result.pairing = lower(opts.ChannelPairing);
     result.nSamples = nSamples;
     result.useROI = opts.UseROI;
+
+    % Optional shared-physiology confound assessment for the dyad. Spurious
+    % inter-brain coherence in the LFO/VLFO band can arise from shared
+    % physiology (respiration, ~0.1 Hz Mayer waves); flag it if requested.
+    if opts.PhysioQC
+        try
+            result.physioQC = exploreFNIRS.hyperscanning.physioConfoundQC( ...
+                dataA, dataB, opts.PhysioQCArgs{:});
+        catch ME
+            warning('exploreFNIRS:computeDyad:physioQCFailed', ...
+                'PhysioQC skipped: %s', ME.message);
+            result.physioQC = struct('flag', false, 'available', false, ...
+                'error', ME.message);
+        end
+    end
 
     % Build labels
     if opts.UseROI

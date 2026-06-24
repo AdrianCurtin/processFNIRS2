@@ -92,22 +92,31 @@ classdef InterpolateValues3DTest < matlab.unittest.TestCase
 
         function testGeodesicCacheReuseIsConsistent(testCase)
             % Two successive geodesic renders (the second reuses the persistent
-            % mesh graph) must produce identical images, and the per-axes mesh
-            % signature breadcrumb must match across calls (same mesh).
+            % mesh graph) must produce identical surface coloring, and the
+            % per-axes mesh signature breadcrumb must match across calls.
+            % Compare the projected per-vertex Brain colors (the geodesic
+            % output) rather than the full getframe image: the default
+            % 'showcase' render adds view-dependent matcap shading and a
+            % colorbar whose rasterization has sub-pixel getframe variation
+            % unrelated to the geodesic cache being tested here.
+            getCData = @(ax) get(findall(ax, 'Type','Patch','Tag','Brain'), 'FaceVertexCData');
+
             f1 = figure('Visible', 'off');
             c1 = onCleanup(@() close(f1)); %#ok<NASGU>
-            [~, img1] = pf2.probe.plot.interpolateValues3D(testCase.hbo, ...
+            pf2.probe.plot.interpolateValues3D(testCase.hbo, ...
                 testCase.processed, 'useGeodesic', true);
+            cData1 = getCData(gca);
             sig1 = getappdata(gca, 'iv3d_meshGraph');
 
             f2 = figure('Visible', 'off');
             c2 = onCleanup(@() close(f2)); %#ok<NASGU>
-            [~, img2] = pf2.probe.plot.interpolateValues3D(testCase.hbo, ...
+            pf2.probe.plot.interpolateValues3D(testCase.hbo, ...
                 testCase.processed, 'useGeodesic', true);
+            cData2 = getCData(gca);
             sig2 = getappdata(gca, 'iv3d_meshGraph');
 
-            testCase.verifyEqual(img2, img1, ...
-                'Cached mesh-graph reuse must not change the render.');
+            testCase.verifyEqual(cData2, cData1, ...
+                'Cached mesh-graph reuse must not change the projected surface coloring.');
             testCase.verifyEqual(sig2, sig1, ...
                 'Same mesh should resolve to the same cache signature.');
         end

@@ -110,6 +110,18 @@ function [ h, imgOut ] = interpolateValues3D(varargin)
 %   'saveWidth'         - Saved image width in pixels (default: figure width)
 %   'saveHeight'        - Saved image height in pixels (default: figure height)
 %   'saveDPI'           - Saved image resolution (default: 150)
+%   'Style'             - Render-quality preset (default 'showcase'):
+%                         'showcase' (default) - procedural matcap shading
+%                           (clay), neutral-gray cortex so activation pops,
+%                           stronger sulcal ambient occlusion, an elevated 3/4
+%                           "hero" default view and 2x export supersampling;
+%                           the polished, presentation look (inspired by
+%                           MRIcroGL/Surfice surface renders).
+%                         'publication' - smooth Gouraud matte cortex, gentle
+%                           sulcal ambient occlusion, peachy anatomical tone,
+%                           data-facing default view; the conservative look.
+%                         A style struct (see pf2_base.plot.RenderStyle) may
+%                         also be passed to override individual fields.
 %
 % Outputs:
 %   h      - Handle to the axes containing the visualization
@@ -174,7 +186,10 @@ cropFn = @(var,n) var(end-n+1:end,:);
 hotCropped = @(n) cropFn(hot(ceil(n*1.25)),n);
 
 validColormapLabels = exploreFNIRS.helper.listColormaps('all');
-validColormap = @(x) (isnumeric(x)&&(size(x,2)==3))||isa(x,'function_handle') || any(ishandle(x)) || any(validatestring(x, validColormapLabels));
+% Accept numeric [Nx3], a function handle, or any name string (resolved by
+% iResolveColormap, which also handles pf2_base.plot.brainColormap names such
+% as 'rdbu','viridis','cividis','actc','warm','cool').
+validColormap = @(x) (isnumeric(x)&&(size(x,2)==3))||isa(x,'function_handle') || any(ishandle(x)) || ischar(x) || isstring(x);
 
 if(numel(varargin) > 0 && isa(varargin{1},'matlab.graphics.axis.Axes')) %If first argument is axes then move to front
     ax=varargin{1};
@@ -268,6 +283,7 @@ addParameter(p, 'savePath', '', @(x) ischar(x) || isstring(x));
 addParameter(p, 'saveWidth', [], @(x) isempty(x) || isnumeric(x));
 addParameter(p, 'saveHeight', [], @(x) isempty(x) || isnumeric(x));
 addParameter(p, 'saveDPI', 150, @isnumeric);
+addParameter(p, 'Style', 'showcase', @(x) ischar(x) || isstring(x) || isstruct(x)); % render preset: 'showcase' (default) | 'publication' | style struct
 
 
 parse(p,varargin{:});
@@ -284,6 +300,9 @@ savePath = p.Results.savePath;
 saveWidth = p.Results.saveWidth;
 saveHeight = p.Results.saveHeight;
 saveDPI = p.Results.saveDPI;
+
+% Resolve the render-quality preset (lighting/AO/matcap/view/supersample).
+renderStyle = pf2_base.plot.RenderStyle.get(p.Results.Style);
 
 
 multiprobe = iscell(data2plot);
@@ -438,19 +457,9 @@ end
 
 
 
-cmap_high = p.Results.cmap;
-if(~isa(cmap_high,'function_handle'))
-    if(strcmp(cmap_high,'hotCropped'))
-        cmap_high=hotCropped;
-    else
-        cmap_high = str2func(cmap_high);
-    end
-end
-
-cmap_low_t = p.Results.cmap_lower;
-if(~isa(cmap_low_t,'function_handle'))
-    cmap_low_t = str2func(cmap_low_t);
-end
+% Resolve colormaps to n->[n x 3] handles (numeric matrices and names alike).
+cmap_high = iResolveColormap(p.Results.cmap, hotCropped);
+cmap_low_t = iResolveColormap(p.Results.cmap_lower, hotCropped);
 cmap_low = @(n) flip(cmap_low_t(n));
 
 ax = p.Results.ax;
@@ -954,7 +963,7 @@ end
 
 
 % TAL EEG locations from Automated cortical projection of EEG sensors: Anatomical correlation via the international 10–10 system
-h=gca;
+h=ax;
 if(useHighRes)
     cerebro_mdl=pf2_base.getAsset('cerebro_mdl', 'cache', h);    %high res model
 else
@@ -971,6 +980,12 @@ end
 plotFNIRS_SD=showSD&&~contains('ProbeSrc',itemsToSkipPlot);
 plot1020=show1020;
 brainColor=p.Results.brainColor;
+% Showcase uses a desaturated neutral-gray cortex (MRIcroGL convention) so
+% activation overlays pop, unless the caller set brainColor explicitly.
+if isfield(renderStyle,'grayCortex') && renderStyle.grayCortex && ...
+        ismember('brainColor', p.UsingDefaults)
+    brainColor = renderStyle.baseGray;
+end
 cMdl=cerebro_mdl;
 
 
@@ -1018,6 +1033,21 @@ end
 mdl.f=cMdl.f.v(:,reorderIdx);
 %mdl.f=[x2tx(mdl.f(:,1)),y2ty(mdl.f(:,2)),z2tz(mdl.f(:,3))];
 
+% Smooth per-vertex normals and a curvature-based ambient-occlusion weight
+% for the cortical surface. These drive Gouraud shading, matcap sampling and
+% sulcal darkening. The mesh is static per axes, so cache the result keyed on
+% vertex count + AO parameters and recompute only when those change.
+surfaceNormals = [];
+surfaceAO = [];
+if ~p.Results.showVoxelBrain
+    try
+        [surfaceNormals, surfaceAO] = iLocalSurfaceShading(ax, mdl.v, mdl.f, renderStyle);
+    catch shErr
+        warning('pf2:probe:interpolateValues3D:shadingFailed', ...
+            'Surface shading precompute failed (%s); falling back to flat colors.', shErr.message);
+    end
+end
+
 %set(h,'linestyle','None');
 %shading interp
 %cameratoolbar
@@ -1025,9 +1055,12 @@ mdl.f=cMdl.f.v(:,reorderIdx);
 camIntensity=0.8;
 camColor=[1,1,1]*camIntensity;
 
-ka=0.825;
-kd=0.4;
-ks=0.2;
+% Surface material coefficients come from the render preset so the cortex can
+% be rendered conservatively ('publication') or with a richer matcap-driven
+% look ('showcase'). See pf2_base.plot.RenderStyle.
+ka=renderStyle.ka;
+kd=renderStyle.kd;
+ks=renderStyle.ks;
 
 % Voxel brain lighting presets
 switch lower(p.Results.voxelLighting)
@@ -1044,20 +1077,20 @@ useVoxelLighting = ~strcmpi(p.Results.voxelLighting, 'none');
 
 hold on;
 
-lht=findobj(gca,'Type','Light','Tag','Front');
+lht=findobj(ax,'Type','Light','Tag','Front');
 if(isempty(lht))
     lht=camlight('right');
     lht.Tag='Front';
-    lht.Color=camColor;
+    lht.Color=[1,1,1]*renderStyle.keyIntensity;   % key light
     lht.Position=[0,100,0];
-    
+
     shading('interp');
-    
-    lighting('phong');
-    
+
+    lighting(renderStyle.lighting);   % honor the style's lighting model (was flat by default)
+
     %camlight(lht,0, 180);
 else
-    %camlight(lht,0,180);
+    lht.Color=[1,1,1]*renderStyle.keyIntensity;
 end
 
 if(islogical(p.Results.BrodmannAreas)&&p.Results.BrodmannAreas||isnumeric(p.Results.BrodmannAreas))
@@ -1604,10 +1637,31 @@ if(~p.Results.showVoxelBrain)
         baseCs = Cs;
     end
 
+    % Shading props from the render preset: smooth normals + Gouraud lighting
+    % (or 'none' when a matcap will be baked post-camera) and a specular
+    % exponent. Bake the sulcal ambient-occlusion weight into the BASE patch
+    % colours only, leaving the stat overlay hue pure.
+    if renderStyle.useMatcap
+        faceLighting = 'none';
+    else
+        faceLighting = renderStyle.lighting;
+    end
+    if ~isempty(surfaceNormals) && size(surfaceNormals,1) == size(mdl.v,1)
+        vnProps = {'VertexNormals', surfaceNormals};
+    else
+        vnProps = {};
+    end
+    shadeProps = [{'FaceLighting', faceLighting, 'SpecularExponent', renderStyle.specExp}, vnProps];
+
+    if ~isempty(surfaceAO) && numel(surfaceAO) == size(mdl.v,1)
+        baseCs = baseCs .* surfaceAO(:);
+        baseCs = min(max(baseCs, 0), 1);
+    end
+
     baseProps = {'vertices', mdl.v, 'faces', mdl.f, ...
                  'FaceVertexCData', baseCs, 'FaceColor','interp', ...
                  'AmbientStrength', ka, 'DiffuseStrength', kd, 'SpecularStrength', ks, ...
-                 'FaceAlpha', p.Results.brainAlpha};
+                 'FaceAlpha', p.Results.brainAlpha, shadeProps{:}};
 
     if(isempty(brainHndl))
         brainHndl=ax;
@@ -1629,7 +1683,7 @@ if(~p.Results.showVoxelBrain)
                         'FaceVertexCData', Cs, 'FaceColor','interp', ...
                         'AmbientStrength', ka, 'DiffuseStrength', kd, 'SpecularStrength', ks, ...
                         'FaceVertexAlphaData', vertexAlpha, 'FaceAlpha', 'interp', ...
-                        'AlphaDataMapping', 'none', 'LineStyle', 'None'};
+                        'AlphaDataMapping', 'none', 'LineStyle', 'None', shadeProps{:}};
         hold on
         if isempty(overlayHndl)
             overlayHndl = patch(ax, overlayProps{:});
@@ -1842,7 +1896,19 @@ if(isempty(itemsToSkipPlot))
             case 'auto'
                 autoPos = mean(optPos, 1, 'omitnan');
                 if any(isnan(autoPos)) || norm(autoPos) == 0
-                    campos([0,1200,0]);  % Fall back to front view
+                    if renderStyle.heroView
+                        campos([-500,1150,650]);  % elevated 3/4 hero fallback
+                    else
+                        campos([0,1200,0]);       % front view fallback
+                    end
+                elseif renderStyle.heroView
+                    % Stay on the data's side but lift and rotate ~25 deg for
+                    % a flattering elevated 3/4 "hero" framing (showcase).
+                    base = autoPos / norm(autoPos);
+                    base = base + 0.40 * [0 0 1];
+                    th = 25*pi/180; c = cos(th); s = sin(th);
+                    base = ([c -s 0; s c 0; 0 0 1] * base(:))';
+                    campos(base / norm(base) * 1550);
                 else
                     campos(autoPos/norm(autoPos)*1500);
                 end
@@ -1888,16 +1954,65 @@ if(isempty(itemsToSkipPlot))
     
     
     
+    % Fill light (softens the shadow side without flattening form).
     lht2=findobj(ax,'Type','Light','Tag','Rear');
     if(isempty(lht2))
         lht2=camlight('left');
         lht2.Tag='Rear';
         lht2.Position=[0,-100,90];
-        lht2.Color=camColor;
-    else
-        
     end
-    
+    lht2.Color=[1,1,1]*renderStyle.fillIntensity;
+
+    % Optional rim/back light for silhouette separation (showcase). Only
+    % created when the preset asks for it; intensity 0 removes it.
+    lht3=findobj(ax,'Type','Light','Tag','Rim');
+    if renderStyle.rimIntensity > 0
+        if isempty(lht3)
+            lht3=light('Parent',ax);
+            lht3.Tag='Rim';
+            lht3.Style='infinite';
+            lht3.Position=[-0.4,-0.7,0.6];   % grazing from behind/below-left
+        end
+        lht3.Color=[1,1,1]*renderStyle.rimIntensity;
+    elseif ~isempty(lht3)
+        delete(lht3);
+    end
+
+end
+
+% Showcase matcap shading: bake a view-dependent material-capture response
+% into the surface patch colours and turn MATLAB lighting off for them,
+% reproducing the polished MRIcroGL/Surfice surface look. The matcap supplies
+% shading; the existing per-vertex colours (anatomy gray + sulcal AO, or stat
+% overlay) supply hue. View-dependent, so this runs after the camera is set
+% (and re-runs every call, e.g. each animation frame).
+if renderStyle.useMatcap && ~p.Results.showVoxelBrain && ~isempty(surfaceNormals)
+    try
+        matImg = pf2_base.plot.matcapTexture(renderStyle.matcapMaterial);
+        mcRGB  = pf2_base.plot.matcapShade(surfaceNormals, ax, matImg);
+        mcLum  = mean(mcRGB, 2);
+        bH = findall(ax, 'Type', 'Patch', 'Tag', 'Brain');
+        for bi = 1:numel(bH)
+            cd = get(bH(bi), 'FaceVertexCData');
+            if size(cd,1) == size(mcRGB,1) && size(cd,2) == 3
+                set(bH(bi), 'FaceVertexCData', min(max(cd .* mcRGB, 0), 1), ...
+                    'FaceLighting', 'none');
+            end
+        end
+        % Overlay keeps its hue; scale by matcap luminance so it sits on the
+        % shaded surface rather than floating as flat colour.
+        oH = findall(ax, 'Type', 'Patch', 'Tag', 'BrainOverlay');
+        for oi = 1:numel(oH)
+            cd = get(oH(oi), 'FaceVertexCData');
+            if size(cd,1) == numel(mcLum) && size(cd,2) == 3
+                set(oH(oi), 'FaceVertexCData', min(max(cd .* mcLum, 0), 1), ...
+                    'FaceLighting', 'none');
+            end
+        end
+    catch mcErr
+        warning('pf2:probe:interpolateValues3D:matcapFailed', ...
+            'Matcap shading failed (%s); using the lit surface instead.', mcErr.message);
+    end
 end
 
 
@@ -2259,13 +2374,79 @@ if (nargout > 1)
     imgOut = frame.cdata;
 end
 
-% Save figure if requested
+% Save figure if requested. The render preset's supersample factor scales the
+% export resolution (render large, downsample) for cleaner edges / specular —
+% the equivalent of MRIcroGL's bmpzoom.
 if ~isempty(savePath)
     fig = ancestor(ax, 'figure');
-    pf2_base.plot.saveFigure(fig, savePath, saveWidth, saveHeight, saveDPI);
+    pf2_base.plot.saveFigure(fig, savePath, saveWidth, saveHeight, ...
+        saveDPI * max(1, renderStyle.supersample));
 end
 
 end  % interpolateValues3D
+
+
+function fn = iResolveColormap(c, hotCroppedFn)
+% Resolve a colormap spec to an n->[n x 3] function handle. Accepts: a function
+% handle (returned as-is); an [Nx3] numeric matrix (wrapped in a resampling
+% handle so every downstream cmap(n) call works); 'hotCropped'; or any other
+% name, which is routed through pf2_base.plot.brainColormap. brainColormap
+% resolves MRIcroGL/Surfice LUTs and CVD-safe maps (rdbu/viridis/cividis),
+% falls through to MATLAB built-in colormap functions, and errors clearly on an
+% unknown name (so a typo surfaces as a clear error, not a silent wrong map).
+if isa(c, 'function_handle')
+    fn = c;
+    return;
+end
+if isnumeric(c)
+    M = c;
+    fn = @(k) iResampleColormap(M, k);
+    return;
+end
+nm = char(c);
+if strcmp(nm, 'hotCropped')
+    fn = hotCroppedFn;
+    return;
+end
+fn = @(n) pf2_base.plot.brainColormap(nm, n);
+end
+
+
+function M2 = iResampleColormap(M, k)
+% Linearly resample a [Nx3] colormap matrix to k rows (identity if N==k).
+k = max(2, round(k));
+if size(M, 1) == k
+    M2 = M;
+    return;
+end
+t  = linspace(0, 1, size(M, 1));
+ti = linspace(0, 1, k);
+M2 = [interp1(t, M(:,1), ti)', interp1(t, M(:,2), ti)', interp1(t, M(:,3), ti)'];
+M2 = min(max(M2, 0), 1);
+end
+
+
+function [N, ao] = iLocalSurfaceShading(ax, V, F, style)
+% Smooth per-vertex normals + sulcal ambient-occlusion weight for the cortex.
+% Cached in axes appdata keyed on vertex count and AO parameters so repeated
+% draws (and animation frames) reuse the result; only matcap, which is
+% view-dependent, recomputes per frame elsewhere.
+cache = getappdata(ax, 'iv3d_shadeCache');
+% Key on vertex count, AO params, and a cheap coordinate fingerprint so a
+% reused axes that switches mesh resolution or coordinate space (e.g. MNI vs
+% Talairach, which keeps the vertex count but moves the coordinates) does not
+% reuse stale normals/AO.
+fp = sum(V(1,:)) + sum(V(end,:));
+key = [size(V,1), style.aoStrength, style.aoGyral, fp];
+if ~isempty(cache) && isfield(cache,'key') && isequal(cache.key, key)
+    N = cache.N; ao = cache.ao;
+    return;
+end
+N  = pf2_base.plot.vertexNormals(V, F);
+ao = pf2_base.plot.meshCurvature(V, F, N, ...
+    'Strength', style.aoStrength, 'Gyral', style.aoGyral);
+setappdata(ax, 'iv3d_shadeCache', struct('key', key, 'N', N, 'ao', ao));
+end
 
 
 function iLocalRestoreVisible(figHandle, vis)

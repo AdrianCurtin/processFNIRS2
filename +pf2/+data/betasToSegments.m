@@ -196,13 +196,16 @@ end
 function stimRegs = detectStimulusRegressors(regressorNames)
 % DETECTSTIMULUSREGRESSORS Identify stimulus regressors by excluding nuisance
 %
-% Nuisance patterns: constant, drift_*, dct_*, short_ch*, *_deriv, *_disp
+% Nuisance patterns: constant, drift_*, dct_*, short_ch*, nuis*, aux_*,
+% *_deriv, *_disp
 
 nuisancePatterns = {
     '^constant$'
     '^drift_'
     '^dct_'
     '^short_ch'
+    '^nuis\d'
+    '^aux_'
     '_deriv$'
     '_disp$'
 };

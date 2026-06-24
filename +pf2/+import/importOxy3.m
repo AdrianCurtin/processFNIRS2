@@ -345,14 +345,9 @@ adcNames = cellfun(@(t) t{1}, adcNames, 'uni', 0);
 [markers, markerDict, trigNames] = localExtractMarkers(M, time, fs, isTrig, adcNames);
 
 % --- auxiliary ADC channels ----------------------------------------------
-Aux = struct();
-trigIdx = find(isTrig);
-if ~isempty(trigIdx)
-    nm = 'Trigger';
-    if ~isempty(trigNames), nm = trigNames{1}; end
-    Aux.trigger = struct('data', M(:, trigIdx(1)), 'time', time, ...
-        'unit', 'code', 'varNames', {{nm}});
-end
+% Export the trigger line (legacy Aux.trigger) plus every other analog AD
+% channel (battery, respiration belt, external sensors), typed by name.
+Aux = pf2_base.oxy3Aux(M, time, isTrig, opticalCols, counterCol, adcNames, trigNames);
 
 % --- assemble fNIR struct ------------------------------------------------
 fNIR = struct();

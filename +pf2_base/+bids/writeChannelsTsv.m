@@ -2,10 +2,10 @@ function writeChannelsTsv(filepath, data, nirs)
 % WRITECHANNELSTSV Write a BIDS-NIRS _channels.tsv
 %
 % Emits one row per measurement (source-detector-wavelength) in the SNIRF
-% measurement list, with the BIDS-required columns name, type, source,
-% detector, wavelength_nominal, units plus the recommended sampling_frequency
-% and a status column derived from data.fchMask when its length matches the
-% channel count.
+% measurement list, with the BIDS-required columns in their required order
+% (name, type, source, detector, wavelength_nominal, units) followed by the
+% recommended wavelength_actual, sampling_frequency, and a status column
+% (good/bad) derived from data.fchMask when it can be mapped to the channels.
 %
 % Inputs:
 %   filepath - output _channels.tsv path
@@ -29,22 +29,17 @@ srcLabels = getField(probe, 'sourceLabels');
 detLabels = getField(probe, 'detectorLabels');
 wl = getField(probe, 'wavelengths');
 
-% Channel-aligned status from fchMask only when lengths agree (asSNIRF strips
-% time/marker columns, so a raw-width mask cannot be mapped reliably here).
-useStatus = false;
-mask = [];
-if isstruct(data) && isfield(data, 'fchMask') && ~isempty(data.fchMask) ...
-        && numel(data.fchMask) == nCh
-    mask = logical(data.fchMask);
-    useStatus = true;
-end
+% Per-measurement good/bad status, mapped from the per-channel (source-detector
+% pair) fchMask. Returns [] when the mask cannot be mapped, in which case the
+% optional status column is omitted rather than guessed.
+status = channelStatus(data, ml, nCh);
+useStatus = ~isempty(status);
 
+% Required columns first, in the spec-mandated order, then recommended extras.
+headers = {'name', 'type', 'source', 'detector', 'wavelength_nominal', ...
+    'units', 'wavelength_actual', 'sampling_frequency'};
 if useStatus
-    headers = {'name', 'type', 'source', 'detector', 'wavelength_nominal', ...
-        'wavelength_actual', 'units', 'sampling_frequency', 'status'};
-else
-    headers = {'name', 'type', 'source', 'detector', 'wavelength_nominal', ...
-        'wavelength_actual', 'units', 'sampling_frequency'};
+    headers{end+1} = 'status';
 end
 
 rows = cell(nCh, numel(headers));
@@ -68,21 +63,16 @@ for k = 1:nCh
         name = sprintf('%s-%s', sLab, dLab);
     end
 
-    units = 'n/a';
-    if isfield(m, 'dataUnit') && ~isempty(m.dataUnit)
-        units = char(m.dataUnit);
-    end
-
     rows{k, 1} = name;
     rows{k, 2} = 'NIRSCWAMPLITUDE';
     rows{k, 3} = sLab;
     rows{k, 4} = dLab;
     rows{k, 5} = wlNom;
-    rows{k, 6} = wlAct;
-    rows{k, 7} = units;
+    rows{k, 6} = bidsUnits(m);
+    rows{k, 7} = wlAct;
     rows{k, 8} = fs;
     if useStatus
-        if mask(k)
+        if status(k)
             rows{k, 9} = 'good';
         else
             rows{k, 9} = 'bad';
@@ -91,6 +81,82 @@ for k = 1:nCh
 end
 
 pf2_base.bids.writeTsv(filepath, headers, rows);
+end
+
+function u = bidsUnits(m)
+% Map the SNIRF measurement unit to a BIDS-acceptable units token. Raw fNIRS
+% CW amplitude is recorded as 'au' by pf2 devices; the BIDS-NIRS convention
+% (and MNE-BIDS) is to label proportional-to-voltage raw amplitude 'V'.
+u = 'n/a';
+if isfield(m, 'dataUnit') && ~isempty(m.dataUnit)
+    u = char(m.dataUnit);
+end
+switch lower(strtrim(u))
+    case {'au', 'a.u.', 'arbitrary', ''}
+        u = 'V';
+end
+end
+
+function status = channelStatus(data, ml, nCh)
+% Per-measurement good/bad logical from fchMask, mapped via source-detector
+% pair (fchMask is per channel-pair; ml is per pair x wavelength). Returns []
+% when a confident mapping is not possible.
+status = [];
+if ~isstruct(data) || ~isfield(data, 'fchMask') || isempty(data.fchMask)
+    return;
+end
+mask = logical(data.fchMask(:));
+
+% Direct case: mask already per measurement.
+if numel(mask) == nCh
+    status = mask;
+    return;
+end
+
+% Pair case: build a (source,detector) -> good/bad map from the device optode
+% table aligned with fchMask, then look up each measurement's pair.
+if ~isfield(data, 'device') || ~isa(data.device, 'pf2.Device')
+    return;
+end
+try
+    opt = data.device.optodeTable();
+catch
+    return;
+end
+if ~istable(opt) || height(opt) ~= numel(mask)
+    return;
+end
+srcCol = firstVar(opt, {'SrcIdx', 'SourceIndex', 'Source'});
+detCol = firstVar(opt, {'DetIdx', 'DetectorIndex', 'Detector'});
+if isempty(srcCol) || isempty(detCol)
+    return;
+end
+srcVals = double(opt.(srcCol));
+detVals = double(opt.(detCol));
+map = containers.Map('KeyType', 'char', 'ValueType', 'logical');
+for r = 1:numel(mask)
+    map(sprintf('%d_%d', srcVals(r), detVals(r))) = mask(r);  % last wins on dup
+end
+
+status = true(nCh, 1);
+for k = 1:nCh
+    s = scalarOr(ml(k), 'sourceIndex', NaN);
+    d = scalarOr(ml(k), 'detectorIndex', NaN);
+    key = sprintf('%d_%d', s, d);
+    if isKey(map, key)
+        status(k) = map(key);
+    end
+end
+end
+
+function name = firstVar(tbl, candidates)
+name = '';
+for i = 1:numel(candidates)
+    if ismember(candidates{i}, tbl.Properties.VariableNames)
+        name = candidates{i};
+        return;
+    end
+end
 end
 
 function v = getField(s, f)

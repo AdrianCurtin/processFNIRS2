@@ -23,14 +23,32 @@ if isempty(participantRows)
     return;
 end
 
-% Column union in first-seen order across all subjects.
-cols = {};
+% Column union across all subjects. Honor the user's requested order first
+% (transformed to match the keys participantFields produces), then append any
+% remaining columns in first-seen order.
+present = {};
 for i = 1:numel(participantRows)
     fn = fieldnames(participantRows(i).fields);
     for j = 1:numel(fn)
-        if ~ismember(fn{j}, cols)
-            cols{end+1} = fn{j}; %#ok<AGROW>
+        if ~ismember(fn{j}, present)
+            present{end+1} = fn{j}; %#ok<AGROW>
         end
+    end
+end
+
+cols = {};
+for i = 1:numel(requested)
+    key = matlab.lang.makeValidName(lower(char(string(requested{i}))));
+    if any(strcmpi(key, {'sex', 'gender'}))
+        key = 'sex';
+    end
+    if ismember(key, present) && ~ismember(key, cols)
+        cols{end+1} = key; %#ok<AGROW>
+    end
+end
+for i = 1:numel(present)
+    if ~ismember(present{i}, cols)
+        cols{end+1} = present{i}; %#ok<AGROW>
     end
 end
 

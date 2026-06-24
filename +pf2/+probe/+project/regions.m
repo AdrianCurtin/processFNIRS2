@@ -96,6 +96,13 @@ parse(p, regionValues, data, varargin{:});
 
 brainColor = p.Results.BrainColor(:)';
 
+% Match the render preset's cortex tone: showcase uses a neutral-gray base so
+% parcels read cleanly, unless the caller set BrainColor explicitly.
+rstyle = pf2_base.plot.RenderStyle.get(iGetOpt(p.Unmatched, 'Style', 'showcase'));
+if ismember('BrainColor', p.UsingDefaults) && isfield(rstyle,'grayCortex') && rstyle.grayCortex
+    brainColor = rstyle.baseGray(:)';
+end
+
 % --- Resolve the region axis (Brodmann numbers) ---
 regionBA = p.Results.Regions(:)';
 if isempty(regionBA)
@@ -200,6 +207,22 @@ if any(inReg)
     idx = round(nrm * (nc - 1)) + 1;
     idx = max(1, min(nc, idx));
     RGB(inReg, :) = cmap(idx, :);
+end
+
+% Preserve the surface's 3D shading. Under a matcap style the renderer baked
+% shading into the patch colours and set FaceLighting='none'; overwriting with
+% flat parcel colours would lose all relief. Modulate the parcel colours by
+% the baked shading luminance so the parcels stay dimensional. (Under the lit
+% styles FaceLighting is gouraud/flat, so MATLAB shades the new colours live
+% and no modulation is needed.)
+existingCData = get(brainHndl(1), 'FaceVertexCData');
+if strcmpi(get(brainHndl(1), 'FaceLighting'), 'none') && isequal(size(existingCData), [V 3])
+    shadeLum = mean(existingCData, 2);
+    ref = pf2_base.compat.prctile(shadeLum(shadeLum > 0), 98);
+    if ~isfinite(ref) || ref == 0, ref = max(shadeLum); end
+    if ref == 0, ref = 1; end
+    shadeN = min(shadeLum / ref, 1.05);
+    RGB = min(max(RGB .* shadeN, 0), 1);
 end
 
 set(brainHndl, 'FaceVertexCData', RGB, 'FaceColor', 'interp');

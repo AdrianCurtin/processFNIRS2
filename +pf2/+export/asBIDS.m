@@ -60,9 +60,10 @@ function bidsRoot = asBIDS(allData, rootDir, varargin)
 %   bidsRoot - Absolute path to the BIDS dataset root.
 %
 % Files written:
-%   dataset_description.json, README, participants.tsv, participants.json,
-%   and per recording: *_nirs.snirf, *_nirs.json, *_channels.tsv,
-%   *_optodes.tsv, *_coordsystem.json, [*_events.tsv].
+%   dataset_description.json, README, participants.tsv, participants.json;
+%   per recording: *_nirs.snirf, *_nirs.json, *_channels.tsv, [*_events.tsv];
+%   per subject/session (montage-level, via BIDS inheritance): *_optodes.tsv,
+%   *_coordsystem.json.
 %
 % Example:
 %   [ex, allData] = pf2.import.sampleData.group();
@@ -125,6 +126,7 @@ entities = pf2_base.bids.resolveEntities(allData, opts.Task);
 % --- Per-recording export ---
 nRec = numel(allData);
 participantRows = struct('participant_id', {}, 'fields', {});
+seenMontage = {};   % sub/ses stems already given an _optodes.tsv/_coordsystem.json
 for i = 1:nRec
     ent = entities(i);
     data = allData{i};
@@ -147,18 +149,34 @@ for i = 1:nRec
     end
 
     % asSNIRF writes the .snirf and returns the structure we derive from.
-    snirf = pf2.export.asSNIRF(data, snirfPath);
+    % Strip dark/ambient (non raw-DC) channels so the .snirf and the derived
+    % channels.tsv carry only real source-detector measurements (no
+    % wavelength_nominal=0 placeholder rows).
+    snirf = pf2.export.asSNIRF(data, snirfPath, false, true);
     nirs = snirf.nirs;   % single-recording export always uses /nirs
 
-    % Required and recommended sidecars
+    % Run-level sidecars (task-/run- entities are permitted on these suffixes)
     pf2_base.bids.writeNirsJson(fullfile(outDir, [base '_nirs.json']), ...
         data, nirs, ent.task);
     pf2_base.bids.writeChannelsTsv(fullfile(outDir, [base '_channels.tsv']), ...
         data, nirs);
-    pf2_base.bids.writeOptodesTsv(fullfile(outDir, [base '_optodes.tsv']), nirs);
-    pf2_base.bids.writeCoordsystemJson( ...
-        fullfile(outDir, [base '_coordsystem.json']), data, nirs);
     pf2_base.bids.writeEventsTsv(fullfile(outDir, [base '_events.tsv']), data);
+
+    % Optodes and coordinate system are montage-level. BIDS disallows task-/run-
+    % entities on _optodes.tsv (and run- on _coordsystem.json); they are written
+    % once per subject/session and applied to every run via the inheritance
+    % principle.
+    montageStem = ['sub-' ent.sub];
+    if ~isempty(ent.ses)
+        montageStem = [montageStem '_ses-' ent.ses];
+    end
+    if ~ismember(montageStem, seenMontage)
+        pf2_base.bids.writeOptodesTsv( ...
+            fullfile(outDir, [montageStem '_optodes.tsv']), nirs);
+        pf2_base.bids.writeCoordsystemJson( ...
+            fullfile(outDir, [montageStem '_coordsystem.json']), data, nirs);
+        seenMontage{end+1} = montageStem; %#ok<AGROW>
+    end
 
     % Collect participant-level metadata (one row per subject, first wins)
     pid = ['sub-' ent.sub];

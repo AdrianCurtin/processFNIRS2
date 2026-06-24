@@ -105,6 +105,10 @@ function results = autoModelLME(groups, groupByVars, varargin)
     addParameter(p, 'ContrastThreshold', 0.1, @isnumeric);
     addParameter(p, 'ResponseVar', '', @ischar);
     addParameter(p, 'ForcedTerms', {}, @iscell);
+    % Aux columns (aux_*) are excluded from predictors by default. Opt in by
+    % naming the auxiliary signals to promote to candidate covariates (e.g.
+    % {'heartRate','gsr'}); use {'all'} to admit every aux_ column.
+    addParameter(p, 'AuxCovariates', {}, @iscell);
     parse(p, groups, groupByVars, varargin{:});
     opts = p.Results;
     opts.Criterion = upper(opts.Criterion);
@@ -242,7 +246,10 @@ function results = autoModelLME(groups, groupByVars, varargin)
         for chI = 1:nCh
             ch = channels(chI);
 
-            % Build merged long-format table
+            % Build merged long-format table (biomarker as the value column).
+            % Note: mergeGbyTablesLong with exportAux=true *replaces* the
+            % biomarker column with aux columns, so aux covariates are joined
+            % on separately below rather than requested here.
             if isROI
                 mergedTable = exploreFNIRS.export.mergeGbyTablesLong( ...
                     groups, {bioM}, ch, barTimes, false, true, chLabels(chI));
@@ -251,6 +258,13 @@ function results = autoModelLME(groups, groupByVars, varargin)
                 mergedTable = exploreFNIRS.export.mergeGbyTablesLong( ...
                     groups, {bioM}, ch, barTimes, false, false, chLabels(chI));
                 varName = sprintf('Opt%s_%s', chLabels{chI}, bioM);
+            end
+
+            % Aux covariate opt-in: build an aux-bearing table over the same
+            % rows and graft the whitelisted aux_ columns onto mergedTable.
+            if ~isempty(opts.AuxCovariates) && ~isempty(mergedTable)
+                mergedTable = appendAuxColumns(mergedTable, groups, bioM, ch, ...
+                    barTimes, isROI, chLabels(chI), opts.AuxCovariates);
             end
 
             if isempty(mergedTable) || height(mergedTable) == 0
@@ -659,12 +673,31 @@ function candidates = discoverCandidates(T, responseVar, nSubjects, opts, hasMul
     % Also exclude other biomarker columns
     bioNames = {'HbO','HbR','HbTotal','HbDiff','CBSI'};
 
+    % Aux covariate opt-in: aux_ columns matching this whitelist are promoted
+    % to candidate predictors instead of being excluded.
+    auxWhitelist = {};
+    if isfield(opts, 'AuxCovariates')
+        auxWhitelist = opts.AuxCovariates;
+    end
+
     candidates = {};
     for i = 1:length(allVars)
         vn = allVars{i};
 
         % Exact match exclusion
         if ismember(vn, excludeExact)
+            continue;
+        end
+
+        % Aux opt-in: skip the aux_ prefix exclusion for whitelisted signals
+        if startsWith(vn, 'aux_') && isAuxWhitelisted(vn, auxWhitelist)
+            col = T.(vn);
+            if isnumeric(col)
+                vals = col(~isnan(col));
+                if ~isempty(vals) && var(vals) > 0
+                    candidates{end+1} = vn; %#ok<AGROW>
+                end
+            end
             continue;
         end
 
@@ -719,6 +752,119 @@ function candidates = discoverCandidates(T, responseVar, nSubjects, opts, hasMul
             if ~isempty(vals) && var(vals) > 0
                 candidates{end+1} = vn; %#ok<AGROW>
             end
+        end
+    end
+end
+
+
+function T = appendAuxColumns(T, groups, bioM, ch, barTimes, isROI, chLabel, whitelist)
+% APPENDAUXCOLUMNS Graft whitelisted aux_ columns onto a biomarker long-table
+%
+% Builds an aux-bearing long table over the same grouping/channel/time rows
+% (mergeGbyTablesLong with exportAux=true) and copies the aux_ columns matching
+% the AuxCovariates whitelist into T. Rows are matched on the shared identifier
+% columns (grouping/channel/time) via a key, NOT by row position, so each
+% covariate value lands on the correct outcome row even if the two tables are
+% ordered differently. Skips quietly if it cannot align (so model selection
+% proceeds on the biomarker table).
+    try
+        auxT = exploreFNIRS.export.mergeGbyTablesLong( ...
+            groups, {bioM}, ch, barTimes, true, isROI, chLabel);
+    catch
+        return;
+    end
+    if isempty(auxT)
+        return;
+    end
+
+    % Which aux_ columns to copy: whitelisted, not an aux time column, and not
+    % already present in T.
+    avn = auxT.Properties.VariableNames;
+    isAux = startsWith(avn, 'aux_') & ~endsWith(lower(avn), '_time');
+    auxCols = avn(isAux);
+    keep = false(1, numel(auxCols));
+    for i = 1:numel(auxCols)
+        keep(i) = isAuxWhitelisted(auxCols{i}, whitelist) ...
+            && ~ismember(auxCols{i}, T.Properties.VariableNames);
+    end
+    auxCols = auxCols(keep);
+    if isempty(auxCols)
+        return;
+    end
+
+    % Identifier columns = columns shared by both tables that are neither aux_
+    % columns nor the biomarker value columns (which end in _<bioM> and carry
+    % NaNs that defeat equality matching). Build a per-row string key from them.
+    shared = intersect(T.Properties.VariableNames, avn, 'stable');
+    isId = ~startsWith(shared, 'aux_') & ~endsWith(shared, ['_' bioM]);
+    keyCols = shared(isId);
+
+    keyT = buildRowKey(T, keyCols);
+    keyA = buildRowKey(auxT, keyCols);
+
+    % Use the key only when it is complete and unambiguous: every aux row has a
+    % unique key and every T row maps to one. Otherwise fall back to a
+    % positional copy when the heights already match.
+    if ~isempty(keyCols) && numel(unique(keyA)) == numel(keyA)
+        [tf, loc] = ismember(keyT, keyA);
+        if all(tf)
+            for i = 1:numel(auxCols)
+                col = auxT.(auxCols{i});
+                T.(auxCols{i}) = col(loc, :);
+            end
+            return;
+        end
+    end
+
+    if height(auxT) == height(T)
+        for i = 1:numel(auxCols)
+            T.(auxCols{i}) = auxT.(auxCols{i});
+        end
+    end
+end
+
+
+function key = buildRowKey(T, keyCols)
+% BUILDROWKEY Per-row string key built from the given identifier columns
+    n = height(T);
+    if isempty(keyCols)
+        key = strings(n, 1);
+        return;
+    end
+    parts = strings(n, numel(keyCols));
+    for c = 1:numel(keyCols)
+        col = T.(keyCols{c});
+        if isnumeric(col) || islogical(col)
+            parts(:, c) = string(num2str(col(:), '%.10g'));
+        else
+            parts(:, c) = string(col(:));
+        end
+    end
+    key = join(parts, char(31), 2);   % unit-separator-joined composite key
+end
+
+
+function tf = isAuxWhitelisted(vn, whitelist)
+% ISAUXWHITELISTED True if an aux_ column is opted in as a candidate covariate
+%   Matches when the whitelist contains 'all'/'*', the exact column name, or a
+%   token contained in the column name (e.g. 'heartRate' matches
+%   'aux_heartRate_HR').
+    tf = false;
+    if isempty(whitelist)
+        return;
+    end
+    if any(strcmpi(whitelist, 'all')) || any(strcmp(whitelist, '*'))
+        tf = true;
+        return;
+    end
+    for k = 1:numel(whitelist)
+        tok = whitelist{k};
+        if isempty(tok)
+            continue;
+        end
+        if strcmpi(vn, tok) || contains(lower(vn), lower(tok))
+            tf = true;
+            return;
         end
     end
 end
