@@ -36,7 +36,7 @@ function [ dataf ] = pf2_lpf( data,ft,fs,freq_cut,Nf, NaN_mode)
 %   - Uses zero-phase filtering (filtfilt) to avoid phase distortion
 %   - Data length must be at least 3*Nf samples; shorter data returns NaN
 %   - For IIR filters (ft=3), Nf is filter order (effective order = 2*Nf)
-%   - Falls back to MATLAB R2018a filtfilt if current version fails
+%   - Falls back to the in-house zero-phase filter (filtfilt_classic)
 %
 % Example:
 %   % Remove cardiac artifact with FIR filter
@@ -64,7 +64,7 @@ end
 half_fs = fs/2;    %half of sampling freq. equal to pi
 
 if ft==1
-    [b,a] = fir1(Nf,freq_cut/half_fs);  % use FIR1 to obtain linear phase filter; b=impulse response
+    [b,a] = pf2_base.external.fir1(Nf,freq_cut/half_fs);  % use FIR1 to obtain linear phase filter; b=impulse response
 
 elseif ft==2
     dp=0.01; %pass-band ripple
@@ -76,7 +76,7 @@ elseif ft==2
     [b,delta]=remez(N1, F0, M0, W);
     a=1;
 elseif ft==3
-    [b,a] = butter(Nf,freq_cut/half_fs);
+    [b,a] = pf2_base.external.butter(Nf,freq_cut/half_fs);
 end
 
 %-----------------------------------------------------------------
@@ -97,20 +97,16 @@ if(size(data,1)>3*Nf)
 			try
 				dataf=pf2_base.filtfilt_interp(b,a,data);
 			catch
-				dataf=pf2_base.external.filtfilt_classic(b,a,data); % Use matlab 2018a filtfilt if current version fails due to nans
+				dataf=pf2_base.external.filtfilt_classic(b,a,data); % Fall back to in-house zero-phase filter if the NaN-aware path errors
 			end
 		case 'Piecewise'
 			try
 				dataf=pf2_base.filtfilt_piecewise(b,a,data,3*Nf);
 			catch
-				dataf=pf2_base.external.filtfilt_classic(b,a,data); % Use matlab 2018a filtfilt if current version fails due to nans
+				dataf=pf2_base.external.filtfilt_classic(b,a,data); % Fall back to in-house zero-phase filter if the NaN-aware path errors
 			end
 		case 'Leave'
-			try
-				dataf=filtfilt(b,a,data);
-			catch
-				dataf=pf2_base.external.filtfilt_classic(b,a,data); % Use matlab 2018a filtfilt if current version fails due to nans
-			end
+			dataf=pf2_base.external.filtfilt_classic(b,a,data);
 	end
 else
     dataf=nan(size(data));

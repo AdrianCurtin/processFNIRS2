@@ -147,7 +147,7 @@ for ch = 1:nCh
                 find(~validIdx), 'linear', 'extrap');
         end
 
-        sgFit = sgolayfilt(yFill, effOrder, effFrame);
+        sgFit = pf2_base.external.sgolayfilt(yFill, effOrder, effFrame);
 
         % Subtract SG fit and anchor to pre-artifact boundary mean
         preWin = max(1, iStart - max(1, round(sample_rate)));

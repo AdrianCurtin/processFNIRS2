@@ -36,14 +36,17 @@ function y = filtfilt_classic(b, a, x)
 %
 % Algorithm:
 %   1. Resolve inputs to one or more biquad/transfer-function stages and the
-%      edge-transient length nfact = 3*(filter order).
+%      edge-transient length nfact = 3*(total filter order across all stages).
 %   2. For each stage compute the steady-state initial state zi by solving the
 %      linear system (I - A_state) * zi = B_state - b0*A_state derived from the
 %      Direct-Form-II-transposed state-space realization.
-%   3. Reflect-pad each column by nfact samples at both ends
-%      (xpad = [2*x(1)-x(nfact+1:-1:2); x; 2*x(end)-x(end-1:-1:end-nfact)]).
-%   4. Filter forward (initial state zi*xpad(1)), reverse, filter again
-%      (initial state zi*y(1)), reverse, and discard the nfact pad samples.
+%   3. Process the stages sequentially (a cascaded transfer function). For
+%      each stage, reflect-pad the running signal by nfact samples at both
+%      ends (using the TOTAL-order nfact, not the per-section order), filter
+%      forward (initial state zi*pad(1)), reverse, filter forward again, then
+%      reverse and strip the pad. This matches the Signal Processing Toolbox
+%      filtfilt, which likewise applies a full forward-backward pass to each
+%      cascade section in turn.
 %
 % Example:
 %   [b, a] = butter(4, 0.2);
@@ -227,7 +230,7 @@ function y = applyStage(b, a, x, zi, nfact)
 %   a     - Denominator column vector
 %   x     - Signal matrix [T x C]
 %   zi    - Steady-state initial condition for this stage
-%   nfact - Edge-transient (reflection) length
+%   nfact - Edge-transient (reflection) length (total-order based)
 %
 % Outputs:
 %   y - Filtered signal matrix [T x C], same size as x

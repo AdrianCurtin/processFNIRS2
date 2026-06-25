@@ -30,8 +30,9 @@ function [ dataf ] = pf2_bandstop( data,filtOrder,fs,lowF,highF)
 %           Frequencies between lowF and highF are attenuated.
 %
 % Algorithm:
-%   1. Design IIR band-stop Butterworth filter using designfilt
-%   2. Apply zero-phase filtering using filtfilt (forward-backward)
+%   1. Design an IIR band-stop Butterworth filter (zero-pole-gain form ->
+%      second-order sections) with the toolbox-free pf2_base.external.butter
+%   2. Apply zero-phase filtering using filtfilt_classic (forward-backward)
 %   3. Preserve input orientation (row vs column vector)
 %
 % Example:
@@ -63,11 +64,15 @@ end
 %-----------------------------------------------------------------
 
 
-d = designfilt('bandstopiir','FilterOrder',filtOrder, ...
-           'HalfPowerFrequency1',lowF,'HalfPowerFrequency2',highF, ...
-           'DesignMethod','butter','SampleRate',fs);
+% Butterworth band-stop in zero-pole-gain form -> SOS. A band design of order
+% n produces a 2n-order filter, so halve the requested total order to match
+% the previous designfilt('FilterOrder', filtOrder) convention.
+nHalf = max(1, round(filtOrder / 2));
+half_fs = fs / 2;
+[z, p, k] = pf2_base.external.butter(nHalf, [lowF highF] / half_fs, 'stop');
+sos = pf2_base.external.zp2sos(z, p, k);
 
-dataf = filtfilt(d, data);
+dataf = pf2_base.external.filtfilt_classic(sos, 1, data);
 
 
 if Mini==1 %if the data is a row vector converts it to column vector

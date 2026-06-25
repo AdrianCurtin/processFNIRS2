@@ -5,8 +5,9 @@
 %   1. Time-animation movies of a biomarker (MP4 / GIF)
 %   2. Sensitivity-weighted cortical interpolation kernel
 %   3. Anatomical (Brodmann) parcel projection
-%   4. Brain-anchored connectome (edges drawn on the cortex / probe)
-%   5. Dual-brain inter-brain synchrony with a linked wavelet panel
+%   4. Optode parcel map (per-channel Voronoi cells, highlight + value-fill)
+%   5. Brain-anchored connectome (edges drawn on the cortex / probe)
+%   6. Dual-brain inter-brain synchrony with a linked wavelet panel
 %
 % Run top-to-bottom. File outputs are written to a temp folder and the paths
 % are printed; figures are also left open for interactive inspection.
@@ -52,7 +53,26 @@ pf2.probe.project.regions('HbO', procC, ...      % biomarker name -> time mean
     'initCamPosition', 'front');
 title('HbO — Brodmann parcels');
 
-%% 4. Brain-anchored connectome
+%% 4. Optode parcel map (per-channel Voronoi cells)
+% A channel-space "parcel map": each cortical vertex is assigned to its nearest
+% optode, drawn as discrete cells with smooth outlines and on-surface numbers.
+% This is a channel-assignment cartoon (NOT image reconstruction/DOT): spatial
+% resolution is channel-limited and the coverage radius is a display heuristic.
+%
+% (a) Highlight a subset of channels (numeric = printed optode numbers).
+figure('Color', 'w', 'Position', [0 0 900 700]);
+pf2.probe.project.parcels(proc, 'Highlight', [2 8 9 16], ...
+    'initCamPosition', 'front', 'savePath', fullfile(outDir, 'parcels_highlight.png'));
+title('Optode parcels — highlighted subset');
+
+% (b) Fill each cell by its channel value (a discrete per-channel map).
+figure('Color', 'w', 'Position', [0 0 900 700]);
+pf2.probe.project.parcels(meanHbO, proc, ...
+    'Colorbar', '\muM', 'initCamPosition', 'front', ...
+    'savePath', fullfile(outDir, 'parcels_value.png'));
+title('Optode parcels — HbO per channel');
+
+%% 5. Brain-anchored connectome
 % Channel-level Pearson connectivity drawn at real optode positions.
 conn = exploreFNIRS.connectivity.computeMatrix(proc, ...
     'Method', 'pearson', 'Biomarker', 'HbO');
@@ -64,7 +84,7 @@ pf2.probe.plot.connectome(conn, proc, 'View', '3d', ...
 figure('Color', 'w', 'Position', [0 0 1000 500]);
 pf2.probe.plot.connectome(conn, proc, 'View', '2d', 'Threshold', 0.5);
 
-%% 5. Dual-brain inter-brain synchrony
+%% 6. Dual-brain inter-brain synchrony
 % Cross-brain coupling between two subjects (here the same recording twice),
 % with a linked wavelet-coherence time-frequency panel.
 A = proc; B = processFNIRS2(pf2.import.sampleData.fNIR2000());

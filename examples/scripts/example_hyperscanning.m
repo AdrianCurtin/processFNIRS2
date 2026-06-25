@@ -12,7 +12,8 @@
 %   5. Dyad-level visualization (heatmap + inter-brain topo)
 %   6. Channel-level hyperscanning (full cross-brain matrix)
 %   7. Within-subject connectivity for comparison
-%   8. Export
+%   8. Multiple coupling methods
+%   9. Connectogram of a condition contrast (node-colored Delta-r)
 %
 % Requirements:
 %   - processFNIRS2 on path
@@ -225,6 +226,75 @@ for m = 1:length(methods)
     fprintf('  %s: mean inter-brain coupling = %.3f\n', ...
         methods{m}, mean(methodResult.Mean, 'omitnan'));
 end
+
+%% Step 8: Connectogram of a condition contrast (node-colored Delta-r)
+%
+% Reproduce the publication-style circular connectogram: channel nodes on a
+% ring, coupled pairs joined by arcs, and each NODE colored by a per-node
+% contrast (here Delta-r between the two task conditions) with its own
+% colorbar. Region anchors (ROI names) label the ring; edges are drawn in a
+% single subtle color so the node contrast reads cleanly.
+
+fprintf('\n=== Step 8: Connectogram (condition contrast, Delta-r) ===\n');
+
+subj = subjects{1};
+
+% The two task conditions are encoded by marker code. Build a within-brain
+% channel connectivity matrix for each condition by averaging that
+% condition's block windows, then take the per-node strength difference.
+codes = unique([blocks.markerCode]);
+codes = codes(1:min(2, numel(codes)));
+
+% Per-node strength = mean off-diagonal coupling (autocorrelation excluded).
+nodeStrength = @(M) (sum(M, 2, 'omitnan') - diag(M)) ./ max(size(M, 1) - 1, 1);
+
+condMat = cell(1, numel(codes));
+lastR = [];
+for ci = 1:numel(codes)
+    bsel = blocks([blocks.markerCode] == codes(ci));
+    accum = []; cnt = 0;
+    for k = 1:numel(bsel)
+        w = [bsel(k).startTime, bsel(k).endTime];
+        if diff(w) <= 0, continue; end
+        r = exploreFNIRS.connectivity.computeMatrix(subj, ...
+            'Method', 'pearson', 'Biomarker', 'HbO', 'TimeWindow', w);
+        if isempty(accum), accum = zeros(size(r.matrix)); end
+        accum = accum + r.matrix; cnt = cnt + 1; lastR = r;
+    end
+    condMat{ci} = accum ./ max(cnt, 1);
+end
+
+% Node Delta-r contrast = node strength in condition A minus condition B.
+dr = nodeStrength(condMat{1}) - nodeStrength(condMat{2});
+
+% Edges: the condition-A matrix. Nodes grouped under their ROI region.
+connResult = lastR;
+connResult.matrix = condMat{1};
+connResult.pmatrix = [];
+
+grp = repmat({''}, 1, nCh);
+for rr = 1:numel(roiDef)
+    grp(roiDef{rr}) = roiNames(rr);
+end
+
+fprintf('  Node Delta-r range: [%.3f, %.3f] across %d channels\n', ...
+    min(dr), max(dr), nCh);
+
+fig = exploreFNIRS.connectivity.plotChord(connResult, ...
+    'NodeValues', dr, 'NodeColormap', 'rdbu', ...
+    'ColorbarLabel', '\Deltar (Task A - Task B)', ...
+    'EdgeColor', [0.55 0.75 0.88], 'ArcAlpha', 0.5, ...
+    'GroupLabels', grp, 'MinThreshold', 0.5, ...
+    'Title', 'Within-Brain Connectogram (condition contrast)');
+% fig = exploreFNIRS.connectivity.plotChord(connResult, ...
+%     'NodeValues', dr, 'NodeColormap', 'rdbu', ...
+%     'ColorbarLabel', '\Deltar (Task A - Task B)', ...
+%     'EdgeColor', [0.55 0.75 0.88], 'ArcAlpha', 0.5, ...
+%     'GroupLabels', grp, 'MinThreshold', 0.5, ...
+%     'Title', 'Within-Brain Connectogram (condition contrast)', ...
+%     'Visible', 'off', ...
+%     'SavePath', fullfile(outDir, 'step8_connectogram.png'));
+% close(fig);
 
 %% Summary
 fprintf('\n=== Hyperscanning tutorial complete ===\n');

@@ -38,8 +38,8 @@ half_fs = fs/2;    %half of sampling freq. equal to pi
 % frequencies (e.g., 0.01 Hz at 5 Hz sampling). The state-space form
 % [A,B,C,D]=butter + ss2sos can produce unstable filters due to
 % ill-conditioned intermediate matrices. ZPK -> SOS avoids this.
-[z, p, k] = butter(filtOrder, [lowF highF]/half_fs);
-sos = zp2sos(z, p, k);
+[z, p, k] = pf2_base.external.butter(filtOrder, [lowF highF]/half_fs);
+sos = pf2_base.external.zp2sos(z, p, k);
 
 % Filter each column, handling NaN-padded regions per channel
 dataf = NaN(size(data));

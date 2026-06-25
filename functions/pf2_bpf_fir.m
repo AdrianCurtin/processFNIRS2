@@ -50,7 +50,7 @@ end
 %-----------------------------------------------------------------
 half_fs = fs/2;    %half of sampling freq. equal to pi
 
-[b,a] = fir1(Nf,[lowF highF]/half_fs);
+[b,a] = pf2_base.external.fir1(Nf,[lowF highF]/half_fs);
 
 if(size(data,1)>3*Nf)
 	switch(NaN_mode)
@@ -58,7 +58,7 @@ if(size(data,1)>3*Nf)
 			try
 				dataf=pf2_base.filtfilt_interp(b,a,data);
 			catch
-				dataf=pf2_base.external.filtfilt_classic(b,a,data); % Use matlab 2018a filtfilt if current version fails due to nans
+				dataf=pf2_base.external.filtfilt_classic(b,a,data); % Fall back to in-house zero-phase filter if the NaN-aware path errors
 			end
 			if(restoreMean)
 			   dataf=dataf+nanmean(data,1); 
@@ -67,14 +67,10 @@ if(size(data,1)>3*Nf)
 			try
 				dataf=pf2_base.filtfilt_piecewise(b,a,data,3*Nf,restoreMean);
 			catch
-				dataf=pf2_base.external.filtfilt_classic(b,a,data); % Use matlab 2018a filtfilt if current version fails due to nans
+				dataf=pf2_base.external.filtfilt_classic(b,a,data); % Fall back to in-house zero-phase filter if the NaN-aware path errors
             end
 		case 'Leave'
-			try
-				dataf=filtfilt(b,a,data);
-			catch
-				dataf=pf2_base.external.filtfilt_classic(b,a,data); % Use matlab 2018a filtfilt if current version fails due to nans
-			end
+			dataf=pf2_base.external.filtfilt_classic(b,a,data);
 			if(restoreMean)
 			   dataf=dataf+nanmean(data,1); 
 			end

@@ -75,7 +75,7 @@ function CARout=pf2_CAR(x,local,medfiltN,mdebug)
     else
         basicCAR=nanmean(x,2);
 
-        basicCAR=medfilt1(basicCAR,medfiltN);
+        basicCAR=pf2_base.external.medfilt1(basicCAR,medfiltN);
 
         CARx=repmat(basicCAR,1,numCh);
 

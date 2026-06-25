@@ -36,7 +36,7 @@ half_fs = fs/2;    %half of sampling freq. equal to pi
 useSOS = false;
 
 if ft==1
-    [b,a] = fir1(Nf,freq_cut/half_fs);  % FIR1 linear phase filter
+    [b,a] = pf2_base.external.fir1(Nf,freq_cut/half_fs);  % FIR1 linear phase filter
 elseif ft==2
     dp=0.01; %pass-band ripple
     ds=0.01; %stop-band ripple
@@ -50,8 +50,8 @@ elseif ft==3
     % Use zero-pole-gain form for numerical stability.
     % The transfer function form [b,a]=butter can produce unstable filters
     % at low normalized frequencies. ZPK -> SOS avoids this.
-    [z, p, k] = butter(Nf, freq_cut/half_fs, 'low');
-    sos = zp2sos(z, p, k);
+    [z, p, k] = pf2_base.external.butter(Nf, freq_cut/half_fs, 'low');
+    sos = pf2_base.external.zp2sos(z, p, k);
     useSOS = true;
 end
 %-----------------------------------------------------------------
@@ -71,7 +71,7 @@ for col = 1:N
         if useSOS
             dataf(first:last, col) = pf2_base.external.filtfilt_classic(sos, 1, seg);
         else
-            dataf(first:last, col) = filtfilt(b, a, seg);
+            dataf(first:last, col) = pf2_base.external.filtfilt_classic(b, a, seg);
         end
     end
 end

@@ -25,14 +25,12 @@ authors:
     email: adrian.b.curtin@drexel.edu
     affiliation: Drexel University
     # orcid: "https://orcid.org/0000-0000-0000-0000"   # add ORCID if available
-  - family-names: DeFilippis
-    given-names: Nick
-  - family-names: Goldblum
-    given-names: Zack
-  - family-names: Topoglu
-    given-names: Yigit
+  - family-names: Ayaz
+    given-names: Hasan
+    affiliation: Drexel University
 # Additional code contributors to review and promote to authors as appropriate
-# (e.g. Pratusha, Venus W.). Add full names / affiliations / ORCIDs before release.
+# (e.g. Pratusha Reddy, Lei Wang, Nicholas DeFilippis, Yigit Topoglu). Add full
+# names / affiliations / ORCIDs before release.
 #
 # When a companion paper or archived release (e.g. Zenodo) is available, add a
 # DOI under `identifiers:` and a `preferred-citation:` block so tools cite the

@@ -70,6 +70,33 @@ if(isnumeric(raw_method)) % Lookup method based on index
 end
 
 if(isstring(raw_method)||ischar(raw_method))
+	raw_method = char(raw_method);
 
-	pf2('Raw_Method',raw_method);
+	% When a ProcessingContext is supplied, set the method ON the context
+	% (isolated state, validated against its own methods library) rather than
+	% mutating the global PF2 -- this keeps parallel/reproducible processing
+	% free of shared global state.
+	if(~isempty(ctx) && isa(ctx,'pf2_base.ProcessingContext'))
+		ctx.setRawMethod(raw_method);
+		return;
+	end
+
+	% Write the selected method straight into the active stage. Previously
+	% this delegated to processFNIRS2('Raw_Method',...), but that config-only
+	% call (no data) is intercepted by the noop pass-through early-return in
+	% processFNIRS2 and never reaches the method-assignment block, so the
+	% selection was silently dropped. Set the global directly instead, matching
+	% processFNIRS2's own raw-method assignment.
+	methodsLib = pf2_base.resolveMethodsLib('raw', ctx);
+	if(~pf2_base.isnestedfield(methodsLib,sprintf('cfg.%s',raw_method)))
+		error('pf2:methods:raw:setMethod:methodNotFound', ...
+			'Unable to find method named: %s', raw_method);
+	end
+
+	global PF2 %#ok<GVMIS>
+	if(pf2_base.isnestedfield(PF2,'stageRawMethod.name')&&~strcmpi(PF2.stageRawMethod.name,raw_method))
+		fprintf('Setting Raw Method to: %s\n',raw_method);
+	end
+	PF2.stageRawMethod=pf2_base.pf2_unpackMethod(methodsLib.cfg.(raw_method));
+	PF2.stageRawMethod.name=raw_method;
 end

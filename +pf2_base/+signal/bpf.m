@@ -31,8 +31,8 @@ half_fs = fs / 2;
 % Use zero-pole-gain form for numerical stability at low normalized
 % frequencies (e.g., 0.01 Hz at 5 Hz sampling). ZPK -> SOS avoids
 % ill-conditioned intermediate matrices.
-[z, p, k] = butter(filtOrder, [lowF highF] / half_fs);
-sos = zp2sos(z, p, k);
+[z, p, k] = pf2_base.external.butter(filtOrder, [lowF highF] / half_fs);
+sos = pf2_base.external.zp2sos(z, p, k);
 
 % Filter each column, handling NaN-padded regions per channel
 dataf = NaN(size(data));

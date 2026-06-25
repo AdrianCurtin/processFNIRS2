@@ -36,8 +36,8 @@ half_fs = fs/2;    %half of sampling freq. equal to pi
 % Use zero-pole-gain form for numerical stability.
 % The transfer function form [b,a]=butter can produce unstable filters
 % at low normalized frequencies. ZPK -> SOS avoids this.
-[z, p, k] = butter(filtOrder, freq_cut/half_fs, 'high');
-sos = zp2sos(z, p, k);
+[z, p, k] = pf2_base.external.butter(filtOrder, freq_cut/half_fs, 'high');
+sos = pf2_base.external.zp2sos(z, p, k);
 
 % Filter each column, handling NaN-padded regions per channel
 dataf = NaN(size(data));

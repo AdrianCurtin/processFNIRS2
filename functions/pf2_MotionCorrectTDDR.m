@@ -124,9 +124,9 @@ function corrected = tddr_core(signal, sample_rate)
     filter_order = 3;
     Fc = filter_cutoff * 2/sample_rate;
     if Fc<1
-        [fb,fa] = butter(filter_order,Fc);
+        [fb,fa] = pf2_base.external.butter(filter_order,Fc);
         try
-            signal_low = filtfilt(fb,fa,signal);
+            signal_low = pf2_base.external.filtfilt_classic(fb,fa,signal);
         catch
             signal_low = pf2_base.external.filtfilt_classic(fb,fa,signal);
         end

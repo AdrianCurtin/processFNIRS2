@@ -80,6 +80,8 @@ function barchart(handles,exSettings,exGby,gbyVars, showBarChart,showTopo)
 % See also: exploreFNIRS.plot.scatter, exploreFNIRS.plot.temporal,
 %           exploreFNIRS.fx.performFDR, exploreFNIRS.fx.autoContrast
 
+global setF   % read-only here (device cfg name); bound once, not per loop iteration
+
 curInfoGroup=exSettings.curInfoGroup;
 
 gbyVars_original=gbyVars;
@@ -1070,8 +1072,6 @@ if(showTopo)
                                 %FDR RESULTS FOUND
                             end
 
-                            global setF
-
                             switch(setF.device.Info.CfgName)
                                 case 'fNIR_Devices_fNIR1000'
                                     curT=nan(2,8);
@@ -1152,8 +1152,6 @@ if(showTopo)
                                     titleSTR=sprintf('%s*',anovaNames{a});
                                     %FDR RESULTS FOUND
                                 end
-
-                                global setF
 
                                 switch(setF.device.Info.CfgName)
                                     case 'fNIR_Devices_fNIR1000'

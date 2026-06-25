@@ -188,8 +188,7 @@ exploreFNIRS(allData);
 %    - Export statistics
 ```
 
-### Scriptable Analysis (Headless) — New in v1.0.0
-
+### Scriptable Analysis (Headless)
 The `Experiment` class enables complete group analysis without the GUI:
 
 ```matlab
@@ -217,19 +216,18 @@ fig = ex.plotBar('Biomarker', 'HbO', 'ROIs', {'DLPFC_L', 'DLPFC_R'});
 [fig, results] = ex.plotLME('Biomarkers', {'HbO'}, 'ShowTopo', true);
 
 % Scatter correlation of behavioral variable vs biomarker
-[fig, stats] = ex.plotScatter('InfoVar', 'reactionTime', 'Biomarkers', {'HbO'});
+[fig, stats] = ex.plotScatter('reactionTime', 'Biomarkers', {'HbO'});
 
 % Auxiliary channel plots (accelerometer, heart rate, etc.)
 fig = ex.plotAux('accelerometer', 'Layout', 'grid');
 
 % Export for external analysis
-longTable = ex.exportLong();
-wideTable = ex.exportWide();
+longTable = ex.toLongTable();
+wideTable = ex.toWideTable();
 writetable(longTable, 'export_for_R.csv');
 ```
 
-### Statistical Analysis Module — New in v1.0.0
-
+### Statistical Analysis Module
 ```matlab
 % Standalone LME fitting (no visualization)
 results = ex.statsFitLME('Biomarkers', {'HbO'}, 'Channels', 1:5);
@@ -258,8 +256,7 @@ T = exploreFNIRS.stats.summarize(results, 'Type', 'anova', 'IncludeFDR', true);
 cr = exploreFNIRS.stats.runContrasts(results, 'FDRMethod', 'twostep');
 ```
 
-### Advanced Visualization — New in v1.0.0
-
+### Advanced Visualization
 ```matlab
 % Topographic maps (auto-uses probe geometry, excludes short-sep channels)
 fig = ex.plotTopo('Biomarker', 'HbO', 'Time', 15, 'SavePath', 'topo.png');
@@ -276,8 +273,7 @@ panels = {
 fig = ex.plotComposite(panels, 'Layout', [1, 2], 'SavePath', 'composite.png');
 ```
 
-### Connectivity Analysis — New in v1.0.0
-
+### Connectivity Analysis
 ```matlab
 % Compute connectivity matrices
 connResults = ex.connectivity('Method', 'pearson');
@@ -308,15 +304,17 @@ T = exploreFNIRS.export.connectivityToTable(connResults);
 writetable(T, 'connectivity_results.csv');
 ```
 
-### Hyperscanning Analysis — New in v1.0.0
-
+### Hyperscanning Analysis
 ```matlab
-% Pair subjects and compute inter-brain coupling
-hsResults = ex.hyperscanning('PairBy', 'Dyad', 'Method', 'wcoherence');
+% Pair subjects (matched by .info.DyadID / .info.Role) and compute coupling
+hsResults = ex.hyperscanning('Method', 'wcoherence');
 
-% Group-level statistics with permutation testing
-groupStats = exploreFNIRS.hyperscanning.computeGroup(hsResults);
-pValues = exploreFNIRS.hyperscanning.permutationTest(hsResults, 1000);
+% Group-level statistics with permutation testing. The package functions take
+% the data cell array plus a pairs struct (from pairSubjects), not the
+% Experiment result:
+pairs      = exploreFNIRS.hyperscanning.pairSubjects(allData);
+groupStats = exploreFNIRS.hyperscanning.computeGroup(allData, pairs, 'Method', 'wcoherence');
+permStats  = exploreFNIRS.hyperscanning.permutationTest(allData, pairs, 'Permutations', 1000);
 fig = exploreFNIRS.hyperscanning.plotGroup(groupStats);
 
 % Dual-brain topographic display
@@ -353,7 +351,7 @@ The following functions can be used outside the GUI:
 | `+core` | `plotHeatmap` | Channel × time heatmap |
 | `+core` | `plotComposite` | Multi-panel publication figures |
 | `+core` | `plotLME` | LME analysis with bar charts and topo F-maps |
-| `+core` | `plotScatterFNIRS` | Scatter correlation with regression and topo maps |
+| `+core` | `plotScatter` | Scatter correlation with regression and topo maps |
 | `+core` | `plotAux` | Headless auxiliary channel temporal plots |
 | `+core` | `getGroupColors` | Consistent group coloring |
 | `+stats` | `fitLME` | Standalone channel-wise LME fitting (no visualization) |

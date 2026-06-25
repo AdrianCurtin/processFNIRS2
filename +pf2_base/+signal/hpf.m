@@ -28,8 +28,8 @@ end
 half_fs = fs / 2;
 
 % Use zero-pole-gain form for numerical stability.
-[z, p, k] = butter(filtOrder, freq_cut / half_fs, 'high');
-sos = zp2sos(z, p, k);
+[z, p, k] = pf2_base.external.butter(filtOrder, freq_cut / half_fs, 'high');
+sos = pf2_base.external.zp2sos(z, p, k);
 
 % Filter each column, handling NaN-padded regions per channel
 dataf = NaN(size(data));

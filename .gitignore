@@ -9,7 +9,11 @@ sampledata/sampleNIR_CH.mat
 .vscode/settings.json
 *.md
 !THIRD_PARTY_LICENSES.md
+!CONTRIBUTING.md
+!docs/*.md
+!examples/scripts/README.md
 internal/
+site/
 tests/benchmarks/data/
 tests/benchmarks/results/
 examples/notebooks/sample_report/

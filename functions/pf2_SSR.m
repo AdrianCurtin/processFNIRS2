@@ -1,4 +1,4 @@
-function [fNIR] = pf2_SSR(fNIR, method, numPCs)
+function [fNIR] = pf2_SSR(fNIR, method, numPCs, centerRegressors)
 % PF2_SSR Short-separation channel regression for superficial signal removal
 %
 % Wrapper for pf2_base.fnirs.shortChannelRegression that is compatible with
@@ -15,11 +15,14 @@ function [fNIR] = pf2_SSR(fNIR, method, numPCs)
 %   fNIR = pf2_SSR(fNIR)
 %   fNIR = pf2_SSR(fNIR, method)
 %   fNIR = pf2_SSR(fNIR, method, numPCs)
+%   fNIR = pf2_SSR(fNIR, method, numPCs, centerRegressors)
 %
 % Inputs:
 %   fNIR   - Processed fNIRS data structure with hemoglobin fields
 %   method - Regression method: 'nearest' (default), 'pca', or 'all'
 %   numPCs - Number of principal components for 'pca' method (default: 1)
+%   centerRegressors - Mean-center short-channel regressors before removal
+%            for an exactly mean-preserving correction (default: false)
 %
 % Outputs:
 %   fNIR - Corrected fNIRS structure with superficial signal removed
@@ -35,7 +38,10 @@ function [fNIR] = pf2_SSR(fNIR, method, numPCs)
 %
 % Notes:
 %   - Intended for use in oxy processing method chains
-%   - Requires probeinfo with IsShortSeparation field
+%   - Short channels are detected from probeinfo.IsShortSeparation, or from
+%     the attached device (device.isShortSep) for device-config imports such
+%     as the bundled fNIR2000 sample (COBI .nir), which carry short channels
+%     in the device but no probeinfo
 %   - Applied after Beer-Lambert conversion (operates on HbO/HbR)
 %
 % See also: pf2_base.fnirs.shortChannelRegression, pf2_MotionCorrectTDDR
@@ -48,7 +54,11 @@ if nargin < 3 || isempty(numPCs)
     numPCs = 1;
 end
 
+if nargin < 4 || isempty(centerRegressors)
+    centerRegressors = false;
+end
+
 fNIR = pf2_base.fnirs.shortChannelRegression(fNIR, ...
-    'Method', method, 'NumPCs', numPCs);
+    'Method', method, 'NumPCs', numPCs, 'CenterRegressors', centerRegressors);
 
 end

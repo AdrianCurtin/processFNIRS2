@@ -3050,9 +3050,12 @@ classdef Experiment < handle
                     blockArgs = [blockArgs, {'ConditionMap', blk.conditionMap}];
                 end
                 % Resolve an explicit extraction window. extractBlocks now
-                % defaults to a 5 s Buffer (and prints a one-time note) when
-                % no window is given; pass PreTime/PostTime explicitly here so
-                % this internal path stays silent and reproducible.
+                % defaults to a 5 s Buffer (and prints a one-time note) when no
+                % window is given; pass PreTime/PostTime explicitly to the
+                % extractBlocks call below so this internal path stays silent and
+                % reproducible. These are extractBlocks parameters only -- they
+                % are NOT appended to blockArgs, which is forwarded to
+                % defineBlocks (which does not recognize PreTime/PostTime).
                 preTime = 5;
                 postTime = 15;
                 if isfield(blk, 'preTime') && ~isempty(blk.preTime)
@@ -3061,7 +3064,6 @@ classdef Experiment < handle
                 if isfield(blk, 'postTime') && ~isempty(blk.postTime)
                     postTime = blk.postTime;
                 end
-                blockArgs = [blockArgs, {'PreTime', preTime, 'PostTime', postTime}];
 
                 dur = 0;
                 if isfield(blk, 'duration'), dur = blk.duration; end

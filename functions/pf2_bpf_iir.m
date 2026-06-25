@@ -89,13 +89,14 @@ end
 Wn = max(Wn, 1e-6);
 Wn = min(Wn, 1 - 1e-6);
 
-% Design filter and convert to SOS for numerical stability
+% Design filter and convert to SOS for numerical stability (zero-pole-gain
+% form -> second-order sections; avoids the Signal Processing Toolbox).
 if strcmp(ftype, 'bandpass')
-    [A, B, C, D] = butter(filtOrder, Wn);
+    [zz, pp, kk] = pf2_base.external.butter(filtOrder, Wn);
 else
-    [A, B, C, D] = butter(filtOrder, Wn, ftype);
+    [zz, pp, kk] = pf2_base.external.butter(filtOrder, Wn, ftype);
 end
-sos = ss2sos(A, B, C, D);
+sos = pf2_base.external.zp2sos(zz, pp, kk);
 
 %% Minimum data length for filtering
 % filtfilt requires at least 3*nSOS samples
@@ -138,7 +139,7 @@ switch NaN_mode
 
     case 'Leave'
         try
-            dataf = filtfilt(sos, 1, data);
+            dataf = pf2_base.external.filtfilt_classic(sos, 1, data);
         catch
             dataf = pf2_base.external.filtfilt_classic(sos, 1, data);
         end

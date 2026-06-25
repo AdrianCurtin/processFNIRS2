@@ -3,9 +3,10 @@ function [ h, imgOut ] = interpolateValues3D(varargin)
 %
 % Generates a 3D brain surface visualization with fNIRS channel data projected
 % onto the cortical surface. Values are interpolated across the brain mesh
-% using nearest-neighbor or weighted distance methods. Supports MNI and
-% Talairach coordinate systems, multiple probe configurations, EEG 10-20
-% electrode positions, Brodmann area overlays, and various visualization options.
+% using nearest-neighbor or weighted distance methods, or (with 'Parcellate')
+% drawn as a discrete optode parcel map. Supports MNI and Talairach coordinate
+% systems, multiple probe configurations, EEG 10-20 electrode positions,
+% Brodmann area overlays, and various visualization options.
 %
 % Reference:
 %   Brain mesh coordinates based on MNI/ICBM templates.
@@ -125,6 +126,29 @@ function [ h, imgOut ] = interpolateValues3D(varargin)
 %                           data-facing default view; the conservative look.
 %                         A style struct (see pf2_base.plot.RenderStyle) may
 %                         also be passed to override individual fields.
+%   'Parcellate'        - Render an optode PARCEL MAP instead of a smooth
+%                         field (default false). Each in-coverage cortical
+%                         vertex is hard-assigned to its nearest optode,
+%                         producing discrete flat-filled cells (Voronoi-style)
+%                         with outlined boundaries. With data2plot, each cell
+%                         is filled by its channel value through the colormap
+%                         (a discrete per-channel map); without data, cells
+%                         use 'ParcelColor'. Surface render only (ignored for
+%                         the voxel brain and when VertexData is supplied);
+%                         honors 'UseGeodesic'. This is a channel-assignment
+%                         cartoon, NOT image reconstruction or DOT — see Notes.
+%   'HighlightChannels' - Channels whose parcels are painted in
+%                         'HighlightColor' (default []). A NUMERIC list matches
+%                         the PRINTED optode numbers (OptodeNum), so
+%                         [2 8 9 16] highlights the cells labelled 2, 8, 9, 16.
+%                         A LOGICAL mask selects by position in the plotted-
+%                         channel order. Parcellation only.
+%   'HighlightColor'    - Fill color for highlighted parcels (default purple
+%                         [0.62 0.40 0.78]).
+%   'ParcelColor'       - Flat fill for non-highlighted parcels when no data
+%                         is supplied (default light gray [0.78 0.78 0.80]).
+%   'ParcelOutlineColor'- Color of the cell boundary outlines (default white).
+%   'ParcelOutlineWidth'- Line width of the cell boundary outlines (default 1.5).
 %
 % Outputs:
 %   h      - Handle to the axes containing the visualization
@@ -146,10 +170,36 @@ function [ h, imgOut ] = interpolateValues3D(varargin)
 %   % Show with Brodmann areas
 %   pf2.probe.plot.interpolateValues3D([], processed, 'BrodmannAreas', [9,10,46]);
 %
+%   % Optode parcel map: gray cells with a highlighted (purple) subset
+%   pf2.probe.plot.interpolateValues3D([], processed, 'Parcellate', true, ...
+%       'HighlightChannels', [2 8 9 16]);
+%
+%   % Parcel map filled discretely by HbO value (a discrete per-channel map)
+%   pf2.probe.plot.interpolateValues3D(hboVals, processed, 'Parcellate', true);
+%
 % Notes:
 %   - Requires cerebro_mdl.mat brain mesh data file
 %   - Short separation channels are excluded by default when data is provided
 %   - Uses 'animated' mode for video generation to avoid redrawing static elements
+%   - PARCELLATION ('Parcellate') is a channel-assignment cartoon, NOT image
+%     reconstruction or DOT, and NOT a measurement of cortical activity at the
+%     cell's spatial extent. Spatial resolution is channel-limited (set by
+%     source-detector geometry, typically ~2-3 cm), not by the mesh. In the
+%     data-filled mode each cell is flat-filled with a single channel value:
+%     that conveys WHICH channel covers a region, not that the hemodynamic
+%     response is spatially uniform across the cell. For a smooth, uncertainty-
+%     communicating field use the default interpolation; for sensitivity-
+%     weighted footprints use interpolateType='sensitivity'; for genuine
+%     image-space estimates use pf2.probe.dot.reconstruct.
+%   - The parcellation coverage radius is a display heuristic derived from the
+%     montage-median source-detector distance (via 'bufferDistance'), not a
+%     measured sensitivity boundary or penetration depth. It is uniform across
+%     the montage; changing it rescales apparent coverage without changing the
+%     data. Vertices are assigned to the nearest parcel center by proximity
+%     (geodesic by default, which prevents bleed across sulci/the midline);
+%     this is a heuristic and does not imply the channel samples that vertex's
+%     cortex. Cell boundaries are cosmetically smoothed and are illustrative —
+%     their exact placement carries no anatomical or functional meaning.
 %   - HEADLESS SAVING: 3D cortical surfaces only rasterize in a *visible*
 %     figure. Under headless MATLAB (-batch / -nodisplay) the generic
 %     figure('Visible','off') + saveas/exportgraphics pattern produces a
@@ -158,7 +208,8 @@ function [ h, imgOut ] = interpolateValues3D(varargin)
 %     to all wrappers (pf2.probe.plot.showProbe3D, pf2.probe.project.*).
 %
 % See also: pf2.probe.plot.showProbe3D, pf2.probe.plot.interpolateValues,
-%           pf2.probe.plot.imageValues, exploreFNIRS
+%           pf2.probe.plot.imageValues, pf2.probe.project.parcels,
+%           pf2.probe.dot.reconstruct, exploreFNIRS
 isStructOrEmpty=@(x) isstruct(x)||isempty(x);
 isStringOrChar=@(x)isstring(x)||ischar(x);
 
@@ -294,6 +345,16 @@ addParameter(p, 'saveWidth', [], @(x) isempty(x) || isnumeric(x));
 addParameter(p, 'saveHeight', [], @(x) isempty(x) || isnumeric(x));
 addParameter(p, 'saveDPI', 150, @isnumeric);
 addParameter(p, 'Style', 'showcase', @(x) ischar(x) || isstring(x) || isstruct(x)); % render preset: 'showcase' (default) | 'publication' | style struct
+
+% Parcellation variant: hard-assign each in-coverage vertex to its nearest
+% optode and render discrete flat-filled cells with outlined boundaries
+% (Voronoi-style optode parcel map) instead of a smoothly interpolated field.
+addParameter(p, 'Parcellate', false, @islogical);
+addParameter(p, 'HighlightChannels', [], @(x) isempty(x) || (isnumeric(x)&&isvector(x)) || islogical(x)); % indices (or logical mask) into the plotted channels to paint in HighlightColor
+addParameter(p, 'HighlightColor', [0.62 0.40 0.78], validColor);   % fill for highlighted parcels (default purple)
+addParameter(p, 'ParcelColor', [0.78 0.78 0.80], validColor);      % flat fill for non-highlighted parcels when no data is supplied
+addParameter(p, 'ParcelOutlineColor', [1 1 1], validColor);        % color of the cell boundary outlines
+addParameter(p, 'ParcelOutlineWidth', 1.5, validScalarPosNum);     % line width of the cell boundary outlines
 
 
 parse(p,varargin{:});
@@ -571,7 +632,7 @@ hold off
 
 
 
-itemsToDelete={'BrainVoxel','BrainOverlay','BrainVoxelOverlay','BA_area_mrk','Eye','ProbeOpt','OptLabel','ProbeSrc','ProbeSrcLabel','ProbeDet','ProbeDetLabel','Scatter1020','Label1020','ScatterCurve','OptLines','BrainRef'};
+itemsToDelete={'BrainVoxel','BrainOverlay','BrainVoxelOverlay','BA_area_mrk','Eye','ProbeOpt','OptLabel','ProbeSrc','ProbeSrcLabel','ProbeDet','ProbeDetLabel','Scatter1020','Label1020','ScatterCurve','OptLines','BrainRef','ParcelEdges'};
 
 grootHandle=groot;
 grootHandle.ShowHiddenHandles=true;
@@ -1666,6 +1727,127 @@ else % No data to plot, everything is brain and anatomy
     end
 end
 
+% ---- Optode parcellation variant -------------------------------------
+% Hard-assign each in-coverage cortical vertex to its nearest optode and
+% render the result as discrete flat-filled cells (a Voronoi-style parcel
+% map) with outlined boundaries, rather than a smoothly interpolated field.
+% Cells are filled by channel value (when data2plot is supplied) or a
+% neutral fill, with an optional highlighted subset (the "purple" cells).
+% Boundary outlines are stashed in parcelEdgesToDraw and drawn after the
+% brain patch. Surface render only (not the voxel brain).
+parcelEdgesToDraw = [];
+% Parcellation is a channel-space render; the precomputed per-vertex field
+% (VertexData, e.g. a DOT reconstruction) is a different representation and
+% the two cannot be combined. Warn and skip rather than silently clobber it.
+if p.Results.Parcellate && ~isempty(vertexData)
+    warning('pf2:interpolateValues3D:parcellateVertexData', ...
+        'Parcellate is ignored when VertexData is supplied (they are different render modes).');
+end
+doParcellate = p.Results.Parcellate && ~p.Results.showVoxelBrain && isempty(vertexData);
+if doParcellate && isfield(probeInfo, 'TableOpt')
+    % Control points (parcel centers) and the OptodeNum label for each, so
+    % HighlightChannels can be resolved against the printed numbers. With
+    % data, reuse the data-path controlPoints so cell colors align with
+    % data2plot; without data, take the full optode set (respecting short-
+    % separation inclusion) since the data-path optode list is empty then.
+    if ~all(dataEmpty) && exist('controlPoints','var') && ~isempty(controlPoints)
+        parcelControl = controlPoints;
+        parcelOptodeNum = probeInfo.TableOpt.OptodeNum(includeChannels);
+    else
+        parcelControl = [probeInfo.TableOpt.Pos3D_x, probeInfo.TableOpt.Pos3D_y, probeInfo.TableOpt.Pos3D_z];
+        parcelOptodeNum = probeInfo.TableOpt.OptodeNum;
+        if ~include_ss
+            keepOpt = ~probeInfo.TableOpt.IsShortSeparation;
+            parcelControl = parcelControl(keepOpt, :);
+            parcelOptodeNum = parcelOptodeNum(keepOpt);
+        end
+        if p.Results.useTalairach
+            parcelControl = pf2_base.external.icbm_fsl2tal(parcelControl);
+        end
+    end
+    parcelOptodeNum = parcelOptodeNum(:)';
+    nParcel = size(parcelControl, 1);
+end
+if doParcellate && exist('nParcel','var') && nParcel >= 1
+    % Coverage radius: the data-path value when available, otherwise derived
+    % from the source-detector distances (bufferDistance is NaN with no data).
+    if exist('max_distance_2','var') && ~isempty(max_distance_2) && ~isnan(max_distance_2)
+        parcelMaxDist2 = max_distance_2;
+    else
+        bd = bufferDistance;
+        if isempty(bd) || isnan(bd)
+            sdcol = probeInfo.TableOpt.SD;
+            bd = median(sdcol(~isnan(sdcol))) * 10 / sqrt(2);
+        end
+        parcelMaxDist2 = bd^2 / sqrt(2);
+    end
+
+    [parcelIdx, inCoverage, parcelEdgesToDraw] = iLocalParcellate( ...
+        ax, mdl.v, mdl.f, parcelControl, parcelMaxDist2, ...
+        p.Results.UseGeodesic, animationOptimized, surfaceNormals);
+
+    % Per-parcel fill: discrete data value (when data supplied) else flat.
+    parcelFill = repmat(p.Results.ParcelColor(:)', nParcel, 1);
+    if ~all(dataEmpty) && exist('c_ind','var') && exist('cmapRGB','var')
+        ci = min(max(c_ind(:), 0), 1);
+        cidx = round(ci * (size(cmapRGB,1) - 1)) + 1;
+        cidx = min(max(cidx, 1), size(cmapRGB,1));
+        if numel(cidx) == nParcel
+            parcelFill = cmapRGB(cidx, :);
+            % Suppress channels the smooth path would hide: NaN/masked-out
+            % channels and two-sided dead-zone channels (between the two
+            % colorbars). Paint these cells the neutral ParcelColor rather
+            % than the spurious value-0 color so the parcel map agrees with
+            % the smooth render.
+            dead = false(nParcel, 1);
+            if exist('mask','var') && numel(mask) == nParcel
+                dead = dead | mask(:);
+            end
+            if numel(data2plot_concat) == nParcel
+                dead = dead | isnan(data2plot_concat(:));
+            end
+            if any(dead)
+                parcelFill(dead, :) = repmat(p.Results.ParcelColor(:)', nnz(dead), 1);
+            end
+        end
+    end
+
+    % Highlighted subset. A numeric list matches the PRINTED optode numbers
+    % (OptodeNum); a logical mask selects by position in the plotted-channel
+    % order. This keeps highlighting intuitive on montages whose optode
+    % numbers are not a simple 1..N sequence.
+    hl = p.Results.HighlightChannels;
+    if ~isempty(hl)
+        if islogical(hl)
+            hlMask = false(1, nParcel);
+            n = min(numel(hl), nParcel);
+            hlMask(1:n) = hl(1:n);
+            hlIdx = find(hlMask);
+        else
+            [tf, loc] = ismember(round(hl(:)'), parcelOptodeNum);
+            hlIdx = loc(tf);
+            if any(~tf)
+                missing = round(hl(~tf));
+                warning('pf2:interpolateValues3D:highlightNotFound', ...
+                    'HighlightChannels values not in the plotted optode numbers: %s', ...
+                    mat2str(missing(:)'));
+            end
+        end
+        hlIdx = hlIdx(hlIdx >= 1 & hlIdx <= nParcel);
+        if ~isempty(hlIdx)
+            parcelFill(hlIdx, :) = repmat(p.Results.HighlightColor(:)', numel(hlIdx), 1);
+        end
+    end
+
+    % Paint vertices: in-coverage -> its parcel color; else brainColor with
+    % zero alpha so out-of-coverage cortex shows the gray base through.
+    Cs = repmat(brainColor, size(mdl.v,1), 1);
+    covIdx = find(inCoverage);
+    Cs(covIdx, :) = parcelFill(parcelIdx(covIdx), :);
+    vertexAlpha = double(inCoverage);
+    transparentMode = true;
+end
+
 if(~p.Results.showVoxelBrain)
     brainHndl  = findobj(ax,'Type','Patch','Tag','Brain');
     overlayHndl = findobj(ax,'Type','Patch','Tag','BrainOverlay');
@@ -1744,6 +1926,15 @@ if(~p.Results.showVoxelBrain)
         end
     elseif ~isempty(overlayHndl)
         delete(overlayHndl);
+    end
+
+    % Draw the parcellation cell-boundary outlines on top of the cortex.
+    if ~isempty(parcelEdgesToDraw)
+        hold on
+        hEdge = plot3(ax, parcelEdgesToDraw(:,1), parcelEdgesToDraw(:,2), parcelEdgesToDraw(:,3), ...
+            '-', 'Color', p.Results.ParcelOutlineColor, 'LineWidth', p.Results.ParcelOutlineWidth);
+        hEdge.Tag = 'ParcelEdges';
+        hEdge.HandleVisibility = 'off';
     end
 
 end
@@ -1830,6 +2021,23 @@ if(showChannels&&isfield(probeInfo, 'TableOpt')&&~contains('ProbeOpt',itemsToSki
 
     if(p.Results.useTalairach)
         optPos=pf2_base.external.icbm_fsl2tal(optPos);
+    end
+
+    % For the parcel map, pull the channel numbers (and their marker circles)
+    % onto the cortical surface: snap each optode to the nearest mesh vertex
+    % and lift it just above the outline so the number sits on its cell rather
+    % than floating at scalp depth.
+    if p.Results.Parcellate && exist('mdl','var') && isfield(mdl,'v') && ~isempty(mdl.v)
+        snapped = optPos;
+        for oi = 1:size(optPos,1)
+            dd = sum((mdl.v - optPos(oi,:)).^2, 2);
+            [~, nv] = min(dd);
+            snapped(oi,:) = mdl.v(nv,:);
+        end
+        cc = mean(mdl.v, 1);
+        d = snapped - cc;
+        d = d ./ max(vecnorm(d, 2, 2), 1e-6);
+        optPos = snapped + 2.6 * d;   % above the 1.8mm outline lift
     end
 
     optPosInset = insetPos(optPos);
@@ -2559,6 +2767,301 @@ function va = iLocalInterpScalar(distSquared, cAlpha, maxDist2, projectMode)
     end
     va(~isfinite(va)) = 0;
     va = max(0, min(1, va));
+end
+
+
+function [parcelIdx, inCoverage, edgeXYZ] = iLocalParcellate(ax, V, F, controlPoints, maxDist2, useGeodesic, animated, surfaceNormals)
+% Hard nearest-optode assignment of cortical vertices for the parcellation
+% render variant. Each vertex is labelled with its nearest optode; vertices
+% beyond the coverage radius are dropped. Boundary edges (between differing
+% parcels and along the coverage rim) are returned as NaN-separated segments,
+% lifted slightly off the surface so the outlines sit cleanly on top.
+%
+% Inputs:
+%   ax             - axes handle (used only for the distance cache lookup)
+%   V              - [nV x 3] cortical mesh vertices
+%   F              - [nF x 3] mesh faces (1-indexed)
+%   controlPoints  - [K x 3] optode positions (parcel centers)
+%   maxDist2       - squared coverage radius; vertices farther are uncovered
+%   useGeodesic    - logical; geodesic vs Euclidean nearest assignment
+%   animated       - logical; reuse the cached [nV x K] distance matrix
+%   surfaceNormals - [nV x 3] vertex normals (accepted for API stability;
+%                    outlines are lifted radially, so this is unused)
+%
+% Outputs:
+%   parcelIdx   - [nV x 1] nearest-optode index for every vertex (>=1)
+%   inCoverage  - [nV x 1] logical mask of vertices within coverage
+%   edgeXYZ     - [M x 3] NaN-separated boundary segment endpoints ([] if none)
+
+    cacheKey = 'iv3d_distCache';
+    cache = [];
+    if animated
+        cache = getappdata(ax, cacheKey);
+    end
+    cacheValid = ~isempty(cache) && isfield(cache,'controlPoints') ...
+        && isequal(cache.controlPoints, controlPoints) ...
+        && isfield(cache,'useGeodesic') && isequal(cache.useGeodesic, useGeodesic);
+
+    if cacheValid
+        dist_array = cache.dist_array;
+    elseif useGeodesic
+        dist_array = iLocalGeodesicDistSq(ax, V, F, controlPoints);
+    else
+        dist_array = sum(V.^2,2) + sum(controlPoints.^2,2)' - 2*(V*controlPoints');
+    end
+
+    [minD, parcelIdx] = min(dist_array, [], 2);
+    inCoverage = minD <= maxDist2;
+
+    % Mesh vertex adjacency (neighbors + self), built once and reused for both
+    % coverage hole-closing and label smoothing below.
+    nV = size(V, 1);
+    Iadj = [F(:,1); F(:,2); F(:,2); F(:,3); F(:,3); F(:,1)];
+    Jadj = [F(:,2); F(:,1); F(:,3); F(:,2); F(:,1); F(:,3)];
+    A = sparse(Iadj, Jadj, 1, nV, nV);
+    A = double(A > 0) + speye(nV);         % neighbors + self
+    deg = full(sum(A, 2)) - 1;             % neighbor count (excludes self)
+
+    % Close interior coverage pinholes. A vertex can fall just outside every
+    % optode's coverage radius where the cortex curves away from the montage
+    % (a positioning/geometry artifact), leaving a small gap between otherwise
+    % adjacent parcels. Pull any uncovered vertex whose neighbors are mostly
+    % covered into coverage (it already carries a nearest-optode label). The
+    % true outer rim, where few neighbors are covered, is left intact.
+    for it = 1:2
+        covNbr = A * double(inCoverage);   % covered neighbors (self adds 0 here)
+        fillv = ~inCoverage & deg > 0 & covNbr >= 0.6 * deg;
+        inCoverage(fillv) = true;
+    end
+
+    % Majority-vote label smoothing among covered vertices. The raw nearest-
+    % optode field is ragged at parcel borders (single-vertex protrusions),
+    % which sprout whisker-like side chains when boundaries are traced. A few
+    % iterations of "adopt the most common neighbor label" straighten the
+    % borders and remove the speckle. Coverage status is held fixed.
+    K = size(controlPoints, 1);
+    if K >= 2
+        cov = inCoverage;
+        covRows = find(cov);
+        for it = 1:3
+            % One sparse matvec against the label indicator gives every
+            % vertex's neighbor vote-count for all parcels at once: counts is
+            % [nV x K], and the column-wise max is the majority label.
+            indicator = sparse(covRows, parcelIdx(cov), 1, nV, K);
+            counts = A * indicator;
+            [mx, best] = max(counts, [], 2);
+            upd = cov & mx > 0;
+            parcelIdx(upd) = best(upd);
+        end
+    end
+
+    % Label uncovered vertices 0 so the coverage rim registers as a boundary.
+    pLabel = parcelIdx;
+    pLabel(~inCoverage) = 0;
+
+    % Marching-triangles label contour: trace boundaries through triangle edge
+    % MIDPOINTS rather than through mesh vertices. A vertex-routed boundary
+    % always zigzags (it can only step between vertices); the midpoint contour
+    % runs between vertices and yields a clean piecewise-linear curve that
+    % Chaikin then smooths into a continuous outline.
+    la = pLabel(F(:,1));  lb = pLabel(F(:,2));  lc = pLabel(F(:,3));
+    active = find(~(la == lb & lb == lc) & max([la, lb, lc], [], 2) > 0);
+    if isempty(active)
+        edgeXYZ = [];
+        return;
+    end
+
+    nFa = numel(active);
+    nodePos = zeros(4 * nFa, 3);    % up to 3 edge-crossings + 1 centroid / face
+    edgesC  = zeros(3 * nFa, 2);
+    nNode = 0; nEdge = 0;
+    edgeNodeMap = containers.Map('KeyType', 'double', 'ValueType', 'double');
+    keyBase = size(V, 1) + 1;
+    pairs = [1 2; 2 3; 3 1];
+    for t = 1:nFa
+        f  = active(t);
+        vv = F(f, :);                       % [a b c]
+        ll = [la(f), lb(f), lc(f)];
+        cross = zeros(1, 3); nc = 0;
+        for q = 1:3
+            if ll(pairs(q,1)) ~= ll(pairs(q,2))
+                v1 = vv(pairs(q,1));  v2 = vv(pairs(q,2));
+                key = min(v1,v2) * keyBase + max(v1,v2);    % unique per mesh edge
+                if isKey(edgeNodeMap, key)
+                    id = edgeNodeMap(key);
+                else
+                    nNode = nNode + 1;  id = nNode;
+                    edgeNodeMap(key) = id;
+                    nodePos(id, :) = (V(v1,:) + V(v2,:)) / 2;
+                end
+                nc = nc + 1;  cross(nc) = id;
+            end
+        end
+        if nc == 2
+            nEdge = nEdge + 1;
+            edgesC(nEdge, :) = cross(1:2);
+        elseif nc == 3
+            nNode = nNode + 1;  cId = nNode;       % triple-junction -> centroid
+            nodePos(cId, :) = mean(V(vv, :), 1);
+            edgesC(nEdge+1, :) = [cId, cross(1)];
+            edgesC(nEdge+2, :) = [cId, cross(2)];
+            edgesC(nEdge+3, :) = [cId, cross(3)];
+            nEdge = nEdge + 3;
+        end
+    end
+    nodePos = nodePos(1:nNode, :);
+    edgesC  = edgesC(1:nEdge, :);
+
+    chains = iLocalTraceChains(edgesC);
+    if isempty(chains)
+        edgeXYZ = [];
+        return;
+    end
+
+    % Smooth each contour chain (corner-cut + light relax) and lift it off the
+    % cortex so the outline reads as a clean curve.
+    c = mean(V, 1);
+    liftMag = 1.8;          % mm outward; clears the surface after smoothing
+    minChainLen = 2.0;      % mm; prune sub-voxel stubs at junctions
+    segs = cell(numel(chains), 1);
+    keep = false(numel(chains), 1);
+    for i = 1:numel(chains)
+        idx = chains{i}(:);
+        P = nodePos(idx, :);
+        isLoop = numel(idx) > 2 && idx(1) == idx(end);
+        if ~isLoop && sum(vecnorm(diff(P), 2, 2)) < minChainLen
+            continue;       % drop tiny spikes that would read as whiskers
+        end
+        P = iLocalChaikin(P, isLoop, 3);            % corner-cut to a smooth curve
+        P = iLocalSmoothChain(P, isLoop, 4, 0.5);   % light relax
+        dir = P - c;        % radial lift (cortex is locally convex)
+        dir = dir ./ max(vecnorm(dir, 2, 2), 1e-6);
+        P = P + liftMag * dir;
+        segs{i} = [P; nan(1, 3)];   % NaN row breaks the polyline
+        keep(i) = true;
+    end
+    edgeXYZ = vertcat(segs{keep});
+end
+
+
+function P = iLocalChaikin(P, isLoop, nIter)
+% Chaikin corner-cutting subdivision: replace each segment endpoint pair with
+% points at the 1/4 and 3/4 marks, smoothing sharp mesh-edge corners while
+% staying inside the original polyline's convex hull (no surface overshoot).
+% Open-chain endpoints are preserved so shared junctions stay stitched.
+    for it = 1:nIter
+        n = size(P, 1);
+        if n < 3, return; end
+        if isLoop
+            A = P;
+            B = P([2:n, 1], :);
+            Q = 0.75 * A + 0.25 * B;
+            R = 0.25 * A + 0.75 * B;
+            P = zeros(2*n, 3);
+            P(1:2:end, :) = Q;
+            P(2:2:end, :) = R;
+        else
+            A = P(1:end-1, :);
+            B = P(2:end, :);
+            Q = 0.75 * A + 0.25 * B;
+            R = 0.25 * A + 0.75 * B;
+            inner = zeros(2*size(A,1), 3);
+            inner(1:2:end, :) = Q;
+            inner(2:2:end, :) = R;
+            P = [P(1,:); inner; P(end,:)];
+        end
+    end
+end
+
+
+function [chain, used] = iLocalWalkChain(Er, deg, eadj, used, startNode, firstEdge)
+% Walk a boundary chain from startNode along firstEdge, stopping at a
+% junction/endpoint (degree ~= 2), a dead end, or loop closure. Returns the
+% ordered remapped-vertex sequence and the updated edge-used mask.
+    chain = startNode;
+    curr = startNode;
+    ei = firstEdge;
+    guard = 0;
+    maxStep = numel(used) + 5;
+    while guard < maxStep
+        guard = guard + 1;
+        used(ei) = true;
+        nxt = Er(ei, 1);
+        if nxt == curr, nxt = Er(ei, 2); end
+        chain(end+1) = nxt; %#ok<AGROW>
+        curr = nxt;
+        if deg(curr) ~= 2, break; end
+        cand = eadj{curr}(~used(eadj{curr}));
+        if isempty(cand), break; end
+        ei = cand(1);
+    end
+end
+
+
+function chains = iLocalTraceChains(E)
+% Order an unstructured set of undirected boundary edges [M x 2] (mesh vertex
+% index pairs) into connected polylines. Chains are split at junctions where
+% 3+ parcels meet and at coverage-rim endpoints; remaining all-degree-2
+% components are closed loops. Returns a cell array of mesh-vertex sequences.
+    chains = {};
+    if isempty(E), return; end
+    verts = unique(E(:));
+    lut = zeros(max(verts), 1);
+    lut(verts) = 1:numel(verts);
+    Er = [lut(E(:,1)), lut(E(:,2))];
+    nB = numel(verts);
+
+    adj = cell(nB, 1);
+    eadj = cell(nB, 1);
+    for i = 1:size(Er, 1)
+        a = Er(i,1); b = Er(i,2);
+        adj{a}(end+1) = b;  eadj{a}(end+1) = i;
+        adj{b}(end+1) = a;  eadj{b}(end+1) = i;
+    end
+    deg = cellfun(@numel, adj);
+    used = false(size(Er, 1), 1);
+
+    % Anchor chains at junctions / endpoints (degree ~= 2) first.
+    starts = find(deg ~= 2)';
+    for s = starts
+        es = eadj{s};
+        for k = 1:numel(es)
+            if ~used(es(k))
+                [cseq, used] = iLocalWalkChain(Er, deg, eadj, used, s, es(k));
+                chains{end+1} = verts(cseq)'; %#ok<AGROW>
+            end
+        end
+    end
+
+    % Whatever remains is part of a pure (all degree-2) loop.
+    rem = find(~used)';
+    for r = rem
+        if used(r), continue; end
+        [cseq, used] = iLocalWalkChain(Er, deg, eadj, used, Er(r,1), r);
+        chains{end+1} = verts(cseq)'; %#ok<AGROW>
+    end
+end
+
+
+function P = iLocalSmoothChain(P, isLoop, nIter, lambda)
+% Laplacian smoothing of an ordered 3D polyline. Loops wrap around; open
+% chains keep their endpoints fixed so shared junctions stay stitched.
+    n = size(P, 1);
+    if n < 3, return; end
+    for it = 1:nIter
+        if isLoop
+            ip = [n, 1:n-1];
+            in = [2:n, 1];
+            P = P + lambda * ((P(ip,:) + P(in,:)) / 2 - P);
+        else
+            ip = [1, 1:n-1];
+            in = [2:n, n];
+            Q = P + lambda * ((P(ip,:) + P(in,:)) / 2 - P);
+            Q(1,:) = P(1,:);
+            Q(end,:) = P(end,:);
+            P = Q;
+        end
+    end
 end
 
 

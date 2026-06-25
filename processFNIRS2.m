@@ -241,6 +241,36 @@ ShowGUI=p.Results.ShowGUI||isempty(varargin)||(nargout==0&&~isempty(data)&&isemp
 % the GUI is suppressed; a bare no-output call processFNIRS2(hbStruct) still
 % routes to the GUI per the ShowGUI rule above (capture an output to noop).
 hasRawIntensity = isstruct(data) && isfield(data,'raw') && ~isempty(data.raw);
+
+% Config-only invocation (no data, global path): persist the parsed settings to
+% the session globals BEFORE the noop early-return below. Without this, a bare
+% processFNIRS2('blLength',10) call -- and every pf2.settings.* setter that
+% delegates here (baseline, DPF, reject level) -- would have its values silently
+% discarded by that return. The scalar defaults were read from the current
+% globals at parse time, so writing them when unspecified is a no-op; methods are
+% only written when explicitly provided, to avoid a config call clobbering the
+% active stage method as a side effect. Mirrors the global-write block on the
+% normal processing path.
+if(~ShowGUI && ~hasContextArg && isempty(data))
+    PF2.baseline.startTime = p.Results.blStartTime;
+    PF2.baseline.blLength  = p.Results.blLength;
+    PF2.curDPF_fixed       = p.Results.FixedDPF;
+    PF2.curDPF_age         = p.Results.defaultSubjectAge;
+    PF2.dpf_mode           = p.Results.DPFmode;
+    PF2.RejectLevel        = p.Results.RejectLevel;
+
+    if(~any(strcmp('Raw_Method',p.UsingDefaults)) && ...
+            pf2_base.isnestedfield(PF2,sprintf('myRawMethods.cfg.%s',p.Results.Raw_Method)))
+        PF2.stageRawMethod = pf2_base.pf2_unpackMethod(PF2.myRawMethods.cfg.(p.Results.Raw_Method));
+        PF2.stageRawMethod.name = p.Results.Raw_Method;
+    end
+    if(~any(strcmp('Oxy_Method',p.UsingDefaults)) && ...
+            pf2_base.isnestedfield(PF2,sprintf('myOxyMethods.cfg.%s',p.Results.Oxy_Method)))
+        PF2.stageOxyMethod = pf2_base.pf2_unpackMethod(PF2.myOxyMethods.cfg.(p.Results.Oxy_Method));
+        PF2.stageOxyMethod.name = p.Results.Oxy_Method;
+    end
+end
+
 if(~ShowGUI && (isempty(data) || ...
         (isstruct(data) && ~hasRawIntensity && ~p.Results.SkipRaw && ~p.Results.SkipOD)))
     if(nargout>0)
