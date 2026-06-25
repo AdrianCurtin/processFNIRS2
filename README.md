@@ -28,43 +28,46 @@ processFNIRS2 is a modular MATLAB toolbox designed for processing functional Nea
 - MATLAB R2025b (recommended). The Statistics and Machine Learning Toolbox is required for LME-based group statistics in exploreFNIRS.
 
 ### Installation
-1. Clone or download this repository
-2. Add the main processFNIRS2 folder and the following subdirectories to your MATLAB path:
+1. Clone or download this repository.
+2. Add the processFNIRS2 root folder to your MATLAB path:
    ```matlab
    addpath('/path/to/processFNIRS2');
-   addpath('base_functions', 'GUI', 'functions');
    ```
-   Note: Package folders (those with `+` prefix like `+pf2`, `+pf2_base`) are automatically available once the parent folder is on the path.
+   That is all that is required. The package folders (`+pf2`, `+pf2_base`,
+   `+exploreFNIRS`) resolve automatically once the root is on the path, and the
+   loose code folders (`base_functions`, `functions`, `GUI`) are added for you on
+   the first call to `processFNIRS2` (or `pf2`) — no manual `addpath` of
+   subdirectories is needed.
 
 ### Quick Start Guide
 ```matlab
-% Import data
-mydata = pf2.import.importNIR('myNIRSfile.nir');
+% Import data (use the bundled sample, or import your own file)
+mydata = pf2.import.sampleData();                 % sample recording with markers
+% mydata = pf2.import.importNIR('myNIRSfile.nir'); % ...or import your own file
 
-% Configure processing methods
-processFNIRS2(); % Opens GUI for method configuration
-% Or select methods programmatically:
-pf2.methods.raw.setMethod('MyRawMethod');
-pf2.methods.oxy.setMethod('MyOxyMethod');
+% Process to hemoglobin. Assigning an output runs headless (GUI suppressed):
+processed = processFNIRS2(mydata);                % uses the default methods
 
-% Process data
-myprocesseddata = processFNIRS2(mydata);
+% To pick specific methods, browse the registered names and select one:
+pf2.methods.raw.list();                           % e.g. 'x2_lpf_smar', 'x5_TDDR'
+pf2.methods.oxy.list();
+pf2.methods.raw.setMethod('x2_lpf_smar');
+processed = processFNIRS2(mydata);                % process with the chosen method
 
-% Visualize data
-pf2.data.plot.oxy(myprocesseddata);
-pf2.data.plot.roi(myprocesseddata);
+% Visualize
+pf2.data.plot.oxy(processed);
+pf2.data.plot.roi(processed);
 
-% Export single file
-pf2.export.asNIR(myprocesseddata, 'myexport.nir');
-pf2.export.asSNIRF(myprocesseddata, 'myexport.snirf');
-
-% Batch export cell array to directory
-pf2.export.asSNIRF(allData, 'output/');
+% Export a single file...
+pf2.export.asSNIRF(processed, 'myexport.snirf');
+% ...or batch-export a cell array of recordings to a directory
 pf2.export.asSNIRF(allData, 'output/', 'Dir1', 'Group', 'Prefix', {'SubjectID'});
 
-% Explore and analyze data
-exploreFNIRS(myprocesseddata);
+% Explore and analyze (group layer / interactive GUI)
+exploreFNIRS(processed);
 ```
+> Assigning an output (`processed = processFNIRS2(...)`) suppresses the GUI.
+> Call `processFNIRS2` with **no** output to open the configuration GUI.
 
 ### Block average (event-related) in 6 lines
 The happy path from a continuous recording with event markers to an averaged

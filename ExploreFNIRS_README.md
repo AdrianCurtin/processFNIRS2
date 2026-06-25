@@ -409,7 +409,7 @@ The following functions can be used outside the GUI:
 
 ## License
 
-exploreFNIRS is part of processFNIRS2 and is free for academic and non-commercial use.
+exploreFNIRS is part of processFNIRS2 and is released under the GNU General Public License v3.0 (GPLv3). See the [LICENSE](LICENSE) file for details.
 
 ## Contact
 

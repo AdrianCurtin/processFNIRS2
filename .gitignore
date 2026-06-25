@@ -8,6 +8,7 @@ sampledata/sampleNIR_CH.mat
 .vscode/launch.json
 .vscode/settings.json
 *.md
+!THIRD_PARTY_LICENSES.md
 internal/
 tests/benchmarks/data/
 tests/benchmarks/results/

@@ -47,7 +47,8 @@
 %   - processFNIRS2 on the MATLAB path
 %   - Sample data: pf2.import.sampleData.fNIR2000()
 
-cd('/Users/adriancurtin/Documents/GitHub/processFNIRS2');
+cd(fileparts(mfilename('fullpath')));
+cd('../..');  % project root
 
 studyRoot = fullfile(tempdir, 'SpeechFNIRS');
 if isfolder(studyRoot), rmdir(studyRoot, 's'); end

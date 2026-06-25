@@ -19,7 +19,8 @@
 %   - processFNIRS2 on the MATLAB path
 %   - Sample data: pf2.import.sampleData.fNIR2000()
 
-cd('/Users/adriancurtin/Documents/GitHub/processFNIRS2');
+cd(fileparts(mfilename('fullpath')));
+cd('../..');  % project root
 
 % Uncomment to save figures and exports to disk:
 % outDir = fullfile(tempdir, 'pf2_tutorial');
