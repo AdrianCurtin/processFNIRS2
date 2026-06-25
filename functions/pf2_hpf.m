@@ -45,7 +45,7 @@ function [ dataf ] = pf2_hpf( data,ft,fs,freq_cut,Nf ,NaN_mode)
 %   % FIR high-pass with 0.008 Hz cutoff
 %   filtered = pf2_hpf(hbData, 1, 10, 0.008, 60);
 %
-% See also: pf2_lpf, pf2_bpf_butter, filtfilt, detrend_nan
+% See also: pf2_lpf, pf2_bpf_butter, pf2_base.external.filtfilt_classic, detrend_nan
 
 if(nargin<6)
 	NaN_mode='Piecewise';
@@ -66,7 +66,13 @@ half_fs = fs/2;    %half of sampling freq. equal to pi
 if ft==1
     [b,a] = pf2_base.external.fir1(Nf,freq_cut/half_fs,'high');  % use FIR1 to obtain linear phase filter; b=impulse response
 elseif ft==3
-    [b,a] = pf2_base.external.butter(Nf,freq_cut/half_fs,'high');
+    % Use zero-pole-gain -> second-order-section form for numerical stability.
+    % The transfer-function form [b,a]=butter is ill-conditioned at the low
+    % normalized cutoffs common in fNIRS and can produce NaN/unstable output;
+    % filtfilt_classic accepts an SOS matrix with unit gain (a=1).
+    [z,p,k] = pf2_base.external.butter(Nf,freq_cut/half_fs,'high');
+    b = pf2_base.external.zp2sos(z,p,k);
+    a = 1;
 else
     error('pf2:hpf:unsupportedFilterType', ...
         'Filter type %d is not supported for high-pass. Use ft=1 (FIR) or ft=3 (Butterworth).', ft);

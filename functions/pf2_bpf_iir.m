@@ -52,7 +52,7 @@ function [dataf] = pf2_bpf_iir(data, fs, lowF, highF, filtOrder, restoreMean, Na
 %   % Highpass only at 0.01 Hz
 %   dataf = pf2_bpf_iir(data.HbO, data.fs, 0.01, 0, 4);
 %
-% See also: bpf, pf2_bpf_fir, lpf, butter, filtfilt
+% See also: bpf, pf2_bpf_fir, lpf, pf2_base.external.butter, pf2_base.external.filtfilt_classic
 
 %% Defaults
 if nargin < 7, NaN_mode = 'Piecewise'; end
@@ -99,8 +99,10 @@ end
 sos = pf2_base.external.zp2sos(zz, pp, kk);
 
 %% Minimum data length for filtering
-% filtfilt requires at least 3*nSOS samples
-minLen = 3 * size(sos, 1) + 1;
+% filtfilt_classic reflect-pads by 3*(total filter order). Each second-order
+% section contributes order 2, so the total order is 2*nSOS and the data must
+% exceed 6*nSOS samples (not 3*nSOS) or the inner filter call errors.
+minLen = 6 * size(sos, 1) + 1;
 
 if M < minLen
     dataf = nan(size(data));
@@ -138,11 +140,7 @@ switch NaN_mode
         end
 
     case 'Leave'
-        try
-            dataf = pf2_base.external.filtfilt_classic(sos, 1, data);
-        catch
-            dataf = pf2_base.external.filtfilt_classic(sos, 1, data);
-        end
+        dataf = pf2_base.external.filtfilt_classic(sos, 1, data);
         if restoreMean
             dataf = dataf + dataMeans;
         end

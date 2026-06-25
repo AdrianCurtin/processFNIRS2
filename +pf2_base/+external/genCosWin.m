@@ -53,7 +53,7 @@ if L == 1
     return;
 end
 
-isPeriodic = strncmpi(sflag, 'periodic', numel(sflag));
+isPeriodic = strcmpi(sflag, 'periodic');
 if isPeriodic
     N = L;            % periodic: sample the length-(L+1) symmetric window
 else

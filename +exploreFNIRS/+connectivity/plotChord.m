@@ -341,7 +341,14 @@ function fig = plotChord(result, varargin)
     if nodeColorActive && ~isempty(char(string(cbLabel)))
         colormap(ax, nodeCmap);
         set(ax, 'CLim', nodeCLim);
+        % colorbar() steals horizontal space from the axes; with axis-equal that
+        % shrinks the whole (square) chord layout and nudges nodes near +/-90 deg
+        % toward the edge. Capture the axes position, add the colorbar, then
+        % restore the axes so the diagram keeps its size -- the colorbar sits in
+        % the right-hand whitespace of the equal-aspect axes.
+        axPos = get(ax, 'Position');
         cb = colorbar(ax);
+        set(ax, 'Position', axPos);
         cb.Label.String = pf2_base.plot.escapeTeX(char(string(cbLabel)));
     end
 

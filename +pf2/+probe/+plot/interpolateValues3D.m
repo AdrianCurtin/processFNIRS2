@@ -350,7 +350,7 @@ addParameter(p, 'Style', 'showcase', @(x) ischar(x) || isstring(x) || isstruct(x
 % optode and render discrete flat-filled cells with outlined boundaries
 % (Voronoi-style optode parcel map) instead of a smoothly interpolated field.
 addParameter(p, 'Parcellate', false, @islogical);
-addParameter(p, 'HighlightChannels', [], @(x) isempty(x) || (isnumeric(x)&&isvector(x)) || islogical(x)); % indices (or logical mask) into the plotted channels to paint in HighlightColor
+addParameter(p, 'HighlightChannels', [], @(x) isempty(x) || ((isnumeric(x)||islogical(x))&&isvector(x))); % indices (or logical mask) into the plotted channels to paint in HighlightColor
 addParameter(p, 'HighlightColor', [0.62 0.40 0.78], validColor);   % fill for highlighted parcels (default purple)
 addParameter(p, 'ParcelColor', [0.78 0.78 0.80], validColor);      % flat fill for non-highlighted parcels when no data is supplied
 addParameter(p, 'ParcelOutlineColor', [1 1 1], validColor);        % color of the cell boundary outlines

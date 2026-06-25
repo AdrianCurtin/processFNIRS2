@@ -9,7 +9,7 @@ function [fNIR] = pf2_SSR(fNIR, method, numPCs, centerRegressors)
 % Reference:
 %   Saager, R. B. & Berger, A. J. (2005). Direct characterization and
 %   removal of interfering absorption trends in two-layer turbid media.
-%   J. Opt. Soc. Am. A, 22(9), 1874-1882.
+%   J. Opt. Soc. Am. A, 22(9), 1874-1882. DOI: 10.1364/josaa.22.001874
 %
 % Syntax:
 %   fNIR = pf2_SSR(fNIR)

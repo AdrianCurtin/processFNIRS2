@@ -15,7 +15,25 @@ multi-subject group analysis and statistics. The boundary between them is a
 plain processed-data struct, so you can script the whole pipeline headlessly or
 drive it through the GUI.
 
+## Architecture at a glance
+
+From a device file to group statistics — `import → processFNIRS2 → epoch →
+Experiment`, with `export` available off the processed struct:
+
+![Pipeline overview](docs/assets/diagrams/pipeline-overview.png)
+
+Once data is processed, the analysis approach follows the experimental design.
+`extractBlocks` segments feed the `Experiment` (whose `aggregate` step does
+group-level averaging); `blockAverage` is the single-subject form; GLM betas
+enter via `betasToSegments`:
+
+![Analysis approaches](docs/assets/diagrams/analysis-approaches.png)
+
+For the full set of diagrams (package map, GLM, hyperscanning) see
+[docs/ARCHITECTURE.md](docs/ARCHITECTURE.md).
+
 ## Contents
+- [Architecture at a Glance](#architecture-at-a-glance)
 - [Key Features](#key-features)
 - [Requirements](#requirements)
 - [Installation](#installation)

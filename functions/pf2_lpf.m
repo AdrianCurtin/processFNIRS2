@@ -45,7 +45,7 @@ function [ dataf ] = pf2_lpf( data,ft,fs,freq_cut,Nf, NaN_mode)
 %   % Butterworth filter for hemodynamic isolation
 %   filtered = pf2_lpf(hbData, 3, 10, 0.1, 4);
 %
-% See also: pf2_hpf, pf2_bpf_butter, filtfilt
+% See also: pf2_hpf, pf2_bpf_butter, pf2_base.external.filtfilt_classic
 
 [Mini,Nini]=size(data);
 if Mini==1 %if the data is a row vector converts it to column vector
@@ -76,7 +76,13 @@ elseif ft==2
     [b,delta]=remez(N1, F0, M0, W);
     a=1;
 elseif ft==3
-    [b,a] = pf2_base.external.butter(Nf,freq_cut/half_fs);
+    % Use zero-pole-gain -> second-order-section form for numerical stability.
+    % The transfer-function form [b,a]=butter is ill-conditioned at the low
+    % normalized cutoffs common in fNIRS and can produce NaN/unstable output;
+    % filtfilt_classic accepts an SOS matrix with unit gain (a=1).
+    [z,p,k] = pf2_base.external.butter(Nf,freq_cut/half_fs,'low');
+    b = pf2_base.external.zp2sos(z,p,k);
+    a = 1;
 end
 
 %-----------------------------------------------------------------

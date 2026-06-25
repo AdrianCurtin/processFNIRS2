@@ -50,8 +50,14 @@ function CARout=pf2_CAR(x,local,medfiltN,mdebug)
 %   hbData_CAR = pf2_CAR(hbData, false, 5);
 %
 % References:
-%   - Similar to EEG average reference but adapted for fNIRS
-%   - Helps reduce extra-cerebral contamination
+%   The common average reference originates in EEG (re-referencing each channel
+%   to the across-channel mean). In fNIRS the across-channel mean is used as a
+%   model of global systemic (extra-cerebral) interference shared across
+%   channels; see global spatial-filtering approaches such as:
+%   Zhang, X., Noah, J. A. & Hirsch, J. (2016). Separation of the global and
+%   local components in functional near-infrared spectroscopy signals using
+%   principal component spatial filtering. Neurophotonics, 3(1), 015004.
+%   DOI: 10.1117/1.nph.3.1.015004
 %
 % See also: pf2_lpf, pf2_ambient_ICA_clean, pf2_subtractAmbient
 

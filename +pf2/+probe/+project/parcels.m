@@ -79,6 +79,12 @@ function [h, imgOut] = parcels(varargin)
 % Notes:
 %   - Surface render only; honors 'UseGeodesic' (geodesic by default, which
 %     prevents parcels bleeding across sulci / the midline).
+%   - SIDE EFFECT: with no explicit 'ax', the CURRENT axes (gca) is reset
+%     (cla reset) before rendering, because a stale 2D axes (YDir='reverse',
+%     2D limits, peer colorbar) would corrupt the 3D surface. This clears any
+%     title, labels, hold state, or custom view you set on gca beforehand. Pass
+%     an 'ax' handle (forwarded to interpolateValues3D) to target a specific
+%     axes and leave gca untouched.
 %   - See pf2.probe.plot.interpolateValues3D for the full list of forwarded
 %     options and the complete interpretive caveats.
 %

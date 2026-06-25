@@ -47,7 +47,7 @@ if L == 1
     return;
 end
 
-if strncmpi(sflag, 'periodic', numel(sflag))
+if strcmpi(sflag, 'periodic')
     % Periodic: first L points of the length-(L+1) HANN window.
     full = pf2_base.external.hann(L + 1, 'symmetric');
     w = full(1:L);

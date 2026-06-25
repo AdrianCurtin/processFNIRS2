@@ -154,8 +154,18 @@ classdef ExternalMathTest < matlab.unittest.TestCase
                 [zM,pM,kM] = butter(n,Wn,ft);
                 [zX,pX,kX] = pf2_base.external.butter(n,Wn,ft);
                 tc.verifyLessThan(abs(kM-kX), 1e-9, 'butter k mismatch');
-                tc.verifyLessThan(max(abs(sort(real(pM))-sort(real(pX)))), 1e-9, 'pole mismatch');
-                tc.verifyLessThan(max(abs(sort(real(zM))-sort(real(zX)))), 1e-9, 'zero mismatch');
+                % Compare BOTH real and imaginary parts. Sorting only the real
+                % parts would let a conjugate pair with the wrong imaginary part
+                % (wrong resonant frequency) pass silently -- and for 'stop'
+                % designs the zeros sit at complex points on the unit circle, so
+                % their imaginary parts carry the stopband location. Sort each
+                % set canonically by [real imag] (equal conjugate-symmetric sets
+                % sort identically) and compare the full complex coordinates.
+                ck = @(v) sortrows([real(v(:)) imag(v(:))], [1 2]);
+                tc.verifyLessThan(max(abs(ck(pM)-ck(pX)), [], 'all'), 1e-9, ...
+                    sprintf('pole mismatch real+imag (%s)', ft));
+                tc.verifyLessThan(max(abs(ck(zM)-ck(zX)), [], 'all'), 1e-9, ...
+                    sprintf('zero mismatch real+imag (%s)', ft));
             end
         end
 
@@ -169,6 +179,26 @@ classdef ExternalMathTest < matlab.unittest.TestCase
             tc.verifyLessThan(max(abs(roots(aH))), 1, 'highpass not stable');
             nyq = sum(bH.*(-1).^(0:numel(bH)-1)) / sum(aH.*(-1).^(0:numel(aH)-1));
             tc.verifyEqual(nyq, 1, 'AbsTol', 1e-9, 'highpass Nyquist gain ~= 1');
+        end
+
+        function testButterBandstopGain(tc)
+            % Toolbox-independent band-stop check (covers the sftrans stop-band
+            % gain folding that the toolbox-conditional test otherwise guards).
+            % A band-stop passes DC and Nyquist (gain ~= 1) and rejects the
+            % stop-band centre.
+            Wn = [0.2 0.5];
+            [b,a] = pf2_base.external.butter(4, Wn, 'stop');
+            tc.verifyLessThan(max(abs(roots(a))), 1, 'bandstop not stable');
+            % H(z=1) DC gain and H(z=-1) Nyquist gain both unity (passbands).
+            tc.verifyEqual(sum(b)/sum(a), 1, 'AbsTol', 1e-9, 'bandstop DC gain ~= 1');
+            nyq = sum(b.*(-1).^(0:numel(b)-1)) / sum(a.*(-1).^(0:numel(a)-1));
+            tc.verifyEqual(nyq, 1, 'AbsTol', 1e-9, 'bandstop Nyquist gain ~= 1');
+            % Stop-band centre is strongly attenuated. Evaluate |H(e^jw)| at the
+            % geometric-mean centre frequency of the stop band.
+            wc = pi * sqrt(Wn(1)*Wn(2));
+            zc = exp(1j*wc);
+            Hc = polyval(b, zc) / polyval(a, zc);
+            tc.verifyLessThan(abs(Hc), 0.1, 'bandstop centre not attenuated');
         end
 
         function testButterAnalogRejected(tc)

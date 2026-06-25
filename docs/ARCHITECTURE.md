@@ -14,7 +14,7 @@ between them:
 flowchart TB
     files[("Device files<br/>.nir · .snirf · .oxy3 · Hitachi MES")]
 
-    subgraph L1["LAYER 1 — Single-subject processing &nbsp;(+pf2)"]
+    subgraph L1["LAYER 1: Single-subject processing &nbsp;(+pf2)"]
         direction TB
         imp["pf2.import.*<br/><i>importNIR · importSNIRF · importOxy3</i>"]
         proc["processFNIRS2<br/><i>3-stage pipeline</i>"]
@@ -25,9 +25,9 @@ flowchart TB
         proc -.-> qc
     end
 
-    struct{{"data struct &nbsp;— the interface<br/><b>raw · HbO/HbR · markers · device · info</b>"}}
+    struct{{"data struct: the interface<br/><b>raw · HbO/HbR · markers · device · info</b>"}}
 
-    subgraph L2["LAYER 2 — Group analysis &nbsp;(+exploreFNIRS)"]
+    subgraph L2["LAYER 2: Group analysis &nbsp;(+exploreFNIRS)"]
         direction TB
         ex["Experiment / GLMExperiment"]
         agg["groupby → aggregate"]
@@ -84,10 +84,11 @@ A single recording travels through the toolbox like this:
 flowchart LR
     imp[import] --> ds[("data<br/>struct")]
     ds --> proc[processFNIRS2] --> ps[("processed<br/>struct")]
-    ps --> db[defineBlocks] --> eb[extractBlocks] --> ba[blockAverage]
+    ps --> db[defineBlocks] --> eb[extractBlocks]
+    eb --> ba[blockAverage] --> wf["averaged waveform<br/>(single subject)"]
+    eb -->|segments| exptl["Experiment"]
+    ps -.->|"cell array of<br/>processed structs"| exptl
     ps --> exp["export<br/>SNIRF · BIDS · tensor"]
-    ba --> exptl["Experiment"]
-    ps -.->|cell array| exptl
     exptl --> gb[groupby] --> ag[aggregate] --> ps2["plot / stats"]
 ```
 
@@ -138,48 +139,49 @@ first-class `RawPipeline` / `OxyPipeline` value objects (see below).
 
 ```mermaid
 flowchart TB
-    subgraph PF2["+pf2 &nbsp;— user-facing API (Layer 1)"]
+    subgraph PF2["+pf2: user-facing API (Layer 1)"]
         direction LR
         p_import["+import"]
-        p_data["+data (+plot)"]
+        p_data["+data<br/>(+plot)"]
         p_process["+process"]
-        p_methods["+methods<br/>+raw · +oxy · +seeds"]
-        p_probe["+probe<br/>+plot · +roi · +project<br/>+forward · +dot"]
+        p_methods["+methods<br/>+raw/+oxy/+seeds"]
+        p_probe["+probe<br/>+plot/+roi/+project<br/>+forward/+dot"]
         p_qc["+qc"]
         p_export["+export"]
         p_dev["Device"]
     end
 
-    subgraph BASE["+pf2_base &nbsp;— infrastructure & algorithms"]
+    subgraph BASE["+pf2_base: infrastructure & algorithms"]
         direction LR
         b_ctx["ProcessingContext"]
-        b_pipe["Pipeline · RawPipeline<br/>OxyPipeline · PipelineFunction"]
-        b_fnirs["+fnirs<br/>stage engines · bvoxy · GLM"]
-        b_sig["+signal · +wavelet · +accel"]
-        b_io["+bids · +dot · +plot · +external"]
-        b_init["pf2_initialize · loadDeviceCfg · normalize*"]
+        b_pipe["Pipeline ·<br/>Raw/Oxy/<br/>PipelineFunction"]
+        b_fnirs["+fnirs<br/>stage engines<br/>bvoxy · GLM"]
+        b_sig["+signal<br/>+wavelet<br/>+accel"]
+        b_io["+bids · +dot<br/>+plot · +external"]
+        b_init["pf2_initialize<br/>loadDeviceCfg<br/>normalize*"]
     end
 
-    FUNS["functions/ &nbsp;— step implementations<br/>TDDR · SMAR · wavelet · Butterworth · Takizawa · CAR · SSR · GSR"]
+    subgraph EX["+exploreFNIRS: group analysis (Layer 2)"]
+        direction LR
+        e_core["+core<br/>Experiment ·<br/>GLMExperiment"]
+        e_conn["+connectivity<br/>+coupling<br/>+hyperscanning"]
+        e_stats["+stats · LME<br/>contrasts · FDR<br/>+graph"]
+        e_rep["+report · +dataset<br/>+export · +fx"]
+    end
+
+    FUNS["functions/: step implementations<br/>TDDR · SMAR · wavelet · Butterworth · Takizawa · CAR · SSR · GSR"]
     DEVS[("devices/*.cfg")]
 
-    subgraph EX["+exploreFNIRS &nbsp;— group analysis (Layer 2)"]
-        direction LR
-        e_core["+core<br/>Experiment · GLMExperiment"]
-        e_conn["+connectivity · +coupling<br/>+hyperscanning"]
-        e_stats["+stats &nbsp;LME · contrasts · FDR<br/>+graph"]
-        e_rep["+report · +dataset · +export · +fx"]
-    end
+    %% invisible chains keep each package's nodes on one row
+    p_import ~~~ p_data ~~~ p_process ~~~ p_methods ~~~ p_probe ~~~ p_qc ~~~ p_export ~~~ p_dev
+    b_ctx ~~~ b_pipe ~~~ b_fnirs ~~~ b_sig ~~~ b_io ~~~ b_init
+    e_core ~~~ e_conn ~~~ e_stats ~~~ e_rep
 
-    p_import --> p_dev --> DEVS
-    p_process --> b_fnirs
-    p_methods --> b_pipe
-    b_fnirs --> FUNS
-    b_pipe --> FUNS
-    e_core --> e_conn
-    e_core --> e_stats
+    PF2 ==>|builds on| BASE
+    BASE ==> FUNS
+    PF2 ==> DEVS
     PF2 -.->|processed structs| EX
-    PF2 --- BASE
+    FUNS ~~~ EX
 ```
 
 ### `+pf2/` — user-facing API (Layer 1)
@@ -222,6 +224,113 @@ wavelet, Butterworth, Takizawa, …), dispatched by name from the method chains.
 - `base_functions/`, `GUI/`, `compat_shims/` — **legacy / compatibility code
   outside the package structure.** Kept working, but new code should not be added
   here.
+
+## Analysis approaches
+
+Once a recording is processed, the choice of analysis approach depends on the
+experimental design. They share the same processed struct and converge on the
+Layer-2 `Experiment` for group statistics.
+
+```mermaid
+flowchart TB
+    proc["Processed recording<br/>HbO/HbR · markers"]
+    proc --> q{"Analysis goal?"}
+
+    q -->|"Event-related amplitude<br/>(clean, spaced trials)"| EPOCH
+    q -->|"Continuous / overlapping<br/>or irregular events"| GLM
+    q -->|"Resting / dynamic FC<br/>(no events)"| SLIDE
+    q -->|"Functional connectivity"| CONN
+
+    subgraph EPOCH["Epoch / block-averaging"]
+        direction TB
+        e1["defineBlocks(code, dur)"] --> e2["extractBlocks<br/>(PreTime / PostTime)"]
+    end
+    subgraph GLM["GLM (continuous)"]
+        direction TB
+        g1["buildDesignMatrix<br/>HRF ⊛ boxcar + drift"] --> g2["fitGLM (OLS / AR-IRLS)"] --> g3["betas /<br/>first-level contrasts"]
+    end
+    subgraph SLIDE["Sliding windows"]
+        direction TB
+        s1["slidingWindows<br/>(Length, Overlap)"] --> s2["extractBlocks"]
+    end
+    subgraph CONN["Connectivity"]
+        direction TB
+        c1["computeMatrix<br/>pearson · partial · ..."]
+    end
+
+    e2 -->|segments| GRP
+    s2 -->|segments| GRP
+    g3 -->|"betas (betasToSegments)"| GRP
+    GRP["exploreFNIRS.core.Experiment<br/>groupby → aggregate<br/>· group-level averaging ·"] --> OUT["Group stats (LME / FDR)<br/>plots · export"]
+    CONN --> COUT["connectome · plotChord<br/>group connectivity"]
+```
+
+### GLM pipeline
+
+`GLMExperiment` automates the manual chain below (process → design → fit →
+contrasts → package → group). Reach for the manual path when you need control
+over the design matrix or first-level contrasts.
+
+```mermaid
+flowchart TB
+    rec["Continuous recordings<br/>(raw subjects)"]
+    blk["block definitions<br/>(markers → conditions)"]
+
+    rec --> proc["processFNIRS2<br/><i>GLM convention: skip bandpass:<br/>drift regressors model trends</i>"]
+    blk --> ev["blocksToEvents"]
+
+    proc --> dm
+    ev --> dm["buildDesignMatrix<br/>HRF ⊛ boxcar · drift (Legendre/DCT)<br/>± derivative/dispersion · short-channels"]
+    dm --> fit["fitGLM &nbsp;<i>per subject × biomarker</i><br/>OLS (default) / AR-IRLS · betas · t / p · R²"]
+    fit --> con["First-level contrasts<br/>C·β &nbsp;(e.g. Hard &gt; Easy)"]
+    con --> pack["betasToSegments<br/><i>β as pseudo-segments</i>"]
+    pack --> grp["Experiment (group)<br/>aggregate"]
+    grp --> lme["statsFitLME · plotLME · plotTopoLME"]
+    grp --> tbl["betaTable &nbsp;<i>(GLMExperiment)</i><br/>R / Python export"]
+
+    subgraph AUTO["GLMExperiment: wraps the whole chain"]
+        direction TB
+        a1["GLMExperiment(subjects, blockDefs) → fit() → plot/stats"]
+        a2["betaSeriesConnectivity · ppi / ppiTable / ppiLME"]
+    end
+```
+
+### Hyperscanning (inter-brain synchrony)
+
+Paired (or grouped) recordings are coupled channel-by-channel, then tested for
+inter-brain synchrony and modeled at the group level.
+
+```mermaid
+flowchart TB
+    A["Subject A<br/>processed"]
+    B["Subject B<br/>processed"]
+    A --> pair["pairSubjects<br/><i>align dyads / groups</i>"]
+    B --> pair
+
+    pair --> dyad["computeDyad<br/><i>ChannelPairing: same / all</i>"]
+    pair --> group["computeGroup<br/><i>n-way coupling</i>"]
+
+    subgraph COUP["+coupling: per-pair metric"]
+        direction LR
+        m1["wcoherence ·<br/>coherence"]
+        m2["pearson · spearman ·<br/>xcorr"]
+        m3["granger · transferEntropy ·<br/>mutualInfo"]
+        m4["partialCoherence /<br/>partialCorr<br/><i>control shared physio</i>"]
+    end
+    dyad --> COUP
+    group --> COUP
+
+    pair --> qc["physioConfoundQC<br/><i>LFO/VLFO shared-aux flag</i>"]
+    COUP --> perm["permutationTest<br/><i>vs pseudo-pairs</i>"]
+    perm --> viz["plotDualBrain · plotDyadMatrix<br/>plotInterBrainTopo · plotGroup"]
+    perm --> stats
+
+    pair --> xppi["cross-brain PPI (gPPI)<br/><i>computePPI · seed = other brain</i>"]
+    xppi --> stats["Group LME<br/><i>Experiment · GLMExperiment.ppi /<br/>ppiTable / ppiLME</i>"]
+
+    A2["HB-ICA<br/><i>hbica · shared inter-brain components</i>"]
+    pair --> A2 --> hviz["plotHBICA"]
+```
 
 ## Key abstractions
 

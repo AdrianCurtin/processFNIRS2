@@ -4,6 +4,26 @@
 
 ### New Features
 
+**Toolbox-Free Signal Processing (`+pf2_base/+external/`):**
+- First-party implementations of `butter`, `fir1`, `sgolay`, `sgolayfilt`, `medfilt1`, `zp2sos`, and the window functions (`hamming`, `hann`, `hanning`, `genCosWin`), so filtering and motion correction no longer require the MATLAB Signal Processing Toolbox
+- Filtering and motion-correction functions (`bpf`/`hpf`/`lpf`, `pf2_bpf_*`, `pf2_hpf`/`pf2_lpf`, `pf2_bandstop`, `pf2_MotionCorrectTDDR`, `pf2_MotionCorrectSplineSG`) route through the external math and `filtfilt_classic`/`filtfilt_piecewise`/`filtfilt_interp`
+- `+pf2_base/+tests/+unit/ExternalMathTest.m` — validates the external math against ground-truth and (when available) toolbox reference values
+
+**Global / Systemic Signal Removal:**
+- `pf2_GSR` — PCA-based global signal removal, isolating and subtracting the dominant shared-variance component(s) as a model of systemic (extra-cerebral) interference, with a fractional-variance safety cap and column-mean preservation
+- Compared head-to-head with common-average reference (`pf2_CAR`) and short-channel regression (`pf2_SSR`), now updated to share a common interface
+- `examples/scripts/example_global_signal_removal.m` — CAR vs PCA-GSR vs short-channel regression on the fNIR2000 sample and against ground truth
+
+**Spatial Visualization:**
+- `pf2.probe.project.parcels()` — Voronoi-style per-channel optode parcel map on the cortical surface (nearest-optode cells with smooth outlines and numbering), with channel highlighting and value-filled or schematic display modes
+- `exploreFNIRS.connectivity.plotChord()` — colour nodes by a per-node statistic with its own colorbar (`'NodeValues'`, `'NodeColormap'`, `'NodeCLim'`), group nodes under region anchors (`'GroupLabels'`), and draw uniform-colour edges
+- `pf2.probe.plot.interpolateValues3D()` — render-style refinements and a parcellation overlay path (`'Parcellate'`, `'HighlightChannels'`)
+
+**Documentation Site:**
+- MkDocs configuration (`mkdocs.yml`) and a published `docs/` reference set (API reference, processing pipeline, usage examples, CLI/UX guide, exploreFNIRS pipeline, architecture)
+- `CONTRIBUTING.md` contributor guide and a GitHub Pages build workflow (`.github/workflows/docs.yml`)
+- Top-level `README.md` restructured to a concise overview, with detailed material relocated into `docs/`
+
 **Diffuse Optical Tomography (`+pf2/+probe/+dot/`, `+pf2/+probe/+forward/`):**
 - `pf2.probe.forward.sensitivity()` — channel-by-vertex PMDF ("banana") sensitivity matrix on the bundled MNI cortical surface, relating an absorption change at each vertex to each channel's optical-density change; options for wavelength, scalp offset, max source-detector distance, and pruning
 - `pf2.probe.forward.coverage()` — per-vertex sensitivity support map for a montage
@@ -172,7 +192,9 @@
 ### Config Changes
 - `pf2_functions_default.cfg` reformatted and alphabetized
 - Added `requiresOD` field to motion correction functions (TDDR, Wavelet, Spline, SplineSG, SMAR, SMAR2, MARA, kbWF, sSMART) — validated at runtime in processStageRaw2OD
-- New function entries: `pf2_MotionCorrectSpline`, `pf2_MotionCorrectSplineSG`
+- New function entries: `pf2_MotionCorrectSpline`, `pf2_MotionCorrectSplineSG`, `pf2_GSR`
+- Global-signal-removal methods (`pf2_CAR`, `pf2_SSR`, `pf2_GSR`) registered through `+pf2/+methods/+oxy/setMethod.m` and `+pf2/+methods/+raw/setMethod.m`
+- Removed bundled `devices/DrP_probe.cfg` (unreferenced)
 
 ### GUI Changes
 - Method configuration GUI now converts between PipelineFunction and legacy struct for editing
