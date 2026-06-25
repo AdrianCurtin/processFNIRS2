@@ -4,6 +4,45 @@
 
 ### New Features
 
+**Diffuse Optical Tomography (`+pf2/+probe/+dot/`, `+pf2/+probe/+forward/`):**
+- `pf2.probe.forward.sensitivity()` — channel-by-vertex PMDF ("banana") sensitivity matrix on the bundled MNI cortical surface, relating an absorption change at each vertex to each channel's optical-density change; options for wavelength, scalp offset, max source-detector distance, and pruning
+- `pf2.probe.forward.coverage()` — per-vertex sensitivity support map for a montage
+- `pf2.probe.dot.reconstruct()` — vertex-space HbO/HbR image reconstruction by inverting the forward model with a depth-weighted, channel-whitened Tikhonov min-norm estimator; automatic regularization (GCV or L-curve), masked to the coverage support; time-mean, windowed, or all-time output; priors `minnorm` / `laplacian` (spatial smoothness) / `parcel`; optional layered head model and short-separation scalp regression
+- `pf2.probe.dot.montageInfo()` — reports whether a montage is high-density / multi-distance and its reconstruction suitability
+- `pf2.probe.dot.resolution()` — point-spread-function diagnostics (localization error, spread, FWHM)
+- `pf2.probe.project.tomography()` — render a reconstruction on cortex (signed, sensitivity-masked, headless-safe)
+- `pf2.probe.project.pmdf()` — honest channel projection through the physical optical footprint (vs a Gaussian kernel)
+- `pf2.probe.plot.tomographyMovie()` — time-resolved DOT movie (MP4/AVI/GIF)
+- `+pf2_base/+dot/` internals: Green's functions (homogeneous and layered), layered head model, cortical mesh and surface normals, mesh Laplacian, optical properties, sensitivity matrix assembly, and regularization-parameter selection
+- `examples/scripts/example_dot_reconstruction.m` — DOT tutorial: forward sensitivity, montage coverage, banana projection, depth-weighted reconstruction, cortical render
+
+**PPI Hyperscanning:**
+- `exploreFNIRS.connectivity.computePPI()` — cross-brain psychophysiological interaction: `'SeedData'` for a seed taken from another recording (e.g. speaker→listener), `'SeedSignal'` for an external seed (e.g. EKG/HRV-derived), plus polynomial drift modeling, OLS / AR-IRLS fitting, optional HRF deconvolution, and ROI seed/target selection
+- `pf2.data.aux.hrvSeries()` — time-resolved HRV metrics via a sliding window over a PPG/EKG waveform, for use as a continuous PPI seed signal
+- `exploreFNIRS.core.GLMExperiment.ppi()` / `.ppiTable()` / `.ppiLME()` — group-level PPI: per-subject contrast betas reshaped into a long-format bridge table and modeled with an LME
+- `exploreFNIRS.hyperscanning.computeGroup()` — N-way (e.g. triad) coupling via `'GroupSize'`
+- `examples/scripts/example_ppi_hyperscanning.m` — PPI tutorial: cross-brain seed, EKG/HRV-derived seed, triad coupling, group-level PPI modeling
+
+**Generic Tidy-Table Import:**
+- `pf2.import.fromTable()` — adapt plain long-format (tidy) repeated-measures data (survey waves, longitudinal scores, diary measures) into the cell array of segment structs the toolbox consumes, so the Experiment class, temporal/bar plots, and the LME engine work on non-fNIRS data; `'Subject'` / `'Time'` / `'Value'` column mapping, multi-channel values, `'TimeMode'` (`index` vs real-spacing `value`), `'Duplicates'` handling, and subject-constant columns carried into `.info` as grouping factors. No device/probe, so spatial visualization is unavailable
+- `exploreFNIRS.core.Experiment` honors `settings.useBaseline = false` and `settings.resampleRate = 0` to skip baseline correction and resampling for already-summarized input
+
+**Block & Marker Workflow:**
+- `pf2.data.dedupeMarkers()` — collapse near-duplicate markers that share a Code and fall within a time `'Tolerance'` of an earlier kept row (typical of bouncing device triggers)
+- `pf2.data.removeMarkers()` — drop marker rows by Code, time window, row index, or any combination
+- `pf2.data.defineBlocks()` — explicit per-block metadata sources (`'ConditionMap'`, `'InfoTable'`, `'InfoFields'`) and per-trial factors carried from marker columns (e.g. RT, condition label) into `block.info`, with explicit sources taking precedence
+- `pf2.data.importBlockInfo()` now accepts block metadata directly from memory, not just a CSV/Excel path: pass an in-memory MATLAB table, or a per-block numeric vector with `'Field'` to name the target `block.info` field (default `'value'`). Non-path/table/vector inputs raise a clear error instead of a cryptic file-read failure
+
+**LME Robustness & Diagnostics:**
+- `exploreFNIRS.stats.suppressLMEWarnings()` — scope-suppresses the `fitlme` rank-deficiency / Hessian warning identifiers that otherwise repeat per channel and term, returning an `onCleanup` handle that restores prior state
+- `exploreFNIRS.stats.autoModelLME()` / `fitLME()` / `fitInfoLME()` — rank-deficiency-aware model selection and reporting
+
+**Probe Geometry Export:**
+- `pf2.probe.saveCfg()` — serialize a probe's geometry (from imported data or a SNIRF file) into a toolbox-native device `.cfg`, reloadable via `pf2.Device.load`; reconstructs source/detector coordinates, channel/wavelength mapping, and source/detector indices, preferring 3D (mm) with a 2D fallback
+
+**BIDS Export:**
+- `pf2_base.bids.resolveEntities()` — recordings that collide on sub/ses/task without an explicit run are auto-numbered `run-01`, `run-02`, … in input order; a duplicate explicit run is renumbered to the next free value with a `pf2:asBIDS:runCollision` warning so entities never resolve to the same path
+
 **New Coupling Methods:**
 - `exploreFNIRS.coupling.partialCorr()` — partial correlation controlling for confound signals
   - Standalone: pass `'Confounds', Z` to regress out signals (QR decomposition)

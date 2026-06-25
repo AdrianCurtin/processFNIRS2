@@ -20,7 +20,9 @@ function [figHandle] = oxy(fNIR, varargin)
 %   'biomarkers'  - {'HbO','HbR'} (default), or 'all', or specific list
 %   'baseline'    - false (default), or seconds, or [start,end]
 %   'ylim'        - [] (auto), or [min max]
-%   'interactive' - true (default), false to skip prompts (for batch/headless)
+%   'interactive' - true (default), false to skip prompts (for batch/headless).
+%                   When left unset, auto-detects headless sessions
+%                   (pf2_base.isHeadless) and skips prompts automatically.
 %   'savePath'    - '' (default), filename to save figure (.png, .pdf, .fig)
 %   'saveWidth'   - [] (default), figure width in pixels
 %   'saveHeight'  - [] (default), figure height in pixels
@@ -103,6 +105,12 @@ if ~isempty(p.Results.plotArranged), plotArranged = p.Results.plotArranged; end
 lineProps = p.Results.lineProps;
 rejectedLineProps = p.Results.rejectedLineProps;
 interactive = p.Results.interactive;
+% Auto-detect non-interactive sessions when the caller didn't set 'interactive'
+% explicitly, so the default never reaches a blocking input() under -batch /
+% -nodisplay (a user can still force the prompt with 'interactive', true).
+if ismember('interactive', p.UsingDefaults) && pf2_base.isHeadless()
+    interactive = false;
+end
 savePath = p.Results.savePath;
 saveWidth = p.Results.saveWidth;
 saveHeight = p.Results.saveHeight;

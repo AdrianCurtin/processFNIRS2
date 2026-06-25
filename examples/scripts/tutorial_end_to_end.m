@@ -135,8 +135,8 @@ end
 fprintf('\n=== Part 4: Extract Segments ===\n');
 
 segments = pf2.data.extractBlocks(processed, blocks, ...
-    'PreTime', 120, ...          % 120s before onset
-    'PostTime', 120, ...         % 120s after block end
+    'PreTime', 5, ...            % 5s before onset (baseline)
+    'PostTime', 15, ...          % 15s after block end (HRF tail)
     'BaselineWindow', [-5, 0], ...  % baseline correction window
     'SetT0', true, ...           % onset = t0
     'CopyInfo', true);

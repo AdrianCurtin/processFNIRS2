@@ -267,9 +267,15 @@ classdef GLMConnectivityTest < matlab.unittest.TestCase
             result = exploreFNIRS.connectivity.computePPI( ...
                 testCase.data, testCase.blocks, 1);
 
-            testCase.verifyTrue(ismember('PPI', result.regressorNames));
+            % gPPI design: a seed main-effect column plus one seed x condition
+            % interaction per condition (PPI_<cond>). The design must be full
+            % rank -- the legacy single 'psych'+'PPI' parameterization was
+            % rank deficient (an exact linear combination of task regressors).
             testCase.verifyTrue(ismember('seed', result.regressorNames));
-            testCase.verifyTrue(ismember('psych', result.regressorNames));
+            testCase.verifyTrue(any(startsWith(result.regressorNames, 'PPI_')));
+            testCase.verifyTrue(isfield(result, 'ppiBetaPerCondition'));
+            X = result.designMatrix;
+            testCase.verifyEqual(rank(X), size(X, 2));
         end
 
         function testPPIFullResultsValid(testCase)

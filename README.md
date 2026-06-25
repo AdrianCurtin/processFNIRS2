@@ -66,6 +66,22 @@ pf2.export.asSNIRF(allData, 'output/', 'Dir1', 'Group', 'Prefix', {'SubjectID'})
 exploreFNIRS(myprocesseddata);
 ```
 
+### Block average (event-related) in 6 lines
+The happy path from a continuous recording with event markers to an averaged
+event-related waveform:
+```matlab
+data     = pf2.import.sampleData();              % recording WITH markers (code 50)
+proc     = processFNIRS2(data);                   % -> HbO/HbR/...
+blocks   = pf2.data.defineBlocks(proc, 50, 15, 'Embed', false);  % code 50, 15 s duration
+segments = pf2.data.extractBlocks(proc, blocks, 'PreTime', 5, 'PostTime', 15, 'SetT0', true);
+ga       = pf2.data.blockAverage(segments);       % trial average onto a common grid
+plot(ga.time, ga.HbO.Mean(:,1));                  % averaged HbO, channel 1
+```
+> The 3rd `defineBlocks` argument is the block **duration** in seconds, not a
+> window. Always pass explicit `PreTime`/`PostTime` to `extractBlocks` — when
+> omitted it now falls back to a small default `Buffer` (2 s each side) rather
+> than the whole recording.
+
 ## Processing Pipeline
 
 ### Data Import
@@ -230,6 +246,15 @@ pf2.data.plot.auxData(myprocesseddata);               % Plot auxiliary data
 pf2.probe.plot.topo(myprocesseddata, 'HbO', 'Time', 30);            % 2D at t=30s
 pf2.probe.plot.topo(myprocesseddata, 'HbO', 'View', '3d');         % 3D surface
 pf2.probe.plot.topo(myprocesseddata, 'HbO', 'savePath', 'topo.png'); % headless save
+% Combine options in one call (publication 3D render straight to PNG):
+pf2.probe.plot.topo(myprocesseddata, 'HbO', 'View', '3d', 'Time', 30, ...
+    'Style', 'publication', 'savePath', 'brain.png');
+
+% Headless note: prefer the 'savePath' option over figure('Visible','off') +
+% saveas — it always writes a correct white-background image (the white-export
+% guarantee applies to pf2's own plot functions, not to user-built figures),
+% and is the reliable path for 3D renders. pf2.data.plot.oxy auto-detects
+% headless/-batch sessions and skips its interactive prompts.
 
 % Plots automatically show device, method, and DPF info in title
 % e.g., "fNIR2000C | x5_TDDR | DPF(age=25)"
@@ -321,13 +346,14 @@ blocks = pf2.data.defineBlocks(data, [49, 50], 30, 'Embed', false);
 blocks = pf2.data.defineBlocks(data, [49, 50], 30, ...
     'ConditionMap', {49, 'Easy'; 50, 'Hard'}, 'Embed', false);
 
-% Import per-trial behavioral data from CSV
+% Import per-trial behavioral data from CSV (or pass an in-memory table /
+% a per-block numeric vector instead of a file path — see Metadata Import)
 blocks = pf2.data.importBlockInfo(blocks, 'trial_data.csv', ...
     'MarkerCode', [49, 50]);
 
-% Extract fNIRS segments aligned to block onset. NOTE: PreTime and PostTime
-% both default to 120 s — always set them, or a short block becomes a very
-% long segment.
+% Extract fNIRS segments aligned to block onset. Always set PreTime/PostTime;
+% when omitted, extractBlocks falls back to a small default Buffer (2 s each
+% side). 'Buffer' sets both at once; explicit PreTime/PostTime override it.
 segments = pf2.data.extractBlocks(data, blocks, ...
     'PreTime', 5, 'PostTime', 15, 'SetT0', true);
 
@@ -340,14 +366,20 @@ ex = exploreFNIRS.core.Experiment(segments);
 ```
 
 ### Metadata Import
-Import subject-level and block-level metadata from CSV/Excel:
+Import subject-level and block-level metadata from a CSV/Excel file, an
+in-memory MATLAB table, or (for block data) a per-block numeric vector:
 ```matlab
 % Subject demographics (one row per subject, matched by SubjectID)
 allData = pf2.data.importInfo(allData, 'demographics.csv', 'SubjectID');
 
-% Block-level behavioral data (positional or key-based matching)
+% Block-level behavioral data from a file (positional or key-based matching)
 blocks = pf2.data.importBlockInfo(blocks, 'behavior.csv', ...
     'MarkerCode', 49);  % only apply to task blocks
+
+% ...or straight from data already in memory — no file needed:
+blocks = pf2.data.importBlockInfo(blocks, behaviorTable);          % a table
+blocks = pf2.data.importBlockInfo(blocks, scorePerBlock, ...        % a vector
+    'Field', 'score');   % one value per block -> block.info.score
 ```
 
 See `examples/scripts/example_import_blocks.m` for a complete walkthrough, or `examples/scripts/tutorial_batch_workflow.m` for a realistic multi-subject workflow with directory import, CSV metadata merge, batch processing, and batch export.
@@ -366,6 +398,15 @@ events = pf2.data.blocksToEvents(blocks);
 % 3. Fit GLM per biomarker
 hboResults = pf2_base.fnirs.fitGLM(data.HbO, X, names);
 hbrResults = pf2_base.fnirs.fitGLM(data.HbR, X, names);
+
+% 3b. Within-subject contrast (Hard > Easy) per channel
+%     Build the [K x P] contrast by regressor name so it stays correct
+%     regardless of drift/constant column placement.
+C = strcmp(names, 'Hard') - strcmp(names, 'Easy');   % +1 Hard, -1 Easy
+con = pf2_base.fnirs.fitGLM(data.HbO, X, names, ...
+    'Contrasts', C, 'ContrastNames', {'Hard>Easy'});
+% con.contrast.beta / .tstat / .pval are [nContrasts x nChannels]
+sig = con.contrast.pval < 0.05;                       % channels showing the effect
 
 % 4. Package betas for Experiment
 segments = pf2.data.betasToSegments(hboResults, data, ...

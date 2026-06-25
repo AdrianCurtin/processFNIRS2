@@ -332,6 +332,128 @@ classdef MetadataImportTest < matlab.unittest.TestCase
             testCase.verifyEqual(result(1).info.Difficulty, 'Easy', ...
                 'New field should be added');
         end
+
+        function testTableSourcePositional(testCase)
+            % In-memory table behaves identically to a just-read CSV
+            blocks = makeTestBlocks();
+
+            tbl = table([85; 90; 78], {'Easy'; 'Hard'; 'Easy'}, ...
+                'VariableNames', {'Score', 'Difficulty'});
+
+            result = pf2.data.importBlockInfo(blocks, tbl);
+
+            testCase.verifyEqual(result(1).info.Score, 85);
+            testCase.verifyEqual(result(2).info.Difficulty, 'Hard');
+            testCase.verifyEqual(result(3).info.Score, 78);
+        end
+
+        function testTableSourceKeyMode(testCase)
+            % Table source honors key-based matching like a CSV
+            blocks = makeTestBlocks();
+
+            tbl = table([3; 1; 2], [78; 85; 90], ...
+                'VariableNames', {'BlockNumber', 'Score'});
+
+            result = pf2.data.importBlockInfo(blocks, tbl, 'Keys', 'BlockNumber');
+
+            testCase.verifyEqual(result(1).info.Score, 85);
+            testCase.verifyEqual(result(2).info.Score, 90);
+            testCase.verifyEqual(result(3).info.Score, 78);
+        end
+
+        function testTableSourceMarkerFilter(testCase)
+            % Table source honors MarkerCode filter
+            blocks = makeMixedBlocks();  % 49, 50, 49, 50, 49
+
+            tbl = table([85; 90; 78], 'VariableNames', {'Score'});
+
+            result = pf2.data.importBlockInfo(blocks, tbl, 'MarkerCode', 49);
+
+            testCase.verifyEqual(result(1).info.Score, 85);
+            testCase.verifyEqual(result(3).info.Score, 90);
+            testCase.verifyEqual(result(5).info.Score, 78);
+            testCase.verifyFalse(isfield(result(2).info, 'Score'));
+        end
+
+        function testNumericVectorWithField(testCase)
+            % Numeric per-block vector assigned to a named field
+            blocks = makeTestBlocks();
+            scores = [10; 20; 30];
+
+            result = pf2.data.importBlockInfo(blocks, scores, 'Field', 'score');
+
+            testCase.verifyEqual(result(1).info.score, 10);
+            testCase.verifyEqual(result(2).info.score, 20);
+            testCase.verifyEqual(result(3).info.score, 30);
+        end
+
+        function testNumericVectorRowOrColumn(testCase)
+            % Row vector accepted the same as a column vector
+            blocks = makeTestBlocks();
+
+            result = pf2.data.importBlockInfo(blocks, [10 20 30], 'Field', 'score');
+
+            testCase.verifyEqual(result(1).info.score, 10);
+            testCase.verifyEqual(result(3).info.score, 30);
+        end
+
+        function testNumericVectorDefaultField(testCase)
+            % Field defaults to 'value' when omitted
+            blocks = makeTestBlocks();
+
+            result = pf2.data.importBlockInfo(blocks, [1; 2; 3]);
+
+            testCase.verifyEqual(result(1).info.value, 1);
+            testCase.verifyEqual(result(2).info.value, 2);
+            testCase.verifyEqual(result(3).info.value, 3);
+        end
+
+        function testNumericVectorWithFilter(testCase)
+            % Numeric vector length matches the FILTERED block count
+            blocks = makeMixedBlocks();  % marker 49 at blocks 1,3,5
+            scores = [11; 22; 33];
+
+            result = pf2.data.importBlockInfo(blocks, scores, ...
+                'MarkerCode', 49, 'Field', 'score');
+
+            testCase.verifyEqual(result(1).info.score, 11);
+            testCase.verifyEqual(result(3).info.score, 22);
+            testCase.verifyEqual(result(5).info.score, 33);
+            testCase.verifyFalse(isfield(result(2).info, 'score'));
+        end
+
+        function testNumericVectorLengthMismatchError(testCase)
+            % Clear error when vector length != number of blocks
+            blocks = makeTestBlocks();  % 3 blocks
+
+            testCase.verifyError(...
+                @() pf2.data.importBlockInfo(blocks, [1; 2], 'Field', 'score'), ...
+                'pf2:data:importBlockInfo:lengthMismatch');
+        end
+
+        function testBadSourceError(testCase)
+            % Friendly error for unsupported source types (not isfile error)
+            blocks = makeTestBlocks();
+
+            testCase.verifyError(...
+                @() pf2.data.importBlockInfo(blocks, struct('a', 1)), ...
+                'pf2:data:importBlockInfo:badSource');
+        end
+
+        function testIntegrationVectorWithSampleData(testCase)
+            % End-to-end: sampleData -> defineBlocks -> numeric vector import
+            data = pf2.import.sampleData.fNIR2000();
+            proc = processFNIRS2(data);
+            blocks = pf2.data.defineBlocks(proc, [1 2], 20, 'Embed', false);
+
+            testCase.assumeNotEmpty(blocks, 'Sample data produced no blocks');
+
+            scores = (1:numel(blocks))';
+            blocks = pf2.data.importBlockInfo(blocks, scores, 'Field', 'score');
+
+            testCase.verifyEqual(blocks(1).info.score, 1);
+            testCase.verifyEqual(blocks(end).info.score, numel(blocks));
+        end
     end
 end
 

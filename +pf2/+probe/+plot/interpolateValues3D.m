@@ -51,7 +51,10 @@ function [ h, imgOut ] = interpolateValues3D(varargin)
 %   'brainColor'        - Base brain surface color (default: [0.92, 0.68, 0.68])
 %   'brainAlpha'        - Brain surface transparency (default: 1)
 %   'showColorbar'      - Display colorbar (default: true)
-%   'initCamPosition'   - Initial camera position (default: 'auto')
+%   'initCamPosition'   - Initial camera position (default: 'auto'). 'auto'
+%                         frames the montage from an elevated 3/4 view (more
+%                         dramatic for 'showcase', gentler for 'publication')
+%                         so it never sits dead-on the camera.
 %                         Options: 'auto', 'front', 'back', 'top', 'bottom',
 %                         'left', 'right', 'face', 'top-left', 'top-right',
 %                         'top-front', 'top-back', 'front-left', 'front-right',
@@ -239,6 +242,13 @@ addParameter(p,'ChannelLabels',true,@islogical);
 addParameter(p,'SDLabels',shouldHideByDefault,@islogical);
 addParameter(p,'I1020_labels',false,validI1020Label);
 addParameter(p, 'useHighRes', true, @islogical);
+% VertexData: pre-computed per-vertex field (e.g. DOT reconstruction, coverage,
+% PMDF backprojection) coloured directly onto the cortical mesh, bypassing the
+% channel->vertex interpolation. Must match the mesh vertex count (high-res by
+% default). NaN vertices render transparent (sensitivity masking). VertexAlpha
+% optionally sets per-vertex opacity.
+addParameter(p, 'VertexData', [], @(x) isempty(x) || isnumeric(x));
+addParameter(p, 'VertexAlpha', [], @(x) isempty(x) || isnumeric(x));
 addParameter(p, 'cmap', defaultColormap, validColormap);
 addParameter(p, 'cmap_lower', defaultColormapLow, validColormap);
 addParameter(p, 'labelfontsize', 10, validScalarPosNum);
@@ -291,6 +301,10 @@ parse(p,varargin{:});
 
 
 data2plot = p.Results.data2plot;
+vertexData = p.Results.VertexData;
+vertexAlphaIn = p.Results.VertexAlpha;
+if ~isempty(vertexData), vertexData = vertexData(:); end
+if ~isempty(vertexAlphaIn), vertexAlphaIn = vertexAlphaIn(:); end
 titleString = p.Results.titleString;
 clrBarTitle = p.Results.colorbarStr;
 projectmode = p.Results.interpolateType;
@@ -1354,9 +1368,10 @@ if(~all(dataEmpty))
     C=data2plot_concat;
     
     num_vertices = size(mdl.v, 1);
-    
+
     Cs = zeros(num_vertices, 3);
-    
+
+  if isempty(vertexData)
     if(p.Results.useProjectedOptodeLocations)
         controlPoints=probeInfo.TableOpt.VectorDir(includeChannels,:);
         max_distance_2 = bufferDistance^1.2;
@@ -1450,6 +1465,12 @@ if(~all(dataEmpty))
     end
     alphaMode = lower(string(p.Results.AlphaMode));
     transparentMode = alphaMode == "transparent";
+  else
+    % Pre-computed per-vertex field path: no channel interpolation. Render as
+    % a transparent overlay so masked-out (NaN) cortex shows the gray base.
+    chanAlpha = [];
+    transparentMode = true;
+  end
 
     if(isnumeric(cmap_high))
         nColorsMaxBar=size(cmap_high,1);
@@ -1513,30 +1534,58 @@ if(~all(dataEmpty))
     cmap = cmap .* cmap(:, 4) + repmat([brainColor(1:3),1], size(cmap, 1), 1) .* (1 - cmap(:, 4));
     cmapRGB = cmap(:, 1:3);
 
-    [Cs_proj, fadeAlpha_v] = pf2_base.plot.interpolateChannelColors( ...
-        dist_array, c_ind(:), cmapRGB, ...
-        'MaxDistance2', max_distance_2, ...
-        'ProjectMode', projectmode, ...
-        'ChanMask', mask(:));
-
-    if transparentMode
-        % Two-sided dead-zone channels (mask == true) should be transparent
-        % rather than brainColor — the gap between the two colorbars then
-        % appears as see-through rather than as a flat brain-colored band.
-        chanAlphaCombined = chanAlpha;
-        if any(mask)
-            chanAlphaCombined(mask(:)) = 0;
+    if ~isempty(vertexData)
+        % Direct per-vertex colouring (DOT reconstruction / coverage / PMDF).
+        if numel(vertexData) ~= size(mdl.v, 1)
+            error('pf2:interpolateValues3D:vertexDataSize', ...
+                ['VertexData has %d entries but the mesh has %d vertices. ' ...
+                 'Match the mesh resolution (high-res by default).'], ...
+                numel(vertexData), size(mdl.v, 1));
         end
-        % Interpolate per-channel alpha onto vertices with the same kernel,
-        % then combine with the distance-based fade. Caller binds vertexAlpha
-        % to the brain patch as FaceVertexAlphaData.
-        chanAlphaInterp = iLocalInterpScalar(dist_array, chanAlphaCombined, max_distance_2, projectmode);
-        vertexAlpha = fadeAlpha_v .* chanAlphaInterp;
+        cbRange = max(cbarUpper_minmax) - min(cbarUpper_minmax);
+        if cbRange <= 0, cbRange = 1; end
+        vci = (vertexData - min(cbarUpper_minmax)) / cbRange;
+        nanV = isnan(vci);
+        vci = min(max(vci, 0), 1);
+        idx = round(vci * (size(cmapRGB, 1) - 1)) + 1;
+        idx = min(max(idx, 1), size(cmapRGB, 1));
+        Cs_proj = cmapRGB(idx, :);
+        if isempty(vertexAlphaIn)
+            fadeAlpha_v = ones(size(mdl.v, 1), 1);
+        else
+            fadeAlpha_v = min(max(vertexAlphaIn, 0), 1);
+        end
+        fadeAlpha_v(nanV) = 0;          % NaN vertices -> transparent (masked)
         Cs = Cs_proj;
+        vertexAlpha = fadeAlpha_v;
     else
-        % Legacy blend path — non-contributing vertices mix with brainColor.
-        Cs = Cs_proj .* fadeAlpha_v + brainColor .* (1 - fadeAlpha_v);
-        vertexAlpha = [];
+        % Channel path: spread channel values onto vertices via the projection
+        % kernel (Gaussian/sensitivity/nearest).
+        [Cs_proj, fadeAlpha_v] = pf2_base.plot.interpolateChannelColors( ...
+            dist_array, c_ind(:), cmapRGB, ...
+            'MaxDistance2', max_distance_2, ...
+            'ProjectMode', projectmode, ...
+            'ChanMask', mask(:));
+
+        if transparentMode
+            % Two-sided dead-zone channels (mask == true) should be transparent
+            % rather than brainColor — the gap between the two colorbars then
+            % appears as see-through rather than as a flat brain-colored band.
+            chanAlphaCombined = chanAlpha;
+            if any(mask)
+                chanAlphaCombined(mask(:)) = 0;
+            end
+            % Interpolate per-channel alpha onto vertices with the same kernel,
+            % then combine with the distance-based fade. Caller binds vertexAlpha
+            % to the brain patch as FaceVertexAlphaData.
+            chanAlphaInterp = iLocalInterpScalar(dist_array, chanAlphaCombined, max_distance_2, projectmode);
+            vertexAlpha = fadeAlpha_v .* chanAlphaInterp;
+            Cs = Cs_proj;
+        else
+            % Legacy blend path — non-contributing vertices mix with brainColor.
+            Cs = Cs_proj .* fadeAlpha_v + brainColor .* (1 - fadeAlpha_v);
+            vertexAlpha = [];
+        end
     end
 
 else % No data to plot, everything is brain and anatomy
@@ -1703,7 +1752,14 @@ end
 % Voxel path uses Euclidean distance regardless of UseGeodesic — building a
 % geodesic graph on the voxel isosurface would be prohibitively expensive
 % and the voxel render is primarily anatomical context.
-if p.Results.showVoxelBrain && ~all(dataEmpty)
+if p.Results.showVoxelBrain && ~isempty(vertexData)
+    % The voxel-overlay path projects CHANNEL data through controlPoints/
+    % max_distance_2, which the VertexData path never computes. They are
+    % mutually exclusive; warn and skip the voxel overlay.
+    warning('pf2:interpolateValues3D:voxelVertexData', ...
+        'showVoxelBrain is ignored when VertexData is supplied.');
+end
+if p.Results.showVoxelBrain && isempty(vertexData) && ~all(dataEmpty)
     voxelPatches = findall(ax, 'Type', 'Patch', 'Tag', 'BrainVoxel');
     existingOverlays = findall(ax, 'Type', 'Patch', 'Tag', 'BrainVoxelOverlay');
     if ~isempty(existingOverlays) && ~transparentMode
@@ -1894,23 +1950,27 @@ if(isempty(itemsToSkipPlot))
     else
         switch(p.Results.initCamPosition)
             case 'auto'
+                % Frame from the data's side, lifted and rotated into an
+                % elevated 3/4 view so the montage never sits dead-on (which
+                % foreshortens it and collides with the colorbar). The hero
+                % preset (showcase) lifts/rotates more dramatically; the
+                % conservative preset (publication) uses a gentler 3/4.
+                if renderStyle.heroView
+                    liftZ = 0.40; azDeg = 25; dist = 1550;
+                    fallbackPos = [-500, 1150, 650];
+                else
+                    liftZ = 0.28; azDeg = 18; dist = 1500;
+                    fallbackPos = [-350, 1150, 520];
+                end
                 autoPos = mean(optPos, 1, 'omitnan');
                 if any(isnan(autoPos)) || norm(autoPos) == 0
-                    if renderStyle.heroView
-                        campos([-500,1150,650]);  % elevated 3/4 hero fallback
-                    else
-                        campos([0,1200,0]);       % front view fallback
-                    end
-                elseif renderStyle.heroView
-                    % Stay on the data's side but lift and rotate ~25 deg for
-                    % a flattering elevated 3/4 "hero" framing (showcase).
-                    base = autoPos / norm(autoPos);
-                    base = base + 0.40 * [0 0 1];
-                    th = 25*pi/180; c = cos(th); s = sin(th);
-                    base = ([c -s 0; s c 0; 0 0 1] * base(:))';
-                    campos(base / norm(base) * 1550);
+                    campos(fallbackPos);
                 else
-                    campos(autoPos/norm(autoPos)*1500);
+                    base = autoPos / norm(autoPos);
+                    base = base + liftZ * [0 0 1];
+                    th = azDeg*pi/180; c = cos(th); s = sin(th);
+                    base = ([c -s 0; s c 0; 0 0 1] * base(:))';
+                    campos(base / norm(base) * dist);
                 end
             case 'front'
                 campos([0,1200,0]);

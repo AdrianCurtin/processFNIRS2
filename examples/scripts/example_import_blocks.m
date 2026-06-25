@@ -212,8 +212,8 @@ fprintf('\n');
 fprintf('=== Step 5: Extract block segments ===\n');
 
 allSegments = pf2.data.extractBlocks(subjects, ...
-    'PreTime', 120, ...    % 120s before block onset
-    'PostTime', 120, ...   % 120s after block end
+    'PreTime', 5, ...      % 5s before block onset (baseline)
+    'PostTime', 15, ...    % 15s after block end (HRF tail)
     'SetT0', true);        % block onset = t=0
 
 fprintf('Extracted %d segments\n', length(allSegments));

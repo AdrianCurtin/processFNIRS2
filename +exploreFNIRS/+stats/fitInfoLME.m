@@ -132,6 +132,13 @@ function results = fitInfoLME(dataTable, infoVar, groupByVars, varargin)
 
     results.formula = lmeString;
 
+    % Suppress MATLAB's own fitlme rank/Hessian spam when not verbose.
+    % Scoped to the specific LME identifiers (not a blanket off-all), so
+    % unrelated warnings still surface; restored when cleanupObj clears.
+    if ~opts.Verbose
+        cleanupObj = exploreFNIRS.stats.suppressLMEWarnings(); %#ok<NASGU>
+    end
+
     % Fit LME
     try
         rng(2019);

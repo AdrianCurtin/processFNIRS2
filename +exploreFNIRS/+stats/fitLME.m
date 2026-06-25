@@ -689,10 +689,11 @@ function results = fitOneModel(results, mergedTable, varName, chRowName, ...
 
     results.formula = lmeString;
 
-    % Suppress MATLAB's own fitlme warnings when not verbose
+    % Suppress MATLAB's own fitlme rank/Hessian spam when not verbose.
+    % Scoped to the specific LME identifiers (not a blanket off-all), so
+    % unrelated warnings still surface; restored when cleanupObj clears.
     if ~opts.Verbose
-        prevWarn = warning('off', 'all');
-        cleanupObj = onCleanup(@() warning(prevWarn));
+        cleanupObj = exploreFNIRS.stats.suppressLMEWarnings(); %#ok<NASGU>
     end
 
     try

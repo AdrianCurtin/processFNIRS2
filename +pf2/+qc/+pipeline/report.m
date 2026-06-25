@@ -151,6 +151,11 @@ if nRejected > 0
         end
         reasons = {};
 
+        if isfield(qcReport, 'saturation') && ~qcReport.saturation.pass(ch)
+            reasons{end+1} = sprintf('Saturation=%.1f%% (>%.1f%%)', ...
+                100*qcReport.saturation.totalPct(ch), ...
+                100*qcReport.saturation.threshold); %#ok<AGROW>
+        end
         if isfield(qcReport, 'sci') && ~qcReport.sci.pass(ch)
             reasons{end+1} = sprintf('SCI=%.2f (<%.2f)', ...
                 qcReport.sci.values(ch), qcReport.sci.threshold); %#ok<AGROW>
@@ -173,6 +178,9 @@ if nRejected > 0
             reasons{end+1} = sprintf('Takizawa: %s', strjoin(ruleNames, ', ')); %#ok<AGROW>
         end
 
+        if isempty(reasons)
+            reasons = {'failed an enabled check (no specific metric recorded)'};
+        end
         fprintf('  Ch %d: %s\n', ch, strjoin(reasons, '; '));
     end
 end

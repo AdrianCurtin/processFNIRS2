@@ -51,10 +51,14 @@ function bidsRoot = asBIDS(allData, rootDir, varargin)
 % Entity resolution (per recording, from .info, case-insensitive):
 %   sub  - SubjectID | SubjectId | Subject | subject; else sub-padded index.
 %   ses  - Session | session | ses (optional).
-%   task - 'Task' parameter; else TaskName | Task | task; else 'task'.
+%   task - 'Task' parameter; else TaskName | Task | task; else 'task'
+%          (a warning is emitted when this generic default is used).
 %   run  - Run | run (optional). Recordings that would otherwise collide on
 %          sub/ses/task get auto-numbered run-01, run-02, ... in input order.
-%   All labels are sanitized to BIDS-legal alphanumerics.
+%   All labels are sanitized to BIDS-legal alphanumerics. A redundant leading
+%   entity word followed by a number is stripped (SubjectID 'Sub01' -> sub-01,
+%   not sub-Sub01), and placeholder values (Unknown, n/a, none, ...) are
+%   treated as absent (no ses-Unknown; such subjects fall back to the index).
 %
 % Outputs:
 %   bidsRoot - Absolute path to the BIDS dataset root.

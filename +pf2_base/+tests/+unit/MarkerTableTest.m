@@ -379,6 +379,24 @@ classdef MarkerTableTest < matlab.unittest.TestCase
             testCase.verifyTrue(d.markers.Difficulty(1) < d.markers.Difficulty(3));
         end
 
+        function testExtraColumnPromotedThroughDefineBlocks(testCase)
+            % A single-valued marker extra column rides through normalizeMarkers
+            % into a block's .info via defineBlocks' scalar-extra promotion.
+            m = pf2_base.normalizeMarkers([10 49 5 1; 40 49 5 1]);
+            m.RT = [0.33; 0.77];
+            fs = 10; t = (0:0.1:60)';
+            data = struct('time', t, 'fs', fs, ...
+                'HbO', zeros(numel(t), 2), 'markers', m, 'info', struct());
+
+            blocks = pf2.data.defineBlocks(data, 'MarkerCode', 49, ...
+                'Duration', 5, 'Embed', false);
+
+            testCase.verifyEqual(blocks(1).info.RT, 0.33, 'AbsTol', 1e-9, ...
+                'Extra RT promoted to first block info');
+            testCase.verifyEqual(blocks(2).info.RT, 0.77, 'AbsTol', 1e-9, ...
+                'Extra RT promoted to second block info');
+        end
+
         function testLabelColumnSurvivesPreprocessing(testCase)
             data = pf2.import.sampleData();
             testCase.assumeTrue(istable(data.markers) && height(data.markers) > 0, ...

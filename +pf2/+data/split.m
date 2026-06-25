@@ -166,7 +166,10 @@ end
 
 if(endTime>max(fNIR.time))
     %endTime=max(fNIR.time);
-    warning('End time excedes fNIR time');
+    warning('pf2:split:endTimeClamped', ...
+        ['End time (%.1f s) exceeds the recording length (%.1f s); ' ...
+         'the segment is truncated to the available data.'], ...
+        endTime, max(fNIR.time));
 end
 
 if(endTime<startTime)

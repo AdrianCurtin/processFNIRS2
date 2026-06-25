@@ -228,6 +228,27 @@ end
 % Don't show GUI if Context is provided (context implies headless processing)
 ShowGUI=p.Results.ShowGUI||isempty(varargin)||(nargout==0&&~isempty(data)&&isempty(p.Results.Context));
 
+% --- Noop pass-through for empty / non-processable inputs ------------------
+% The pipeline converts raw light intensities (data.raw) into hemoglobin, so a
+% device configuration is only meaningful when there are raw intensities to
+% convert. When an element carries no .raw there is nothing to process and no
+% probe cfg is needed: empty cells, or structs already in biomarker form (e.g.
+% from pf2.import.fromTable or a prior processFNIRS2 run). Return these
+% untouched instead of demanding a device. Exemptions fall through to the normal
+% path: SkipRaw deliberately processes non-raw (oxy-only) data; SkipOD requests
+% raw-stage output and so is only meaningful with raw present (left to error
+% downstream as before rather than silently nooping). NOTE: this fires only when
+% the GUI is suppressed; a bare no-output call processFNIRS2(hbStruct) still
+% routes to the GUI per the ShowGUI rule above (capture an output to noop).
+hasRawIntensity = isstruct(data) && isfield(data,'raw') && ~isempty(data.raw);
+if(~ShowGUI && (isempty(data) || ...
+        (isstruct(data) && ~hasRawIntensity && ~p.Results.SkipRaw && ~p.Results.SkipOD)))
+    if(nargout>0)
+        varargout{1}=data;
+    end
+    return;
+end
+
 % Device acquisition. On the context path the device is supplied by the
 % context (threaded locally below); the legacy/GUI device-loading logic that
 % reads/writes global setF.device is skipped to keep processing isolated.

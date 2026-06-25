@@ -32,6 +32,13 @@ function results = autoModelLME(groups, groupByVars, varargin)
 %   Verbose        - Print progress to console (default: true)
 %   ExcludeShortSeparation - Skip short separation channels (default: true)
 %   ContrastThreshold - p-value threshold for auto-contrasts (default: 0.1)
+%   Covariates     - Info variable(s) (e.g. {'RT','Score'}) forced as fixed-
+%                    effect covariates in every channel's model, instead of
+%                    being subject to forward selection. Alias for ForcedTerms;
+%                    parallels AuxCovariates (which is for aux_* signals).
+%                    Continuous covariates are entered UNCENTERED; mean-center
+%                    (e.g. zscore) before passing so the group intercepts stay
+%                    interpretable.
 %   ResponseVar    - Info variable name to use as response (default: '')
 %                    When set, the response is the named info variable (e.g.
 %                    'reactionTime') and each channel's biomarker column becomes
@@ -109,8 +116,18 @@ function results = autoModelLME(groups, groupByVars, varargin)
     % naming the auxiliary signals to promote to candidate covariates (e.g.
     % {'heartRate','gsr'}); use {'all'} to admit every aux_ column.
     addParameter(p, 'AuxCovariates', {}, @iscell);
+    % 'Covariates' is a friendly alias for 'ForcedTerms': named INFO variables
+    % (e.g. 'RT', 'Score') are forced as fixed-effect covariates in every
+    % channel's model instead of being subject to forward selection. Parallels
+    % 'AuxCovariates' (which is for aux_* signals).
+    addParameter(p, 'Covariates', {}, @iscell);
     parse(p, groups, groupByVars, varargin{:});
     opts = p.Results;
+    % Fold the 'Covariates' alias into ForcedTerms (info vars forced as
+    % fixed-effect covariates, listed before any explicit ForcedTerms).
+    if ~isempty(opts.Covariates)
+        opts.ForcedTerms = unique([opts.Covariates(:)', opts.ForcedTerms(:)'], 'stable');
+    end
     opts.Criterion = upper(opts.Criterion);
 
     isROI = strcmpi(opts.DataType, 'ROI');

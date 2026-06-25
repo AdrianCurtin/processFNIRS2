@@ -79,6 +79,42 @@ classdef BidsExportTest < matlab.unittest.TestCase
             testCase.verifyEqual(ent(3).run, '');   % unique -> no run needed
         end
 
+        function testResolveEntitiesEmptyThenExplicitRun(testCase)
+            % Regression: an empty-run member BEFORE an explicit-run member in
+            % the same sub/ses/task group must NOT steal the explicit number nor
+            % raise a false collision. Explicit runs are reserved first; the
+            % empty member takes the next free number; no warning.
+            mk = @(id, r) struct('info', struct('SubjectID', id, 'Run', r));
+            allData = {mk('01', ''), mk('01', '01')};
+            lastwarn('', '');
+            ent = pf2_base.bids.resolveEntities(allData, 'rest');
+            [~, wid] = lastwarn();
+            testCase.verifyEqual(ent(1).run, '02', ...
+                'Empty-run member must not steal the later explicit run-01.');
+            testCase.verifyEqual(ent(2).run, '01', ...
+                'Explicit run-01 must be preserved.');
+            testCase.verifyNotEqual(wid, 'pf2:asBIDS:runCollision', ...
+                'No collision warning for a valid empty+explicit group.');
+        end
+
+        function testResolveEntitiesDuplicateExplicitRunRenumbers(testCase)
+            % Two recordings sharing sub/ses/task with the SAME explicit run are
+            % a genuine collision: the first keeps its value, the later one is
+            % renumbered, and the collision warning fires.
+            mk = @(id, r) struct('info', struct('SubjectID', id, 'Run', r));
+            allData = {mk('01', '01'), mk('01', '01'), mk('01', '')};
+            ws = warning('off', 'all');
+            restore = onCleanup(@() warning(ws)); %#ok<NASGU>
+            warning('on', 'pf2:asBIDS:runCollision');
+            lastwarn('', '');
+            ent = pf2_base.bids.resolveEntities(allData, 'rest');
+            [~, wid] = lastwarn();
+            testCase.verifyEqual(wid, 'pf2:asBIDS:runCollision', ...
+                'Duplicate explicit runs must raise the collision warning.');
+            testCase.verifyEqual({ent.run}, {'01', '02', '03'}, ...
+                'Colliding explicit runs must be renumbered to distinct values.');
+        end
+
         function testResolveEntitiesTaskOverrideAndSanitize(testCase)
             allData = {struct('info', struct('SubjectID', 'P 1'))};
             ent = pf2_base.bids.resolveEntities(allData, 'my-task');
@@ -225,7 +261,8 @@ classdef BidsExportTest < matlab.unittest.TestCase
     %% ---- No-marker, batch, and option tests ----
     methods (Test)
         function testNoMarkersSkipsEventsFile(testCase)
-            data = pf2.import.sampleData.fNIR2000();   % no markers
+            data = pf2.import.sampleData.fNIR2000();
+            data.markers = pf2_base.normalizeMarkers([]);  % force the no-markers case
             data = processFNIRS2(data);
             root = pf2.export.asBIDS(data, testCase.outRoot, 'Task', 'rest', ...
                 'Verbose', false);

@@ -25,8 +25,16 @@ function segments = extractBlocks(data, varargin)
 %            If omitted, data.blocks is used.
 %
 % Name-Value Parameters:
-%   'PreTime'        - Seconds to include before block start (default: 120)
-%   'PostTime'       - Seconds to include after block end (default: 120)
+%   'PreTime'        - Seconds to include before block start. Overrides Buffer
+%                      for the pre side when given (default: from Buffer).
+%   'PostTime'       - Seconds to include after block end. Overrides Buffer for
+%                      the post side when given (default: from Buffer).
+%   'Buffer'         - Symmetric padding in seconds applied to BOTH sides when
+%                      the corresponding PreTime/PostTime is not given
+%                      (default: 2). With no window argument at all, the
+%                      default Buffer = 2 s is used and a note is emitted
+%                      (pf2:extractBlocks:defaultBuffer) whenever this default
+%                      path is taken (i.e. on every call with no window given).
 %   'BaselineWindow' - [start, end] relative to block start for baseline
 %                      subtraction, e.g. [-5, 0] (default: [])
 %   'SetT0'          - Shift time so block start = 0 (default: true)
@@ -60,6 +68,9 @@ function segments = extractBlocks(data, varargin)
 %   segments = pf2.data.extractBlocks(data, blocks, ...
 %       'PreTime', 5, 'PostTime', 2, ...
 %       'BaselineWindow', [-5, 0], 'SetT0', true);
+%
+%   % Symmetric padding on both sides with Buffer
+%   segments = pf2.data.extractBlocks(data, blocks, 'Buffer', 10);
 %
 %   % Prevent block info from overwriting parent subject info
 %   segments = pf2.data.extractBlocks(data, 'OverwriteInfo', false);
@@ -117,8 +128,9 @@ else
 end
 
 p = inputParser;
-p.addParameter('PreTime', 120, @(x) isnumeric(x) && isscalar(x) && x >= 0);
-p.addParameter('PostTime', 120, @(x) isnumeric(x) && isscalar(x) && x >= 0);
+p.addParameter('PreTime', [], @(x) isempty(x) || (isnumeric(x) && isscalar(x) && x >= 0));
+p.addParameter('PostTime', [], @(x) isempty(x) || (isnumeric(x) && isscalar(x) && x >= 0));
+p.addParameter('Buffer', 2, @(x) isnumeric(x) && isscalar(x) && x >= 0);
 p.addParameter('BaselineWindow', [], @(x) isempty(x) || (isnumeric(x) && numel(x) == 2));
 p.addParameter('SetT0', true, @islogical);
 p.addParameter('OverwriteInfo', true, @islogical);
@@ -132,8 +144,41 @@ p.addParameter('AuxMotionFraction', 0.2, @(x) isnumeric(x) && isscalar(x) && x >
 p.addParameter('AuxMotionThresh', [], @(x) isempty(x) || (isnumeric(x) && isscalar(x)));
 p.parse(nvArgs{:});
 
-preTime = p.Results.PreTime;
-postTime = p.Results.PostTime;
+% Resolve the extraction window. Precedence: an explicit PreTime/PostTime
+% overrides for its side; otherwise the Buffer value (default 2 s) is applied
+% to both sides. When the user passes no window argument at all, the default
+% Buffer is used and an info-level note is emitted below.
+buffer = p.Results.Buffer;
+gavePre  = ~ismember('PreTime',  p.UsingDefaults);
+gavePost = ~ismember('PostTime', p.UsingDefaults);
+gaveBuffer = ~ismember('Buffer', p.UsingDefaults);
+
+if gavePre
+    preTime = p.Results.PreTime;
+else
+    preTime = buffer;
+end
+if gavePost
+    postTime = p.Results.PostTime;
+else
+    postTime = buffer;
+end
+
+% This note is emitted when the default Buffer is used because NO window control
+% was given at all (the pure default path), so a 15 s block does not silently
+% inherit a surprise window. It is suppressed when a BaselineWindow is supplied
+% (a deliberate epoch spec) and fires at most ONCE per session so batch loops
+% are not flooded.
+gaveBaseline = ~ismember('BaselineWindow', p.UsingDefaults);
+persistent defaultBufferNoted
+if ~gavePre && ~gavePost && ~gaveBuffer && ~gaveBaseline && isempty(defaultBufferNoted)
+    defaultBufferNoted = true;
+    warning('pf2:extractBlocks:defaultBuffer', ...
+        ['No window given; using default Buffer = 2 s (both sides); ', ...
+         'pass ''Buffer'' or ''PreTime''/''PostTime'' to set your own. ', ...
+         '(This note is shown once per session.)']);
+end
+
 blWindow = p.Results.BaselineWindow;
 doSetT0 = p.Results.SetT0;
 overwriteInfo = p.Results.OverwriteInfo;
@@ -165,25 +210,6 @@ end
 if isempty(blocks)
     segments = {};
     return;
-end
-
-% Footgun guard: PreTime and PostTime both default to 120 s. If the user
-% leaves them at default and the resulting window dwarfs the block, warn
-% once with the resolved segment length so a "-2 to +15 s" intent does not
-% silently become a ~250 s segment. Only fires when a default is in use.
-usingDefaultPre  = ismember('PreTime',  p.UsingDefaults);
-usingDefaultPost = ismember('PostTime', p.UsingDefaults);
-if usingDefaultPre || usingDefaultPost
-    durs = [blocks.duration];
-    medDur = median(durs(isfinite(durs)));
-    if isempty(medDur) || isnan(medDur); medDur = 0; end
-    if (preTime + postTime) > max(20, 4 * max(medDur, 0))
-        warning('pf2:extractBlocks:largeWindow', ...
-            ['Using default PreTime=%g s and PostTime=%g s: each ~%.0f s block ', ...
-             'becomes a ~%.0f s segment. Pass ''PreTime''/''PostTime'' to size the ', ...
-             'epoch (e.g. ''PreTime'', 5, ''PostTime'', 15).'], ...
-            preTime, postTime, medDur, preTime + medDur + postTime);
-    end
 end
 
 % Get data time range for validation

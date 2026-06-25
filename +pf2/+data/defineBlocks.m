@@ -57,6 +57,13 @@ function blocks = defineBlocks(data, varargin)
 %                    Shifts startTime earlier by this amount.
 %   'PostPad'      - Seconds to include after block end (default: 0)
 %                    Shifts endTime later by this amount.
+%   'MarkerWindow' - Which block window attributes marker rows to a block for
+%                    auto-promotion of per-trial extra columns (default 'core'):
+%                    'core'   - the original PRE-PAD block window, so PrePad/
+%                               PostPad cannot pull a neighbouring block's onset
+%                               marker into this block (the safe default).
+%                    'padded' - the widened (post-pad) window, to deliberately
+%                               attribute markers that fall in the pad region.
 %   'Embed'        - Store blocks on data.blocks and return the data struct
 %                    instead of the blocks array (default: true).
 %                    Set false to return just the blocks struct array.
@@ -72,6 +79,12 @@ function blocks = defineBlocks(data, varargin)
 %            .info        - Struct with block-level metadata:
 %                           .BlockNumber - Sequential 1, 2, 3...
 %                           .(ConditionField) - From ConditionMap (default 'Condition')
+%                           .(extraColumn) - Any marker EXTRA column (e.g. RT)
+%                              that resolves to a single value for the block is
+%                              auto-promoted here for Experiment groupby/plots,
+%                              but only for fields not already set by an
+%                              explicit source (ConditionMap/InfoTable/
+%                              InfoFields), which take precedence.
 %                           ... any user fields from InfoTable/InfoFields
 %
 % Algorithm:
@@ -85,8 +98,17 @@ function blocks = defineBlocks(data, varargin)
 %   4. Build struct array with startTime, endTime, duration, markerCode, markerIndex
 %   5. Apply PrePad/PostPad to extend block boundaries
 %   6. Auto-populate ConditionMap from data.info.eventTypes if not provided
-%   7. Apply ConditionMap, InfoTable, InfoFields to .info
-%   8. Filter by MinDuration/MaxDuration, sort by time
+%   7. Apply ConditionMap, InfoTable, InfoFields to .info (explicit sources)
+%   8. Auto-promote single-valued marker EXTRA columns into any block .info
+%      field those explicit sources left unset (explicit sources take
+%      precedence over promotion)
+%   9. Filter by MinDuration/MaxDuration, sort by time
+%
+%   A near-duplicate onset check warns (pf2:defineBlocks:nearDuplicateOnsets)
+%   when two consecutive same-code markers fall within 0.05 s. The check is
+%   limited to the codes being extracted (markerCode/startMarker) so a bounce
+%   on an un-extracted code does not raise a false alarm; clean flagged codes
+%   with pf2.data.dedupeMarkers.
 %
 % Example:
 %   % Simple: marker codes + fixed duration
@@ -125,7 +147,8 @@ function blocks = defineBlocks(data, varargin)
 %   data = pf2.import.importSNIRF('sub-01_nirs.snirf');
 %   blocks = pf2.data.defineBlocks(data, [1, 2, 3]);  % auto-labeled
 %
-% See also: pf2.data.extractBlocks, pf2.data.getMarkers, pf2.data.split
+% See also: pf2.data.extractBlocks, pf2.data.getMarkers, pf2.data.split, ...
+%           pf2.data.dedupeMarkers, pf2.data.removeMarkers
 
 % --- Cell array input: apply to each element (requires Embed) ---
 if iscell(data)
@@ -167,6 +190,8 @@ p.addParameter('MaxDuration', Inf, @(x) isnumeric(x) && isscalar(x));
 p.addParameter('SortByTime', true, @islogical);
 p.addParameter('PrePad', 0, @(x) isnumeric(x) && isscalar(x) && x >= 0);
 p.addParameter('PostPad', 0, @(x) isnumeric(x) && isscalar(x) && x >= 0);
+p.addParameter('MarkerWindow', 'core', @(x) (ischar(x) || isstring(x)) && ...
+    any(strcmpi(char(x), {'core', 'padded'})));
 p.addParameter('Embed', true, @islogical);
 p.parse(remainingArgs{:});
 
@@ -198,6 +223,7 @@ maxDur = p.Results.MaxDuration;
 sortByTime = p.Results.SortByTime;
 prePad = p.Results.PrePad;
 postPad = p.Results.PostPad;
+markerWindow = lower(char(p.Results.MarkerWindow));
 embedBlocks = p.Results.Embed;
 
 % Validate input data
@@ -230,6 +256,41 @@ end
 % data.markers field remains a canonical table.
 mrk = pf2_base.markersToArray(data.markers);
 
+% Near-duplicate onset check: two consecutive same-code markers within a small
+% time tolerance usually indicate trigger bounce / repeated sends and will
+% spawn overlapping near-identical blocks. Warn (do not auto-remove) and point
+% the user at pf2.data.dedupeMarkers. The check is restricted to the codes
+% actually being extracted by this call (markerCode / startMarker) so a bounce
+% on an UN-extracted code (e.g. a device heartbeat) never raises a false alarm
+% about overlapping blocks that will not exist. When no explicit code set is
+% available, all codes are inspected (current behavior).
+nearDupTol = 0.05;
+if hasMarkerCode
+    extractCodes = markerCode(:);
+elseif hasStartMarker
+    extractCodes = startMarker(:);
+else
+    extractCodes = [];
+end
+if ~isempty(mrk) && size(mrk, 1) > 1
+    [srt, ~] = sortrows(mrk(:, [1 2]), 1);  % by Time
+    if ~isempty(extractCodes)
+        inSet = ismember(srt(:, 2), extractCodes);
+    else
+        inSet = true(size(srt, 1), 1);  % no code set: inspect everything
+    end
+    % Only flag a pair when BOTH rows are extracted codes of the same code.
+    sameCode = (srt(2:end, 2) == srt(1:end-1, 2)) & inSet(2:end) & inSet(1:end-1);
+    closeInTime = (srt(2:end, 1) - srt(1:end-1, 1)) <= nearDupTol;
+    nNearDup = sum(sameCode & closeInTime);
+    if nNearDup > 0
+        warning('pf2:defineBlocks:nearDuplicateOnsets', ...
+            ['Found %d near-duplicate marker onset(s) (same code within %g s). ', ...
+             'These will create overlapping blocks. Consider cleaning markers ', ...
+             'first with pf2.data.dedupeMarkers.'], nNearDup, nearDupTol);
+    end
+end
+
 if isempty(mrk) || size(mrk, 1) == 0
     blocks = struct('startTime', {}, 'endTime', {}, 'duration', {}, ...
         'markerCode', {}, 'markerIndex', {}, 'amplitude', {}, 'info', {});
@@ -258,6 +319,14 @@ if isempty(blocks)
     return;
 end
 
+% Record the CORE (pre-pad) block bounds. Per-trial marker promotion below
+% uses these by default (MarkerWindow='core') so that PrePad/PostPad widening
+% does not pull a neighbouring block's onset marker into this block's window
+% (which would make a per-trial extra column multi-valued and silently drop or
+% misattribute it). MarkerWindow='padded' opts into the widened window.
+coreStart = [blocks.startTime];
+coreEnd   = [blocks.endTime];
+
 % Apply PrePad / PostPad
 if prePad > 0 || postPad > 0
     for k = 1:length(blocks)
@@ -267,10 +336,12 @@ if prePad > 0 || postPad > 0
     end
 end
 
-% Sort by time
+% Sort by time (carry the core-bounds arrays along with the reorder)
 if sortByTime
     [~, sortIdx] = sort([blocks.startTime]);
     blocks = blocks(sortIdx);
+    coreStart = coreStart(sortIdx);
+    coreEnd   = coreEnd(sortIdx);
 end
 
 % Assign BlockNumber
@@ -343,6 +414,64 @@ if ~isempty(fieldnames(infoFields))
     end
 end
 
+% Auto-promote scalar marker extras into block.info. For each block, inspect
+% its marker rows (start marker, or all rows spanning the block window) and
+% any EXTRA column (beyond Time/Code/Duration/Amplitude) that resolves to a
+% single value for that block is copied into block.info.<colname>. This makes
+% per-trial factors (e.g. an onset marker's RT, condition label) visible to
+% the Experiment class for groupby/plotInfoBar.
+%
+% Precedence: explicit info sources (ConditionMap, InfoTable, InfoFields) win
+% over promotion. This step runs AFTER them and only fills a field that those
+% higher-priority sources left unset (empty), so a promoted value never
+% overwrites an explicitly provided one. Reserved canonical names are excluded.
+mtFull = pf2_base.normalizeMarkers(data.markers);
+canonNames = {'Time', 'Code', 'Duration', 'Amplitude'};
+extraNames = setdiff(mtFull.Properties.VariableNames, canonNames, 'stable');
+if ~isempty(extraNames) && height(mtFull) > 0
+    % Window used to attribute marker rows to a block. Default 'core' uses the
+    % pre-pad bounds so PrePad/PostPad cannot drag a neighbour's onset marker in;
+    % 'padded' uses the widened bounds to deliberately include markers that fall
+    % in the pad region.
+    if strcmp(markerWindow, 'padded')
+        blockTimes = [blocks.startTime];
+        blockEnds  = [blocks.endTime];
+    else
+        blockTimes = coreStart;
+        blockEnds  = coreEnd;
+    end
+    for k = 1:length(blocks)
+        % Rows belonging to this block: the triggering marker row plus any
+        % rows whose Time falls within [start, end). The end is EXCLUSIVE so
+        % a neighbouring block's onset marker (adjacent blocks share an
+        % endpoint) is not pulled in, which would make a per-trial column
+        % multi-valued and silently drop it.
+        rowMask = false(height(mtFull), 1);
+        mi = blocks(k).markerIndex;
+        if ~isempty(mi) && isscalar(mi) && mi >= 1 && mi <= height(mtFull)
+            rowMask(mi) = true;
+        end
+        rowMask = rowMask | (mtFull.Time >= blockTimes(k) & mtFull.Time < blockEnds(k));
+        if ~any(rowMask)
+            continue;
+        end
+        for e = 1:numel(extraNames)
+            name = extraNames{e};
+            % Only promote a field left unset by the explicit (higher-priority)
+            % info sources above. An existing non-empty .info field wins.
+            if isfield(blocks(k).info, name) && ~isempty(blocks(k).info.(name))
+                continue;
+            end
+            vals = mtFull.(name)(rowMask, :);
+            scalarVal = singleScalarValue(vals);
+            if isempty(scalarVal)
+                continue;  % column does not resolve to one value for this block
+            end
+            blocks(k).info.(name) = scalarVal{1};
+        end
+    end
+end
+
 % Filter by duration
 if minDur > 0 || isfinite(maxDur)
     keep = arrayfun(@(b) b.duration >= minDur && b.duration <= maxDur, blocks);
@@ -362,6 +491,64 @@ end
 end
 
 %%_Subfunctions_________________________________________________________
+
+function val = singleScalarValue(vals)
+% SINGLESCALARVALUE Resolve a block's marker-column rows to one scalar value
+%
+% Returns a 1x1 cell containing the single value of the column for the block,
+% or empty ({}) when the column has multiple distinct values (and so cannot be
+% promoted to a scalar block.info field).
+%
+% Inputs:
+%   vals - Column slice for the block's marker rows (any type)
+%
+% Outputs:
+%   val  - 1x1 cell with the unique value, or {} if not single-valued
+
+val = {};
+if isempty(vals)
+    return;
+end
+
+% Cell columns: compare by isequal; treat [] / '' entries as missing and drop
+% them so a partially-empty column still resolves to its single real value.
+if iscell(vals)
+    vals = vals(~cellfun(@isempty, vals));
+    if isempty(vals)
+        return;
+    end
+    if all(cellfun(@(x) isequal(x, vals{1}), vals))
+        val = vals(1);
+    end
+    return;
+end
+
+% Non-cell columns: drop missing entries (NaN / <undefined> / <missing>)
+% first, then require exactly one unique remaining value. A missing-only
+% column (e.g. an all-NaN extra) does NOT promote - it returns {} so NaN
+% never leaks into block.info.
+try
+    if size(vals, 2) == 1
+        vals = vals(~ismissing(vals));
+    end
+catch
+    % Types without a missing concept (e.g. logical) keep all rows.
+end
+if isempty(vals)
+    return;
+end
+try
+    u = unique(vals);
+    if numel(u) == 1
+        % u is already scalar here; wrap it directly. (categorical/string and
+        % numeric all take the same 1x1-cell path.)
+        val = {u};
+    end
+catch
+    val = {};
+end
+
+end
 
 function blocks = buildFromMarkerCode(mrk, markerCode, fixedDuration, useDuration)
 % BUILDFROMMARKERCODE Find markers matching code and build blocks

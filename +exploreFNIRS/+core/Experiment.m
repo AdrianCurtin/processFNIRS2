@@ -1727,6 +1727,32 @@ classdef Experiment < handle
             end
             varargin = obj.injectStatWindow(varargin);
             varargin = obj.injectTimeModel(varargin);
+            % Diagnose between-subjects confounds once, up front, and silence
+            % the per-channel "Hessian"/rank-deficiency spam during the fit.
+            obj.warnBetweenSubjectConfound(obj.groupByVars, varargin);
+            % With 2+ non-time grouping factors the default model is ADDITIVE
+            % (main effects only). 'Group + Condition' is easily mistaken for
+            % 'Group x Condition', so say so and point to the interaction flag.
+            % Scan NAME positions only; stay silent when the interaction was
+            % requested or an explicit CustomFormula overrides the auto-formula.
+            nonTime = setdiff(obj.groupByVars, {'Time','time'}, 'stable');
+            keys = varargin(1:2:end);
+            allIntOn = false;
+            ki = find(strcmpi(keys, 'AllInteractions'), 1);
+            if ~isempty(ki) && numel(varargin) >= 2*ki
+                v = varargin{2*ki};
+                allIntOn = (islogical(v) || isnumeric(v)) && ~isempty(v) && all(logical(v(:)));
+            end
+            hasCustom = any(strcmpi(keys, 'CustomFormula'));
+            if numel(nonTime) >= 2 && ~allIntOn && ~hasCustom
+                warning('exploreFNIRS:statsLME:additiveModel', ...
+                    ['Fitting an ADDITIVE model %s (main effects only). For the ', ...
+                     'Group x Condition interaction pass ''AllInteractions'', true. ', ...
+                     'If a between-subjects confound note also appeared, the ', ...
+                     'interaction may still be inestimable.'], ...
+                    strjoin(nonTime, ' + '));
+            end
+            cleanupObj = exploreFNIRS.core.Experiment.suppressFitWarnings(); %#ok<NASGU>
             results = exploreFNIRS.stats.fitLME(obj.groups, ...
                 obj.groupByVars, varargin{:});
         end
@@ -1752,6 +1778,10 @@ classdef Experiment < handle
                     'Call groupby() before statsInfoLME()');
             end
             selTable = obj.getSelectedTable();
+            % Diagnose between-subjects confounds once, up front, and silence
+            % the per-channel "Hessian"/rank-deficiency spam during the fit.
+            obj.warnBetweenSubjectConfound(obj.groupByVars, varargin);
+            cleanupObj = exploreFNIRS.core.Experiment.suppressFitWarnings(); %#ok<NASGU>
             results = exploreFNIRS.stats.fitInfoLME(selTable, infoVar, ...
                 obj.groupByVars, varargin{:});
         end
@@ -1819,6 +1849,14 @@ classdef Experiment < handle
         % Results are compatible with statsSummarize() and statsRunContrasts().
         % Requires aggregate() first.
         %
+        %   % Force a per-trial info variable as a fixed-effect covariate:
+        %   results = ex.statsAutoLME('Covariates', {'RT'})
+        %
+        % Continuous covariates are entered UNCENTERED; consider mean-centering
+        % (e.g. zscore) before passing so the group intercepts stay
+        % interpretable. A forced covariate that is constant within every
+        % subject triggers the between-subjects confound warning.
+        %
         % See also: exploreFNIRS.stats.autoModelLME, statsFitLME
 
             if ~obj.isAggregated
@@ -1827,6 +1865,32 @@ classdef Experiment < handle
             end
             varargin = obj.injectStatWindow(varargin);
             varargin = obj.injectTimeModel(varargin);
+            % Forward selection guards auto-discovered factors against a
+            % between-subjects confound, but FORCED terms (Covariates /
+            % ForcedTerms) bypass selection - so check them up front: a forced
+            % covariate that is constant within every subject is confounded
+            % with the (1|SubjectID) random intercept and yields NaN rows.
+            forced = {};
+            keys = varargin(1:2:end);
+            for nm = {'Covariates', 'ForcedTerms'}
+                fi = find(strcmpi(keys, nm{1}), 1);
+                if ~isempty(fi) && numel(varargin) >= 2*fi
+                    v = varargin{2*fi};
+                    if iscell(v)
+                        forced = [forced, v(:)']; %#ok<AGROW>
+                    elseif ischar(v) || isstring(v)
+                        forced = [forced, {char(v)}]; %#ok<AGROW>
+                    end
+                end
+            end
+            if ~isempty(forced)
+                obj.warnBetweenSubjectConfound(unique(forced, 'stable'), varargin);
+            end
+            % autoModelLME fits fitlme repeatedly per channel/candidate model;
+            % suppress the raw MATLAB Hessian/rank-deficiency spam here (as
+            % statsFitLME/statsInfoLME do) so the consolidated diagnostic above
+            % is the user-facing message.
+            cleanupObj = exploreFNIRS.core.Experiment.suppressFitWarnings(); %#ok<NASGU>
             results = exploreFNIRS.stats.autoModelLME(obj.groups, ...
                 obj.groupByVars, varargin{:});
         end
@@ -2087,6 +2151,41 @@ classdef Experiment < handle
                 'InfoVar', infoVar, ...
                 bioArgs{:}, chArgs{:}, corrArgs{:}, ...
                 summarizeArgs{:});
+
+            % Fail loud on too few observations instead of returning a silent
+            % blank/NaN table. brainBehavior correlates ONE value per
+            % observation unit (subject / hierarchy leaf after averaging)
+            % against the biomarker, so a single subject (or single group leaf)
+            % yields N<3 and nothing to correlate. Tell the user why and where
+            % to go for a within-subject, trial-level relationship.
+            maxN = 0;
+            haveN = false;
+            if isstruct(stats) && isfield(stats, 'N')
+                for si = 1:numel(stats)
+                    Nsi = stats(si).N;
+                    if ~isempty(Nsi) && isnumeric(Nsi)
+                        haveN = true;
+                        maxN = max(maxN, max(double(Nsi(:))));
+                    end
+                end
+            end
+            % Only flag the genuine "nothing to correlate" case (matches the
+            % N>=3 gate inside plotScatter, where the table is otherwise
+            % blank/NaN). Skip when stats carried no N at all - that is a
+            % different failure and a low-N message would mislead.
+            if haveN && maxN < 3
+                warning('exploreFNIRS:core:Experiment:brainBehaviorLowN', ...
+                    ['brainBehavior(''%s'') has at most N=%d observation(s) per ', ...
+                     'channel - too few to correlate. Brain-behavior correlation ', ...
+                     'is computed ACROSS observation units (subjects / hierarchy ', ...
+                     'leaves after averaging), not across trials; with one ', ...
+                     'subject there is nothing to correlate. For a within-subject ', ...
+                     'trial-level relationship, aggregate with avgMode ''none'' ', ...
+                     '(per-trial rows) then model the table directly - e.g. ', ...
+                     'ex.statsAutoLME(''Covariates'', {''%s''}) or fitlme on the ', ...
+                     'per-trial info+biomarker values.'], ...
+                    infoVar, maxN, infoVar);
+            end
         end
 
 
@@ -2840,8 +2939,8 @@ classdef Experiment < handle
         %   cfg.blocks.markerCodes - Marker code(s) for defineBlocks
         %   cfg.blocks.duration    - Block duration in seconds
         %   cfg.blocks.conditionMap - Cell array mapping codes to labels
-        %   cfg.blocks.preTime     - Time before first marker to keep (default: 120)
-        %   cfg.blocks.postTime    - Time after last marker to keep (default: 120)
+        %   cfg.blocks.preTime     - Time before first marker to keep (default: 5)
+        %   cfg.blocks.postTime    - Time after last marker to keep (default: 15)
         %
         %   cfg.experiment.baseline      - [start, end] baseline window
         %   cfg.experiment.taskEnd       - Task end time
@@ -2950,12 +3049,19 @@ classdef Experiment < handle
                 if isfield(blk, 'conditionMap') && ~isempty(blk.conditionMap)
                     blockArgs = [blockArgs, {'ConditionMap', blk.conditionMap}];
                 end
-                if isfield(blk, 'preTime')
-                    blockArgs = [blockArgs, {'PreTime', blk.preTime}];
+                % Resolve an explicit extraction window. extractBlocks now
+                % defaults to a 5 s Buffer (and prints a one-time note) when
+                % no window is given; pass PreTime/PostTime explicitly here so
+                % this internal path stays silent and reproducible.
+                preTime = 5;
+                postTime = 15;
+                if isfield(blk, 'preTime') && ~isempty(blk.preTime)
+                    preTime = blk.preTime;
                 end
-                if isfield(blk, 'postTime')
-                    blockArgs = [blockArgs, {'PostTime', blk.postTime}];
+                if isfield(blk, 'postTime') && ~isempty(blk.postTime)
+                    postTime = blk.postTime;
                 end
+                blockArgs = [blockArgs, {'PreTime', preTime, 'PostTime', postTime}];
 
                 dur = 0;
                 if isfield(blk, 'duration'), dur = blk.duration; end
@@ -2963,7 +3069,8 @@ classdef Experiment < handle
                 try
                     allData = pf2.data.defineBlocks(allData, blk.markerCodes, dur, ...
                         blockArgs{:}, 'Embed', true);
-                    allData = pf2.data.extractBlocks(allData);
+                    allData = pf2.data.extractBlocks(allData, ...
+                        'PreTime', preTime, 'PostTime', postTime);
                 catch ME
                     error('exploreFNIRS:core:Experiment:fromConfig:blocksFailed', ...
                         'Block extraction failed: %s', ME.message);
@@ -3190,6 +3297,284 @@ classdef Experiment < handle
             end
             if ~any(strcmpi(keys, 'PolynomialOrder')) && obj.settings.polyOrder ~= 2
                 args = [args, {'PolynomialOrder', obj.settings.polyOrder}];
+            end
+        end
+
+
+        function warnBetweenSubjectConfound(obj, fixedVars, args)
+        % WARNBETWEENSUBJECTCONFOUND Flag inestimable between-grouping factors
+        %
+        % Summary:
+        %   When an LME model carries a random grouping variable (e.g. the
+        %   (1|SubjectID) random intercept), any fixed-effect factor that is
+        %   constant within every level of that grouping variable is
+        %   confounded with the random intercept and cannot be estimated. Such
+        %   terms produce repeated MATLAB "Hessian not positive definite" /
+        %   rank-deficiency warnings and all-NaN ANOVA rows. This helper
+        %   detects those factors up front and emits ONE consolidated, plain-
+        %   language diagnostic naming the offending factor(s), the grouping
+        %   variable, and concrete fixes — so the outcome reads as a design
+        %   limitation rather than a toolbox failure.
+        %
+        % Inputs:
+        %   fixedVars - Cell array of candidate fixed-effect variable names
+        %               (the current groupby variables).
+        %   args      - The varargin name/value cell forwarded to the fit, used
+        %               to recover the 'RandomEffects' formula (default
+        %               '1|SubjectID').
+        %
+        % Outputs:
+        %   (none) - Emits at most one warning with id
+        %            'exploreFNIRS:statsLME:betweenSubjectConfound'.
+        %
+        % Notes:
+        %   - Conservative: only inspects; never alters the user's model.
+        %   - Emits a single message per call, not per channel/term.
+
+            % Recover the effective random-effects spec. A CustomFormula
+            % overrides RandomEffects entirely, so its grouping structure
+            % (not the default '1|SubjectID') is what governs the confound.
+            % Default mirrors fitLME.
+            randomFx = '1|SubjectID';
+            keys = args(1:2:end);
+            cfIdx = find(strcmpi(keys, 'CustomFormula'), 1);
+            haveCustom = false;
+            if ~isempty(cfIdx)
+                cfVal = args{cfIdx * 2};
+                if (ischar(cfVal) || isstring(cfVal)) && ~isempty(char(cfVal))
+                    randomFx = char(cfVal);
+                    haveCustom = true;
+                end
+            end
+            if ~haveCustom
+                reIdx = find(strcmpi(keys, 'RandomEffects'), 1);
+                if ~isempty(reIdx)
+                    val = args{reIdx * 2};
+                    if ischar(val) || isstring(val)
+                        randomFx = char(val);
+                    end
+                end
+            end
+
+            % No '|' anywhere -> no random intercept -> no between-subject
+            % confound to flag (e.g. a CustomFormula like 'HbO~Group').
+            if ~any(randomFx == '|'), return; end
+
+            % Robustly collect EVERY grouping variable that appears after a
+            % '|'. regexp tolerates parentheses, surrounding whitespace, and
+            % multiple random terms, e.g. '(1|A)+(1|B)' -> {'A','B'}.
+            tok = regexp(randomFx, '\|\s*([A-Za-z]\w*)', 'tokens');
+            groupVars = unique(cellfun(@(c) c{1}, tok, 'UniformOutput', false), ...
+                'stable');
+            if isempty(groupVars), return; end
+
+            % Need the metadata table to test against.
+            tbl = obj.getSelectedTable();
+
+            % The confound only BITES when the fitted model carries within-
+            % subject replication: a between-subjects factor and (1|grp) are
+            % aliased only if grp has more than one observation. With exactly
+            % one observation per grouping level the random intercept is
+            % confounded with the residual, not with the fixed effect, and the
+            % between-subjects term IS estimable (fitlme handles it). Replication
+            % enters from two sources: multiple SEGMENTS per level, or multiple
+            % TIME BINS per segment (barBinSize>0 over a finite window). Estimate
+            % the time-bin count from settings; barBinSize<=0 collapses to a
+            % single bar (one time point), so time adds no replication.
+            s = obj.settings;
+            if isfield(s, 'barBinSize') && s.barBinSize > 0
+                ts = 0; if isfield(s, 'taskStart'), ts = s.taskStart; end
+                span = NaN;
+                if isfield(s, 'taskEnd') && isfinite(s.taskEnd)
+                    span = s.taskEnd - ts;
+                else
+                    % taskEnd = Inf (the default) means "use the full segment".
+                    % Derive the span from the actual selected data instead of
+                    % assuming infinite replication, otherwise a clean one-
+                    % segment-per-subject design with binning enabled is wrongly
+                    % flagged. Use the longest selected segment as an upper bound.
+                    selData = obj.getSelectedData();
+                    maxT = 0;
+                    for d = 1:numel(selData)
+                        if isstruct(selData{d}) && isfield(selData{d}, 'time') && ...
+                                ~isempty(selData{d}.time)
+                            maxT = max(maxT, max(selData{d}.time));
+                        end
+                    end
+                    if maxT > ts, span = maxT - ts; end
+                end
+                if ~isfinite(span) || span <= 0
+                    nTimeBins = 1;     % truly unknown window -> assume no time replication
+                else
+                    nTimeBins = max(1, floor(span / s.barBinSize + 1e-9));
+                end
+            else
+                nTimeBins = 1;         % single bar -> one time point per segment
+            end
+
+            % Test each fixed factor against each real grouping column; a
+            % factor confounded with ANY grouping variable is flagged, paired
+            % with that grouping variable for the message.
+            confounded = {};
+            confoundGroups = {};
+            for g = 1:numel(groupVars)
+                groupVar = groupVars{g};
+                if ~ismember(groupVar, tbl.Properties.VariableNames), continue; end
+                % Skip this grouping variable if the model will have no within-
+                % level replication (<=1 segment per level AND <=1 time bin):
+                % the between-subjects factor is then estimable, so flagging it
+                % would mislead (the reviewer's one-row-per-subject case).
+                [~, ~, lvlIdx] = unique(tbl.(groupVar), 'stable');
+                maxSegPerLevel = max(accumarray(lvlIdx(:), 1));
+                if maxSegPerLevel <= 1 && nTimeBins <= 1, continue; end
+                for i = 1:numel(fixedVars)
+                    fv = fixedVars{i};
+                    if strcmp(fv, groupVar), continue; end
+                    if ismember(fv, confounded), continue; end
+                    if ~ismember(fv, tbl.Properties.VariableNames), continue; end
+                    if exploreFNIRS.core.Experiment.isConstantWithinGroup( ...
+                            tbl.(fv), tbl.(groupVar))
+                        confounded{end+1} = fv; %#ok<AGROW>
+                        confoundGroups{end+1} = groupVar; %#ok<AGROW>
+                    end
+                end
+            end
+
+            if isempty(confounded), return; end
+
+            quoted = cellfun(@(s) ['"' s '"'], confounded, ...
+                'UniformOutput', false);
+            factorStr = strjoin(quoted, ', ');
+            % Name the relevant grouping variable(s) the factors are nested in.
+            groupVar = strjoin(unique(confoundGroups, 'stable'), '", "');
+            if isscalar(confounded)
+                subjVerb = 'is a between-subjects factor';
+                pronoun = 'it is';
+            else
+                subjVerb = 'are between-subjects factors';
+                pronoun = 'they are';
+            end
+
+            warning('exploreFNIRS:statsLME:betweenSubjectConfound', ...
+                ['LME design note: %s %s (constant within every level of the ' ...
+                 'random grouping variable "%s"), so %s confounded with the ' ...
+                 '(1|%s) random intercept and cannot be estimated — the ' ...
+                 'corresponding ANOVA rows will be NaN or unreliable. This ' ...
+                 'reflects the design, not a failure: within-subject terms ' ...
+                 '(e.g. Condition) still estimate normally. To estimate %s, ' ...
+                 'fit a between-subjects model without the (1|%s) random ' ...
+                 'intercept (pass ''RandomEffects'' / ''CustomFormula'' ' ...
+                 'accordingly), or collapse to one row per %s first (a flat ' ...
+                 'avgMode).'], ...
+                factorStr, subjVerb, groupVar, pronoun, groupVar, ...
+                factorStr, groupVar, groupVar);
+        end
+    end
+
+
+    methods (Static, Access = private)
+        function cleanupObj = suppressFitWarnings()
+        % SUPPRESSFITWARNINGS Scope-suppress fitlme rank/Hessian spam
+        %
+        % Summary:
+        %   Turns off the specific MATLAB LinearMixedModel warning ids that
+        %   fitlme repeats per channel/term when a design is rank-deficient or
+        %   has more covariance parameters than the data support (the typical
+        %   symptom of a between-subjects confound). The previous warning
+        %   state is restored automatically when the returned onCleanup object
+        %   goes out of scope, so suppression is strictly scoped to the fit and
+        %   no unrelated warnings are affected.
+        %
+        % Outputs:
+        %   cleanupObj - onCleanup handle that restores the prior warning state.
+        %
+        % Notes:
+        %   The clean, consolidated explanation comes from
+        %   warnBetweenSubjectConfound; this only mutes the raw spam.
+        %   Delegates to exploreFNIRS.stats.suppressLMEWarnings so the
+        %   suppressed identifier set lives in one place and cannot drift
+        %   from the fitLME/fitInfoLME path.
+            cleanupObj = exploreFNIRS.stats.suppressLMEWarnings();
+        end
+
+
+        function tf = isConstantWithinGroup(factorCol, groupCol)
+        % ISCONSTANTWITHINGROUP True if factorCol is constant within every
+        % unique value of groupCol (i.e. the factor is nested in / between
+        % the grouping variable). NaN/empty entries are ignored per group.
+            tf = false;
+            % Coerce both columns to string keys for robust comparison
+            fkey = exploreFNIRS.core.Experiment.colToStringKey(factorCol);
+            gkey = exploreFNIRS.core.Experiment.colToStringKey(groupCol);
+            if numel(fkey) ~= numel(gkey) || isempty(gkey), return; end
+
+            ug = unique(gkey);
+            anyValid = false;  % did any group contribute a real (non-missing) value?
+            for i = 1:numel(ug)
+                sel = strcmp(gkey, ug{i});
+                vals = fkey(sel);
+                % Ignore missing markers so partially-missing groups don't
+                % falsely look variable.
+                vals = vals(~strcmp(vals, '<missing>'));
+                % A group with no valid values says nothing about constancy;
+                % skip it rather than letting its empty set imply "constant".
+                if isempty(vals), continue; end
+                anyValid = true;
+                if numel(unique(vals)) > 1
+                    return;  % varies within this group -> not confounded
+                end
+            end
+            % If NO group had a single valid value, there is no evidence the
+            % factor is constant -> do not flag it.
+            tf = anyValid;
+        end
+
+
+        function keys = colToStringKey(col)
+        % COLTOSTRINGKEY Normalize a table column to a cellstr of keys for
+        % equality comparison, with a sentinel for missing values.
+            if iscell(col)
+                keys = cellfun(@(x) localToKey(x), col, 'UniformOutput', false);
+            elseif iscategorical(col)
+                keys = cellstr(col);
+                keys(ismissing(col)) = {'<missing>'};
+            elseif isstring(col)
+                keys = cellstr(col);
+                keys(ismissing(col)) = {'<missing>'};
+            elseif isnumeric(col) || islogical(col)
+                keys = cell(numel(col), 1);
+                for k = 1:numel(col)
+                    if isnan(double(col(k)))
+                        keys{k} = '<missing>';
+                    else
+                        % %.15g is precision/locale stable (vs num2str).
+                        keys{k} = sprintf('%.15g', double(col(k)));
+                    end
+                end
+            else
+                keys = cellstr(string(col));
+            end
+
+            function key = localToKey(x)
+                if isnumeric(x) || islogical(x)
+                    if isempty(x) || any(isnan(double(x(:))))
+                        key = '<missing>';
+                    else
+                        % %.15g is precision/locale stable (vs num2str).
+                        key = strjoin(arrayfun(@(v) sprintf('%.15g', v), ...
+                            double(x(:)'), 'UniformOutput', false), ' ');
+                    end
+                elseif ischar(x)
+                    if isempty(x), key = '<missing>'; else, key = x; end
+                elseif isstring(x)
+                    if ismissing(x) || strlength(x) == 0
+                        key = '<missing>';
+                    else
+                        key = char(x);
+                    end
+                else
+                    key = char(string(x));
+                end
             end
         end
     end
@@ -3647,6 +4032,8 @@ if nPerms > 0
         groupArgs{:});
 end
 
+end
+
 
 function result = computeHBICAcore(selData, pairs, hbicaArgs, timeWindow)
 % COMPUTEHBICACORE Core HB-ICA computation across dyads
@@ -3656,8 +4043,22 @@ dyads = cell(nDyads, 1);
 dyadIDs = cell(nDyads, 1);
 
 for d = 1:nDyads
-    idxA = pairs(d).indexA;
-    idxB = pairs(d).indexB;
+    % pairSubjects emits an .indices vector (not indexA/indexB). HB-ICA is a
+    % pairwise decomposition, so require exactly two members per group.
+    idx = pairs(d).indices;
+    if numel(idx) ~= 2
+        if isfield(pairs(d), 'dyadID') && ~isempty(pairs(d).dyadID)
+            gid = char(string(pairs(d).dyadID));
+        else
+            gid = sprintf('group %d', d);
+        end
+        error('exploreFNIRS:core:Experiment:hbicaNotDyad', ...
+            ['HB-ICA operates on dyads, but %s has %d members. Provide ' ...
+             '2-member pairs (e.g. ManualPairs {{1,2}}); triad/N-way HB-ICA ' ...
+             'is not supported.'], gid, numel(idx));
+    end
+    idxA = idx(1);
+    idxB = idx(2);
     dataA = selData{idxA};
     dataB = selData{idxB};
 
@@ -3689,7 +4090,5 @@ result.pairs = pairs;
 result.summary.meanGOF = meanGOF;
 result.summary.nInterBrain = nInterBrain;
 result.summary.nDyads = nDyads;
-
-end
 
 end

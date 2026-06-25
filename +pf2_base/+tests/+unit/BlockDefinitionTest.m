@@ -79,6 +79,13 @@ classdef BlockDefinitionTest < matlab.unittest.TestCase
                 240, 53, 0, 1;   % End B block 2
             ]);
         end
+
+        function out = suppressWarn(fcn)
+            % Run fcn with the default-buffer warning suppressed and restored
+            ws = warning('off', 'pf2:extractBlocks:defaultBuffer');
+            cleanup = onCleanup(@() warning(ws)); %#ok<NASGU>
+            out = fcn();
+        end
     end
 
     %% defineBlocks - Marker + Fixed Duration
@@ -368,7 +375,8 @@ classdef BlockDefinitionTest < matlab.unittest.TestCase
             blocks = pf2.data.defineBlocks(data, 'MarkerCode', 49, ...
                 'Duration', 20, 'ConditionMap', {49, 'StroopTask'}, 'Embed', false);
 
-            segments = pf2.data.extractBlocks(data, blocks);
+            segments = pf2_base.tests.unit.BlockDefinitionTest.suppressWarn(...
+                @() pf2.data.extractBlocks(data, blocks));
 
             seg = segments{1};
             % Parent info fields preserved
@@ -390,7 +398,8 @@ classdef BlockDefinitionTest < matlab.unittest.TestCase
             blocks = pf2.data.defineBlocks(data, 'MarkerCode', 49, 'Duration', 20, ...
                 'ConditionMap', {49, 'BlockCondition'}, 'Embed', false);
 
-            segments = pf2.data.extractBlocks(data, blocks, 'OverwriteInfo', false);
+            segments = pf2_base.tests.unit.BlockDefinitionTest.suppressWarn(...
+                @() pf2.data.extractBlocks(data, blocks, 'OverwriteInfo', false));
 
             seg = segments{1};
             testCase.verifyEqual(seg.info.Condition, 'ParentCondition', ...
@@ -408,7 +417,8 @@ classdef BlockDefinitionTest < matlab.unittest.TestCase
             blocks = pf2.data.defineBlocks(data, 'MarkerCode', 49, 'Duration', 20, ...
                 'ConditionMap', {49, 'BlockCondition'}, 'Embed', false);
 
-            segments = pf2.data.extractBlocks(data, blocks);
+            segments = pf2_base.tests.unit.BlockDefinitionTest.suppressWarn(...
+                @() pf2.data.extractBlocks(data, blocks));
 
             seg = segments{1};
             testCase.verifyEqual(seg.info.Condition, 'BlockCondition', ...
@@ -437,7 +447,8 @@ classdef BlockDefinitionTest < matlab.unittest.TestCase
             blocks(2).markerIndex = 2;
             blocks(2).info = struct('BlockNumber', 2);
 
-            segments = pf2.data.extractBlocks(data, blocks, 'SkipInvalid', true);
+            segments = pf2_base.tests.unit.BlockDefinitionTest.suppressWarn(...
+                @() pf2.data.extractBlocks(data, blocks, 'SkipInvalid', true));
 
             testCase.verifyLength(segments, 1, ...
                 'Out-of-range block should be skipped');
@@ -489,7 +500,8 @@ classdef BlockDefinitionTest < matlab.unittest.TestCase
             ]);
 
             blocks = pf2.data.defineBlocks(data, 'MarkerCode', 10, 'Duration', 20, 'Embed', false);
-            segments = pf2.data.extractBlocks(data, blocks, 'SetT0', true);
+            segments = pf2_base.tests.unit.BlockDefinitionTest.suppressWarn(...
+                @() pf2.data.extractBlocks(data, blocks, 'SetT0', true));
 
             testCase.verifyLength(segments, 2);
             testCase.verifyTrue(isfield(segments{1}, 'HbO'));
@@ -725,7 +737,8 @@ classdef BlockDefinitionTest < matlab.unittest.TestCase
             data = pf2_base.tests.unit.BlockDefinitionTest.makeSyntheticData();
             data = pf2.data.defineBlocks(data, 49, 20, 'Embed', true);
 
-            segments = pf2.data.extractBlocks(data, 'SetT0', false);
+            segments = pf2_base.tests.unit.BlockDefinitionTest.suppressWarn(...
+                @() pf2.data.extractBlocks(data, 'SetT0', false));
 
             testCase.verifyLength(segments, 3, 'Should extract 3 segments');
             testCase.verifyTrue(isfield(segments{1}, 'HbO'));
@@ -736,7 +749,8 @@ classdef BlockDefinitionTest < matlab.unittest.TestCase
             data = pf2_base.tests.unit.BlockDefinitionTest.makeSyntheticData();
             blocks = pf2.data.defineBlocks(data, 49, 20, 'Embed', false);
 
-            segments = pf2.data.extractBlocks(data, blocks, 'SetT0', false);
+            segments = pf2_base.tests.unit.BlockDefinitionTest.suppressWarn(...
+                @() pf2.data.extractBlocks(data, blocks, 'SetT0', false));
 
             testCase.verifyLength(segments, 3);
             testCase.verifyTrue(isfield(segments{1}, 'HbO'));
@@ -760,7 +774,8 @@ classdef BlockDefinitionTest < matlab.unittest.TestCase
             data2.info.SubjectID = 'S02';
             data2 = pf2.data.defineBlocks(data2, 49, 20, 'Embed', true);
 
-            segments = pf2.data.extractBlocks({data1, data2}, 'SetT0', false);
+            segments = pf2_base.tests.unit.BlockDefinitionTest.suppressWarn(...
+                @() pf2.data.extractBlocks({data1, data2}, 'SetT0', false));
 
             testCase.verifyLength(segments, 6, 'Should have 3+3=6 segments');
             testCase.verifyEqual(segments{1}.info.SubjectID, 'S01');
@@ -784,7 +799,8 @@ classdef BlockDefinitionTest < matlab.unittest.TestCase
             data = pf2_base.tests.unit.BlockDefinitionTest.makeSyntheticData();
             data = pf2.data.defineBlocks(data, 49, 20, 'Embed', true);
 
-            segments = pf2.data.extractBlocks(data);
+            segments = pf2_base.tests.unit.BlockDefinitionTest.suppressWarn(...
+                @() pf2.data.extractBlocks(data));
 
             testCase.verifyFalse(isfield(segments{1}, 'blocks'), ...
                 'Individual segments should not have .blocks');
@@ -835,6 +851,209 @@ classdef BlockDefinitionTest < matlab.unittest.TestCase
             testCase.verifyTrue(isfield(processed, 'blocks'), ...
                 'processFNIRS2 should preserve .blocks');
             testCase.verifyLength(processed.blocks, 2);
+        end
+    end
+
+    %% extractBlocks - Buffer option
+    methods (Test)
+        function testBufferSymmetric(testCase)
+            % Buffer applies to both pre and post sides
+            data = pf2_base.tests.unit.BlockDefinitionTest.makeSyntheticData();
+            blocks = pf2.data.defineBlocks(data, 'MarkerCode', 49, 'Duration', 20, 'Embed', false);
+
+            segments = pf2.data.extractBlocks(data, blocks, ...
+                'Buffer', 5, 'SetT0', false);
+
+            seg = segments{1};
+            testCase.verifyLessThanOrEqual(min(seg.time), blocks(1).startTime - 5 + 0.2, ...
+                'Buffer should extend pre side by 5 s');
+            testCase.verifyGreaterThanOrEqual(max(seg.time), blocks(1).endTime + 5 - 0.2, ...
+                'Buffer should extend post side by 5 s');
+        end
+
+        function testBufferOverriddenByExplicit(testCase)
+            % Explicit PreTime overrides Buffer for the pre side; Buffer fills post
+            data = pf2_base.tests.unit.BlockDefinitionTest.makeSyntheticData();
+            blocks = pf2.data.defineBlocks(data, 'MarkerCode', 49, 'Duration', 20, 'Embed', false);
+
+            segments = pf2.data.extractBlocks(data, blocks, ...
+                'PreTime', 2, 'Buffer', 8, 'SetT0', false);
+
+            seg = segments{1};
+            testCase.verifyEqual(min(seg.time), blocks(1).startTime - 2, 'AbsTol', 0.2, ...
+                'Explicit PreTime should win over Buffer');
+            testCase.verifyEqual(max(seg.time), blocks(1).endTime + 8, 'AbsTol', 0.2, ...
+                'Buffer should size the post side');
+        end
+
+        function testDefaultBufferWarningOnce(testCase)
+            % With no window argument at all, the default-buffer note fires --
+            % but only ONCE per session. Reset the function's persistent state
+            % first so the test is independent of prior calls in the session.
+            clear functions %#ok<CLFUNC>
+            data = pf2_base.tests.unit.BlockDefinitionTest.makeSyntheticData();
+            blocks = pf2.data.defineBlocks(data, 'MarkerCode', 49, 'Duration', 20, 'Embed', false);
+
+            % First call: the note fires.
+            testCase.verifyWarning(...
+                @() pf2.data.extractBlocks(data, blocks, 'SetT0', false), ...
+                'pf2:extractBlocks:defaultBuffer');
+
+            % Second call in the same session: suppressed (fires at most once).
+            lastwarn('', '');
+            pf2.data.extractBlocks(data, blocks, 'SetT0', false);
+            [~, wid] = lastwarn();
+            testCase.verifyNotEqual(wid, 'pf2:extractBlocks:defaultBuffer', ...
+                'Default-buffer note should fire at most once per session.');
+        end
+
+        function testDefaultBufferIsTwoSeconds(testCase)
+            % Default Buffer = 2 s on both sides when nothing is passed
+            data = pf2_base.tests.unit.BlockDefinitionTest.makeSyntheticData();
+            blocks = pf2.data.defineBlocks(data, 'MarkerCode', 49, 'Duration', 20, 'Embed', false);
+
+            segments = pf2_base.tests.unit.BlockDefinitionTest.suppressWarn(...
+                @() pf2.data.extractBlocks(data, blocks, 'SetT0', false));
+
+            seg = segments{1};
+            testCase.verifyEqual(min(seg.time), blocks(1).startTime - 2, 'AbsTol', 0.3, ...
+                'Default pre buffer should be 2 s');
+            testCase.verifyEqual(max(seg.time), blocks(1).endTime + 2, 'AbsTol', 0.3, ...
+                'Default post buffer should be 2 s');
+        end
+
+        function testExplicitNoDefaultBufferWarning(testCase)
+            % Passing PreTime/PostTime suppresses the default-buffer note
+            data = pf2_base.tests.unit.BlockDefinitionTest.makeSyntheticData();
+            blocks = pf2.data.defineBlocks(data, 'MarkerCode', 49, 'Duration', 20, 'Embed', false);
+
+            % No defaultBuffer warning when an explicit window is given. Use a
+            % lastwarn-based check (verifyWarningFree would also flag unrelated
+            % warnings such as channel-mask notices on this synthetic data).
+            lastwarn('', '');
+            pf2.data.extractBlocks(data, blocks, ...
+                'PreTime', 5, 'PostTime', 15, 'SetT0', false);
+            [~, wid] = lastwarn();
+            testCase.verifyNotEqual(wid, 'pf2:extractBlocks:defaultBuffer', ...
+                'Explicit window should not emit the default-buffer note');
+        end
+    end
+
+    %% defineBlocks - scalar marker-extra promotion
+    methods (Test)
+        function testScalarExtraPromotedToBlockInfo(testCase)
+            % A single-valued marker extra column (e.g. RT) is promoted to info
+            data = pf2_base.tests.unit.BlockDefinitionTest.makeSyntheticData();
+            data.markers.RT = [0.45; 0.62; 0.71];
+
+            blocks = pf2.data.defineBlocks(data, 'MarkerCode', 49, ...
+                'Duration', 5, 'Embed', false);
+
+            testCase.verifyEqual(blocks(1).info.RT, 0.45, 'AbsTol', 1e-9);
+            testCase.verifyEqual(blocks(2).info.RT, 0.62, 'AbsTol', 1e-9);
+            testCase.verifyEqual(blocks(3).info.RT, 0.71, 'AbsTol', 1e-9);
+        end
+
+        function testScalarExtraSurvivesIntoSegmentInfo(testCase)
+            % Promoted block.info extra survives into the extracted segment info
+            data = pf2_base.tests.unit.BlockDefinitionTest.makeSyntheticData();
+            data.markers.RT = [0.45; 0.62; 0.71];
+
+            blocks = pf2.data.defineBlocks(data, 'MarkerCode', 49, ...
+                'Duration', 5, 'Embed', false);
+            segments = pf2.data.extractBlocks(data, blocks, ...
+                'PreTime', 1, 'PostTime', 1, 'SetT0', false);
+
+            testCase.verifyEqual(segments{1}.info.RT, 0.45, 'AbsTol', 1e-9);
+            testCase.verifyEqual(segments{2}.info.RT, 0.62, 'AbsTol', 1e-9);
+        end
+
+        function testExtraNotPromotedWhenInfoTableSetsIt(testCase)
+            % An existing non-empty .info field is not overwritten by promotion
+            data = pf2_base.tests.unit.BlockDefinitionTest.makeSyntheticData();
+            data.markers.RT = [0.45; 0.62; 0.71];
+            rtTable = table([9; 9; 9], 'VariableNames', {'RT'});
+
+            blocks = pf2.data.defineBlocks(data, 'MarkerCode', 49, ...
+                'Duration', 5, 'InfoTable', rtTable, 'Embed', false);
+
+            testCase.verifyEqual(blocks(1).info.RT, 9, ...
+                'InfoTable value should take precedence over promotion');
+        end
+
+        function testPaddingDoesNotPullNeighborMarkerExtra(testCase)
+            % With PrePad/PostPad widening the window, the default
+            % MarkerWindow='core' must still attribute each block its OWN
+            % per-trial extra (the pre-pad window), not a neighbour's, even when
+            % the padded windows overlap the next onset.
+            data = pf2_base.tests.unit.BlockDefinitionTest.makeSyntheticData();
+            data.markers = pf2_base.normalizeMarkers([
+                30, 49, 10, 1;
+                50, 49, 10, 1;   % only 10 s after block 1 ends -> pad overlaps
+                70, 49, 10, 1;
+            ]);
+            data.markers.RT = [0.45; 0.62; 0.71];
+
+            blocks = pf2.data.defineBlocks(data, 'MarkerCode', 49, ...
+                'Duration', 10, 'PostPad', 15, 'Embed', false);
+
+            testCase.verifyEqual(blocks(1).info.RT, 0.45, 'AbsTol', 1e-9, ...
+                'Core window must not pull the neighbour''s RT into block 1.');
+            testCase.verifyEqual(blocks(2).info.RT, 0.62, 'AbsTol', 1e-9);
+            testCase.verifyEqual(blocks(3).info.RT, 0.71, 'AbsTol', 1e-9);
+        end
+
+        function testPaddedMarkerWindowSeesNeighborMarkers(testCase)
+            % MarkerWindow='padded' deliberately uses the widened window: block 1
+            % then spans block 2's onset, making RT multi-valued, so it does not
+            % resolve to a scalar and is left unset. The final block (no later
+            % neighbour) still promotes.
+            data = pf2_base.tests.unit.BlockDefinitionTest.makeSyntheticData();
+            data.markers = pf2_base.normalizeMarkers([
+                30, 49, 10, 1;
+                50, 49, 10, 1;
+                70, 49, 10, 1;
+            ]);
+            data.markers.RT = [0.45; 0.62; 0.71];
+
+            blocks = pf2.data.defineBlocks(data, 'MarkerCode', 49, ...
+                'Duration', 10, 'PostPad', 15, 'MarkerWindow', 'padded', ...
+                'Embed', false);
+
+            block1HasRT = isfield(blocks(1).info, 'RT') && ~isempty(blocks(1).info.RT);
+            testCase.verifyFalse(block1HasRT, ...
+                'Padded window should see two RTs for block 1 and skip promotion.');
+            testCase.verifyEqual(blocks(3).info.RT, 0.71, 'AbsTol', 1e-9, ...
+                'Final block has no later neighbour and should still promote.');
+        end
+    end
+
+    %% defineBlocks - near-duplicate onset warning
+    methods (Test)
+        function testNearDuplicateOnsetWarning(testCase)
+            % Two same-code markers within 0.05 s trigger a warning
+            data = pf2_base.tests.unit.BlockDefinitionTest.makeSyntheticData();
+            data.markers = pf2_base.normalizeMarkers([
+                30,    49, 10, 1;
+                30.02, 49, 10, 1;   % near-duplicate of the first
+                90,    49, 10, 1;
+            ]);
+
+            testCase.verifyWarning(...
+                @() pf2.data.defineBlocks(data, 'MarkerCode', 49, ...
+                    'Duration', 10, 'Embed', false), ...
+                'pf2:defineBlocks:nearDuplicateOnsets');
+        end
+
+        function testNoNearDuplicateWarningWhenSpaced(testCase)
+            % Well-separated markers do not trigger the warning
+            data = pf2_base.tests.unit.BlockDefinitionTest.makeSyntheticData();
+            lastwarn('', '');
+            pf2.data.defineBlocks(data, 'MarkerCode', 49, ...
+                'Duration', 10, 'Embed', false);
+            [~, wid] = lastwarn();
+            testCase.verifyNotEqual(wid, 'pf2:defineBlocks:nearDuplicateOnsets', ...
+                'Spaced markers should not emit the near-duplicate warning');
         end
     end
 

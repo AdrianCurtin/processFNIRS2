@@ -697,12 +697,14 @@ function generateScript(cfg)
         % --- EXTRACT SEGMENTS ---
         partNum = partNum + 1;
         codeLines = {};
-        codeLines{end+1} = sprintf('preTime = %g;  %% seconds before block onset (baseline period)', cfg.baselineLength);
+        codeLines{end+1} = sprintf('preTime  = %g;  %% seconds before block onset (baseline period)', cfg.baselineLength);
+        codeLines{end+1} = 'postTime = 15;  % seconds after block end (capture the HRF tail)';
         codeLines{end+1} = '';
         codeLines{end+1} = 'allSegments = {};';
         codeLines{end+1} = 'for i = 1:numel(allProcessed)';
         codeLines{end+1} = '    segs = pf2.data.extractBlocks(allProcessed{i}, blocks, ...';
         codeLines{end+1} = '        ''PreTime'', preTime, ...';
+        codeLines{end+1} = '        ''PostTime'', postTime, ...';
         codeLines{end+1} = '        ''SetT0'', true);';
         codeLines{end+1} = '    allSegments = [allSegments, segs]; %#ok<AGROW>';
         codeLines{end+1} = 'end';

@@ -852,6 +852,344 @@ classdef GLMExperiment < exploreFNIRS.core.Experiment
             end
         end
 
+        function T = ppiTable(obj, seedChannels, varargin)
+        % PPITABLE Long-format table of per-subject PPI contrast betas
+        %
+        %   T = gx.ppiTable(seedChannels)
+        %   T = gx.ppiTable(seedChannels, 'Covariates', {'Group','Age'})
+        %   T = gx.ppiTable(1, 'Contrast', {'Hard','Easy'}, 'Covariates', {'Group'})
+        %
+        % Runs gx.ppi (per-subject PPI contrast) and reshapes the result into a
+        % tidy long table with one row per subject x target channel. This is the
+        % bridge artifact for group-level modeling: feed it to gx.ppiLME, to
+        % fitlme directly, or export it to CSV/R. Subject-level covariates named
+        % in 'Covariates' are pulled from each subject's .info and broadcast
+        % across that subject's channels.
+        %
+        % Inputs:
+        %   seedChannels - Seed channel indices (forwarded to computePPI; may be
+        %                  [] when 'SeedSignal' is supplied as a forwarded arg)
+        %
+        % Name-Value Parameters:
+        %   Covariates - Cell array of .info field names to attach as columns
+        %                (default: {}). All other name-value pairs are forwarded
+        %                to gx.ppi / computePPI (e.g. Contrast, Biomarker, Align,
+        %                SeedData, SeedSignal).
+        %
+        % Outputs:
+        %   T - Table with variables:
+        %       SubjectID (categorical), Channel (categorical), PPI (double, the
+        %       contrast beta), plus one column per requested covariate.
+        %
+        % Example:
+        %   gx = exploreFNIRS.core.GLMExperiment(subjects, blockDefs);
+        %   T  = gx.ppiTable(1, 'Contrast', {'Hard','Easy'}, 'Covariates', {'Group'});
+        %   lme = fitlme(T, 'PPI ~ Group + Channel + (1|SubjectID)');
+        %
+        % See also: exploreFNIRS.core.GLMExperiment.ppi,
+        %   exploreFNIRS.core.GLMExperiment.ppiLME
+
+            [covars, fwdArgs] = extractCovariatesArg(varargin);
+
+            res   = obj.ppi(seedChannels, fwdArgs{:});
+            betas = res.ppi_betas;            % [N x nCh]
+            chans = res.channels(:)';         % [1 x nCh]
+            [N, nCh] = size(betas);
+
+            % Subject IDs and covariate values (subject-level)
+            subjID  = strings(N, 1);
+            covRaw  = cell(1, numel(covars));
+            for k = 1:numel(covars)
+                covRaw{k} = cell(N, 1);
+            end
+            for s = 1:N
+                info = struct();
+                if isfield(obj.subjects{s}, 'info')
+                    info = obj.subjects{s}.info;
+                end
+                if isfield(info, 'SubjectID') && ~isempty(info.SubjectID)
+                    subjID(s) = string(info.SubjectID);
+                else
+                    subjID(s) = "S" + s;
+                end
+                for k = 1:numel(covars)
+                    if isfield(info, covars{k})
+                        covRaw{k}{s} = info.(covars{k});
+                    else
+                        covRaw{k}{s} = NaN;
+                    end
+                end
+            end
+
+            % Stack subject x channel (column-major: subject varies fastest, to
+            % match betas(:) which walks channel-by-channel)
+            subjAll = repmat(subjID, nCh, 1);
+            chanAll = reshape(repmat(chans, N, 1), [], 1);
+            ppiAll  = betas(:);
+
+            T = table(categorical(subjAll), categorical(chanAll), ppiAll, ...
+                'VariableNames', {'SubjectID', 'Channel', 'PPI'});
+
+            for k = 1:numel(covars)
+                T.(covars{k}) = expandCovariate(covRaw{k}, nCh);
+            end
+        end
+
+        function results = ppiLME(obj, seedChannels, varargin)
+        % PPILME Group-level linear mixed-effects model of PPI contrast betas
+        %
+        %   results = gx.ppiLME(seedChannels)
+        %   results = gx.ppiLME(1, 'Predictors', {'Group'}, 'Contrast', {'Hard','Easy'})
+        %   results = gx.ppiLME(1, 'Predictors', {'Age'})
+        %
+        % Carries the first-level PPI interaction estimate to a defensible group
+        % model. Two complementary results are returned:
+        %   (1) A POOLED linear mixed-effects model across all subject x channel
+        %       betas: PPI ~ <Predictors> [+ Channel] + (1|SubjectID). The
+        %       subject random intercept (identifiable because each subject
+        %       contributes one row per channel) accounts for within-subject
+        %       correlation across channels. This answers omnibus questions such
+        %       as "does the PPI differ between groups?" or "does age moderate
+        %       seed->target coupling?".
+        %   (2) A PER-CHANNEL second-level map. For each channel a model is fit
+        %       across subjects (ordinary least squares -- one beta per subject
+        %       per channel, so no random effect is identifiable at the channel
+        %       level). With no predictors this is a one-sample test of the PPI
+        %       against zero; with predictors it is a between-subject regression.
+        %       The per-term p-values and F-statistics are returned as
+        %       [channels x terms] tables matching exploreFNIRS.stats.fitLME, so
+        %       they feed pf2.probe.project.pvalues / .fstats directly.
+        %
+        % Inputs:
+        %   seedChannels - Seed channel indices (forwarded to computePPI; may be
+        %                  [] when 'SeedSignal' is supplied as a forwarded arg)
+        %
+        % Name-Value Parameters:
+        %   Predictors     - Cell array of subject-level .info fields used as
+        %                    fixed effects (default: {} -> one-sample vs zero)
+        %   IncludeChannel - Add Channel as a fixed factor in the pooled model
+        %                    (default: true when more than one channel)
+        %   RandomEffects  - Random-effects formula for the pooled model
+        %                    (default: '1|SubjectID')
+        %   Verbose        - Print a short summary (default: true). All other
+        %                    name-value pairs are forwarded to gx.ppi / computePPI.
+        %
+        % Outputs:
+        %   results - Struct with fields:
+        %     .model        - Pooled LinearMixedModel object
+        %     .anova        - ANOVA table of the pooled model
+        %     .formula      - Pooled model formula string
+        %     .anova_pval   - [channels x terms] table of per-channel p-values
+        %                     (UNCORRECTED -- one test per channel; threshold with
+        %                     care or use .anova_qval below)
+        %     .anova_qval   - [channels x terms] table of Benjamini-Hochberg
+        %                     FDR-corrected q-values (per term, across channels).
+        %                     Prefer this for thresholded maps / project.pvalues.
+        %     .anova_Fstat  - [channels x terms] table of per-channel F-statistics
+        %     .channels     - Target channel indices (map columns/rows order)
+        %     .predictors   - Predictors used
+        %     .biomarker    - Biomarker used
+        %     .table        - The long-format table (from ppiTable)
+        %
+        % Example:
+        %   results = gx.ppiLME(1, 'Predictors', {'Group'}, 'Contrast', {'Hard','Easy'});
+        %   disp(results.anova);                       % omnibus group effect
+        %   qvec = results.anova_qval.Group';           % FDR-corrected per-channel Group q
+        %   pf2.probe.project.pvalues(qvec, gx.subjects{1}, 'savePath', 'ppi_group.png');
+        %
+        % See also: exploreFNIRS.core.GLMExperiment.ppi,
+        %   exploreFNIRS.core.GLMExperiment.ppiTable, exploreFNIRS.stats.fitLME
+
+            ip = inputParser;
+            ip.KeepUnmatched = true;
+            addParameter(ip, 'Predictors', {}, @iscell);
+            addParameter(ip, 'IncludeChannel', [], @(x) isempty(x) || islogical(x));
+            addParameter(ip, 'RandomEffects', '1|SubjectID', @ischar);
+            addParameter(ip, 'Verbose', true, @islogical);
+            parse(ip, varargin{:});
+            predictors    = ip.Results.Predictors;
+            includeChannel = ip.Results.IncludeChannel;
+            randomEffects = ip.Results.RandomEffects;
+            verbose       = ip.Results.Verbose;
+            fwdArgs       = reconstructNameValue(ip.Unmatched);
+
+            % Long table with predictors attached as covariates
+            T = obj.ppiTable(seedChannels, 'Covariates', predictors, fwdArgs{:});
+
+            % Channel axis. Numeric channel indices are sorted ascending and get
+            % "Ch%d" row names; non-numeric labels (e.g. ROI names) are kept in
+            % their category order with the label used verbatim as the row name.
+            chanLabels = string(categories(T.Channel));      % [nCh x 1] string
+            chanNum    = str2double(chanLabels);
+            if all(~isnan(chanNum))
+                [chanNum, ord] = sort(chanNum);
+                chanLabels = chanLabels(ord);
+                chans    = chanNum(:)';                       % numeric indices
+                rowNames = arrayfun(@(c) sprintf('Ch%d', c), chans, 'uni', 0);
+            else
+                chans    = cellstr(chanLabels(:)');           % string labels
+                rowNames = cellstr(chanLabels);
+            end
+            nCh = numel(chanLabels);
+
+            if isempty(includeChannel)
+                includeChannel = nCh > 1;
+            end
+
+            % --- (1) Pooled mixed-effects model ---
+            rhsTerms = predictors;
+            if includeChannel
+                rhsTerms = [rhsTerms, {'Channel'}];
+            end
+            if isempty(rhsTerms)
+                rhs = '1';
+            else
+                rhs = strjoin(rhsTerms, ' + ');
+            end
+            formula = sprintf('PPI ~ %s + (%s)', rhs, randomEffects);
+
+            cleanupObj = exploreFNIRS.stats.suppressLMEWarnings(); %#ok<NASGU>
+            model = fitlme(T, formula);
+
+            results.model   = model;
+            results.anova   = anova(model);
+            results.formula = formula;
+
+            % --- (2) Per-channel second-level map ---
+            [anovaPval, anovaFstat, termNames] = ...
+                perChannelPPImap(T, predictors, chanLabels);
+
+            % Benjamini-Hochberg FDR across channels, per term. anova_pval stays
+            % UNCORRECTED (one test per channel); use anova_qval for thresholded
+            % maps / the bridge to pf2.probe.project.pvalues.
+            anovaQval = nan(size(anovaPval));
+            for tIdx = 1:size(anovaPval, 2)
+                anovaQval(:, tIdx) = exploreFNIRS.fx.performFDR(anovaPval(:, tIdx));
+            end
+
+            results.anova_pval  = array2table(anovaPval, ...
+                'VariableNames', termNames, 'RowNames', rowNames);
+            results.anova_qval  = array2table(anovaQval, ...
+                'VariableNames', termNames, 'RowNames', rowNames);
+            results.anova_Fstat = array2table(anovaFstat, ...
+                'VariableNames', termNames, 'RowNames', rowNames);
+            results.channels    = chans;
+            results.predictors  = predictors;
+            results.biomarker   = obj.glm.biomarkers{1};
+            results.table       = T;
+
+            if verbose
+                fprintf('PPI group LME: %s\n', formula);
+                fprintf('  %d subjects x %d channels; per-channel terms: %s\n', ...
+                    numel(categories(T.SubjectID)), nCh, strjoin(termNames, ', '));
+            end
+        end
+
+    end
+end
+
+
+%% Local helper functions (PPI -> LME bridge)
+
+function [covars, fwd] = extractCovariatesArg(args)
+% Pull the 'Covariates' name-value pair out of a varargin list, forwarding
+% the rest unchanged.
+    covars = {};
+    fwd = {};
+    k = 1;
+    while k <= numel(args)
+        if (ischar(args{k}) || isstring(args{k})) && strcmpi(args{k}, 'Covariates')
+            covars = args{k+1};
+            k = k + 2;
+        else
+            fwd = [fwd, args(k)]; %#ok<AGROW>
+            k = k + 1;
+        end
+    end
+    if isempty(covars)
+        covars = {};
+    elseif ischar(covars) || isstring(covars)
+        covars = cellstr(covars);   % accept 'Group' or "Group" as a single covariate
+    end
+end
+
+function fwd = reconstructNameValue(unmatched)
+% Turn an inputParser .Unmatched struct back into a name-value cell array.
+    names = fieldnames(unmatched);
+    fwd = cell(1, 2 * numel(names));
+    for i = 1:numel(names)
+        fwd{2*i-1} = names{i};
+        fwd{2*i}   = unmatched.(names{i});
+    end
+end
+
+function col = expandCovariate(rawCells, nCh)
+% Broadcast a subject-level covariate (Nx1 cell) across channels and coerce to
+% a numeric or string column suitable for a table / model.
+    N = numel(rawCells);
+    isNum = all(cellfun(@(v) isnumeric(v) && isscalar(v), rawCells));
+    if isNum
+        base = cell2mat(rawCells(:));
+    else
+        base = strings(N, 1);
+        for s = 1:N
+            base(s) = string(rawCells{s});
+        end
+    end
+    col = repmat(base, nCh, 1);
+end
+
+function [pvalMat, fstatMat, termNames] = perChannelPPImap(T, predictors, chanLabels)
+% Fit a per-channel second-level model and return [nCh x nTerms] p/F matrices.
+% No predictors -> one-sample test of PPI vs zero. Predictors -> OLS regression
+% with one ANOVA term per predictor. chanLabels is a string array of channel
+% labels (numeric indices or named/ROI labels) addressing T.Channel.
+    chanLabels = string(chanLabels);
+    nCh = numel(chanLabels);
+
+    if isempty(predictors)
+        termNames = {'Intercept'};
+        pvalMat  = nan(nCh, 1);
+        fstatMat = nan(nCh, 1);
+        for c = 1:nCh
+            b = T.PPI(string(T.Channel) == chanLabels(c));
+            b = b(~isnan(b));
+            if numel(b) < 2
+                continue;
+            end
+            [~, pp, ~, st] = pf2_base.compat.ttest(b);
+            pvalMat(c)  = pp;
+            fstatMat(c) = st.tstat^2;
+        end
+        return;
+    end
+
+    termNames = predictors(:)';
+    nTerms = numel(termNames);
+    pvalMat  = nan(nCh, nTerms);
+    fstatMat = nan(nCh, nTerms);
+    rhs = strjoin(predictors, ' + ');
+
+    for c = 1:nCh
+        Tc = T(string(T.Channel) == chanLabels(c), :);
+        Tc = Tc(~isnan(Tc.PPI), :);
+        if height(Tc) <= numel(predictors) + 1
+            continue;   % not enough subjects to fit
+        end
+        try
+            lm = fitlm(Tc, sprintf('PPI ~ %s', rhs));
+            a = anova(lm);                  % rows: each term + Error
+            for tIdx = 1:nTerms
+                rn = a.Properties.RowNames;
+                hit = find(strcmp(rn, termNames{tIdx}), 1);
+                if ~isempty(hit)
+                    pvalMat(c, tIdx)  = a.pValue(hit);
+                    fstatMat(c, tIdx) = a.F(hit);
+                end
+            end
+        catch
+            % leave NaN for this channel
+        end
     end
 end
 
