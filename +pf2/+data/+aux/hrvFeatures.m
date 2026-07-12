@@ -1,4 +1,4 @@
-function [hrv, info] = hrvFeatures(x, fs, varargin)
+function [hrv, info] = hrvFeatures(x, fs, opts)
 % HRVFEATURES Heart-rate variability metrics from a waveform or beat series
 %
 % Computes standard time- and frequency-domain HRV metrics, which serve as
@@ -55,21 +55,21 @@ function [hrv, info] = hrvFeatures(x, fs, varargin)
 %
 % See also: pf2.data.aux.heartRateFrom, pf2_base.auxSignalType
 
-p = inputParser;
-p.addRequired('x', @isnumeric);
-p.addRequired('fs', @(v) isempty(v) || (isnumeric(v) && isscalar(v) && v > 0));
-p.addParameter('Input', 'waveform', @(v) ismember(lower(char(v)), {'waveform','beats','ibi'}));
-p.addParameter('IBIUnit', 'ms', @(v) ismember(lower(char(v)), {'ms','s'}));
-p.addParameter('Band', [0.5 5], @(v) isnumeric(v) && numel(v) == 2);
-p.addParameter('LFBand', [0.04 0.15], @(v) isnumeric(v) && numel(v) == 2);
-p.addParameter('HFBand', [0.15 0.40], @(v) isnumeric(v) && numel(v) == 2);
-p.addParameter('ResampleFs', 4, @(v) isnumeric(v) && isscalar(v) && v > 0);
-p.parse(x, fs, varargin{:});
-inputType = lower(char(p.Results.Input));
-ibiUnit = lower(char(p.Results.IBIUnit));
-lfBand = p.Results.LFBand;
-hfBand = p.Results.HFBand;
-reFs = p.Results.ResampleFs;
+arguments
+    x {mustBeNumeric}
+    fs {mustBeNumeric} = []
+    opts.Input = 'waveform'
+    opts.IBIUnit = 'ms'
+    opts.Band {mustBeNumeric} = [0.5 5]
+    opts.LFBand {mustBeNumeric} = [0.04 0.15]
+    opts.HFBand {mustBeNumeric} = [0.15 0.40]
+    opts.ResampleFs {mustBeNumeric, mustBeScalarOrEmpty, mustBePositive} = 4
+end
+inputType = lower(char(opts.Input));
+ibiUnit = lower(char(opts.IBIUnit));
+lfBand = opts.LFBand;
+hfBand = opts.HFBand;
+reFs = opts.ResampleFs;
 
 x = x(:);
 
@@ -79,7 +79,7 @@ switch inputType
         if isempty(fs)
             error('pf2:hrvFeatures:noFs', 'fs is required for waveform input.');
         end
-        [~, hrInfo] = pf2.data.aux.heartRateFrom(x, fs, 'Band', p.Results.Band);
+        [~, hrInfo] = pf2.data.aux.heartRateFrom(x, fs, 'Band', opts.Band);
         beatTimes = hrInfo.peakTimes(:);
         nnMs = diff(beatTimes) * 1000;
     case 'beats'
@@ -92,6 +92,10 @@ switch inputType
             nnMs = x;
         end
         beatTimes = cumsum([0; nnMs / 1000]);
+    otherwise
+        error('pf2:hrvFeatures:badInput', ...
+            'Input must be one of ''waveform'', ''beats'', or ''ibi'' (got ''%s'').', ...
+            inputType);
 end
 
 info = struct('nBeats', numel(beatTimes), 'beatTimes', beatTimes, 'source', inputType);

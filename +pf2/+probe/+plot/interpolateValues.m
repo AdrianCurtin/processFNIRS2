@@ -1,4 +1,4 @@
-function [ imgOut,optPos2Plot ] = interpolateValues(varargin)
+function [ imgOut,optPos2Plot ] = interpolateValues(data2plot, fNIR, minVal, maxVal, titleString, clrBarTitle, opts)
 % INTERPOLATEVALUES Create interpolated 2D topographic map of channel values
 %
 % Generates a smooth, interpolated 2D topographic visualization of fNIRS
@@ -66,36 +66,25 @@ function [ imgOut,optPos2Plot ] = interpolateValues(varargin)
 %
 % See also: pf2.probe.plot.interpolateValues3D, pf2.probe.plot.imageValues,
 %           pf2.probe.plot.interpolateROIvalues, pf2.data.plot.oxy
-p = inputParser;
+arguments
+    data2plot
+    fNIR = {}
+    minVal {mustBeNumeric} = []
+    maxVal {mustBeNumeric} = []
+    titleString {mustBeText} = ''
+    clrBarTitle {mustBeText} = ''
+    opts.bufferDistance {mustBeNumeric} = 1
+    opts.savePath {mustBeText} = ''
+    opts.saveWidth {mustBeNumeric} = []
+    opts.saveHeight {mustBeNumeric} = []
+    opts.saveDPI {mustBeNumeric} = 150
+end
 
-isStructOrEmpty=@(x) isstruct(x)||isempty(x);
-isStringOrChar=@(x)isstring(x)||ischar(x);
-
-addRequired(p, 'data2plot');
-addOptional(p, 'fNIR', {}, isStructOrEmpty);
-addOptional(p, 'minVal', [], @isnumeric);
-addOptional(p, 'maxVal', [], @isnumeric);
-addOptional(p, 'titleString', '', isStringOrChar);
-addOptional(p, 'clrBarTitle', '', isStringOrChar);
-addParameter(p, 'bufferDistance', 1, @isnumeric);
-addParameter(p, 'savePath', '', @(x) ischar(x) || isstring(x));
-addParameter(p, 'saveWidth', [], @(x) isempty(x) || isnumeric(x));
-addParameter(p, 'saveHeight', [], @(x) isempty(x) || isnumeric(x));
-addParameter(p, 'saveDPI', 150, @isnumeric);
-
-parse(p, varargin{:});
-
-clrBarTitle = p.Results.clrBarTitle;
-titleString = p.Results.titleString;
-bufferDistance = round(p.Results.bufferDistance);
-minVal = p.Results.minVal;
-maxVal = p.Results.maxVal;
-fNIR = p.Results.fNIR;
-data2plot = p.Results.data2plot;
-savePath = p.Results.savePath;
-saveWidth = p.Results.saveWidth;
-saveHeight = p.Results.saveHeight;
-saveDPI = p.Results.saveDPI;
+bufferDistance = round(opts.bufferDistance);
+savePath = opts.savePath;
+saveWidth = opts.saveWidth;
+saveHeight = opts.saveHeight;
+saveDPI = opts.saveDPI;
 
 if(isempty(minVal))
     minVal=nanmin(data2plot);

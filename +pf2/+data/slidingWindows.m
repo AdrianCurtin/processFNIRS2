@@ -1,4 +1,4 @@
-function blocks = slidingWindows(data, varargin)
+function blocks = slidingWindows(data, opts)
 % SLIDINGWINDOWS Define fixed-length sliding-window blocks over a recording
 %
 % Tiles a continuous recording with fixed-length time windows at a regular
@@ -94,29 +94,30 @@ function blocks = slidingWindows(data, varargin)
 %
 % See also: pf2.data.defineBlocks, pf2.data.extractBlocks, pf2.data.split
 
+arguments
+    data
+    opts.Length          {mustBeNumeric, mustBeScalarOrEmpty, mustBePositive} = []
+    opts.Step            {mustBeNumeric, mustBeScalarOrEmpty, mustBePositive} = []
+    opts.Overlap         {mustBeNumeric, mustBeScalarOrEmpty, mustBeNonnegative, mustBeLessThan(opts.Overlap, 1)} = []
+    opts.Start           {mustBeNumeric, mustBeScalarOrEmpty} = []
+    opts.End             {mustBeNumeric, mustBeScalarOrEmpty} = []
+    opts.Partial         (1,1) logical = false
+    opts.Condition       {mustBeText} = ''
+    opts.ConditionField  {mustBeText} = 'Condition'
+    opts.Embed           (1,1) logical = true
+end
+
 % --- Cell array input: apply to each element (requires Embed) ---
 if iscell(data)
+    fwd = namedargs2cell(opts);
     blocks = data;
     for ci = 1:numel(data)
-        blocks{ci} = pf2.data.slidingWindows(data{ci}, varargin{:});
+        blocks{ci} = pf2.data.slidingWindows(data{ci}, fwd{:});
     end
     return;
 end
 
-% --- Parse inputs ---
-p = inputParser;
-p.addParameter('Length', [], @(x) isnumeric(x) && isscalar(x) && x > 0);
-p.addParameter('Step', [], @(x) isnumeric(x) && isscalar(x) && x > 0);
-p.addParameter('Overlap', [], @(x) isnumeric(x) && isscalar(x) && x >= 0 && x < 1);
-p.addParameter('Start', [], @(x) isnumeric(x) && isscalar(x));
-p.addParameter('End', [], @(x) isnumeric(x) && isscalar(x));
-p.addParameter('Partial', false, @islogical);
-p.addParameter('Condition', '', @(x) ischar(x) || isstring(x));
-p.addParameter('ConditionField', 'Condition', @(x) ischar(x) || isstring(x));
-p.addParameter('Embed', true, @islogical);
-p.parse(varargin{:});
-
-winLen = p.Results.Length;
+winLen = opts.Length;
 if isempty(winLen)
     error('pf2:slidingWindows:noLength', ...
         '''Length'' (window length in seconds) is required.');
@@ -129,14 +130,14 @@ if ~isstruct(data) || ~isfield(data, 'time') || isempty(data.time)
 end
 
 % Resolve step from Step / Overlap (mutually exclusive)
-if ~isempty(p.Results.Step) && ~isempty(p.Results.Overlap)
+if ~isempty(opts.Step) && ~isempty(opts.Overlap)
     error('pf2:slidingWindows:stepAndOverlap', ...
         'Specify only one of ''Step'' or ''Overlap''.');
 end
-if ~isempty(p.Results.Overlap)
-    step = winLen * (1 - p.Results.Overlap);
-elseif ~isempty(p.Results.Step)
-    step = p.Results.Step;
+if ~isempty(opts.Overlap)
+    step = winLen * (1 - opts.Overlap);
+elseif ~isempty(opts.Step)
+    step = opts.Step;
 else
     step = winLen;   % contiguous, non-overlapping
 end
@@ -144,12 +145,12 @@ end
 % Resolve time span
 tMin = min(data.time);
 tMax = max(data.time);
-if isempty(p.Results.Start); winStart0 = tMin; else; winStart0 = p.Results.Start; end
-if isempty(p.Results.End);   spanEnd   = tMax; else; spanEnd   = p.Results.End;   end
+if isempty(opts.Start); winStart0 = tMin; else; winStart0 = opts.Start; end
+if isempty(opts.End);   spanEnd   = tMax; else; spanEnd   = opts.End;   end
 
-partial = p.Results.Partial;
-condLabel = char(p.Results.Condition);
-condField = char(p.Results.ConditionField);
+partial = opts.Partial;
+condLabel = char(opts.Condition);
+condField = char(opts.ConditionField);
 
 if spanEnd <= winStart0
     error('pf2:slidingWindows:emptySpan', ...
@@ -177,7 +178,7 @@ if isempty(starts)
             winLen, spanEnd - winStart0);
     end
     blocks = emptyBlocks;
-    if p.Results.Embed
+    if opts.Embed
         data.blocks = blocks;
         blocks = data;
     end
@@ -212,7 +213,7 @@ for k = 1:nWin
 end
 
 % --- Embed on the data struct if requested ---
-if p.Results.Embed
+if opts.Embed
     data.blocks = blocks;
     blocks = data;
 end

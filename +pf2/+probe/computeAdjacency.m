@@ -1,4 +1,4 @@
-function adj = computeAdjacency(deviceOrData, varargin)
+function adj = computeAdjacency(deviceOrData, opts)
 % COMPUTEADJACENCY Compute channel adjacency matrix from MNI coordinates
 %
 % Builds a spatial adjacency matrix for fNIRS channels based on Euclidean
@@ -53,14 +53,14 @@ function adj = computeAdjacency(deviceOrData, varargin)
 %
 % See also: pf2.Device, exploreFNIRS.stats.clusterPermutation
 
-p = inputParser;
-addRequired(p, 'deviceOrData');
-addParameter(p, 'MaxDistance', 30, @(x) isnumeric(x) && isscalar(x) && x > 0);
-addParameter(p, 'ExcludeShortSep', true, @(x) islogical(x) || (isnumeric(x) && isscalar(x)));
-parse(p, deviceOrData, varargin{:});
+arguments
+    deviceOrData
+    opts.MaxDistance (1,1) {mustBeNumeric} = 30
+    opts.ExcludeShortSep = true
+end
 
-maxDist = p.Results.MaxDistance;
-excludeSS = p.Results.ExcludeShortSep;
+maxDist = opts.MaxDistance;
+excludeSS = opts.ExcludeShortSep;
 
 % Resolve device
 if isa(deviceOrData, 'pf2.Device')

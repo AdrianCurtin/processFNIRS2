@@ -1,4 +1,4 @@
-function [feat, info] = respFeatures(x, fs, varargin)
+function [feat, info] = respFeatures(x, fs, opts)
 % RESPFEATURES Derive respiration rate and RVT from a respiration waveform
 %
 % Detects breaths in a respiration signal (belt / RIP / derived) and returns
@@ -53,15 +53,15 @@ function [feat, info] = respFeatures(x, fs, varargin)
 %
 % See also: pf2.data.aux.heartRateFrom, pf2_base.auxSignalType, pf2.data.auxOnGrid
 
-p = inputParser;
-p.addRequired('x', @isnumeric);
-p.addRequired('fs', @(v) isnumeric(v) && isscalar(v) && v > 0);
-p.addParameter('Band', [0.1 0.5], @(v) isnumeric(v) && numel(v) == 2);
-p.addParameter('MinRate', 5, @(v) isnumeric(v) && isscalar(v) && v > 0);
-p.addParameter('MaxRate', 60, @(v) isnumeric(v) && isscalar(v) && v > 0);
-p.parse(x, fs, varargin{:});
-band = p.Results.Band;
-maxRate = p.Results.MaxRate;
+arguments
+    x {mustBeNumeric}
+    fs {mustBeNumeric, mustBeScalarOrEmpty, mustBePositive}
+    opts.Band {mustBeNumeric} = [0.1 0.5]
+    opts.MinRate {mustBeNumeric, mustBeScalarOrEmpty, mustBePositive} = 5
+    opts.MaxRate {mustBeNumeric, mustBeScalarOrEmpty, mustBePositive} = 60
+end
+band = opts.Band;
+maxRate = opts.MaxRate;
 
 x = x(:);
 T = numel(x);

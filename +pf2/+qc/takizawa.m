@@ -1,4 +1,4 @@
-function report = takizawa(data, varargin)
+function report = takizawa(data, opts)
 % TAKIZAWA Automatic channel quality assessment using Takizawa criteria
 %
 % Evaluates four rules derived from Takizawa et al. (2008, 2014) to
@@ -88,24 +88,19 @@ function report = takizawa(data, varargin)
 %
 % See also: pf2.qc.pipeline.assess, pf2.qc.sci, pf2_TakizawaRejection
 
-%% Parse inputs
-p = inputParser;
-p.FunctionName = 'pf2.qc.takizawa';
-
-addRequired(p, 'data', @isstruct);
-addParameter(p, 'Strict', false, @islogical);
-addParameter(p, 'HFNoiseRatio', 4, @(x) isnumeric(x) && isscalar(x));
-addParameter(p, 'HFNoiseWindow', 15, @(x) isnumeric(x) && isscalar(x));
-addParameter(p, 'HFNoiseFraction', 0.5, @(x) isnumeric(x) && isscalar(x));
-addParameter(p, 'LFThreshold', 0.3, @(x) isnumeric(x) && isscalar(x));
-addParameter(p, 'CorrThreshold', -0.9, @(x) isnumeric(x) && isscalar(x));
-addParameter(p, 'BodyMovementThreshold', 0.5, @(x) isnumeric(x) && isscalar(x));
-addParameter(p, 'BodyMovementWindow', 2, @(x) isnumeric(x) && isscalar(x));
-addParameter(p, 'ProtocolDuration', 90, @(x) isnumeric(x) && isscalar(x));
-addParameter(p, 'IncludeBandPower', false, @islogical);
-
-parse(p, data, varargin{:});
-opts = p.Results;
+arguments
+    data struct
+    opts.Strict (1,1) logical = false
+    opts.HFNoiseRatio (1,1) {mustBeNumeric} = 4
+    opts.HFNoiseWindow (1,1) {mustBeNumeric} = 15
+    opts.HFNoiseFraction (1,1) {mustBeNumeric} = 0.5
+    opts.LFThreshold (1,1) {mustBeNumeric} = 0.3
+    opts.CorrThreshold (1,1) {mustBeNumeric} = -0.9
+    opts.BodyMovementThreshold (1,1) {mustBeNumeric} = 0.5
+    opts.BodyMovementWindow (1,1) {mustBeNumeric} = 2
+    opts.ProtocolDuration (1,1) {mustBeNumeric} = 90
+    opts.IncludeBandPower (1,1) logical = false
+end
 
 %% Resolve Hb data
 if isfield(data, 'HbO') && isfield(data, 'HbR')

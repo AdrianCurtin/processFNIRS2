@@ -1,4 +1,4 @@
-function blocks = importBlockInfo(blocks, source, varargin)
+function blocks = importBlockInfo(blocks, source, opts)
 % IMPORTBLOCKINFO Import block-level metadata into block structs
 %
 % Attaches per-block metadata to a block struct array (from defineBlocks).
@@ -90,26 +90,28 @@ function blocks = importBlockInfo(blocks, source, varargin)
 %
 % See also: pf2.data.importInfo, pf2.data.defineBlocks, pf2.data.extractBlocks
 
-p = inputParser;
-p.addParameter('Field', '', @(x) ischar(x) || isstring(x));
-p.addParameter('Keys', {}, @(x) ischar(x) || isstring(x) || iscellstr(x));
-p.addParameter('MarkerCode', [], @(x) isnumeric(x));
-p.addParameter('Condition', '', @(x) ischar(x) || isstring(x));
-p.addParameter('Sheet', 1, @(x) isnumeric(x) || ischar(x) || isstring(x));
-p.addParameter('Overwrite', true, @islogical);
-p.addParameter('ReadOptions', {}, @iscell);
-p.parse(varargin{:});
+arguments
+    blocks
+    source
+    opts.Field = ''
+    opts.Keys = {}
+    opts.MarkerCode {mustBeNumeric} = []
+    opts.Condition = ''
+    opts.Sheet = 1
+    opts.Overwrite (1,1) logical = true
+    opts.ReadOptions {mustBeA(opts.ReadOptions, 'cell')} = {}
+end
 
-keys = cellstr(p.Results.Keys);
+keys = cellstr(opts.Keys);
 if numel(keys) == 1 && isempty(keys{1})
     keys = {};
 end
-fieldName = char(p.Results.Field);
-markerFilter = p.Results.MarkerCode;
-condFilter = string(p.Results.Condition);
-sheet = p.Results.Sheet;
-overwrite = p.Results.Overwrite;
-readOpts = p.Results.ReadOptions;
+fieldName = char(opts.Field);
+markerFilter = opts.MarkerCode;
+condFilter = string(opts.Condition);
+sheet = opts.Sheet;
+overwrite = opts.Overwrite;
+readOpts = opts.ReadOptions;
 
 useKeyMode = ~isempty(keys);
 

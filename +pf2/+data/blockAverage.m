@@ -1,4 +1,4 @@
-function ga = blockAverage(segments, varargin)
+function ga = blockAverage(segments, opts)
 % BLOCKAVERAGE Trial/grand average of epoched fNIRS segments onto a common grid
 %
 % Averages a cell array of epoched fNIRS structs (e.g. from
@@ -66,6 +66,13 @@ function ga = blockAverage(segments, varargin)
 % See also: pf2.data.extractBlocks, pf2.data.defineBlocks,
 %           exploreFNIRS.core.Experiment, grandAvgFNIRS
 
+arguments
+    segments
+    opts.ResampleInterval {mustBeNumeric} = []
+    opts.AverageAux = false
+    opts.HierarchyVars {mustBeNumeric} = []
+end
+
 pf2_base.ensureStatsFallbacks();  % ensure stats-toolbox fallbacks (nan*) are on the path before use
 
 if ~iscell(segments)
@@ -73,14 +80,6 @@ if ~iscell(segments)
         ['SEGMENTS must be a cell array of fNIRS structs ', ...
          '(e.g. the output of pf2.data.extractBlocks).']);
 end
-
-p = inputParser;
-p.FunctionName = 'pf2.data.blockAverage';
-p.addParameter('ResampleInterval', [], @(x) isempty(x) || (isnumeric(x) && isscalar(x) && x > 0));
-p.addParameter('AverageAux', false, @(x) islogical(x) || (isnumeric(x) && isscalar(x)));
-p.addParameter('HierarchyVars', [], @(x) isempty(x) || isnumeric(x));
-p.parse(varargin{:});
-opts = p.Results;
 
 % Keep only non-empty segments (track indices for HierarchyVars alignment).
 keep = find(~cellfun(@isempty, segments));

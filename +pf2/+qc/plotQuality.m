@@ -1,4 +1,4 @@
-function fig = plotQuality(qcResult, varargin)
+function fig = plotQuality(qcResult, opts)
 % PLOTQUALITY Visualize fNIRS signal quality metrics
 %
 % Dispatches based on the type of QC result passed in. Produces an SCI bar
@@ -45,19 +45,14 @@ function fig = plotQuality(qcResult, varargin)
 %
 % See also: pf2.qc.sci, pf2.qc.powerSpectrum
 
-%% Parse inputs
-p = inputParser;
-p.FunctionName = 'pf2.qc.plotQuality';
-
-addRequired(p, 'qcResult', @isstruct);
-addParameter(p, 'Channels', [], @isnumeric);
-addParameter(p, 'Layout', 'overlay', @(x) ismember(lower(char(x)), {'overlay', 'tiled'}));
-addParameter(p, 'Visible', 'on', @(x) ismember(lower(char(x)), {'on', 'off'}));
-addParameter(p, 'SavePath', '', @(x) ischar(x) || isstring(x));
-addParameter(p, 'Title', '', @(x) ischar(x) || isstring(x));
-
-parse(p, qcResult, varargin{:});
-opts = p.Results;
+arguments
+    qcResult struct
+    opts.Channels {mustBeNumeric} = []
+    opts.Layout = 'overlay'
+    opts.Visible = 'on'
+    opts.SavePath = ''
+    opts.Title = ''
+end
 
 %% Dispatch based on result type
 if isfield(qcResult, 'sci')

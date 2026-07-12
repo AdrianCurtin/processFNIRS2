@@ -1,4 +1,4 @@
-function data = addFeature(data, name, values, varargin)
+function data = addFeature(data, name, values, opts)
 % ADDFEATURE Store a derived signal as a typed auxiliary feature
 %
 % Writes a derived feature (e.g. an HR series from heartRateFrom, RVT from
@@ -38,17 +38,17 @@ function data = addFeature(data, name, values, varargin)
 % See also: pf2_base.normalizeAux, pf2.data.aux.heartRateFrom,
 %           pf2.data.aux.respFeatures, pf2.export.asSNIRF
 
-p = inputParser;
-p.addRequired('data', @isstruct);
-p.addRequired('name', @(x) ischar(x) || isstring(x));
-p.addRequired('values', @isnumeric);
-p.addParameter('Time', [], @(x) isempty(x) || isnumeric(x));
-p.addParameter('Unit', '', @(x) ischar(x) || isstring(x));
-p.addParameter('VarNames', {}, @(x) iscell(x) || ischar(x) || isstring(x));
-p.parse(data, name, values, varargin{:});
+arguments
+    data {mustBeA(data, 'struct')}
+    name {mustBeText}
+    values {mustBeNumeric}
+    opts.Time {mustBeNumeric} = []
+    opts.Unit = ''
+    opts.VarNames = {}
+end
 name = matlab.lang.makeValidName(char(string(name)));
 
-t = p.Results.Time;
+t = opts.Time;
 if isempty(t)
     if ~isfield(data, 'time') || isempty(data.time)
         error('pf2:addFeature:noTime', ...
@@ -58,11 +58,11 @@ if isempty(t)
 end
 
 sig = struct('data', values, 'time', t(:));
-if ~isempty(char(string(p.Results.Unit)))
-    sig.unit = char(string(p.Results.Unit));
+if ~isempty(char(string(opts.Unit)))
+    sig.unit = char(string(opts.Unit));
 end
-if ~isempty(p.Results.VarNames)
-    sig.varNames = cellstr(p.Results.VarNames);
+if ~isempty(opts.VarNames)
+    sig.varNames = cellstr(opts.VarNames);
 end
 
 if ~isfield(data, 'Aux') || isempty(data.Aux) || ~isstruct(data.Aux)

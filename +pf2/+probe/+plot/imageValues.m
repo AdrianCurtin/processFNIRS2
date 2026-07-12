@@ -1,4 +1,4 @@
-function [ imgOut ] = imageValues(varargin)
+function [ imgOut ] = imageValues(data2plot, fNIR, minVal, maxVal, titleString, clrBarTitle, opts)
 % IMAGEVALUES Display per-channel values as a 2D image heatmap
 %
 % Creates a 2D image visualization where each fNIRS channel position is filled
@@ -53,40 +53,26 @@ function [ imgOut ] = imageValues(varargin)
 % See also: pf2.probe.plot.arrangedValues, pf2.probe.plot.interpolateValues,
 %           pf2.probe.plot.imageROIvalues, pf2.data.plot.oxy
 
-p = inputParser;
+arguments
+    data2plot
+    fNIR = {}
+    minVal {mustBeNumeric} = []
+    maxVal {mustBeNumeric} = []
+    titleString {mustBeText} = ''
+    clrBarTitle {mustBeText} = ''
+    opts.includeSS (1,1) logical = true
+    opts.Layout = 'auto'
+    opts.savePath {mustBeText} = ''
+    opts.saveWidth {mustBeNumeric} = []
+    opts.saveHeight {mustBeNumeric} = []
+    opts.saveDPI {mustBeNumeric} = 150
+end
 
-isStructOrEmpty=@(x) isstruct(x)||isempty(x);
-isStringOrChar=@(x)isstring(x)||ischar(x);
-
-addRequired(p, 'data2plot');
-addOptional(p, 'fNIR', {}, isStructOrEmpty);
-addOptional(p, 'minVal', [], @isnumeric);
-addOptional(p, 'maxVal', [], @isnumeric);
-addOptional(p, 'titleString', '', isStringOrChar);
-addOptional(p, 'clrBarTitle', '', isStringOrChar);
-
-addParameter(p, 'includeSS', true, @islogical);
-addParameter(p, 'Layout', 'auto', @(x) (ischar(x) || isstring(x)) && ...
-    any(strcmpi(char(x), {'auto','schematic','flat','anatomical','projected'})));
-addParameter(p, 'savePath', '', @(x) ischar(x) || isstring(x));
-addParameter(p, 'saveWidth', [], @(x) isempty(x) || isnumeric(x));
-addParameter(p, 'saveHeight', [], @(x) isempty(x) || isnumeric(x));
-addParameter(p, 'saveDPI', 150, @isnumeric);
-
-parse(p, varargin{:});
-
-clrBarTitle = p.Results.clrBarTitle;
-titleString = p.Results.titleString;
-minVal = p.Results.minVal;
-maxVal = p.Results.maxVal;
-fNIR = p.Results.fNIR;
-data2plot = p.Results.data2plot;
-
-include_ss=p.Results.includeSS;
-savePath = p.Results.savePath;
-saveWidth = p.Results.saveWidth;
-saveHeight = p.Results.saveHeight;
-saveDPI = p.Results.saveDPI;
+include_ss=opts.includeSS;
+savePath = opts.savePath;
+saveWidth = opts.saveWidth;
+saveHeight = opts.saveHeight;
+saveDPI = opts.saveDPI;
 
 
 if(isempty(maxVal))
@@ -107,7 +93,7 @@ end
 
 % Resolve which 2D layout to draw: the clean declared/auto "schematic" grid
 % or the affine 3D->2D "anatomical" projection.
-layoutMode = lower(char(p.Results.Layout));
+layoutMode = lower(char(opts.Layout));
 if any(strcmp(layoutMode, {'flat'})),       layoutMode = 'schematic';  end
 if any(strcmp(layoutMode, {'projected'})),  layoutMode = 'anatomical'; end
 hasSchem = ismember('subplot_layout_schematic', probeInfo.OptPos.Properties.VariableNames);

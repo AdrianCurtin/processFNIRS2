@@ -1,4 +1,4 @@
-function allData = importDirectory(dirPath, pattern, varargin)
+function allData = importDirectory(dirPath, pattern, opts)
 % IMPORTDIRECTORY Batch-import fNIRS files from a directory tree
 %
 % Recursively scans a directory for fNIRS files matching a glob pattern,
@@ -74,22 +74,21 @@ function allData = importDirectory(dirPath, pattern, varargin)
 %           pf2.import.importHitachiMES, pf2.import.importNIRX
 
     % --- Parse inputs ---
-    p = inputParser;
-    p.addRequired('dirPath', @(x) ischar(x) || isstring(x));
-    p.addRequired('pattern', @(x) ischar(x) || isstring(x));
-    p.addParameter('Dir1', '', @(x) ischar(x) || isstring(x));
-    p.addParameter('Dir2', '', @(x) ischar(x) || isstring(x));
-    p.addParameter('Dir3', '', @(x) ischar(x) || isstring(x));
-    p.addParameter('Dir4', '', @(x) ischar(x) || isstring(x));
-    p.addParameter('Filename', '', @(x) ischar(x) || isstring(x));
-    p.addParameter('ChannelCheck', false, @islogical);
-    p.addParameter('ContinueOnError', true, @islogical);
-    p.addParameter('Verbose', true, @islogical);
-    p.parse(dirPath, pattern, varargin{:});
-    opts = p.Results;
+    arguments
+        dirPath {mustBeText}
+        pattern {mustBeText}
+        opts.Dir1 {mustBeText} = ''
+        opts.Dir2 {mustBeText} = ''
+        opts.Dir3 {mustBeText} = ''
+        opts.Dir4 {mustBeText} = ''
+        opts.Filename {mustBeText} = ''
+        opts.ChannelCheck (1,1) logical = false
+        opts.ContinueOnError (1,1) logical = true
+        opts.Verbose (1,1) logical = true
+    end
 
-    dirPath = char(opts.dirPath);
-    pattern = char(opts.pattern);
+    dirPath = char(dirPath);
+    pattern = char(pattern);
 
     % --- Validate directory ---
     if ~isfolder(dirPath)

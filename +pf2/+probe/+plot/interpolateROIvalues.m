@@ -1,4 +1,4 @@
-function [ imgOut ] = interpolateROIvalues(varargin)
+function [ imgOut ] = interpolateROIvalues(data2plot, fNIR, ROIinfo, minVal, maxVal, bufferMult, titleString, clrBarTitle, opts)
 % INTERPOLATEROIVALUES Create interpolated 2D topographic map of ROI values
 %
 % Generates a smooth, interpolated 2D topographic visualization of fNIRS
@@ -61,39 +61,26 @@ function [ imgOut ] = interpolateROIvalues(varargin)
 % See also: pf2.probe.plot.imageROIvalues, pf2.probe.plot.interpolateValues,
 %           pf2.probe.roi.defineROI, pf2_base.fnirs.buildROI
 
-p = inputParser;
+arguments
+    data2plot
+    fNIR = {}
+    ROIinfo = {}
+    minVal {mustBeNumeric} = []
+    maxVal {mustBeNumeric} = []
+    bufferMult {mustBeNumeric} = 1
+    titleString {mustBeText} = ''
+    clrBarTitle {mustBeText} = ''
+    opts.savePath {mustBeText} = ''
+    opts.saveWidth {mustBeNumeric} = []
+    opts.saveHeight {mustBeNumeric} = []
+    opts.saveDPI {mustBeNumeric} = 150
+end
 
-isStructOrEmpty=@(x) isstruct(x)||isempty(x) ||istable(x);
-isStringOrChar=@(x)isstring(x)||ischar(x);
-
-
-addRequired(p, 'data2plot');
-addOptional(p, 'fNIR', {}, isStructOrEmpty);
-addOptional(p, 'ROIinfo',{}, isStructOrEmpty);
-addOptional(p, 'minVal', [], @isnumeric);
-addOptional(p, 'maxVal', [], @isnumeric);
-addOptional(p, 'bufferMult', 1, @isnumeric);
-addOptional(p, 'titleString', '', isStringOrChar);
-addOptional(p, 'clrBarTitle', '', isStringOrChar);
-addParameter(p, 'savePath', '', @(x) ischar(x) || isstring(x));
-addParameter(p, 'saveWidth', [], @(x) isempty(x) || isnumeric(x));
-addParameter(p, 'saveHeight', [], @(x) isempty(x) || isnumeric(x));
-addParameter(p, 'saveDPI', 150, @isnumeric);
-
-parse(p, varargin{:});
-
-clrBarTitle = p.Results.clrBarTitle;
-titleString = p.Results.titleString;
-bufferMult = round(p.Results.bufferMult);
-minVal = p.Results.minVal;
-maxVal = p.Results.maxVal;
-fNIR = p.Results.fNIR;
-data2plot = p.Results.data2plot;
-ROIinfo = p.Results.ROIinfo;
-savePath = p.Results.savePath;
-saveWidth = p.Results.saveWidth;
-saveHeight = p.Results.saveHeight;
-saveDPI = p.Results.saveDPI;
+bufferMult = round(bufferMult);
+savePath = opts.savePath;
+saveWidth = opts.saveWidth;
+saveHeight = opts.saveHeight;
+saveDPI = opts.saveDPI;
 
 if(isempty(ROIinfo))
     if(~isempty(fNIR)&&istable(fNIR)&&any(ismember(fNIR.Properties.VariableNames,'DeviceCfg')))%%is struct for ROI info?

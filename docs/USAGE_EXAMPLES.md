@@ -312,25 +312,28 @@ segments = pf2.data.extractBlocks(data, blocks);
 
 ## Workflow 9: Context-Based Processing
 ```matlab
-% Create isolated processing context
-ctx = pf2_base.ProcessingContext.fromGlobals();
-ctx.dpfMode = 'Calc';
-ctx.subjectAge = 30;
-ctx.setRawMethod('x5_TDDR');
-ctx.setOxyMethod('takizawa_easy');
+% Create an isolated processing context, configured in one call. The public
+% pf2.ProcessingContext is usable straight from construction (no fromGlobals
+% bootstrap) and accepts processFNIRS2-style Name-Value settings.
+ctx = pf2.ProcessingContext('DPFmode', 'Calc', 'SubjectAge', 30, ...
+    'RawMethod', 'x5_TDDR', 'OxyMethod', 'takizawa_easy');
 
-% Process without modifying global state
-result = processFNIRS2(data, 'Context', ctx);
+% Process without modifying global state (either form works)
+result = ctx.process(data);                       % context as receiver
+% result = processFNIRS2(data, 'Context', ctx);   % equivalent keyword form
 
 % Save for reproducibility (-struct needs a variable, not an inline call)
 settings = ctx.toStruct();
 save('analysis_settings.mat', '-struct', 'settings');
+% Rebuild a usable context later: ctx = pf2.ProcessingContext.fromRecipe(load('analysis_settings.mat'));
 
-% Parallel processing with different ages
+% Parallel processing with different ages. Configure ONCE, then take an
+% independent copy() per worker -- a plain ctx = base would alias one handle,
+% and fromGlobals() on a worker sees empty globals.
 parfor i = 1:length(subjects)
-    ctx = pf2_base.ProcessingContext.fromGlobals();
-    ctx.subjectAge = ages(i);
-    results{i} = processFNIRS2(data{i}, 'Context', ctx);
+    c = ctx.copy();
+    c.subjectAge = ages(i);
+    results{i} = processFNIRS2(data{i}, 'Context', c);
 end
 ```
 

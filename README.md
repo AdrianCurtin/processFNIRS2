@@ -292,6 +292,11 @@ Full reference documentation lives in the [`docs/`](docs/) directory — see
 For per-function help in MATLAB, use `help` (e.g. `help processFNIRS2`,
 `help pf2.import.importNIR`).
 
+### Driving pf2 from an AI agent (MCP)
+processFNIRS2 can be operated by an MCP client (Claude Code/Desktop, VS Code)
+through the official [MATLAB MCP Server](https://github.com/matlab/matlab-mcp-server).
+See [`mcp/README.md`](mcp/README.md) for install/config and a session tool card.
+
 ## Examples & Tutorials
 Runnable, copy-pasteable scripts live in [`examples/scripts/`](examples/scripts)
 — see [`examples/scripts/README.md`](examples/scripts/README.md) for the full

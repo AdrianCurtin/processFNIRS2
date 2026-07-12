@@ -1,4 +1,4 @@
-function [A, mesh, info] = sensitivity(data, varargin)
+function [A, mesh, info] = sensitivity(data, opts)
 % SENSITIVITY DOT forward sensitivity matrix (PMDF) for a montage on cortex
 %
 % Builds the channel-by-vertex photon-measurement-density (sensitivity) matrix
@@ -57,23 +57,24 @@ function [A, mesh, info] = sensitivity(data, varargin)
 % See also: pf2.probe.forward.coverage, pf2.probe.dot.reconstruct,
 %           pf2_base.dot.sensitivityMatrix
 
+arguments
+    data
+    opts.Wavelength = 'mean'
+    opts.HighRes (1,1) logical = true
+    opts.ScalpOffset (1,1) {mustBeNumeric} = 12
+    opts.MaxDistance (1,1) {mustBeNumeric} = 50
+    opts.Prune (1,1) {mustBeNumeric} = 1e-3
+    opts.mua = []
+    opts.musp = []
+    opts.HeadModel = 'homogeneous'
+    opts.Layers = []
+    opts.NormalMode = 'surface'
+end
+
 persistent CACHE
 if isempty(CACHE), CACHE = containers.Map('KeyType','char','ValueType','any'); end
 
-p = inputParser;
-addRequired(p, 'data');
-addParameter(p, 'Wavelength', 'mean');
-addParameter(p, 'HighRes', true, @(x) islogical(x) && isscalar(x));
-addParameter(p, 'ScalpOffset', 12, @(x) isnumeric(x) && isscalar(x) && x >= 0);
-addParameter(p, 'MaxDistance', 50, @(x) isnumeric(x) && isscalar(x) && x > 0);
-addParameter(p, 'Prune', 1e-3, @(x) isnumeric(x) && isscalar(x) && x >= 0);
-addParameter(p, 'mua', [], @(x) isempty(x) || isnumeric(x));
-addParameter(p, 'musp', [], @(x) isempty(x) || isnumeric(x));
-addParameter(p, 'HeadModel', 'homogeneous', @(x) any(strcmpi(x, {'homogeneous','layered'})));
-addParameter(p, 'Layers', [], @(x) isempty(x) || isstruct(x));
-addParameter(p, 'NormalMode', 'surface', @(x) any(strcmpi(x, {'surface','radial'})));
-parse(p, data, varargin{:});
-opt = p.Results;
+opt = opts;
 
 geom = pf2_base.dot.channelGeometry(data);
 mesh = pf2_base.dot.corticalMesh('HighRes', opt.HighRes);

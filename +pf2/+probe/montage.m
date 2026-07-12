@@ -1,4 +1,4 @@
-function [tbl, descriptor] = montage(data, varargin)
+function [tbl, descriptor] = montage(data, opts)
 % MONTAGE Export a portable, self-describing montage descriptor for a probe
 %
 % Serializes a probe's geometry and metadata into a portable form: a
@@ -93,15 +93,15 @@ function [tbl, descriptor] = montage(data, varargin)
 %           pf2.probe.transformToMNI
 
 % --- Parse inputs ---
-p = inputParser;
-p.addRequired('data');
-p.addParameter('Brodmann', [], @(x) isempty(x) || islogical(x) || (isnumeric(x) && isscalar(x)));
-p.addParameter('MaxDistance', Inf, @(x) isnumeric(x) && isscalar(x) && x > 0);
-p.addParameter('SavePath', '', @(x) ischar(x) || isstring(x));
-p.parse(data, varargin{:});
+arguments
+    data
+    opts.Brodmann = []
+    opts.MaxDistance (1,1) {mustBeNumeric} = Inf
+    opts.SavePath = ''
+end
 
-maxDist = p.Results.MaxDistance;
-savePath = char(p.Results.SavePath);
+maxDist = opts.MaxDistance;
+savePath = char(opts.SavePath);
 
 % --- Resolve a pf2.Device ---
 [dev, baSource] = resolveDevice(data);
@@ -109,7 +109,7 @@ savePath = char(p.Results.SavePath);
 hasMNI = dev.hasMNI();
 
 % Default Brodmann to on only when 3D positions exist
-doBrodmann = p.Results.Brodmann;
+doBrodmann = opts.Brodmann;
 if isempty(doBrodmann)
     doBrodmann = hasMNI;
 else

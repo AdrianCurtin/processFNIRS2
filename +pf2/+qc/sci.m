@@ -1,4 +1,4 @@
-function result = sci(data, varargin)
+function result = sci(data, opts)
 % SCI Scalp Coupling Index for fNIRS channel quality assessment
 %
 % Measures optode-scalp contact quality by cross-correlating cardiac
@@ -68,19 +68,14 @@ function result = sci(data, varargin)
 %
 % See also: pf2.qc.powerSpectrum, pf2.qc.plotQuality, bpf
 
-%% Parse inputs
-p = inputParser;
-p.FunctionName = 'pf2.qc.sci';
-
-addRequired(p, 'data', @isstruct);
-addParameter(p, 'CardiacBand', [0.5, 2.5], @(x) isnumeric(x) && numel(x) == 2);
-addParameter(p, 'FilterOrder', 4, @(x) isnumeric(x) && isscalar(x) && x > 0);
-addParameter(p, 'Wavelengths', [], @isnumeric);
-addParameter(p, 'ChannelNumbers', [], @isnumeric);
-addParameter(p, 'Threshold', 0.75, @(x) isnumeric(x) && isscalar(x));
-
-parse(p, data, varargin{:});
-opts = p.Results;
+arguments
+    data struct
+    opts.CardiacBand {mustBeNumeric} = [0.5, 2.5]
+    opts.FilterOrder (1,1) {mustBeNumeric, mustBePositive} = 4
+    opts.Wavelengths {mustBeNumeric} = []
+    opts.ChannelNumbers {mustBeNumeric} = []
+    opts.Threshold (1,1) {mustBeNumeric} = 0.75
+end
 
 %% Validate required fields
 assert(isfield(data, 'raw'), 'pf2:qc:sci:noRaw', ...

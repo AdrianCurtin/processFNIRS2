@@ -1,4 +1,4 @@
-function data = setMarkerDict(data, dict, varargin)
+function data = setMarkerDict(data, dict, opts)
 % SETMARKERDICT Set or merge the dataset's marker dictionary
 %
 % Stores a canonical code->label dictionary at data.info.markerDict so that
@@ -46,18 +46,22 @@ function data = setMarkerDict(data, dict, varargin)
 % See also: pf2.data.getMarkerDict, pf2.data.labelMarkers,
 %           pf2_base.normalizeMarkerDict
 
+arguments
+    data
+    dict
+    opts.Merge (1,1) logical = true
+end
+
 % Cell array: apply to each element
 if iscell(data)
+    fwd = namedargs2cell(opts);
     for ci = 1:numel(data)
-        data{ci} = pf2.data.setMarkerDict(data{ci}, dict, varargin{:});
+        data{ci} = pf2.data.setMarkerDict(data{ci}, dict, fwd{:});
     end
     return;
 end
 
-p = inputParser;
-p.addParameter('Merge', true, @(x) islogical(x) && isscalar(x));
-p.parse(varargin{:});
-doMerge = p.Results.Merge;
+doMerge = opts.Merge;
 
 if ~isstruct(data)
     error('pf2:setMarkerDict:badInput', ...

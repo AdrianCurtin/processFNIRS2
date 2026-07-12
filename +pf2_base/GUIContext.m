@@ -196,8 +196,31 @@ classdef GUIContext < pf2_base.ProcessingContext
                 pf2_base.pf2_initialize();
             end
 
-            % Call parent method for processing settings
-            obj.applyToGlobals();
+            % Push processing settings back to the globals the GUI reads.
+            % (This globals-write path is intentionally GUI-only: the general
+            % ProcessingContext is one-directional and never writes globals.)
+            PF2.dpf_mode = obj.dpfMode;
+            PF2.curDPF_fixed = obj.dpfFixedValue;
+            PF2.curDPF_age = obj.subjectAge;
+
+            PF2.baseline.startTime = obj.baselineStartTime;
+            PF2.baseline.blLength = obj.baselineLength;
+            PF2.baseline.useAbsoluteTime = obj.useAbsoluteTime;
+            PF2.baseline.windowStartTime = obj.windowStartTime;
+
+            PF2.RejectLevel = obj.rejectLevel;
+            PF2.OutputLegacyMarkers = obj.outputLegacyMarkers;
+
+            if ~isempty(obj.rawMethod) && isfield(obj.rawMethod, 'name')
+                PF2.stageRawMethod = obj.rawMethod;
+            end
+            if ~isempty(obj.oxyMethod) && isfield(obj.oxyMethod, 'name')
+                PF2.stageOxyMethod = obj.oxyMethod;
+            end
+
+            if ~isempty(fieldnames(obj.device))
+                setF.device = obj.device;
+            end
 
             % Sync GUI-specific state to PF2.GUIPF2
             if ~isfield(PF2, 'GUIPF2')

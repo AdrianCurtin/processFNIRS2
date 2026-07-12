@@ -1,4 +1,4 @@
-function out = dedupeMarkers(data, varargin)
+function out = dedupeMarkers(data, opts)
 % DEDUPEMARKERS Collapse near-duplicate markers firing within a tolerance
 %
 % Removes near-duplicate event markers, where "near-duplicate" means a row
@@ -73,21 +73,24 @@ function out = dedupeMarkers(data, varargin)
 % See also: pf2.data.removeMarkers, pf2.data.defineBlocks, ...
 %           pf2.data.getMarkers, pf2_base.normalizeMarkers
 
+arguments
+    data
+    opts.Tolerance (1,1) {mustBeNumeric, mustBeNonnegative} = 0.05
+    opts.Verbose   (1,1) logical = true
+end
+
 % --- Cell array input: apply to each element ---
 if iscell(data)
+    fwd = namedargs2cell(opts);
     out = data;
     for ci = 1:numel(data)
-        out{ci} = pf2.data.dedupeMarkers(data{ci}, varargin{:});
+        out{ci} = pf2.data.dedupeMarkers(data{ci}, fwd{:});
     end
     return;
 end
 
-p = inputParser;
-p.addParameter('Tolerance', 0.05, @(x) isnumeric(x) && isscalar(x) && x >= 0);
-p.addParameter('Verbose', true, @(x) islogical(x) && isscalar(x));
-p.parse(varargin{:});
-tol = p.Results.Tolerance;
-verbose = p.Results.Verbose;
+tol = opts.Tolerance;
+verbose = opts.Verbose;
 
 % --- Resolve the marker table from the input form ---
 isStructInput = isstruct(data) && isfield(data, 'markers');

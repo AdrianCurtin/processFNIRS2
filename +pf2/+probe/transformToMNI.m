@@ -1,4 +1,4 @@
-function [transformedCoords, T, matchInfo] = transformToMNI(coords, landmarks, varargin)
+function [transformedCoords, T, matchInfo] = transformToMNI(coords, landmarks, opts)
 % TRANSFORMTOMNI Transform coordinates from subject space to MNI space
 %
 % Computes a rigid-body transformation from subject-specific coordinates
@@ -65,17 +65,17 @@ function [transformedCoords, T, matchInfo] = transformToMNI(coords, landmarks, v
 % See also: pf2.probe.plot.interpolateValues3D, pf2.import.importSNIRF
 
 % Parse inputs
-p = inputParser;
-p.addRequired('coords', @(x) isnumeric(x) && size(x, 2) == 3);
-p.addRequired('landmarks');
-p.addParameter('AllowScaling', false, @islogical);
-p.addParameter('MinMatches', 4, @(x) isnumeric(x) && x >= 3);
-p.addParameter('Verbose', false, @islogical);
-p.parse(coords, landmarks, varargin{:});
+arguments
+    coords {mustBeNumeric}
+    landmarks
+    opts.AllowScaling (1,1) logical = false
+    opts.MinMatches {mustBeNumeric} = 4
+    opts.Verbose (1,1) logical = false
+end
 
-allowScaling = p.Results.AllowScaling;
-minMatches = p.Results.MinMatches;
-verbose = p.Results.Verbose;
+allowScaling = opts.AllowScaling;
+minMatches = opts.MinMatches;
+verbose = opts.Verbose;
 
 % Extract landmarks table from various input types
 if istable(landmarks)

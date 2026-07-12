@@ -1,4 +1,4 @@
-function data = importEmbeddings(data, path, varargin)
+function data = importEmbeddings(data, path, opts)
 % IMPORTEMBEDDINGS Attach model embeddings from an HDF5 file to a data struct
 %
 % Reads learned features/embeddings written by the Python sibling repository
@@ -88,14 +88,13 @@ function data = importEmbeddings(data, path, varargin)
 %           exploreFNIRS.core.Experiment
 
 %% Parse inputs
-p = inputParser;
-p.FunctionName = 'pf2.import.importEmbeddings';
-addRequired(p, 'data', @isstruct);
-addRequired(p, 'path', @(x) ischar(x) || (isstring(x) && isscalar(x)));
-addParameter(p, 'Field', 'embeddings', @(x) ischar(x) || (isstring(x) && isscalar(x)));
-parse(p, data, path, varargin{:});
+arguments
+    data {mustBeA(data, 'struct')}
+    path {mustBeTextScalar}
+    opts.Field {mustBeTextScalar} = 'embeddings'
+end
 path = char(path);
-field = char(p.Results.Field);
+field = char(opts.Field);
 
 assert(exist(path, 'file') == 2, 'pf2:import:importEmbeddings:noFile', ...
     'Embeddings file not found: %s', path);

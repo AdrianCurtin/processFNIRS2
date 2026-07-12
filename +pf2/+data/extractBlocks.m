@@ -1,4 +1,4 @@
-function segments = extractBlocks(data, varargin)
+function segments = extractBlocks(data, blocks, opts)
 % EXTRACTBLOCKS Extract each block as a separate fNIRS struct
 %
 % Takes an fNIRS data structure and a block definition array (from
@@ -87,20 +87,35 @@ function segments = extractBlocks(data, varargin)
 %
 % See also: pf2.data.defineBlocks, pf2.data.split, pf2.data.setT0
 
+arguments
+    data
+    blocks                  = []
+    opts.PreTime            {mustBeNumeric} = []
+    opts.PostTime           {mustBeNumeric} = []
+    opts.Buffer             = []   % [] = not given; effective default 2 s (both sides)
+    opts.BaselineWindow     {mustBeNumeric} = []
+    opts.SetT0              (1,1) logical = true
+    opts.OverwriteInfo      (1,1) logical = true
+    opts.CopyInfo           (1,1) logical = true   % Kept for backward compat, ignored
+    opts.SkipInvalid        (1,1) logical = true
+    opts.RejectByAux        = ''
+    opts.AuxMotionFraction  (1,1) {mustBeNumeric} = 0.2
+    opts.AuxMotionThresh    = []
+end
+
 % --- Cell array input: iterate and concatenate ---
 if iscell(data)
+    fwd = namedargs2cell(opts);
     segments = {};
     for i = 1:numel(data)
-        segs = pf2.data.extractBlocks(data{i}, varargin{:});
+        segs = pf2.data.extractBlocks(data{i}, blocks, fwd{:});
         segments = [segments, segs]; %#ok<AGROW>
     end
     return;
 end
 
 % --- Resolve blocks: explicit argument or data.blocks ---
-if ~isempty(varargin) && isstruct(varargin{1})
-    blocks = varargin{1};
-    nvArgs = varargin(2:end);
+if ~isempty(blocks) && isstruct(blocks)
     % Guard: a data struct carrying embedded blocks (from defineBlocks with
     % 'Embed', true, which is the default) is easy to pass here by mistake.
     % It has a .blocks field but no .startTime, so detect it and use its
@@ -124,42 +139,30 @@ else
         error('pf2:extractBlocks:noBlocks', ...
             'No blocks provided and data.blocks is empty. Call defineBlocks first.');
     end
-    nvArgs = varargin;
 end
-
-p = inputParser;
-p.addParameter('PreTime', [], @(x) isempty(x) || (isnumeric(x) && isscalar(x) && x >= 0));
-p.addParameter('PostTime', [], @(x) isempty(x) || (isnumeric(x) && isscalar(x) && x >= 0));
-p.addParameter('Buffer', 2, @(x) isnumeric(x) && isscalar(x) && x >= 0);
-p.addParameter('BaselineWindow', [], @(x) isempty(x) || (isnumeric(x) && numel(x) == 2));
-p.addParameter('SetT0', true, @islogical);
-p.addParameter('OverwriteInfo', true, @islogical);
-p.addParameter('CopyInfo', true, @islogical);  % Kept for backward compat, ignored
-p.addParameter('SkipInvalid', true, @islogical);
-% Aux-conditioned trial rejection: drop epochs overlapping accelerometer-flagged
-% motion. RejectByAux names the accelerometer signal (or true for auto-detect);
-% AuxMotionFraction is the max tolerated fraction of flagged samples in a block.
-p.addParameter('RejectByAux', '', @(x) ischar(x) || isstring(x) || islogical(x));
-p.addParameter('AuxMotionFraction', 0.2, @(x) isnumeric(x) && isscalar(x) && x >= 0 && x <= 1);
-p.addParameter('AuxMotionThresh', [], @(x) isempty(x) || (isnumeric(x) && isscalar(x)));
-p.parse(nvArgs{:});
 
 % Resolve the extraction window. Precedence: an explicit PreTime/PostTime
 % overrides for its side; otherwise the Buffer value (default 2 s) is applied
 % to both sides. When the user passes no window argument at all, the default
 % Buffer is used and an info-level note is emitted below.
-buffer = p.Results.Buffer;
-gavePre  = ~ismember('PreTime',  p.UsingDefaults);
-gavePost = ~ismember('PostTime', p.UsingDefaults);
-gaveBuffer = ~ismember('Buffer', p.UsingDefaults);
+% Empty defaults double as the "not given" sentinels the one-time note below
+% keys on (formerly inputParser p.UsingDefaults).
+gavePre    = ~isempty(opts.PreTime);
+gavePost   = ~isempty(opts.PostTime);
+gaveBuffer = ~isempty(opts.Buffer);
+if gaveBuffer
+    buffer = opts.Buffer;
+else
+    buffer = 2;
+end
 
 if gavePre
-    preTime = p.Results.PreTime;
+    preTime = opts.PreTime;
 else
     preTime = buffer;
 end
 if gavePost
-    postTime = p.Results.PostTime;
+    postTime = opts.PostTime;
 else
     postTime = buffer;
 end
@@ -169,7 +172,7 @@ end
 % inherit a surprise window. It is suppressed when a BaselineWindow is supplied
 % (a deliberate epoch spec) and fires at most ONCE per session so batch loops
 % are not flooded.
-gaveBaseline = ~ismember('BaselineWindow', p.UsingDefaults);
+gaveBaseline = ~isempty(opts.BaselineWindow);
 persistent defaultBufferNoted
 if ~gavePre && ~gavePost && ~gaveBuffer && ~gaveBaseline && isempty(defaultBufferNoted)
     defaultBufferNoted = true;
@@ -179,14 +182,14 @@ if ~gavePre && ~gavePost && ~gaveBuffer && ~gaveBaseline && isempty(defaultBuffe
          '(This note is shown once per session.)']);
 end
 
-blWindow = p.Results.BaselineWindow;
-doSetT0 = p.Results.SetT0;
-overwriteInfo = p.Results.OverwriteInfo;
-skipInvalid = p.Results.SkipInvalid;
+blWindow = opts.BaselineWindow;
+doSetT0 = opts.SetT0;
+overwriteInfo = opts.OverwriteInfo;
+skipInvalid = opts.SkipInvalid;
 
 % --- Resolve aux motion mask for trial rejection (computed once) ----------
-rejectByAux = p.Results.RejectByAux;
-auxMotionFraction = p.Results.AuxMotionFraction;
+rejectByAux = opts.RejectByAux;
+auxMotionFraction = opts.AuxMotionFraction;
 doRejectAux = false;
 auxMotionMask = [];
 if (islogical(rejectByAux) && rejectByAux) || ...
@@ -195,8 +198,8 @@ if (islogical(rejectByAux) && rejectByAux) || ...
     if ~islogical(rejectByAux)
         detectArgs = {'Signal', char(string(rejectByAux))};
     end
-    if ~isempty(p.Results.AuxMotionThresh)
-        detectArgs = [detectArgs, {'Threshold', p.Results.AuxMotionThresh}]; %#ok<AGROW>
+    if ~isempty(opts.AuxMotionThresh)
+        detectArgs = [detectArgs, {'Threshold', opts.AuxMotionThresh}]; %#ok<AGROW>
     end
     try
         auxMotionMask = pf2_base.fnirs.accelMotionDetect(data, detectArgs{:});

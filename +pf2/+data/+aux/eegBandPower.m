@@ -1,4 +1,4 @@
-function [bandPower, info] = eegBandPower(x, fs, varargin)
+function [bandPower, info] = eegBandPower(x, fs, opts)
 % EEGBANDPOWER Extract canonical EEG band-power feature series
 %
 % Converts a raw EEG waveform (one or more channels) into per-band power
@@ -46,14 +46,14 @@ function [bandPower, info] = eegBandPower(x, fs, varargin)
 %
 % See also: pf2_base.auxSignalType, pf2.data.auxOnGrid
 
-p = inputParser;
-p.addRequired('x', @isnumeric);
-p.addRequired('fs', @(v) isnumeric(v) && isscalar(v) && v > 0);
-p.addParameter('Bands', [], @(v) isempty(v) || isstruct(v));
-p.addParameter('SmoothWin', 1, @(v) isnumeric(v) && isscalar(v) && v > 0);
-p.parse(x, fs, varargin{:});
-bands = p.Results.Bands;
-smoothWin = p.Results.SmoothWin;
+arguments
+    x {mustBeNumeric}
+    fs {mustBeNumeric, mustBeScalarOrEmpty, mustBePositive}
+    opts.Bands = []
+    opts.SmoothWin {mustBeNumeric, mustBeScalarOrEmpty, mustBePositive} = 1
+end
+bands = opts.Bands;
+smoothWin = opts.SmoothWin;
 
 if isempty(bands)
     info0 = pf2_base.auxSignalType('eeg');

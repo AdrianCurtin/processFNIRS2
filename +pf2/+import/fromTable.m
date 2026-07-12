@@ -1,4 +1,4 @@
-function data = fromTable(T, varargin)
+function data = fromTable(T, opts)
 % FROMTABLE Build fNIRS-shaped segment structs from a long-format data table
 %
 % Adapts a plain long-format (tidy) table of repeated-measures data into the
@@ -123,31 +123,30 @@ function data = fromTable(T, varargin)
 %           exploreFNIRS.core.Experiment, pf2.import.sampleData.experiment
 
 % ----------------------------- parse inputs -----------------------------
+arguments
+    T
+    opts.Subject {mustBeText} = ''
+    opts.Value = {}
+    opts.Time {mustBeText} = ''
+    opts.Info = {}
+    opts.TimeMode {mustBeText} = 'index'
+    opts.Units {mustBeText} = ''
+    opts.SubjectField {mustBeText} = 'SubjectID'
+    opts.Duplicates {mustBeText} = 'mean'
+end
+
 if ~istable(T)
     error('pf2:fromTable:notTable', ...
         'T must be a table. Use readtable(file) to load a CSV/Excel file first.');
 end
 
-p = inputParser;
-p.FunctionName = 'pf2.import.fromTable';
-addRequired(p, 'T', @istable);
-addParameter(p, 'Subject', '', @(x) ischar(x) || isStringScalar(x));
-addParameter(p, 'Value', {}, @(x) ischar(x) || isstring(x) || iscell(x));
-addParameter(p, 'Time', '', @(x) ischar(x) || isStringScalar(x));
-addParameter(p, 'Info', {}, @(x) ischar(x) || isstring(x) || iscell(x));
-addParameter(p, 'TimeMode', 'index', @(x) any(strcmpi(x, {'value','index'})));
-addParameter(p, 'Units', '', @(x) ischar(x) || isStringScalar(x));
-addParameter(p, 'SubjectField', 'SubjectID', @(x) ischar(x) || isStringScalar(x));
-addParameter(p, 'Duplicates', 'mean', @(x) any(strcmpi(x, {'mean','first','error'})));
-parse(p, T, varargin{:});
-
-subjectCol   = char(p.Results.Subject);
-timeCol      = char(p.Results.Time);
-valueCols    = cellstr(p.Results.Value);
-infoCols     = cellstr(p.Results.Info);
-timeMode     = lower(p.Results.TimeMode);
-subjectField = char(p.Results.SubjectField);
-dupRule      = lower(p.Results.Duplicates);
+subjectCol   = char(opts.Subject);
+timeCol      = char(opts.Time);
+valueCols    = cellstr(opts.Value);
+infoCols     = cellstr(opts.Info);
+timeMode     = lower(opts.TimeMode);
+subjectField = char(opts.SubjectField);
+dupRule      = lower(opts.Duplicates);
 vars         = T.Properties.VariableNames;
 
 if isempty(subjectCol)
@@ -213,8 +212,8 @@ end
 
 % units / channel labels
 nCh = numel(valueCols);
-if ~isempty(char(p.Results.Units))
-    units = char(p.Results.Units);
+if ~isempty(char(opts.Units))
+    units = char(opts.Units);
 elseif nCh == 1
     units = valueCols{1};
 else

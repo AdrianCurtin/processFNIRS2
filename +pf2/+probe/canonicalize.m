@@ -1,4 +1,4 @@
-function out = canonicalize(data, varargin)
+function out = canonicalize(data, opts)
 % CANONICALIZE Project channel data onto a common anatomical region grid
 %
 % Maps each channel of a processed recording to its nearest anatomical
@@ -93,18 +93,18 @@ function out = canonicalize(data, varargin)
 %           pf2.probe.roi.defineROI, pf2.data.extractBlocks
 
 % --- Parse inputs ---
-p = inputParser;
-p.addRequired('data');
-p.addParameter('MaxDistance', 20, @(x) isnumeric(x) && isscalar(x) && x > 0);
-p.addParameter('Regions', [], @(x) isempty(x) || (isnumeric(x) && isvector(x)));
-p.addParameter('Space', 'Brodmann', @(x) ischar(x) || isstring(x));
-p.addParameter('Aggregate', 'nanmean', @(x) ischar(x) || isstring(x));
-p.parse(data, varargin{:});
+arguments
+    data
+    opts.MaxDistance (1,1) {mustBeNumeric} = 20
+    opts.Regions = []
+    opts.Space = 'Brodmann'
+    opts.Aggregate = 'nanmean'
+end
 
-maxDist   = p.Results.MaxDistance;
-regions   = p.Results.Regions(:)';
-space     = char(p.Results.Space);
-aggregate = lower(char(p.Results.Aggregate));
+maxDist   = opts.MaxDistance;
+regions   = opts.Regions(:)';
+space     = char(opts.Space);
+aggregate = lower(char(opts.Aggregate));
 
 if ~strcmpi(space, 'Brodmann')
     error('pf2:probe:canonicalize:unsupportedSpace', ...

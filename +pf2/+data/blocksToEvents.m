@@ -1,4 +1,4 @@
-function events = blocksToEvents(blocks, varargin)
+function events = blocksToEvents(blocks, opts)
 % BLOCKSTOEVENTS Convert block definitions to GLM event structs
 %
 % Groups blocks by condition and collects onset times, durations, and
@@ -41,13 +41,12 @@ function events = blocksToEvents(blocks, varargin)
 % See also: pf2.data.defineBlocks, pf2_base.fnirs.buildDesignMatrix,
 %           pf2_base.fnirs.fitGLM
 
-% --- Parse inputs ---
-p = inputParser;
-p.addRequired('blocks', @isstruct);
-p.addParameter('GroupBy', 'Condition', @(x) ischar(x) || isstring(x));
-p.parse(blocks, varargin{:});
+arguments
+    blocks {mustBeA(blocks, 'struct')}
+    opts.GroupBy = 'Condition'
+end
 
-groupField = char(p.Results.GroupBy);
+groupField = char(opts.GroupBy);
 
 if isempty(blocks)
     events = struct('name', {}, 'onsets', {}, 'duration', {}, ...

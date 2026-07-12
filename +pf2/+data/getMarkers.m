@@ -1,4 +1,4 @@
-function [markerTimes, tableMrkTimes, matchedPatterns] = getMarkers(varargin)
+function [markerTimes, tableMrkTimes, matchedPatterns] = getMarkers(fNIR, markersStart, markersEnd, opts)
 % GETMARKERS Extract event marker times matching specified codes or patterns
 %
 % Searches fNIRS marker data to find events matching specified marker codes
@@ -60,40 +60,28 @@ function [markerTimes, tableMrkTimes, matchedPatterns] = getMarkers(varargin)
 
 
 
-p=inputParser;
+arguments
+    fNIR
+    markersStart {mustBeNumericOrLogical} = []
+    markersEnd {mustBeNumericOrLogical} = []
+    opts.markerPattern = []
+    opts.markerColumn {mustBeNumericOrLogical} = 2
+    opts.markerVariableName {mustBeText} = ''
+    opts.timeColumn {mustBeNumericOrLogical} = 1
+    opts.returnIndices {mustBeNumericOrLogical} = false
+    opts.exactMatch {mustBeNumericOrLogical} = false
+    opts.sortTimes {mustBeNumericOrLogical} = false
+end
 
 validfNIR_Input = @(x) (isstruct(x) && (isfield(x,'raw')||isfield(x,'time')||isfield(x,'info')));
-validfNIR_or_marker_Input = @(x) (istable(x)&&size(x,1)>=1)||(isnumeric(x)&&length(x)>=1) ||validfNIR_Input(x);
-validScalarNum = @(x) isnumeric(x) && ismatrix(x)||islogical(x);
-validScalarNumOrCell = @(x) (isnumeric(x) && ismatrix(x) || iscell(x));
-isStringOrChar = @(x) isstring(x)||ischar(x);
 
-addRequired(p,'fNIR',validfNIR_or_marker_Input);
-addOptional(p,'markersStart',[],validScalarNum);
-addOptional(p,'markersEnd',[],validScalarNum);
-addParameter(p,'markerPattern',[],validScalarNumOrCell);
-addParameter(p,'markerColumn',2,validScalarNum);
-addParameter(p,'markerVariableName',[],isStringOrChar);
-addParameter(p,'timeColumn',1,validScalarNum);
-addParameter(p,'returnIndices',false,validScalarNum);
-addParameter(p,'exactMatch',false,validScalarNum);
-addParameter(p,'sortTimes',false,validScalarNum);
-
-
-
-parse(p,varargin{:});
-
-fNIR=p.Results.fNIR;
-markersStart=p.Results.markersStart;
-markersEnd=p.Results.markersEnd;
-
-markerPatternIn=p.Results.markerPattern;
-markerColumn=p.Results.markerColumn;
-markerVariableName=p.Results.markerVariableName;
-timeColumn=p.Results.timeColumn;
-returnIndices=p.Results.returnIndices;
-exactMatch=p.Results.exactMatch;
-sortTimes=p.Results.sortTimes;
+markerPatternIn=opts.markerPattern;
+markerColumn=opts.markerColumn;
+markerVariableName=opts.markerVariableName;
+timeColumn=opts.timeColumn;
+returnIndices=opts.returnIndices;
+exactMatch=opts.exactMatch;
+sortTimes=opts.sortTimes;
 
 if(iscell(markersStart))
     markerPatternIn=markersStart;

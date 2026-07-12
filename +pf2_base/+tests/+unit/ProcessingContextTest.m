@@ -175,44 +175,45 @@ classdef ProcessingContextTest < matlab.unittest.TestCase
             testCase.verifyTrue(isfield(ctx.oxyMethodsLib, 'cfg'));
         end
 
-        %% applyToGlobals Tests
+        %% GUIContext syncToGlobals Tests
+        % applyToGlobals was retired from the general ProcessingContext (which
+        % is now one-directional and never writes globals). The globals-write
+        % path lives only on GUIContext, where globals coupling is inherent.
 
-        function testApplyToGlobalsWritesDPF(testCase)
-            % TESTAPPLYTOGLOBALSWRITESDPF Verify DPF written to globals
+        function testGUISyncWritesDPFToGlobals(testCase)
+            % TESTGUISYNCWRITESDPFTOGLOBALS Verify DPF written to globals
             global PF2
             pf2_base.pf2_initialize();
 
-            ctx = pf2_base.ProcessingContext();
+            ctx = pf2_base.GUIContext();
             ctx.dpfMode = 'Fixed';
             ctx.dpfFixedValue = 7.0;
             ctx.subjectAge = 35;
 
-            ctx.applyToGlobals();
+            ctx.syncToGlobals();
 
             testCase.verifyEqual(PF2.dpf_mode, 'Fixed');
             testCase.verifyEqual(PF2.curDPF_fixed, 7.0);
             testCase.verifyEqual(PF2.curDPF_age, 35);
         end
 
-        function testApplyToGlobalsWritesBaseline(testCase)
-            % TESTAPPLYTOGLOBALSWRITESBASELINE Verify baseline written
+        function testGUISyncWritesBaselineToGlobals(testCase)
+            % TESTGUISYNCWRITESBASELINETOGLOBALS Verify baseline written
             global PF2
             pf2_base.pf2_initialize();
 
-            ctx = pf2_base.ProcessingContext();
+            ctx = pf2_base.GUIContext();
             ctx.baselineStartTime = 2;
             ctx.baselineLength = 8;
 
-            ctx.applyToGlobals();
+            ctx.syncToGlobals();
 
             testCase.verifyEqual(PF2.baseline.startTime, 2);
             testCase.verifyEqual(PF2.baseline.blLength, 8);
         end
 
-        %% Roundtrip Tests
-
-        function testFromGlobalsApplyRoundtrip(testCase)
-            % TESTFROMGLOBALSAPPLYROUNDTRIP Verify globals -> context -> globals
+        function testGUISyncRoundtrip(testCase)
+            % TESTGUISYNCROUNDTRIP Verify globals -> context -> globals via GUI
             global PF2
             pf2_base.pf2_initialize();
 
@@ -223,15 +224,15 @@ classdef ProcessingContextTest < matlab.unittest.TestCase
             PF2.baseline.startTime = 3;
             PF2.baseline.blLength = 12;
 
-            % Roundtrip
-            ctx = pf2_base.ProcessingContext.fromGlobals();
+            % Capture settings into a GUI context, then clear globals
+            ctx = pf2_base.GUIContext();
+            ctx.syncFromGlobals();
 
-            % Clear globals
             PF2.dpf_mode = 'None';
             PF2.curDPF_fixed = 0;
 
-            % Apply back
-            ctx.applyToGlobals();
+            % Push back
+            ctx.syncToGlobals();
 
             % Verify restored
             testCase.verifyEqual(PF2.dpf_mode, 'Fixed');

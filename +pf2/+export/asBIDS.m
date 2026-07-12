@@ -1,4 +1,4 @@
-function bidsRoot = asBIDS(allData, rootDir, varargin)
+function bidsRoot = asBIDS(allData, rootDir, opts)
 % ASBIDS Export fNIRS recordings as a BIDS-NIRS dataset
 %
 % Writes a complete, validator-oriented BIDS dataset for functional NIRS
@@ -84,8 +84,21 @@ function bidsRoot = asBIDS(allData, rootDir, varargin)
 % See also: pf2.export.asSNIRF, pf2.import.importSNIRF, pf2.probe.montage,
 %           pf2.data.infoToTable
 
+arguments
+    allData
+    rootDir = []
+    opts.Task = ''
+    opts.Name = ''
+    opts.BIDSVersion = '1.10.0'
+    opts.Authors {mustBeA(opts.Authors, 'cell')} = {}
+    opts.Participants {mustBeA(opts.Participants, 'cell')} = {}
+    opts.License = ''
+    opts.Overwrite = false
+    opts.Verbose = true
+end
+
 % --- Normalize inputs ---
-if nargin < 2 || isempty(rootDir)
+if isempty(rootDir)
     error('pf2:asBIDS:noRoot', 'An output dataset root directory is required.');
 end
 if isstruct(allData)
@@ -96,17 +109,6 @@ elseif ~iscell(allData) || isempty(allData)
 end
 rootDir = char(rootDir);
 
-p = inputParser;
-p.addParameter('Task', '', @(x) ischar(x) || isstring(x));
-p.addParameter('Name', '', @(x) ischar(x) || isstring(x));
-p.addParameter('BIDSVersion', '1.10.0', @(x) ischar(x) || isstring(x));
-p.addParameter('Authors', {}, @iscell);
-p.addParameter('Participants', {}, @iscell);
-p.addParameter('License', '', @(x) ischar(x) || isstring(x));
-p.addParameter('Overwrite', false, @(x) islogical(x) || isnumeric(x));
-p.addParameter('Verbose', true, @(x) islogical(x) || isnumeric(x));
-p.parse(varargin{:});
-opts = p.Results;
 opts.Task = char(opts.Task);
 verbose = logical(opts.Verbose);
 

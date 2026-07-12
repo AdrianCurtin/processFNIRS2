@@ -1,4 +1,4 @@
-function blocks = defineBlocks(data, varargin)
+function blocks = defineBlocks(data, markerCodes, duration, opts)
 % DEFINEBLOCKS Create block definition struct array from event markers
 %
 % Parses fNIRS markers into a block definition array describing time
@@ -150,81 +150,69 @@ function blocks = defineBlocks(data, varargin)
 % See also: pf2.data.extractBlocks, pf2.data.getMarkers, pf2.data.split, ...
 %           pf2.data.dedupeMarkers, pf2.data.removeMarkers
 
+arguments
+    data
+    markerCodes         {mustBeNumeric} = []
+    duration            {mustBeNumeric, mustBeScalarOrEmpty} = []
+    opts.MarkerCode     {mustBeNumeric} = []
+    opts.Duration       (1,1) {mustBeNumeric, mustBeNonnegative} = 0
+    opts.UseDuration    (1,1) logical = false
+    opts.StartMarker    {mustBeNumeric} = []
+    opts.EndMarker      {mustBeNumeric} = []
+    opts.ConditionMap   = []            % [] = not provided (auto-populate); a cell = provided
+    opts.ConditionField = 'Condition'
+    opts.InfoTable      = []
+    opts.InfoFields     (1,1) struct = struct()
+    opts.MinDuration    (1,1) {mustBeNumeric} = 0
+    opts.MaxDuration    (1,1) {mustBeNumeric} = Inf
+    opts.SortByTime     (1,1) logical = true
+    opts.PrePad         (1,1) {mustBeNumeric, mustBeNonnegative} = 0
+    opts.PostPad        (1,1) {mustBeNumeric, mustBeNonnegative} = 0
+    opts.MarkerWindow   = 'core'
+    opts.Embed          (1,1) logical = true
+end
+
 % --- Cell array input: apply to each element (requires Embed) ---
 if iscell(data)
+    fwd = namedargs2cell(opts);
     blocks = data;
     for ci = 1:numel(data)
-        blocks{ci} = pf2.data.defineBlocks(data{ci}, varargin{:});
+        blocks{ci} = pf2.data.defineBlocks(data{ci}, markerCodes, duration, fwd{:});
     end
     return;
 end
 
-% --- Parse simple positional args vs name-value ---
-% Detect: defineBlocks(data, numericCodes) or defineBlocks(data, numericCodes, numericDuration)
-positionalCodes = [];
-positionalDuration = [];
-remainingArgs = varargin;
-
-if ~isempty(varargin) && isnumeric(varargin{1})
-    positionalCodes = varargin{1};
-    remainingArgs = varargin(2:end);
-
-    if ~isempty(remainingArgs) && isnumeric(remainingArgs{1}) && isscalar(remainingArgs{1})
-        positionalDuration = remainingArgs{1};
-        remainingArgs = remainingArgs(2:end);
-    end
-end
-
-p = inputParser;
-p.addParameter('MarkerCode', [], @(x) isnumeric(x));
-p.addParameter('Duration', 0, @(x) isnumeric(x) && isscalar(x) && x >= 0);
-p.addParameter('UseDuration', false, @islogical);
-p.addParameter('StartMarker', [], @(x) isnumeric(x));
-p.addParameter('EndMarker', [], @(x) isnumeric(x));
-p.addParameter('ConditionMap', {}, @iscell);
-p.addParameter('ConditionField', 'Condition', @(x) ischar(x) || isstring(x) || iscellstr(x));
-p.addParameter('InfoTable', [], @(x) isempty(x) || istable(x));
-p.addParameter('InfoFields', struct(), @isstruct);
-p.addParameter('MinDuration', 0, @(x) isnumeric(x) && isscalar(x));
-p.addParameter('MaxDuration', Inf, @(x) isnumeric(x) && isscalar(x));
-p.addParameter('SortByTime', true, @islogical);
-p.addParameter('PrePad', 0, @(x) isnumeric(x) && isscalar(x) && x >= 0);
-p.addParameter('PostPad', 0, @(x) isnumeric(x) && isscalar(x) && x >= 0);
-p.addParameter('MarkerWindow', 'core', @(x) (ischar(x) || isstring(x)) && ...
-    any(strcmpi(char(x), {'core', 'padded'})));
-p.addParameter('Embed', true, @islogical);
-p.parse(remainingArgs{:});
-
 % Merge positional args with name-value (positional takes precedence)
-if ~isempty(positionalCodes)
-    markerCode = positionalCodes(:);  % Always treat as column (OR logic)
+if ~isempty(markerCodes)
+    markerCode = markerCodes(:);  % Always treat as column (OR logic)
 else
-    markerCode = p.Results.MarkerCode;
+    markerCode = opts.MarkerCode;
 end
 
-if ~isempty(positionalDuration)
-    fixedDuration = positionalDuration;
+if ~isempty(duration)
+    fixedDuration = duration;
 else
-    fixedDuration = p.Results.Duration;
+    fixedDuration = opts.Duration;
 end
 
-useDuration = p.Results.UseDuration;
-startMarker = p.Results.StartMarker;
-endMarker = p.Results.EndMarker;
-conditionMap = p.Results.ConditionMap;
-conditionField = p.Results.ConditionField;
+useDuration = opts.UseDuration;
+startMarker = opts.StartMarker;
+endMarker = opts.EndMarker;
+conditionMap = opts.ConditionMap;
+condMapProvided = iscell(conditionMap);  % [] default = not provided; a cell = provided
+conditionField = opts.ConditionField;
 if ischar(conditionField) || isstring(conditionField)
     conditionField = {char(conditionField)};
 end
-infoTable = p.Results.InfoTable;
-infoFields = p.Results.InfoFields;
-minDur = p.Results.MinDuration;
-maxDur = p.Results.MaxDuration;
-sortByTime = p.Results.SortByTime;
-prePad = p.Results.PrePad;
-postPad = p.Results.PostPad;
-markerWindow = lower(char(p.Results.MarkerWindow));
-embedBlocks = p.Results.Embed;
+infoTable = opts.InfoTable;
+infoFields = opts.InfoFields;
+minDur = opts.MinDuration;
+maxDur = opts.MaxDuration;
+sortByTime = opts.SortByTime;
+prePad = opts.PrePad;
+postPad = opts.PostPad;
+markerWindow = lower(char(opts.MarkerWindow));
+embedBlocks = opts.Embed;
 
 % Validate input data
 if ~isstruct(data) || ~isfield(data, 'markers')
@@ -351,7 +339,7 @@ end
 
 % Auto-populate ConditionMap from the dataset's marker dictionary when not
 % explicitly provided (markerDict -> eventTypes -> COBI MarkerDict).
-if isempty(conditionMap) && ismember('ConditionMap', p.UsingDefaults) && isstruct(data)
+if ~condMapProvided && isstruct(data)
     dict = pf2.data.getMarkerDict(data);
     dict = dict(~ismissing(dict.Label), :);
     if ~isempty(dict)

@@ -1,4 +1,4 @@
-function [feat, info] = accelFeatures(x, fs, varargin)
+function [feat, info] = accelFeatures(x, fs, opts)
 % ACCELFEATURES Derive motion features from a multi-axis accelerometer signal
 %
 % Computes summary motion features from accelerometer/IMU axes: the vector
@@ -36,12 +36,12 @@ function [feat, info] = accelFeatures(x, fs, varargin)
 %
 % See also: pf2_base.auxSignalType, pf2.data.auxOnGrid
 
-p = inputParser;
-p.addRequired('x', @isnumeric);
-p.addRequired('fs', @(v) isnumeric(v) && isscalar(v) && v > 0);
-p.addParameter('RemoveGravity', true, @(v) islogical(v) && isscalar(v));
-p.parse(x, fs, varargin{:});
-removeGravity = p.Results.RemoveGravity;
+arguments
+    x {mustBeNumeric}
+    fs {mustBeNumeric, mustBeScalarOrEmpty, mustBePositive}
+    opts.RemoveGravity (1,1) logical = true
+end
+removeGravity = opts.RemoveGravity;
 
 if isrow(x)
     x = x(:);

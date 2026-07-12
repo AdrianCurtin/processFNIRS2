@@ -1,4 +1,4 @@
-function [series, t] = hrvSeries(signal, fs, varargin)
+function [series, t] = hrvSeries(signal, fs, opts)
 % HRVSERIES Time-resolved HRV metrics via a sliding window over a waveform
 %
 % Computes standard HRV metrics in successive overlapping windows of a PPG
@@ -130,39 +130,39 @@ function [series, t] = hrvSeries(signal, fs, varargin)
 %           pf2.data.aux.addFeature, pf2.data.auxOnGrid,
 %           pf2.data.slidingWindows
 
-p = inputParser;
-p.addRequired('signal', @(x) isnumeric(x) && ~isempty(x));
-p.addRequired('fs', @(v) isnumeric(v) && isscalar(v) && v > 0);
-p.addParameter('Window',     60,    @(v) isnumeric(v) && isscalar(v) && v > 0);
-p.addParameter('Step',       [],    @(v) isempty(v) || (isnumeric(v) && isscalar(v) && v > 0));
-p.addParameter('Overlap',    [],    @(v) isempty(v) || (isnumeric(v) && isscalar(v) && v >= 0 && v < 1));
-p.addParameter('Metric',     'all', @(v) ischar(v) || isstring(v) || iscell(v));
-p.addParameter('MinBeats',   20,    @(v) isnumeric(v) && isscalar(v) && v >= 2);
-p.addParameter('Band',       [0.5 5],   @(v) isnumeric(v) && numel(v) == 2);
-p.addParameter('LFBand',     [0.04 0.15], @(v) isnumeric(v) && numel(v) == 2);
-p.addParameter('HFBand',     [0.15 0.40], @(v) isnumeric(v) && numel(v) == 2);
-p.addParameter('ResampleFs', 4,     @(v) isnumeric(v) && isscalar(v) && v > 0);
-p.parse(signal, fs, varargin{:});
+arguments
+    signal {mustBeNumeric, mustBeNonempty}
+    fs {mustBeNumeric, mustBeScalarOrEmpty, mustBePositive}
+    opts.Window     {mustBeNumeric, mustBeScalarOrEmpty, mustBePositive} = 60
+    opts.Step       {mustBeNumeric, mustBeScalarOrEmpty, mustBePositive} = []
+    opts.Overlap    {mustBeNumeric, mustBeScalarOrEmpty} = []
+    opts.Metric     = 'all'
+    opts.MinBeats   {mustBeNumeric, mustBeScalarOrEmpty} = []
+    opts.Band       {mustBeNumeric} = [0.5 5]
+    opts.LFBand     {mustBeNumeric} = [0.04 0.15]
+    opts.HFBand     {mustBeNumeric} = [0.15 0.40]
+    opts.ResampleFs {mustBeNumeric, mustBeScalarOrEmpty, mustBePositive} = 4
+end
 
-winLen   = p.Results.Window;
-if ismember('MinBeats', p.UsingDefaults)
+winLen   = opts.Window;
+if isempty(opts.MinBeats)
     % Scale the beat-count gate to the window length (~0.33 beats/s, i.e. 20
     % beats for the default 60 s window, floored at 6) so short windows are not
     % silently NaN-gated by a fixed 60 s-tuned threshold.
     minBeats = max(6, round(winLen / 3));
 else
-    minBeats = p.Results.MinBeats;
+    minBeats = opts.MinBeats;
 end
 
 % --- Resolve Step from Step / Overlap (mutually exclusive) ----------------
-if ~isempty(p.Results.Step) && ~isempty(p.Results.Overlap)
+if ~isempty(opts.Step) && ~isempty(opts.Overlap)
     error('pf2:hrvSeries:stepAndOverlap', ...
         'Specify only one of ''Step'' or ''Overlap'', not both.');
 end
-if ~isempty(p.Results.Overlap)
-    step = winLen * (1 - p.Results.Overlap);
-elseif ~isempty(p.Results.Step)
-    step = p.Results.Step;
+if ~isempty(opts.Overlap)
+    step = winLen * (1 - opts.Overlap);
+elseif ~isempty(opts.Step)
+    step = opts.Step;
 else
     step = 5;   % default 5 s step
 end
@@ -172,7 +172,7 @@ allMetrics = {'meanHR', 'meanNN', 'SDNN', 'RMSSD', 'pNN50', 'LF', 'HF', 'LFHF'};
 metricUnits = struct('meanHR','bpm','meanNN','ms','SDNN','ms','RMSSD','ms', ...
     'pNN50','%','LF','ms^2','HF','ms^2','LFHF','ratio');
 
-metricArg = p.Results.Metric;
+metricArg = opts.Metric;
 if ischar(metricArg) || isstring(metricArg)
     if strcmpi(char(string(metricArg)), 'all')
         metrics = allMetrics;
@@ -235,10 +235,10 @@ for wi = 1:nWin
     % Delegate all beat detection and HRV math to hrvFeatures
     try
         [hrv, info] = pf2.data.aux.hrvFeatures(slice, fs, ...
-            'Band',       p.Results.Band, ...
-            'LFBand',     p.Results.LFBand, ...
-            'HFBand',     p.Results.HFBand, ...
-            'ResampleFs', p.Results.ResampleFs);
+            'Band',       opts.Band, ...
+            'LFBand',     opts.LFBand, ...
+            'HFBand',     opts.HFBand, ...
+            'ResampleFs', opts.ResampleFs);
     catch
         % Any error in a single window (e.g. degenerate slice) -> NaN row
         continue;

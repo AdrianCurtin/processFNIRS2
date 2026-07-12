@@ -1,4 +1,4 @@
-function [ figHandle ] = arrangedValues(varargin)
+function [ figHandle ] = arrangedValues(data2plot, fNIR, minVal, maxVal, titleString, clrBarTitle, opts)
 % ARRANGEDVALUES Display per-channel values in probe-arranged subplot grid
 %
 % Creates a visualization where each fNIRS channel is displayed as a separate
@@ -47,38 +47,27 @@ function [ figHandle ] = arrangedValues(varargin)
 % See also: pf2.probe.plot.imageValues, pf2.probe.plot.interpolateValues,
 %           pf2.data.plot.oxy, pf2_base.pf2_plotArranged
 
-p = inputParser;
+arguments
+    data2plot
+    fNIR = {}
+    minVal {mustBeNumeric} = []
+    maxVal {mustBeNumeric} = []
+    titleString {mustBeText} = ''
+    clrBarTitle {mustBeText} = ''
+    opts.includeSS (1,1) logical = true
+    opts.savePath {mustBeText} = ''
+    opts.saveWidth {mustBeNumeric} = []
+    opts.saveHeight {mustBeNumeric} = []
+    opts.saveDPI {mustBeNumeric} = 150
+end
 
-isStructOrEmpty=@(x) isstruct(x)||isempty(x);
-isStringOrChar=@(x)isstring(x)||ischar(x);
+suptitleString = titleString;
 
-addRequired(p, 'data2plot');
-addOptional(p, 'fNIR', {}, isStructOrEmpty);
-addOptional(p, 'minVal', [], @isnumeric);
-addOptional(p, 'maxVal', [], @isnumeric);
-addOptional(p, 'titleString', '', isStringOrChar);
-addOptional(p, 'clrBarTitle', '', isStringOrChar);
-
-addParameter(p, 'includeSS', true, @islogical);
-addParameter(p, 'savePath', '', @(x) ischar(x) || isstring(x));
-addParameter(p, 'saveWidth', [], @(x) isempty(x) || isnumeric(x));
-addParameter(p, 'saveHeight', [], @(x) isempty(x) || isnumeric(x));
-addParameter(p, 'saveDPI', 150, @isnumeric);
-
-parse(p, varargin{:});
-
-clrBarTitle = p.Results.clrBarTitle;
-suptitleString = p.Results.titleString;
-minVal = p.Results.minVal;
-maxVal = p.Results.maxVal;
-fNIR = p.Results.fNIR;
-data2plot = p.Results.data2plot;
-
-include_ss= p.Results.includeSS;
-savePath = p.Results.savePath;
-saveWidth = p.Results.saveWidth;
-saveHeight = p.Results.saveHeight;
-saveDPI = p.Results.saveDPI;
+include_ss= opts.includeSS;
+savePath = opts.savePath;
+saveWidth = opts.saveWidth;
+saveHeight = opts.saveHeight;
+saveDPI = opts.saveDPI;
 
 if(isempty(maxVal))
     maxVal=nanmax(data2plot);

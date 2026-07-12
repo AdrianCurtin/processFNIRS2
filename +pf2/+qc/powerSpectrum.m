@@ -1,4 +1,4 @@
-function result = powerSpectrum(data, varargin)
+function result = powerSpectrum(data, opts)
 % POWERSPECTRUM Power spectral density with physiological peak detection
 %
 % Computes power spectral density per channel using Welch's method and
@@ -72,20 +72,15 @@ function result = powerSpectrum(data, varargin)
 %
 % See also: pf2.qc.sci, pf2.qc.plotQuality, pwelch
 
-%% Parse inputs
-p = inputParser;
-p.FunctionName = 'pf2.qc.powerSpectrum';
-
-addRequired(p, 'data', @isstruct);
-addParameter(p, 'Signal', 'auto', @(x) ischar(x) || isstring(x));
-addParameter(p, 'Channels', [], @isnumeric);
-addParameter(p, 'WindowLength', 10, @(x) isnumeric(x) && isscalar(x) && x > 0);
-addParameter(p, 'Overlap', 0.5, @(x) isnumeric(x) && isscalar(x) && x >= 0 && x < 1);
-addParameter(p, 'FreqRange', [0, 5], @(x) isnumeric(x) && numel(x) == 2);
-addParameter(p, 'DetectPeaks', true, @islogical);
-
-parse(p, data, varargin{:});
-opts = p.Results;
+arguments
+    data struct
+    opts.Signal = 'auto'
+    opts.Channels {mustBeNumeric} = []
+    opts.WindowLength (1,1) {mustBeNumeric, mustBePositive} = 10
+    opts.Overlap (1,1) {mustBeNumeric} = 0.5
+    opts.FreqRange {mustBeNumeric} = [0, 5]
+    opts.DetectPeaks (1,1) logical = true
+end
 
 %% Validate and resolve signal
 assert(isfield(data, 'fs'), 'pf2:qc:powerSpectrum:noFs', ...

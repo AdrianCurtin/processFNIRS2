@@ -1,4 +1,4 @@
-function out = removeMarkers(data, varargin)
+function out = removeMarkers(data, codes, opts)
 % REMOVEMARKERS Remove marker rows by code, time window, or row index
 %
 % Drops rows from the event marker table selected by marker Code, by a time
@@ -65,31 +65,27 @@ function out = removeMarkers(data, varargin)
 % See also: pf2.data.dedupeMarkers, pf2.data.getMarkers, ...
 %           pf2.data.defineBlocks, pf2_base.normalizeMarkers
 
+arguments
+    data
+    codes         {mustBeNumeric} = []
+    opts.Time     {mustBeNumeric} = []
+    opts.Indices  = []
+    opts.Verbose  (1,1) logical = true
+end
+
 % --- Cell array input: apply to each element ---
 if iscell(data)
+    fwd = namedargs2cell(opts);
     out = data;
     for ci = 1:numel(data)
-        out{ci} = pf2.data.removeMarkers(data{ci}, varargin{:});
+        out{ci} = pf2.data.removeMarkers(data{ci}, codes, fwd{:});
     end
     return;
 end
 
-% --- Parse optional positional codes vs name-value ---
-codes = [];
-remainingArgs = varargin;
-if ~isempty(varargin) && isnumeric(varargin{1})
-    codes = varargin{1};
-    remainingArgs = varargin(2:end);
-end
-
-p = inputParser;
-p.addParameter('Time', [], @(x) isempty(x) || (isnumeric(x) && numel(x) == 2));
-p.addParameter('Indices', [], @(x) isempty(x) || isnumeric(x) || islogical(x));
-p.addParameter('Verbose', true, @(x) islogical(x) && isscalar(x));
-p.parse(remainingArgs{:});
-timeWin = p.Results.Time;
-indices = p.Results.Indices;
-verbose = p.Results.Verbose;
+timeWin = opts.Time;
+indices = opts.Indices;
+verbose = opts.Verbose;
 
 if isempty(codes) && isempty(timeWin) && isempty(indices)
     error('pf2:removeMarkers:noSelector', ...

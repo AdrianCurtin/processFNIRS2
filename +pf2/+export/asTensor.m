@@ -1,4 +1,4 @@
-function outPath = asTensor(data, path, varargin)
+function outPath = asTensor(data, path, opts)
 % ASTENSOR Export fNIRS data as a self-describing HDF5 tensor (contract v1.0)
 %
 % Writes a single, versioned, cross-language .h5 file implementing the
@@ -136,25 +136,20 @@ function outPath = asTensor(data, path, varargin)
 %           pf2.data.slidingWindows, pf2.data.extractBlocks,
 %           pf2.qc.pipeline.assess, pf2.export.asSNIRF
 
-%% Default contract version (single source of truth)
-DEFAULT_CONTRACT_VERSION = '1.0';
-
 %% Parse inputs
-p = inputParser;
-p.FunctionName = 'pf2.export.asTensor';
-addRequired(p, 'data', @isstruct);
-addRequired(p, 'path', @(x) ischar(x) || (isstring(x) && isscalar(x)));
-addParameter(p, 'Features', {}, @(x) iscell(x) || ischar(x) || isstring(x));
-addParameter(p, 'Windows', [], @(x) iscell(x) || isstruct(x));
-addParameter(p, 'QC', false, @(x) islogical(x) || isstruct(x));
-% Auxiliary signals (and derived features) to align onto the tensor time grid
-% and write to /aux. Pass a cellstr of aux base names, or true / 'all' for
-% every aux signal present (default: {} = none).
-addParameter(p, 'Aux', {}, @(x) iscell(x) || ischar(x) || isstring(x) || islogical(x));
-addParameter(p, 'ContractVersion', DEFAULT_CONTRACT_VERSION, ...
-    @(x) ischar(x) || (isstring(x) && isscalar(x)));
-parse(p, data, path, varargin{:});
-opts = p.Results;
+% The ContractVersion default '1.0' is the single source of truth for the
+% export contract version. 'Aux' selects auxiliary signals (and derived
+% features) to align onto the tensor time grid and write to /aux: a cellstr of
+% aux base names, or true / 'all' for every aux signal present (default: {}).
+arguments
+    data {mustBeA(data, 'struct')}
+    path {mustBeText}
+    opts.Features = {}
+    opts.Windows = []
+    opts.QC = false
+    opts.Aux = {}
+    opts.ContractVersion = '1.0'
+end
 
 path = char(path);
 if numel(path) < 3 || ~strcmpi(path(end-2:end), '.h5')

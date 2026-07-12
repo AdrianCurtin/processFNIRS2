@@ -1,4 +1,4 @@
-function [outFNIR, pFit] = resample(varargin)
+function [outFNIR, pFit] = resample(fNIR, segmentLength, blLength, opts)
 % RESAMPLE Downsample and time-average fNIRS data
 %
 % Resamples fNIRS data to a lower sampling rate by averaging samples within
@@ -60,38 +60,27 @@ function [outFNIR, pFit] = resample(varargin)
 %
 % See also: pf2.data.split, pf2.data.setT0, pf2.data.concatenate
 
-p=inputParser;
+arguments
+    fNIR
+    segmentLength (1,1) {mustBeNumeric, mustBePositive} = 1
+    blLength {mustBeNumeric} = []
+    opts.blfNIR = []
+    opts.centerOnT0 (1,1) logical = false
+    opts.timeOutMode {mustBeMember(opts.timeOutMode, {'mid','start','end'})} = 'start'
+    opts.nanRejectionLevel (1,1) {mustBeNumeric, mustBeNonnegative} = 0.7
+    opts.averageAux (1,1) logical = false
+    opts.flattenAux (1,1) logical = false
+    opts.trimAux (1,1) logical = false
+    opts.polyDegree (1,1) {mustBeNumeric, mustBeNonnegative} = 1
+    opts.centerOnTime {mustBeNumeric} = NaN
+    opts.specifiedTimepoints {mustBeNumeric} = []
+end
 
-validfNIRInput = @(x) (isnumeric(x)&&length(x)>1) || (isstruct(x) && (isfield(x,'raw')||isfield(x,'time')||isfield(x,'info')));
-validScalarPosNum = @(x) isnumeric(x) && isscalar(x) && (x >= 0);
-validScalarStrictPosNum = @(x) isnumeric(x) && isscalar(x) && (x > 0);
-validTimeOutMode = @(x) ischar(x)&&(ismember(x,{'mid','start','end'}));
-validTimepoints = @(x) isnumeric(x) && isvector(x) && issorted(x);
-
-
-addRequired(p,'fNIR',validfNIRInput);
-addOptional(p,'segmentLength',1,validScalarStrictPosNum);
-addOptional(p,'blLength',[],validScalarPosNum);
-addOptional(p,'blfNIR',[],validfNIRInput);
-addParameter(p,'centerOnT0',false,@islogical);
-addParameter(p,'timeOutMode','start',validTimeOutMode);
-addParameter(p,'nanRejectionLevel',0.7,validScalarPosNum);
-addParameter(p,'averageAux',false,@islogical);
-addParameter(p,'flattenAux',false,@islogical);
-addParameter(p,'trimAux',false,@islogical);
-addParameter(p,'polyDegree',1,validScalarPosNum);
-addParameter(p,'centerOnTime',NaN,@isnumeric);
-addParameter(p,'specifiedTimepoints',[],validTimepoints);
-
-parse(p,varargin{:});
-
-fNIR=p.Results.fNIR;
-segLength=p.Results.segmentLength; % How long is each segment, ie: 1 sample
-blLength=p.Results.blLength; % how long is the baseline
-blfNIR=p.Results.blfNIR; % a baseline fNIR struct
-centerOnT0=p.Results.centerOnT0; % should the resample include t=0 as the start point
-centerOnTime=p.Results.centerOnTime;
-specifiedTimepoints = p.Results.specifiedTimepoints;
+segLength=segmentLength; % How long is each segment, ie: 1 sample
+blfNIR=opts.blfNIR; % Separate baseline source struct/array (mutated as a local below)
+centerOnT0=opts.centerOnT0; % should the resample include t=0 as the start point
+centerOnTime=opts.centerOnTime;
+specifiedTimepoints = opts.specifiedTimepoints;
 
 if(centerOnT0)
     centerOnTime=0;
@@ -100,12 +89,12 @@ if(isempty(centerOnTime))
     centerOnTime=nan;
 end
 
-timeOutMode=p.Results.timeOutMode; % should time include or center on a point (ex: t=1 := t[0.051...1.4999]
-nanRejectionLevel=p.Results.nanRejectionLevel; % number of NaNs in segment to entirely reject it
-averageAux=p.Results.averageAux; % Also average/ resample the Aux channels
-flattenAux=p.Results.flattenAux; % Unroll nested Aux data into tables within the Aux struct, also map times to non-time columns
-trimAux=p.Results.trimAux; % Clear all Aux samples before and after fNIRS time series
-polyDegree=p.Results.polyDegree; % degree for polyfit
+timeOutMode=opts.timeOutMode; % should time include or center on a point (ex: t=1 := t[0.051...1.4999]
+nanRejectionLevel=opts.nanRejectionLevel; % number of NaNs in segment to entirely reject it
+averageAux=opts.averageAux; % Also average/ resample the Aux channels
+flattenAux=opts.flattenAux; % Unroll nested Aux data into tables within the Aux struct, also map times to non-time columns
+trimAux=opts.trimAux; % Clear all Aux samples before and after fNIRS time series
+polyDegree=opts.polyDegree; % degree for polyfit
 
 
 if(~isstruct(fNIR))

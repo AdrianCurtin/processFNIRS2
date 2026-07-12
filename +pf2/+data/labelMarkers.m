@@ -1,4 +1,4 @@
-function out = labelMarkers(data, varargin)
+function out = labelMarkers(data, map, opts)
 % LABELMARKERS Attach categorical labels to marker codes
 %
 % Adds (or updates) a categorical column on the marker table that maps each
@@ -64,31 +64,27 @@ function out = labelMarkers(data, varargin)
 %
 % See also: pf2.data.defineBlocks, pf2.data.getMarkers, pf2_base.normalizeMarkers
 
+arguments
+    data
+    map               = []
+    opts.VarName      {mustBeTextScalar} = 'Label'
+    opts.Ordinal      (1,1) logical = false
+    opts.Categories   = []
+end
+
 % --- Cell array input: apply to each element ---
 if iscell(data)
+    fwd = namedargs2cell(opts);
     out = data;
     for ci = 1:numel(data)
-        out{ci} = pf2.data.labelMarkers(data{ci}, varargin{:});
+        out{ci} = pf2.data.labelMarkers(data{ci}, map, fwd{:});
     end
     return;
 end
 
-% --- Parse optional positional map vs name-value ---
-map = [];
-remainingArgs = varargin;
-if ~isempty(varargin) && (iscell(varargin{1}) && size(varargin{1}, 2) >= 2)
-    map = varargin{1};
-    remainingArgs = varargin(2:end);
-end
-
-p = inputParser;
-p.addParameter('VarName', 'Label', @(x) ischar(x) || isstring(x));
-p.addParameter('Ordinal', false, @(x) islogical(x) && isscalar(x));
-p.addParameter('Categories', [], @(x) isempty(x) || iscellstr(x) || isstring(x));
-p.parse(remainingArgs{:});
-varName = char(p.Results.VarName);
-ordinal = p.Results.Ordinal;
-explicitCats = p.Results.Categories;
+varName = char(opts.VarName);
+ordinal = opts.Ordinal;
+explicitCats = opts.Categories;
 
 % --- Resolve the marker table and (if struct) the eventTypes fallback ---
 isStructInput = isstruct(data) && isfield(data, 'markers');

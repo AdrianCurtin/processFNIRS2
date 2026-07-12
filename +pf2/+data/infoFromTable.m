@@ -1,4 +1,4 @@
-function data = infoFromTable(data, T, varargin)
+function data = infoFromTable(data, T, value, opts)
 % INFOFROMTABLE Write table columns back into .info fields of fNIRS structs
 %
 % Maps table rows positionally to fNIRS data structs: row 1 updates
@@ -55,11 +55,23 @@ function data = infoFromTable(data, T, varargin)
 %
 % See also: pf2.data.infoToTable, pf2.data.importInfo
 
+arguments
+    data
+    T
+    value = "__pf2_infoFromTable_novalue__"
+    opts.Overwrite (1,1) logical = true
+    opts.Clear (1,1) logical = false
+end
+
+% A sentinel default marks "value was not supplied" (single-field mode
+% requires an explicit value argument, matching the original ~isempty(varargin)
+% guard). A real supplied value of [] must still trigger single-field mode.
+valueSupplied = ~(isstring(value) && isscalar(value) && ...
+    value == "__pf2_infoFromTable_novalue__");
+
 % --- Detect single-field mode: infoFromTable(data, fieldName, value) ---
-if (ischar(T) || (isstring(T) && isscalar(T))) && ~isempty(varargin)
+if (ischar(T) || (isstring(T) && isscalar(T))) && valueSupplied
     fieldName = char(T);
-    value = varargin{1};
-    remainingArgs = varargin(2:end);
 
     % Normalize to cell array
     inputWasCell = iscell(data);
@@ -113,12 +125,8 @@ if (ischar(T) || (isstring(T) && isscalar(T))) && ~isempty(varargin)
 end
 
 % --- Table mode: parse inputs ---
-p = inputParser;
-p.addParameter('Overwrite', true, @islogical);
-p.addParameter('Clear', false, @islogical);
-p.parse(varargin{:});
-overwrite = p.Results.Overwrite;
-clearMode = p.Results.Clear;
+overwrite = opts.Overwrite;
+clearMode = opts.Clear;
 
 % --- Normalize to cell array ---
 inputWasCell = iscell(data);

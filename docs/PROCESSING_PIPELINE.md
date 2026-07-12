@@ -486,16 +486,25 @@ from the context, or from the data's embedded probeinfo/cfg). This makes the
 path safe for `parfor` and byte-for-byte reproducible.
 
 ```matlab
-ctx = pf2_base.ProcessingContext.fromGlobals();
-ctx.dpfMode = 'Calc';
-ctx.subjectAge = 30;
-ctx.setRawMethod('x5_TDDR');
-result = processFNIRS2(data, 'Context', ctx);   % globals left untouched
+% Configure in one call — usable immediately, no fromGlobals() bootstrap
+ctx = pf2.ProcessingContext('DPFmode', 'Calc', 'SubjectAge', 30, ...
+    'RawMethod', 'x5_TDDR');
+result = ctx.process(data);                       % globals left untouched
+% equivalently: result = processFNIRS2(data, 'Context', ctx);
+
+% Parallel: snapshot/derive once, take an independent copy() per worker
+parfor i = 1:numel(allData)
+    c = ctx.copy();
+    c.subjectAge = ages(i);
+    results{i} = processFNIRS2(allData{i}, 'Context', c);
+end
 ```
 
-The legacy (no-context) call still uses the `PF2`/`setF` globals for
-interactive/GUI back-compat. An explicit `ctx.applyToGlobals()` remains as an
-opt-in for GUI code that reads from globals.
+The context is **one-directional**: it reads from globals only if you build it
+with `pf2_base.ProcessingContext.fromGlobals()`, and it never writes them back.
+The legacy (no-context) call still uses the `PF2`/`setF` globals for interactive
+use; the GUI keeps its own globals in sync internally (via `GUIContext`), so no
+general-purpose write-to-globals method is needed or exposed.
 
 ### Custom Method Management
 Create, modify, and share processing methods programmatically:

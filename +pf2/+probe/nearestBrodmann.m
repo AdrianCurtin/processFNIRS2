@@ -1,4 +1,4 @@
-function tbl = nearestBrodmann(data, varargin)
+function tbl = nearestBrodmann(data, opts)
 % NEARESTBRODMANN Find nearest Brodmann areas for each channel in a probe
 %
 % Maps each channel's MNI position to the closest Brodmann areas using the
@@ -48,14 +48,14 @@ function tbl = nearestBrodmann(data, varargin)
 %           pf2_base.getAsset
 
 % --- Parse inputs ---
-p = inputParser;
-p.addRequired('data');
-p.addParameter('N', 3, @(x) isnumeric(x) && isscalar(x) && x >= 1);
-p.addParameter('MaxDistance', Inf, @(x) isnumeric(x) && isscalar(x) && x > 0);
-p.parse(data, varargin{:});
+arguments
+    data
+    opts.N (1,1) {mustBeNumeric} = 3
+    opts.MaxDistance (1,1) {mustBeNumeric} = Inf
+end
 
-N = round(p.Results.N);
-maxDist = p.Results.MaxDistance;
+N = round(opts.N);
+maxDist = opts.MaxDistance;
 
 % --- Frame check: BA lookup uses a 1mm MNI atlas, so it is only valid for
 %     MNI-space coordinates. Warn (don't block) on a declared non-MNI system,

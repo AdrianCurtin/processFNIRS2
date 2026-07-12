@@ -1,4 +1,4 @@
-function [tonic, phasic, info] = edaDecompose(x, fs, varargin)
+function [tonic, phasic, info] = edaDecompose(x, fs, opts)
 % EDADECOMPOSE Split electrodermal activity into tonic and phasic components
 %
 % Decomposes a galvanic skin response / electrodermal activity (GSR/EDA)
@@ -40,12 +40,12 @@ function [tonic, phasic, info] = edaDecompose(x, fs, varargin)
 %
 % See also: pf2_base.auxSignalType, pf2.data.aux.heartRateFrom
 
-p = inputParser;
-p.addRequired('x', @isnumeric);
-p.addRequired('fs', @(v) isnumeric(v) && isscalar(v) && v > 0);
-p.addParameter('TonicCutoff', 0.05, @(v) isnumeric(v) && isscalar(v) && v > 0);
-p.parse(x, fs, varargin{:});
-cutoff = p.Results.TonicCutoff;
+arguments
+    x {mustBeNumeric}
+    fs {mustBeNumeric, mustBeScalarOrEmpty, mustBePositive}
+    opts.TonicCutoff {mustBeNumeric, mustBeScalarOrEmpty, mustBePositive} = 0.05
+end
+cutoff = opts.TonicCutoff;
 
 x = x(:);
 

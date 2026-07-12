@@ -1,4 +1,4 @@
-function [vals, info] = auxOnGrid(data, name, varargin)
+function [vals, info] = auxOnGrid(data, name, opts)
 % AUXONGRID Resample a named auxiliary signal onto a target time base
 %
 % Returns an auxiliary signal aligned to an arbitrary time grid (the fNIRS
@@ -50,22 +50,22 @@ function [vals, info] = auxOnGrid(data, name, varargin)
 %
 % See also: pf2_base.normalizeAux, pf2_base.auxSignalType, pf2.data.resample
 
-p = inputParser;
-p.addRequired('data', @isstruct);
-p.addRequired('name', @(x) ischar(x) || isstring(x));
-p.addParameter('Time', [], @(x) isempty(x) || isnumeric(x));
-p.addParameter('Channels', [], @(x) isempty(x) || isnumeric(x) || iscell(x) || isstring(x));
-p.addParameter('Method', 'linear', @(x) ischar(x) || isstring(x));
-p.addParameter('Offset', 0, @(x) isnumeric(x) && isscalar(x));
-p.addParameter('AntiAlias', true, @(x) islogical(x) && isscalar(x));
-p.addParameter('MaxGap', Inf, @(x) isnumeric(x) && isscalar(x) && x > 0);
-p.parse(data, name, varargin{:});
+arguments
+    data {mustBeA(data, 'struct')}
+    name {mustBeText}
+    opts.Time {mustBeNumeric} = []
+    opts.Channels = []
+    opts.Method = 'linear'
+    opts.Offset (1,1) {mustBeNumeric} = 0
+    opts.AntiAlias (1,1) logical = true
+    opts.MaxGap (1,1) {mustBeNumeric, mustBePositive} = Inf
+end
 
 name = char(string(name));
-method = char(string(p.Results.Method));
-offset = p.Results.Offset;
-antiAlias = p.Results.AntiAlias;
-maxGap = p.Results.MaxGap;
+method = char(string(opts.Method));
+offset = opts.Offset;
+antiAlias = opts.AntiAlias;
+maxGap = opts.MaxGap;
 
 % --- Locate and normalize the requested signal ---------------------------
 if ~isfield(data, 'Aux') || isempty(data.Aux) || ~isstruct(data.Aux)
@@ -87,7 +87,7 @@ if isrow(srcData), srcData = srcData(:); end
 
 % --- Channel subset -------------------------------------------------------
 nCh = size(srcData, 2);
-chans = p.Results.Channels;
+chans = opts.Channels;
 if isempty(chans)
     chanIdx = 1:nCh;
 elseif isnumeric(chans)
@@ -107,7 +107,7 @@ end
 srcData = srcData(:, chanIdx);
 
 % --- Target grid ----------------------------------------------------------
-tgt = p.Results.Time;
+tgt = opts.Time;
 if isempty(tgt)
     if ~isfield(data, 'time') || isempty(data.time)
         error('pf2:auxOnGrid:noTime', ...

@@ -1,4 +1,4 @@
-function [hr, info] = heartRateFrom(x, fs, varargin)
+function [hr, info] = heartRateFrom(x, fs, opts)
 % HEARTRATEFROM Derive a heart-rate (bpm) series from a PPG or EKG waveform
 %
 % Detects cardiac beats in a pulsatile waveform (photoplethysmography or
@@ -47,15 +47,15 @@ function [hr, info] = heartRateFrom(x, fs, varargin)
 %
 % See also: pf2_base.auxSignalType, pf2.data.auxOnGrid, pf2.data.aux.edaDecompose
 
-p = inputParser;
-p.addRequired('x', @isnumeric);
-p.addRequired('fs', @(v) isnumeric(v) && isscalar(v) && v > 0);
-p.addParameter('Band', [0.5 5], @(v) isnumeric(v) && numel(v) == 2);
-p.addParameter('MinBPM', 30, @(v) isnumeric(v) && isscalar(v) && v > 0);
-p.addParameter('MaxBPM', 220, @(v) isnumeric(v) && isscalar(v) && v > 0);
-p.parse(x, fs, varargin{:});
-band = p.Results.Band;
-maxBPM = p.Results.MaxBPM;
+arguments
+    x {mustBeNumeric}
+    fs {mustBeNumeric, mustBeScalarOrEmpty, mustBePositive}
+    opts.Band {mustBeNumeric} = [0.5 5]
+    opts.MinBPM {mustBeNumeric, mustBeScalarOrEmpty, mustBePositive} = 30
+    opts.MaxBPM {mustBeNumeric, mustBeScalarOrEmpty, mustBePositive} = 220
+end
+band = opts.Band;
+maxBPM = opts.MaxBPM;
 
 x = x(:);
 T = numel(x);

@@ -1,4 +1,4 @@
-function report = assess(data, varargin)
+function report = assess(data, opts)
 % ASSESS Standalone fNIRS channel quality assessment pipeline
 %
 % Performs lightweight internal processing on raw fNIRS data and runs
@@ -53,24 +53,19 @@ function report = assess(data, varargin)
 % See also: pf2.qc.pipeline.apply, pf2.qc.pipeline.report,
 %           pf2.qc.pipeline.plotReport, pf2.qc.sci, pf2.qc.powerSpectrum
 
-%% Parse inputs
-p = inputParser;
-p.FunctionName = 'pf2.qc.pipeline.assess';
-
-addRequired(p, 'data', @isstruct);
-addParameter(p, 'Checks', {'saturation','sci','cardiac','cov','takizawa'}, @iscell);
-addParameter(p, 'SaturationThreshold', 0.1, @(x) isnumeric(x) && isscalar(x));
-addParameter(p, 'SCIThreshold', 0.75, @(x) isnumeric(x) && isscalar(x));
-addParameter(p, 'CardiacBand', [0.5, 2.5], @(x) isnumeric(x) && numel(x) == 2);
-addParameter(p, 'CardiacSNR', 3, @(x) isnumeric(x) && isscalar(x));
-addParameter(p, 'CoVThreshold', 0.2, @(x) isnumeric(x) && isscalar(x));
-addParameter(p, 'LPFCutoff', 0.1, @(x) isnumeric(x) && isscalar(x));
-addParameter(p, 'TakizawaStrict', false, @islogical);
-addParameter(p, 'Wavelengths', [], @isnumeric);
-addParameter(p, 'ChannelNumbers', [], @isnumeric);
-
-parse(p, data, varargin{:});
-opts = p.Results;
+arguments
+    data struct
+    opts.Checks {mustBeA(opts.Checks, 'cell')} = {'saturation','sci','cardiac','cov','takizawa'}
+    opts.SaturationThreshold (1,1) {mustBeNumeric} = 0.1
+    opts.SCIThreshold (1,1) {mustBeNumeric} = 0.75
+    opts.CardiacBand {mustBeNumeric} = [0.5, 2.5]
+    opts.CardiacSNR (1,1) {mustBeNumeric} = 3
+    opts.CoVThreshold (1,1) {mustBeNumeric} = 0.2
+    opts.LPFCutoff (1,1) {mustBeNumeric} = 0.1
+    opts.TakizawaStrict (1,1) logical = false
+    opts.Wavelengths {mustBeNumeric} = []
+    opts.ChannelNumbers {mustBeNumeric} = []
+end
 
 %% Validate required fields
 assert(isfield(data, 'raw'), 'pf2:qc:pipeline:noRaw', ...

@@ -1,4 +1,4 @@
-function segments = betasToSegments(glmResults, data, varargin)
+function segments = betasToSegments(glmResults, data, opts)
 % BETASTOSEGMENTS Package GLM betas into Experiment-compatible pseudo-segments
 %
 % Converts first-level GLM beta weights into fNIRS-like structs that can be
@@ -58,21 +58,21 @@ function segments = betasToSegments(glmResults, data, varargin)
 %           exploreFNIRS.core.Experiment
 
 % --- Parse inputs ---
-p = inputParser;
-p.addRequired('glmResults', @isstruct);
-p.addRequired('data', @isstruct);
-p.addParameter('Biomarker', 'HbO', @(x) ischar(x) || isstring(x));
-p.addParameter('Conditions', {}, @iscell);
-p.addParameter('ConditionMap', {}, @iscell);
-p.addParameter('Units', '\beta', @(x) ischar(x) || isstring(x));
-p.addParameter('BiomarkerResults', [], @(x) isempty(x) || isstruct(x));
-p.parse(glmResults, data, varargin{:});
+arguments
+    glmResults {mustBeA(glmResults, 'struct')}
+    data {mustBeA(data, 'struct')}
+    opts.Biomarker = 'HbO'
+    opts.Conditions {mustBeA(opts.Conditions, 'cell')} = {}
+    opts.ConditionMap {mustBeA(opts.ConditionMap, 'cell')} = {}
+    opts.Units = '\beta'
+    opts.BiomarkerResults = []
+end
 
-biomarker = char(p.Results.Biomarker);
-conditions = p.Results.Conditions;
-conditionMap = p.Results.ConditionMap;
-units = char(p.Results.Units);
-bioResults = p.Results.BiomarkerResults;
+biomarker = char(opts.Biomarker);
+conditions = opts.Conditions;
+conditionMap = opts.ConditionMap;
+units = char(opts.Units);
+bioResults = opts.BiomarkerResults;
 
 % All biomarker fields
 allBiomarkers = {'HbO', 'HbR', 'HbTotal', 'HbDiff', 'CBSI'};

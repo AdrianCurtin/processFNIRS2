@@ -369,6 +369,12 @@ if useContext
         ctxRejectLevel = p.Results.RejectLevel;
     end
 
+    % Honor the context's processRejected unless the call site set it
+    % explicitly (an explicit ProcessRejectedChannels argument wins).
+    if any(strcmp(p.UsingDefaults, 'ProcessRejectedChannels'))
+        outputData.ProcessRejected = ctx.processRejected;
+    end
+
     outputData.DirtyBaseline = ctx.dirtyBaseline || p.Results.DirtyBaseline || ctxBaseline.blLength == 0;
 
     % Get methods from context

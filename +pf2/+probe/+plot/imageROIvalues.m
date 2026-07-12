@@ -1,4 +1,4 @@
-function [ imgOut ] = imageROIvalues(fNIR, data2plot, varargin)
+function [ imgOut ] = imageROIvalues(fNIR, data2plot, opts)
 % IMAGEROIVALUES Display per-ROI values as a 2D image heatmap
 %
 % Creates a 2D image visualization where each region of interest (ROI) is
@@ -38,6 +38,19 @@ function [ imgOut ] = imageROIvalues(fNIR, data2plot, varargin)
 % See also: pf2.probe.plot.imageValues, pf2.probe.plot.interpolateROIvalues,
 %           pf2.probe.roi.defineROI, pf2_base.fnirs.buildROI
 
+arguments
+    fNIR
+    data2plot
+    opts.minVal {mustBeNumeric} = []
+    opts.maxVal {mustBeNumeric} = []
+    opts.title {mustBeText} = ''
+    opts.colorbarTitle {mustBeText} = ''
+    opts.savePath {mustBeText} = ''
+    opts.saveWidth {mustBeNumeric} = []
+    opts.saveHeight {mustBeNumeric} = []
+    opts.saveDPI {mustBeNumeric} = 150
+end
+
 % Validate fNIR input
 if ~isstruct(fNIR)
     error('pf2:InvalidInput', 'First argument must be a fNIRS data structure');
@@ -47,28 +60,14 @@ if(~isempty(fNIR)&&~pf2_base.isnestedfield(fNIR,'ROI.info')&&~isempty(fNIR.info)
     error('pf2:probe:imageROIvalues:noROIInfo', 'No ROI information in the fNIR struct, unable to plot data');
 end
 
-% Parse name-value pairs
-p = inputParser;
-p.CaseSensitive = false;
-addParameter(p, 'minVal', [], @(x) isempty(x) || isnumeric(x));
-addParameter(p, 'maxVal', [], @(x) isempty(x) || isnumeric(x));
-addParameter(p, 'title', '', @(x) ischar(x) || isstring(x));
-addParameter(p, 'colorbarTitle', '', @(x) ischar(x) || isstring(x));
-addParameter(p, 'savePath', '', @(x) ischar(x) || isstring(x));
-addParameter(p, 'saveWidth', [], @(x) isempty(x) || isnumeric(x));
-addParameter(p, 'saveHeight', [], @(x) isempty(x) || isnumeric(x));
-addParameter(p, 'saveDPI', 150, @isnumeric);
-
-parse(p, varargin{:});
-
-minVal = p.Results.minVal;
-maxVal = p.Results.maxVal;
-titleString = p.Results.title;
-clrBarTitle = p.Results.colorbarTitle;
-savePath = p.Results.savePath;
-saveWidth = p.Results.saveWidth;
-saveHeight = p.Results.saveHeight;
-saveDPI = p.Results.saveDPI;
+minVal = opts.minVal;
+maxVal = opts.maxVal;
+titleString = opts.title;
+clrBarTitle = opts.colorbarTitle;
+savePath = opts.savePath;
+saveWidth = opts.saveWidth;
+saveHeight = opts.saveHeight;
+saveDPI = opts.saveDPI;
 
 % Set defaults for min/max if not provided
 if isempty(maxVal)

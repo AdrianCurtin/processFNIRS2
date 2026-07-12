@@ -1,4 +1,4 @@
-classdef ProcessingContext < handle
+classdef ProcessingContext < matlab.mixin.Copyable
     % PROCESSINGCONTEXT Encapsulates all processing settings for fNIRS analysis
     %
     % ProcessingContext provides an alternative to global variables (PF2, setF)
@@ -62,9 +62,13 @@ classdef ProcessingContext < handle
     %   ctx.baselineLength = 5;
     %   result = processFNIRS2(data, 'Context', ctx);
     %
-    %   % Parallel processing with different ages
+    %   % Parallel processing with different ages. Snapshot ONCE in the client
+    %   % (fromGlobals reads client globals; on a parfor worker they are empty),
+    %   % then take an independent copy() per iteration -- a plain ctx = base
+    %   % would alias the same handle across workers.
+    %   baseCtx = ProcessingContext.fromGlobals();
     %   parfor i = 1:numSubjects
-    %       ctx = ProcessingContext.fromGlobals();
+    %       ctx = baseCtx.copy();
     %       ctx.subjectAge = ages(i);
     %       results{i} = processFNIRS2(data{i}, 'Context', ctx);
     %   end
@@ -170,52 +174,44 @@ classdef ProcessingContext < handle
             obj.oxyMethod.name = methodName;
         end
 
-        function applyToGlobals(obj)
-            % APPLYTOGLOBALS Write context settings back to global variables
+        function loadMethods(obj)
+            % LOADMETHODS Populate the raw/oxy method libraries on this context
             %
-            % This is useful when you've configured a context and want to
-            % use it with GUI functions that read from globals.
+            % Loads the device method-definition libraries (from the toolbox
+            % cfg files, via resolveMethodsLib) into rawMethodsLib/oxyMethodsLib
+            % so that setRawMethod/setOxyMethod work on a context that was NOT
+            % built through fromGlobals(). Any method NAMES already set on the
+            % context (e.g. restored by fromStruct) are re-resolved into their
+            % unpacked method structs against the freshly loaded libraries.
             %
             % Syntax:
-            %   ctx.applyToGlobals()
+            %   ctx.loadMethods()
+            %
+            % See also: pf2_base.resolveMethodsLib, setRawMethod, setOxyMethod
 
-            global PF2 setF
+            obj.rawMethodsLib = pf2_base.resolveMethodsLib('raw');
+            obj.oxyMethodsLib = pf2_base.resolveMethodsLib('oxy');
 
-            % Ensure initialized
-            if ~isfield(PF2, 'myRawMethods')
-                pf2_base.pf2_initialize();
+            % Re-resolve any names that were set before the library existed.
+            if ~isempty(obj.rawMethodName) && ~strcmpi(obj.rawMethodName, 'None')
+                obj.setRawMethod(obj.rawMethodName);
             end
-
-            % DPF settings
-            PF2.dpf_mode = obj.dpfMode;
-            PF2.curDPF_fixed = obj.dpfFixedValue;
-            PF2.curDPF_age = obj.subjectAge;
-
-            % Baseline settings
-            PF2.baseline.startTime = obj.baselineStartTime;
-            PF2.baseline.blLength = obj.baselineLength;
-            PF2.baseline.useAbsoluteTime = obj.useAbsoluteTime;
-            PF2.baseline.windowStartTime = obj.windowStartTime;
-
-            % Quality control
-            PF2.RejectLevel = obj.rejectLevel;
-
-            % Output options
-            PF2.OutputLegacyMarkers = obj.outputLegacyMarkers;
-
-            % Methods (if set)
-            if ~isempty(obj.rawMethod) && isfield(obj.rawMethod, 'name')
-                PF2.stageRawMethod = obj.rawMethod;
-            end
-            if ~isempty(obj.oxyMethod) && isfield(obj.oxyMethod, 'name')
-                PF2.stageOxyMethod = obj.oxyMethod;
-            end
-
-            % Device
-            if ~isempty(fieldnames(obj.device))
-                setF.device = obj.device;
+            if ~isempty(obj.oxyMethodName) && ~strcmpi(obj.oxyMethodName, 'None')
+                obj.setOxyMethod(obj.oxyMethodName);
             end
         end
+
+        % copy() is inherited from matlab.mixin.Copyable: it returns an
+        % independent instance of the concrete class WITHOUT invoking the
+        % constructor (so it never re-loads method libraries or touches
+        % globals). This is what per-worker / per-subject configuration needs,
+        % since plain assignment (ctx2 = ctx) only aliases the handle:
+        %
+        %   parfor i = 1:N
+        %       c = baseCtx.copy();
+        %       c.subjectAge = ages(i);
+        %       out{i} = processFNIRS2(data{i}, 'Context', c);
+        %   end
 
         function s = toStruct(obj)
             % TOSTRUCT Convert context to a plain struct for saving
@@ -262,9 +258,12 @@ classdef ProcessingContext < handle
             %   ctx = ProcessingContext.fromGlobals();
             %   save('my_settings.mat', 'ctx');
             %
-            %   % Modify for parallel processing
+            %   % Modify for parallel processing. Snapshot once here in the
+            %   % client, then copy() per worker (fromGlobals on a worker sees
+            %   % empty globals; plain assignment would alias one handle).
+            %   baseCtx = ProcessingContext.fromGlobals();
             %   parfor i = 1:N
-            %       ctx = ProcessingContext.fromGlobals();
+            %       ctx = baseCtx.copy();
             %       ctx.subjectAge = ages(i);
             %       results{i} = processFNIRS2(data{i}, 'Context', ctx);
             %   end
@@ -371,6 +370,12 @@ classdef ProcessingContext < handle
             if isfield(s, 'processRejected'), obj.processRejected = s.processRejected; end
             if isfield(s, 'outputLegacyMarkers'), obj.outputLegacyMarkers = s.outputLegacyMarkers; end
             if isfield(s, 'rootPath'), obj.rootPath = s.rootPath; end
+
+            % Reload the method libraries so a deserialized recipe is actually
+            % usable: without this, rawMethodsLib/oxyMethodsLib stay empty and
+            % the restored method names cannot be resolved (setRawMethod would
+            % error). loadMethods() also re-resolves the names into structs.
+            obj.loadMethods();
         end
     end
 end

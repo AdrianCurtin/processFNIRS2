@@ -1,0 +1,538 @@
+{
+  "_schemaVersion": "1.0.0",
+
+  "processFNIRS2":
+  {
+    "inputs":
+    [
+      {"name":"data", "kind":"required", "type":["struct"], "purpose":"Imported fNIRS data struct (or cell array of structs)"},
+      {"name":"rawMethod", "kind":"ordered", "type":["char"], "purpose":"Named raw-stage method"},
+      {"name":"oxyMethod", "kind":"ordered", "type":["char"], "purpose":"Named oxy-stage method"},
+      {"name":"ShowGUI", "kind":"namevalue", "type":["logical","scalar"], "purpose":"Force the GUI even when an output is captured"},
+      {"name":"Context", "kind":"namevalue", "type":["pf2_base.ProcessingContext"], "purpose":"Isolated processing context (bypasses PF2/setF globals)"},
+      {"name":"SkipRaw", "kind":"namevalue", "type":["logical","scalar"], "purpose":"Skip the raw stage (oxy-only input)"},
+      {"name":"SkipOD", "kind":"namevalue", "type":["logical","scalar"], "purpose":"Return optical-density output from the raw stage"}
+    ]
+  },
+
+  "pf2.import.importNIR":
+  {
+    "inputs":
+    [
+      {"name":"nir_filename", "kind":"required", "type":["char"], "purpose":".nir file path"},
+      {"name":"mrk_filename", "kind":"ordered", "type":[["char"],["logical"],["cell"]], "purpose":"Marker file path (or false to skip)"},
+      {"name":"channelCheck", "kind":"ordered", "type":["logical","scalar"], "purpose":"Open the channel-check GUI"},
+      {"name":"ChannelCheckVersion", "kind":"namevalue", "type":["numeric","scalar"]}
+    ]
+  },
+  "pf2.import.importSNIRF":
+  {
+    "inputs":
+    [
+      {"name":"filepath", "kind":"required", "type":["char"], "purpose":".snirf file path"},
+      {"name":"channelCheck", "kind":"ordered", "type":["logical","scalar"]},
+      {"name":"ChannelCheckVersion", "kind":"namevalue", "type":["numeric","scalar"]}
+    ]
+  },
+  "pf2.import.importHitachiMES":
+  {
+    "inputs":
+    [
+      {"name":"file", "kind":"required", "type":["char"], "purpose":"Hitachi MES file"},
+      {"name":"pathname", "kind":"ordered", "type":["char"]},
+      {"name":"channelCheck", "kind":"ordered", "type":["logical","scalar"]},
+      {"name":"ChannelCheckVersion", "kind":"namevalue", "type":["numeric","scalar"]}
+    ]
+  },
+  "pf2.import.importOxy3":
+  {
+    "inputs":
+    [
+      {"name":"file", "kind":"required", "type":["char"], "purpose":".oxy3 file path"},
+      {"name":"channelCheck", "kind":"ordered", "type":["logical","scalar"]},
+      {"name":"OptodeTemplate", "kind":"namevalue", "type":["char"], "purpose":"Optode template XML for real geometry"},
+      {"name":"ChannelCheckVersion", "kind":"namevalue", "type":["numeric","scalar"]}
+    ]
+  },
+  "pf2.import.importDirectory":
+  {
+    "inputs":
+    [
+      {"name":"dirPath", "kind":"required", "type":["char"], "purpose":"Root directory to search"},
+      {"name":"pattern", "kind":"ordered", "type":["char"], "purpose":"Glob pattern, e.g. '*.snirf'"},
+      {"name":"Dir1", "kind":"namevalue", "type":["choices={'Group','SubjectID','Session','Condition','Task','Run'}"], "purpose":".info field mapped from the 1st subdirectory level"},
+      {"name":"Dir2", "kind":"namevalue", "type":["choices={'Group','SubjectID','Session','Condition','Task','Run'}"]},
+      {"name":"Dir3", "kind":"namevalue", "type":["choices={'Group','SubjectID','Session','Condition','Task','Run'}"]},
+      {"name":"Dir4", "kind":"namevalue", "type":["choices={'Group','SubjectID','Session','Condition','Task','Run'}"]},
+      {"name":"Filename", "kind":"namevalue", "type":["choices={'SubjectID','Group','Session','Condition'}"], "purpose":".info field taken from each file's name"},
+      {"name":"ChannelCheck", "kind":"namevalue", "type":["logical","scalar"]},
+      {"name":"ContinueOnError", "kind":"namevalue", "type":["logical","scalar"]},
+      {"name":"Verbose", "kind":"namevalue", "type":["logical","scalar"]}
+    ]
+  },
+  "pf2.import.importEmbeddings":
+  {
+    "inputs":
+    [
+      {"name":"data", "kind":"required", "type":["struct"]},
+      {"name":"path", "kind":"required", "type":["char"], "purpose":"HDF5 embeddings file"},
+      {"name":"Field", "kind":"namevalue", "type":["char"], "purpose":"Destination field name (default 'embeddings')"}
+    ]
+  },
+  "pf2.import.fromTable":
+  {
+    "inputs":
+    [
+      {"name":"T", "kind":"required", "type":["table"]},
+      {"name":"Subject", "kind":"namevalue", "type":["char"], "purpose":"Column identifying subjects"},
+      {"name":"Value", "kind":"namevalue", "type":[["char"],["cell"]], "purpose":"Column(s) becoming pseudo-channels"},
+      {"name":"Time", "kind":"namevalue", "type":["char"], "purpose":"Column for the time axis"},
+      {"name":"Info", "kind":"namevalue", "type":["cell"], "purpose":"Subject-constant columns to carry into .info"},
+      {"name":"TimeMode", "kind":"namevalue", "type":["choices={'index','value'}"]},
+      {"name":"Units", "kind":"namevalue", "type":["char"]},
+      {"name":"Duplicates", "kind":"namevalue", "type":["choices={'mean','first','error'}"]}
+    ]
+  },
+
+  "pf2.data.setT0":
+  {
+    "inputs":
+    [
+      {"name":"data", "kind":"required", "type":["struct"]},
+      {"name":"t0time", "kind":"required", "type":["numeric","scalar"], "purpose":"New t0 in seconds"}
+    ]
+  },
+  "pf2.data.resample":
+  {
+    "inputs":
+    [
+      {"name":"data", "kind":"required", "type":["struct"]},
+      {"name":"segmentLength", "kind":"required", "type":["numeric","scalar"], "purpose":"Bin size in seconds"},
+      {"name":"blLength", "kind":"ordered", "type":["numeric","scalar"]},
+      {"name":"centerOnT0", "kind":"namevalue", "type":["logical","scalar"]},
+      {"name":"timeOutMode", "kind":"namevalue", "type":["choices={'start','mid','end'}"]},
+      {"name":"nanRejectionLevel", "kind":"namevalue", "type":["numeric","scalar"]},
+      {"name":"averageAux", "kind":"namevalue", "type":["logical","scalar"]}
+    ]
+  },
+  "pf2.data.getMarkers":
+  {
+    "inputs":
+    [
+      {"name":"data", "kind":"required", "type":["struct"]},
+      {"name":"markersStart", "kind":"ordered", "type":["numeric"], "purpose":"Marker code(s)"},
+      {"name":"returnIndices", "kind":"namevalue", "type":["logical","scalar"]},
+      {"name":"exactMatch", "kind":"namevalue", "type":["logical","scalar"]},
+      {"name":"sortTimes", "kind":"namevalue", "type":["logical","scalar"]}
+    ]
+  },
+  "pf2.data.defineBlocks":
+  {
+    "inputs":
+    [
+      {"name":"data", "kind":"required", "type":["struct"]},
+      {"name":"markerCodes", "kind":"ordered", "type":["numeric"], "purpose":"Marker code(s) that start a block"},
+      {"name":"duration", "kind":"ordered", "type":["numeric","scalar"], "purpose":"Block duration in seconds"},
+      {"name":"UseDuration", "kind":"namevalue", "type":["logical","scalar"]},
+      {"name":"StartMarker", "kind":"namevalue", "type":["numeric"]},
+      {"name":"EndMarker", "kind":"namevalue", "type":["numeric"]},
+      {"name":"ConditionField", "kind":"namevalue", "type":[["char"],["cell"]]},
+      {"name":"MarkerWindow", "kind":"namevalue", "type":["choices={'core','padded'}"]},
+      {"name":"Embed", "kind":"namevalue", "type":["logical","scalar"]}
+    ]
+  },
+  "pf2.data.extractBlocks":
+  {
+    "inputs":
+    [
+      {"name":"data", "kind":"required", "type":["struct"]},
+      {"name":"blocks", "kind":"required", "type":["struct"]},
+      {"name":"PreTime", "kind":"namevalue", "type":["numeric","scalar"], "purpose":"Seconds before onset"},
+      {"name":"PostTime", "kind":"namevalue", "type":["numeric","scalar"], "purpose":"Seconds after onset"},
+      {"name":"Buffer", "kind":"namevalue", "type":["numeric","scalar"]},
+      {"name":"BaselineWindow", "kind":"namevalue", "type":["numeric"]},
+      {"name":"SetT0", "kind":"namevalue", "type":["logical","scalar"]},
+      {"name":"SkipInvalid", "kind":"namevalue", "type":["logical","scalar"]},
+      {"name":"RejectByAux", "kind":"namevalue", "type":[["char"],["logical"]]},
+      {"name":"AuxMotionFraction", "kind":"namevalue", "type":["numeric","scalar"]},
+      {"name":"AuxMotionThresh", "kind":"namevalue", "type":["numeric","scalar"]}
+    ]
+  },
+  "pf2.data.blockAverage":
+  {
+    "inputs":
+    [
+      {"name":"segments", "kind":"required", "type":["cell"]},
+      {"name":"ResampleInterval", "kind":"namevalue", "type":["numeric","scalar"]},
+      {"name":"AverageAux", "kind":"namevalue", "type":["logical","scalar"]},
+      {"name":"HierarchyVars", "kind":"namevalue", "type":["numeric"]}
+    ]
+  },
+  "pf2.data.grandAverage":
+  {
+    "inputs":
+    [
+      {"name":"segments", "kind":"required", "type":["cell"]},
+      {"name":"ResampleInterval", "kind":"namevalue", "type":["numeric","scalar"]},
+      {"name":"AverageAux", "kind":"namevalue", "type":["logical","scalar"]},
+      {"name":"HierarchyVars", "kind":"namevalue", "type":["numeric"]}
+    ]
+  },
+  "pf2.data.slidingWindows":
+  {
+    "inputs":
+    [
+      {"name":"data", "kind":"required", "type":["struct"]},
+      {"name":"Length", "kind":"namevalue", "type":["numeric","scalar"], "purpose":"Window length in seconds"},
+      {"name":"Step", "kind":"namevalue", "type":["numeric","scalar"]},
+      {"name":"Overlap", "kind":"namevalue", "type":["numeric","scalar"]},
+      {"name":"Start", "kind":"namevalue", "type":["numeric","scalar"]},
+      {"name":"End", "kind":"namevalue", "type":["numeric","scalar"]},
+      {"name":"Partial", "kind":"namevalue", "type":["logical","scalar"]},
+      {"name":"Condition", "kind":"namevalue", "type":["char"]},
+      {"name":"Embed", "kind":"namevalue", "type":["logical","scalar"]}
+    ]
+  },
+  "pf2.data.importInfo":
+  {
+    "inputs":
+    [
+      {"name":"data", "kind":"required", "type":[["struct"],["cell"]]},
+      {"name":"filepath", "kind":"required", "type":["char"], "purpose":"CSV/XLSX metadata file"},
+      {"name":"keyColumn", "kind":"required", "type":["char"], "purpose":"Column matched against .info"},
+      {"name":"Keys", "kind":"namevalue", "type":[["char"],["cell"]]},
+      {"name":"Sheet", "kind":"namevalue", "type":[["numeric"],["char"]]},
+      {"name":"Overwrite", "kind":"namevalue", "type":["logical","scalar"]}
+    ]
+  },
+  "pf2.data.importBlockInfo":
+  {
+    "inputs":
+    [
+      {"name":"blocks", "kind":"required", "type":["struct"]},
+      {"name":"source", "kind":"required", "type":[["char"],["table"],["numeric"]]},
+      {"name":"Field", "kind":"namevalue", "type":["char"]},
+      {"name":"MarkerCode", "kind":"namevalue", "type":["numeric"]},
+      {"name":"Overwrite", "kind":"namevalue", "type":["logical","scalar"]}
+    ]
+  },
+  "pf2.data.infoToTable":
+  {
+    "inputs":
+    [
+      {"name":"data", "kind":"required", "type":[["struct"],["cell"]]},
+      {"name":"fieldName", "kind":"ordered", "type":["char"]},
+      {"name":"Fields", "kind":"namevalue", "type":["cell"]},
+      {"name":"SavePath", "kind":"namevalue", "type":["char"]}
+    ]
+  },
+  "pf2.data.infoFromTable":
+  {
+    "inputs":
+    [
+      {"name":"data", "kind":"required", "type":[["struct"],["cell"]]},
+      {"name":"T", "kind":"required", "type":[["table"],["char"]]},
+      {"name":"value", "kind":"ordered", "type":[]},
+      {"name":"Overwrite", "kind":"namevalue", "type":["logical","scalar"]},
+      {"name":"Clear", "kind":"namevalue", "type":["logical","scalar"]}
+    ]
+  },
+  "pf2.data.setMarkerDict":
+  {
+    "inputs":
+    [
+      {"name":"data", "kind":"required", "type":["struct"]},
+      {"name":"dict", "kind":"required", "type":[["table"],["cell"]], "purpose":"Code->Label dictionary"},
+      {"name":"Merge", "kind":"namevalue", "type":["logical","scalar"]}
+    ]
+  },
+  "pf2.data.labelMarkers":
+  {
+    "inputs":
+    [
+      {"name":"data", "kind":"required", "type":["struct"]},
+      {"name":"map", "kind":"ordered", "type":["cell"]},
+      {"name":"VarName", "kind":"namevalue", "type":["char"]},
+      {"name":"Ordinal", "kind":"namevalue", "type":["logical","scalar"]}
+    ]
+  },
+  "pf2.data.plot.oxy":
+  {
+    "inputs":
+    [
+      {"name":"data", "kind":"required", "type":["struct"]},
+      {"name":"channels", "kind":"ordered", "type":["numeric"]},
+      {"name":"biomarkers", "kind":"namevalue", "type":[["choices={'HbO','HbR','HbTotal','HbDiff','CBSI','all'}"],["cell"]]},
+      {"name":"baseline", "kind":"namevalue", "type":["numeric"]},
+      {"name":"markers", "kind":"namevalue", "type":["logical","scalar"]},
+      {"name":"ylim", "kind":"namevalue", "type":["numeric"]},
+      {"name":"savePath", "kind":"namevalue", "type":["char"]},
+      {"name":"saveDPI", "kind":"namevalue", "type":["numeric","scalar"]}
+    ]
+  },
+
+  "pf2.export.asNIR":
+  {
+    "inputs":
+    [
+      {"name":"data", "kind":"required", "type":[["struct"],["cell"]]},
+      {"name":"filepath", "kind":"ordered", "type":["char"]},
+      {"name":"Dir1", "kind":"namevalue", "type":["char"]},
+      {"name":"Prefix", "kind":"namevalue", "type":["cell"]},
+      {"name":"Verbose", "kind":"namevalue", "type":["logical","scalar"]}
+    ]
+  },
+  "pf2.export.asSNIRF":
+  {
+    "inputs":
+    [
+      {"name":"data", "kind":"required", "type":[["struct"],["cell"]]},
+      {"name":"filepath", "kind":"ordered", "type":["char"]},
+      {"name":"Dir1", "kind":"namevalue", "type":["char"]},
+      {"name":"Prefix", "kind":"namevalue", "type":["cell"]},
+      {"name":"NormalizeRaw", "kind":"namevalue", "type":["logical","scalar"]},
+      {"name":"StripExtraRawChannels", "kind":"namevalue", "type":["logical","scalar"]},
+      {"name":"Verbose", "kind":"namevalue", "type":["logical","scalar"]}
+    ]
+  },
+  "pf2.export.asBIDS":
+  {
+    "inputs":
+    [
+      {"name":"data", "kind":"required", "type":[["struct"],["cell"]]},
+      {"name":"rootDir", "kind":"required", "type":["char"], "purpose":"Output BIDS dataset root"},
+      {"name":"Task", "kind":"namevalue", "type":["char"], "purpose":"Task label (required)"},
+      {"name":"Name", "kind":"namevalue", "type":["char"]},
+      {"name":"Authors", "kind":"namevalue", "type":["cell"]},
+      {"name":"Participants", "kind":"namevalue", "type":["cell"]},
+      {"name":"Overwrite", "kind":"namevalue", "type":["logical","scalar"]},
+      {"name":"Verbose", "kind":"namevalue", "type":["logical","scalar"]}
+    ]
+  },
+  "pf2.export.asTensor":
+  {
+    "inputs":
+    [
+      {"name":"data", "kind":"required", "type":["struct"]},
+      {"name":"path", "kind":"required", "type":["char"], "purpose":"HDF5 output file"},
+      {"name":"Features", "kind":"namevalue", "type":["cell"], "purpose":"Feature-axis biomarker names"},
+      {"name":"Windows", "kind":"namevalue", "type":[["cell"],["struct"]]},
+      {"name":"QC", "kind":"namevalue", "type":[["logical"],["struct"]]},
+      {"name":"Aux", "kind":"namevalue", "type":[["choices={'all'}"],["cell"],["logical"]]},
+      {"name":"ContractVersion", "kind":"namevalue", "type":["char"]}
+    ]
+  },
+  "pf2.export.export":
+  {
+    "inputs":
+    [
+      {"name":"data", "kind":"required", "type":[["struct"],["cell"]]},
+      {"name":"filepath", "kind":"required", "type":["char"]},
+      {"name":"Format", "kind":"namevalue", "type":["choices={'snirf','nir','bids'}"]},
+      {"name":"Task", "kind":"namevalue", "type":["char"]}
+    ]
+  },
+
+  "pf2.probe.nearestBrodmann":
+  {
+    "inputs":
+    [
+      {"name":"data", "kind":"required", "type":[["struct"],["char"]]},
+      {"name":"N", "kind":"namevalue", "type":["numeric","scalar"], "purpose":"Number of nearest areas"},
+      {"name":"MaxDistance", "kind":"namevalue", "type":["numeric","scalar"]}
+    ]
+  },
+  "pf2.probe.montage":
+  {
+    "inputs":
+    [
+      {"name":"data", "kind":"required", "type":[["struct"],["char"]]},
+      {"name":"Brodmann", "kind":"namevalue", "type":["logical","scalar"]},
+      {"name":"MaxDistance", "kind":"namevalue", "type":["numeric","scalar"]},
+      {"name":"SavePath", "kind":"namevalue", "type":["char"]}
+    ]
+  },
+  "pf2.probe.saveCfg":
+  {
+    "inputs":
+    [
+      {"name":"source", "kind":"required", "type":[["struct"],["char"]]},
+      {"name":"savePath", "kind":"required", "type":["char"]},
+      {"name":"Name", "kind":"namevalue", "type":["char"]},
+      {"name":"CoordinateSystem", "kind":"namevalue", "type":["char"]},
+      {"name":"ReferenceHead", "kind":"namevalue", "type":["char"]},
+      {"name":"Overwrite", "kind":"namevalue", "type":["logical","scalar"]}
+    ]
+  },
+  "pf2.probe.canonicalize":
+  {
+    "inputs":
+    [
+      {"name":"data", "kind":"required", "type":[["struct"],["cell"]]},
+      {"name":"MaxDistance", "kind":"namevalue", "type":["numeric","scalar"]},
+      {"name":"Regions", "kind":"namevalue", "type":["numeric"]},
+      {"name":"Space", "kind":"namevalue", "type":["choices={'Brodmann'}"]},
+      {"name":"Aggregate", "kind":"namevalue", "type":["choices={'nanmean','mean'}"]}
+    ]
+  },
+  "pf2.probe.plot.topo":
+  {
+    "inputs":
+    [
+      {"name":"data", "kind":"required", "type":["struct"]},
+      {"name":"biomarker", "kind":"required", "type":["choices={'HbO','HbR','HbTotal','HbDiff','CBSI'}"]},
+      {"name":"Time", "kind":"namevalue", "type":["numeric"], "purpose":"Instant or [t1 t2] window"},
+      {"name":"View", "kind":"namevalue", "type":["choices={'2d','3d','movie'}"]},
+      {"name":"Layout", "kind":"namevalue", "type":["choices={'schematic','flat','anatomical','auto'}"]},
+      {"name":"Style", "kind":"namevalue", "type":["choices={'showcase','publication'}"]},
+      {"name":"Title", "kind":"namevalue", "type":["char"]},
+      {"name":"Colorbar", "kind":"namevalue", "type":["char"]},
+      {"name":"savePath", "kind":"namevalue", "type":["char"]}
+    ]
+  },
+  "pf2.probe.plot.movie":
+  {
+    "inputs":
+    [
+      {"name":"data", "kind":"required", "type":["struct"]},
+      {"name":"biomarker", "kind":"required", "type":["choices={'HbO','HbR','HbTotal','HbDiff','CBSI'}"]},
+      {"name":"savePath", "kind":"namevalue", "type":["char"]},
+      {"name":"View", "kind":"namevalue", "type":["choices={'3d','2d'}"]},
+      {"name":"TimeRange", "kind":"namevalue", "type":["numeric"]},
+      {"name":"NFrames", "kind":"namevalue", "type":["numeric","scalar"]},
+      {"name":"FPS", "kind":"namevalue", "type":["numeric","scalar"]},
+      {"name":"Range", "kind":"namevalue", "type":["numeric"]}
+    ]
+  },
+  "pf2.probe.plot.connectome":
+  {
+    "inputs":
+    [
+      {"name":"result", "kind":"required", "type":[["struct"],["numeric"]]},
+      {"name":"data", "kind":"required", "type":["struct"]},
+      {"name":"View", "kind":"namevalue", "type":["choices={'3d','2d'}"]},
+      {"name":"Threshold", "kind":"namevalue", "type":["numeric","scalar"]},
+      {"name":"TopN", "kind":"namevalue", "type":["numeric","scalar"]},
+      {"name":"CLim", "kind":"namevalue", "type":["numeric"]},
+      {"name":"ShowLabels", "kind":"namevalue", "type":["logical","scalar"]}
+    ]
+  },
+  "pf2.probe.plot.interpolateValues3D":
+  {
+    "inputs":
+    [
+      {"name":"data2plot", "kind":"required", "type":["numeric"], "purpose":"[1 x C] per-channel values"},
+      {"name":"data", "kind":"ordered", "type":[["struct"],["char"]]},
+      {"name":"cmap", "kind":"namevalue", "type":["choices={'actc','warm','cool','blue2red','bone','rdbu','viridis','cividis','hotCropped'}"]},
+      {"name":"interpolateType", "kind":"namevalue", "type":["choices={'nearest','linear','quadratic','cubic','sensitivity'}"]},
+      {"name":"initCamPosition", "kind":"namevalue", "type":["choices={'auto','front','back','top','bottom','left','right','top-left','top-right','top-front','top-back','front-left','front-right','back-left','back-right'}"]},
+      {"name":"Style", "kind":"namevalue", "type":["choices={'showcase','publication'}"]},
+      {"name":"voxelLighting", "kind":"namevalue", "type":["choices={'none','realistic','dramatic','clinical'}"]},
+      {"name":"AlphaMode", "kind":"namevalue", "type":["choices={'blend','transparent'}"]},
+      {"name":"Parcellate", "kind":"namevalue", "type":["logical","scalar"]},
+      {"name":"HighlightChannels", "kind":"namevalue", "type":["numeric"]},
+      {"name":"showColorbar", "kind":"namevalue", "type":["logical","scalar"]},
+      {"name":"savePath", "kind":"namevalue", "type":["char"]}
+    ]
+  },
+  "pf2.probe.project.regions":
+  {
+    "inputs":
+    [
+      {"name":"regionValues", "kind":"required", "type":[["numeric"],["choices={'HbO','HbR','HbTotal','HbDiff','CBSI'}"]]},
+      {"name":"data", "kind":"required", "type":["struct"]},
+      {"name":"Regions", "kind":"namevalue", "type":["numeric"]},
+      {"name":"Range", "kind":"namevalue", "type":["numeric"]},
+      {"name":"Title", "kind":"namevalue", "type":["char"]},
+      {"name":"savePath", "kind":"namevalue", "type":["char"]}
+    ]
+  },
+  "pf2.probe.project.parcels":
+  {
+    "inputs":
+    [
+      {"name":"channelValues", "kind":"ordered", "type":["numeric"]},
+      {"name":"data", "kind":"required", "type":["struct"]},
+      {"name":"Highlight", "kind":"namevalue", "type":["numeric"]},
+      {"name":"Range", "kind":"namevalue", "type":["numeric"]},
+      {"name":"Colorbar", "kind":"namevalue", "type":["char"]},
+      {"name":"savePath", "kind":"namevalue", "type":["char"]}
+    ]
+  },
+  "pf2.probe.project.pvalues":
+  {
+    "inputs":
+    [
+      {"name":"pvals", "kind":"required", "type":["numeric"]},
+      {"name":"data", "kind":"required", "type":[["struct"],["char"]]},
+      {"name":"pThreshold", "kind":"namevalue", "type":["numeric","scalar"]},
+      {"name":"FDR", "kind":"namevalue", "type":["logical","scalar"]},
+      {"name":"LogScale", "kind":"namevalue", "type":["logical","scalar"]},
+      {"name":"savePath", "kind":"namevalue", "type":["char"]}
+    ]
+  },
+  "pf2.probe.project.fstats":
+  {
+    "inputs":
+    [
+      {"name":"Fvals", "kind":"required", "type":["numeric"]},
+      {"name":"data", "kind":"required", "type":[["struct"],["char"]]},
+      {"name":"pvalues", "kind":"namevalue", "type":["numeric"]},
+      {"name":"pThreshold", "kind":"namevalue", "type":["numeric","scalar"]},
+      {"name":"FDR", "kind":"namevalue", "type":["logical","scalar"]},
+      {"name":"savePath", "kind":"namevalue", "type":["char"]}
+    ]
+  },
+  "pf2.probe.project.tomography":
+  {
+    "inputs":
+    [
+      {"name":"recon", "kind":"required", "type":["struct"]},
+      {"name":"Biomarker", "kind":"namevalue", "type":["choices={'HbO','HbR'}"]},
+      {"name":"TimeIndex", "kind":"namevalue", "type":["numeric","scalar"]},
+      {"name":"Range", "kind":"namevalue", "type":["numeric"]},
+      {"name":"cmap", "kind":"namevalue", "type":["choices={'rdbu','warm','cool','viridis','cividis'}"]},
+      {"name":"savePath", "kind":"namevalue", "type":["char"]}
+    ]
+  },
+  "pf2.probe.dot.reconstruct":
+  {
+    "inputs":
+    [
+      {"name":"data", "kind":"required", "type":["struct"]},
+      {"name":"Biomarkers", "kind":"namevalue", "type":["cell"]},
+      {"name":"Time", "kind":"namevalue", "type":["numeric"]},
+      {"name":"AllTimes", "kind":"namevalue", "type":["logical","scalar"]},
+      {"name":"Lambda", "kind":"namevalue", "type":["numeric","scalar"]},
+      {"name":"DepthWeight", "kind":"namevalue", "type":["logical","scalar"]},
+      {"name":"RegMethod", "kind":"namevalue", "type":["choices={'gcv','lcurve'}"]},
+      {"name":"Prior", "kind":"namevalue", "type":["choices={'minnorm','laplacian','parcel'}"]},
+      {"name":"HeadModel", "kind":"namevalue", "type":["choices={'homogeneous','layered'}"]},
+      {"name":"ScalpRegression", "kind":"namevalue", "type":["logical","scalar"]},
+      {"name":"ScalpMethod", "kind":"namevalue", "type":["choices={'nearest','pca','all'}"]}
+    ]
+  },
+
+  "pf2.qc.pipeline.assess":
+  {
+    "inputs":
+    [
+      {"name":"data", "kind":"required", "type":["struct"]},
+      {"name":"Checks", "kind":"namevalue", "type":["cell"], "purpose":"Subset of {'saturation','sci','cardiac','cov','takizawa'}"},
+      {"name":"SaturationThreshold", "kind":"namevalue", "type":["numeric","scalar"]},
+      {"name":"SCIThreshold", "kind":"namevalue", "type":["numeric","scalar"]},
+      {"name":"CoVThreshold", "kind":"namevalue", "type":["numeric","scalar"]},
+      {"name":"TakizawaStrict", "kind":"namevalue", "type":["logical","scalar"]}
+    ]
+  },
+  "pf2.qc.snapshot":
+  {
+    "inputs":
+    [
+      {"name":"data", "kind":"required", "type":["struct"]},
+      {"name":"SaveDir", "kind":"namevalue", "type":["char"]},
+      {"name":"Prefix", "kind":"namevalue", "type":["char"]},
+      {"name":"DPI", "kind":"namevalue", "type":["numeric","scalar"]}
+    ]
+  }
+}

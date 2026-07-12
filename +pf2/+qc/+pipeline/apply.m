@@ -1,4 +1,4 @@
-function data = apply(data, report, varargin)
+function data = apply(data, report, opts)
 % APPLY Update fchMask based on a QC pipeline report
 %
 % ANDs the QC check results with the existing fchMask so that previously
@@ -31,18 +31,13 @@ function data = apply(data, report, varargin)
 %
 % See also: pf2.qc.pipeline.assess, pf2.qc.pipeline.report
 
-%% Parse inputs
-p = inputParser;
-p.FunctionName = 'pf2.qc.pipeline.apply';
-
-addRequired(p, 'data', @isstruct);
-addRequired(p, 'report', @isstruct);
-addParameter(p, 'Checks', 'all', @(x) ischar(x) || isstring(x) || iscell(x));
-addParameter(p, 'Mode', 'and', @(x) ischar(x) || isstring(x));
-addParameter(p, 'MarkNoisy', false, @islogical);
-
-parse(p, data, report, varargin{:});
-opts = p.Results;
+arguments
+    data struct
+    report struct
+    opts.Checks = 'all'
+    opts.Mode = 'and'
+    opts.MarkNoisy (1,1) logical = false
+end
 
 %% Validate report
 assert(isfield(report, 'pass'), 'pf2:qc:pipeline:badReport', ...

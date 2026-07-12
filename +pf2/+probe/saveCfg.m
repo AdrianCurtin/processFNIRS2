@@ -1,4 +1,4 @@
-function outPath = saveCfg(source, savePath, varargin)
+function outPath = saveCfg(source, savePath, opts)
 % SAVECFG Write a probe's geometry to a device .cfg file
 %
 % Serializes the probe geometry carried by a pf2.Device (typically built by
@@ -97,25 +97,25 @@ function outPath = saveCfg(source, savePath, varargin)
 %           pf2.import.importSNIRF, pf2_base.external.INI
 
 % --- Parse inputs ---
-p = inputParser;
-p.addRequired('source');
-p.addRequired('savePath', @(x) ischar(x) || isstring(x));
-p.addParameter('Name', '', @(x) ischar(x) || isstring(x));
-p.addParameter('Manufacturer', '', @(x) ischar(x) || isstring(x));
-p.addParameter('CoordinateUnits', '', @(x) ischar(x) || isstring(x));
-p.addParameter('CoordinateSystem', '', @(x) ischar(x) || isstring(x));
-p.addParameter('RegistrationMethod', '', @(x) ischar(x) || isstring(x));
-p.addParameter('CoordinateProvenance', '', @(x) ischar(x) || isstring(x));
-p.addParameter('ReferenceHead', '', @(x) ischar(x) || isstring(x));
-p.addParameter('SamplingRate', [], @(x) isempty(x) || (isnumeric(x) && isscalar(x) && x > 0));
-p.addParameter('Overwrite', true, @(x) islogical(x) && isscalar(x));
-p.parse(source, savePath, varargin{:});
+arguments
+    source
+    savePath {mustBeText}
+    opts.Name = ''
+    opts.Manufacturer = ''
+    opts.CoordinateUnits = ''
+    opts.CoordinateSystem = ''
+    opts.RegistrationMethod = ''
+    opts.CoordinateProvenance = ''
+    opts.ReferenceHead = ''
+    opts.SamplingRate = []
+    opts.Overwrite (1,1) logical = true
+end
 
 savePath = char(savePath);
 if ~endsWith(lower(savePath), '.cfg')
     savePath = [savePath '.cfg'];
 end
-if ~p.Results.Overwrite && exist(savePath, 'file')
+if ~opts.Overwrite && exist(savePath, 'file')
     error('pf2:probe:saveCfg:fileExists', ...
         'Target file already exists (set ''Overwrite'', true to replace): %s', savePath);
 end
@@ -203,7 +203,7 @@ if ~has3D
     if isnan(scale2d), scale2d = 1; end
 end
 
-coordUnits = char(p.Results.CoordinateUnits);
+coordUnits = char(opts.CoordinateUnits);
 if isempty(coordUnits)
     if has3D, coordUnits = 'mm'; else, coordUnits = 'cm'; end
 end
@@ -232,22 +232,22 @@ probe1.dI = dI;
 
 % --- Assemble [Info] ---
 info = struct();
-info.CoordinateSystem     = override(p.Results.CoordinateSystem, dev.CoordinateSystem, 'Unknown');
+info.CoordinateSystem     = override(opts.CoordinateSystem, dev.CoordinateSystem, 'Unknown');
 info.CoordinateUnits      = coordUnits;
-info.RegistrationMethod   = override(p.Results.RegistrationMethod, dev.RegistrationMethod, 'unspecified');
-info.CoordinateProvenance = override(p.Results.CoordinateProvenance, dev.CoordinateProvenance, 'unspecified');
-info.ReferenceHead        = override(p.Results.ReferenceHead, dev.ReferenceHead, 'unspecified');
+info.RegistrationMethod   = override(opts.RegistrationMethod, dev.RegistrationMethod, 'unspecified');
+info.CoordinateProvenance = override(opts.CoordinateProvenance, dev.CoordinateProvenance, 'unspecified');
+info.ReferenceHead        = override(opts.ReferenceHead, dev.ReferenceHead, 'unspecified');
 info.CfgName              = cfgBase;
 
-devName = char(p.Results.Name);
+devName = char(opts.Name);
 if isempty(devName), devName = orDefault(dev.model, cfgBase); end
 info.Name = devName;
 
-manu = char(p.Results.Manufacturer);
+manu = char(opts.Manufacturer);
 if isempty(manu), manu = orDefault(dev.manufacturer, 'Unknown'); end
 info.Manufacturer = manu;
 
-fs = p.Results.SamplingRate;
+fs = opts.SamplingRate;
 if isempty(fs), fs = dev.defaultFs; end
 if isempty(fs) || ~isfinite(fs)
     fs = srcFs;

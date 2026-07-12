@@ -42,6 +42,11 @@ function outFNIR=setT0(fnirStruct,t0time)
 %
 % See also: pf2.data.split, pf2.data.getMarkers, pf2.data.resample
 
+arguments
+    fnirStruct (1,1) struct
+    t0time {mustBeA(t0time, ["numeric", "duration", "datetime"])}
+end
+
 outFNIR=fnirStruct;
 
 
