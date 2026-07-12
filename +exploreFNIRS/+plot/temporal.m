@@ -693,7 +693,9 @@ for i=1:size(sH,1)
 
                        end
                     end
-                    legend(sH{i,b}.subH{y,x},legendGFXstrs(:)','Location', 'Best');
+                    lgd=legend(sH{i,b}.subH{y,x},legendGFXstrs(:)','Location', 'Best');
+                    lgdSty=pf2_base.plot.PlotStyle.getDefault();
+                    set(lgd,'TextColor',lgdSty.LegendTextColor,'Color',lgdSty.LegendBgColor);
                 end
 
                 if(exSettings.plot_task_lines)
@@ -877,6 +879,7 @@ th.FontSize = 6;
 th.LineStyle='none';
 th.HorizontalAlignment='left';
 th.VerticalAlignment='bottom';
+th.Color=pf2_base.plot.PlotStyle.getDefault().ForegroundColor;
 curPos=th.Position;
 end
 

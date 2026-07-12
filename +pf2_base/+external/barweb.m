@@ -176,11 +176,18 @@ priorHold = ishold(ax);
 if ~isempty(R.ErrorColor)
     fgColor = R.ErrorColor(:)';
 else
-    axBg = get(ax, 'Color');
-    if isnumeric(axBg) && mean(axBg) < 0.5
-        fgColor = [1 1 1];
-    else
-        fgColor = [0 0 0];
+    % Honor the active processFNIRS2 plot theme (respects ForceLightMode)
+    % rather than sniffing the axes background, so bar edges, error bars,
+    % and the legend stay consistent with the rest of the toolbox.
+    try
+        fgColor = pf2_base.plot.PlotStyle.getDefault().ForegroundColor;
+    catch
+        axBg = get(ax, 'Color');
+        if isnumeric(axBg) && mean(axBg) < 0.5
+            fgColor = [1 1 1];
+        else
+            fgColor = [0 0 0];
+        end
     end
 end
 
@@ -255,12 +262,19 @@ if hideBars
     set(hbars, 'Visible', 'off');
 end
 
-% Recover the true x-center of every bar series. XOffset is populated by the
-% graphics system; for a single (non-grouped) series it is 0.
+% Recover the true x-center of every bar series. XEndPoints holds the
+% per-group bar centers and is reliably populated (unlike XOffset, which can
+% return 0 before the figure has flushed, collapsing every series onto the
+% shared group center). Fall back to XData + XOffset if XEndPoints is absent.
 xCenters = zeros(nGroups, nBars);
 for j = 1:nBars
-    xData = hbars(j).XData(1:nGroups);
-    xCenters(:, j) = xData(:) + hbars(j).XOffset;
+    if isprop(hbars(j), 'XEndPoints') && numel(hbars(j).XEndPoints) >= nGroups
+        xe = hbars(j).XEndPoints;
+        xCenters(:, j) = xe(1:nGroups).';
+    else
+        xData = hbars(j).XData(1:nGroups);
+        xCenters(:, j) = xData(:) + hbars(j).XOffset;
+    end
 end
 
 % Approximate per-bar width (for violin / box rectangle footprint).
@@ -377,6 +391,13 @@ if showLegend && strcmp(legendType, 'plot')
         handles.legend = legend(ax, hbars(1:nShow), legendNames(1:nShow), ...
             'Location', 'best', 'TextColor', fgColor);
         legend(ax, 'boxoff');
+        % Match the legend background to the theme so it does not show a dark
+        % fill under ForceLightMode (boxoff only removes the outline).
+        try
+            set(handles.legend, 'Color', ...
+                pf2_base.plot.PlotStyle.getDefault().LegendBgColor);
+        catch
+        end
     end
 end
 

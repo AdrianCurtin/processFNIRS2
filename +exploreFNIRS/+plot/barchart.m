@@ -720,8 +720,10 @@ for chIdx=1:numOpt
                     gAStrs{i,curChart}='';
                 end
             end
-            legend(gAStrs(:,curChart),'Location', 'Best');
+            lgd=legend(gAStrs(:,curChart),'Location', 'Best');
             legend boxoff;
+            lgdSty=pf2_base.plot.PlotStyle.getDefault();
+            set(lgd,'TextColor',lgdSty.LegendTextColor,'Color',lgdSty.LegendBgColor);
         end
         hold off;
     end
@@ -1453,6 +1455,7 @@ th.FontSize = 6;
 th.LineStyle='none';
 th.HorizontalAlignment='left';
 th.VerticalAlignment='bottom';
+th.Color=pf2_base.plot.PlotStyle.getDefault().ForegroundColor;
 curPos=th.Position;
 end
 

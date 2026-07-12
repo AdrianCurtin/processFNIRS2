@@ -1249,7 +1249,9 @@ for i=1:size(sH,1)
                         lgStrs=[lgStrs;pointStrs(k)];
                     end
                     
-                    legend(sH{i,b}.subH{y,x},pointStrs(:),'Location', 'Best');
+                    lgd=legend(sH{i,b}.subH{y,x},pointStrs(:),'Location', 'Best');
+                    lgdSty=pf2_base.plot.PlotStyle.getDefault();
+                    set(lgd,'TextColor',lgdSty.LegendTextColor,'Color',lgdSty.LegendBgColor);
                 end
                 
                 hold(sH{i,b}.subH{y,x},'off')
@@ -1447,6 +1449,7 @@ th.FontSize = 6;
 th.LineStyle='none';
 th.HorizontalAlignment='left';
 th.VerticalAlignment='bottom';
+th.Color=pf2_base.plot.PlotStyle.getDefault().ForegroundColor;
 curPos=th.Position;
 end
 

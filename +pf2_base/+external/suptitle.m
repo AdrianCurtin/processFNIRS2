@@ -87,8 +87,8 @@ function hout = suptitle(varargin)
     dataAxes = findobj(figH, 'Type', 'axes');
     dataAxes = dataAxes(~strcmp(get(dataAxes, 'Tag'), 'suptitle'));
 
-    titleBand = 0.075;   % fraction of figure height reserved at the top
-    titleY    = 1 - titleBand / 2;  % vertical centre of the reserved band
+    titleBand = 0.12;    % fraction of figure height reserved at the top
+    titleY    = 1 - titleBand * 0.3; % keep the title clear of any axes title
 
     if ~isempty(dataAxes)
         oldUnits = get(dataAxes, {'Units'});
