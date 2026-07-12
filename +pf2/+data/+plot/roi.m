@@ -1,4 +1,4 @@
-function [ figHandle ] = roi(fNIR,rois2plot,showMarkers,bioMlist,baseline,ylimit,lineProps,rejectedLineProps)
+function [figHandle] = roi(fNIR, varargin)
 % ROI Plot hemoglobin time series for regions of interest
 %
 % Creates time series plots of hemoglobin concentration changes for
@@ -7,108 +7,117 @@ function [ figHandle ] = roi(fNIR,rois2plot,showMarkers,bioMlist,baseline,ylimit
 % baseline subtraction, and event marker overlay.
 %
 % Syntax:
-%   pf2.data.plot.roi(fNIR)
-%   pf2.data.plot.roi(fNIR, rois2plot)
-%   pf2.data.plot.roi(fNIR, rois2plot, showMarkers, bioMlist)
-%   pf2.data.plot.roi(fNIR, rois2plot, showMarkers, bioMlist, baseline, ylimit)
-%   figHandle = pf2.data.plot.roi(..., lineProps, rejectedLineProps)
+%   pf2.data.plot.roi(fNIR)                      % All ROIs
+%   pf2.data.plot.roi(fNIR, rois)                % Specific ROIs
+%   pf2.data.plot.roi(fNIR, ..., Name, Value)    % With options
 %
 % Inputs:
-%   fNIR              - fNIRS data structure with ROI field [struct]
-%                       Must contain 'ROI' field with 'info' table and
-%                       biomarker subfields (HbO, HbR, etc.).
-%   rois2plot         - ROIs to display [numeric | cell | char | 'all']
-%                       (default: all ROIs) Can be numeric indices, logical
-%                       array, ROI names as cell array, or 'all'.
-%   showMarkers       - Display event markers [logical | numeric | 'all']
-%                       (default: true) If numeric, specifies marker codes.
-%   bioMlist          - Biomarkers to plot [cell array of strings | 'all']
-%                       (default: {'HbO', 'HbR'})
-%                       Options: 'HbO', 'HbR', 'HbDiff', 'HbTotal', 'CBSI'
-%   baseline          - Baseline correction specification [numeric | struct | logical]
-%                       (default: false, no baseline)
-%                       - Positive number: baseline duration from start (seconds)
-%                       - Negative number: baseline from end of recording
-%                       - [start, end]: explicit baseline window
-%                       - fNIRS struct: use as baseline reference
-%                       - true: use default 10s baseline
-%   ylimit            - Y-axis limits [1x2 numeric | scalar]
-%                       (default: auto from data range)
-%                       Scalar value creates symmetric limits [-val, val].
-%   lineProps         - Line properties for good ROIs [cell array]
-%                       (default: {'LineWidth', 1})
-%   rejectedLineProps - Line properties for rejected ROIs [cell array]
-%                       (default: {'--', 'LineWidth', 1})
+%   fNIR      - fNIRS data structure with ROI field [struct]
+%               Must contain 'ROI' field with 'info' table and
+%               biomarker subfields (HbO, HbR, etc.).
+%   rois      - (optional) ROIs to plot: numeric, logical, cell, or 'all'
 %
-% Outputs:
-%   figHandle - Handle to the created figure [figure handle]
-%               Only returned when output argument is requested.
+% Options (Name-Value):
+%   'markers'     - true (default), false, or numeric array of codes
+%   'biomarkers'  - {'HbO','HbR'} (default), or 'all', or specific list
+%   'baseline'    - false (default), or seconds, or [start,end]
+%   'ylim'        - [] (auto), or [min max]
+%   'interactive' - true (default), false to skip prompts (for batch/headless)
+%   'savePath'    - '' (default), filename to save figure (.png, .pdf, .fig)
+%   'saveWidth'   - [] (default), figure width in pixels
+%   'saveHeight'  - [] (default), figure height in pixels
+%   'saveDPI'     - 150 (default), resolution for raster formats
 %
 % Example:
-%   % Plot all ROIs with default settings
-%   data = pf2.import.sampleData.fNIR2000();
-%   processed = processFNIRS2(data);
-%   % Build ROIs first (required)
-%   processed = pf2.probe.roi.Build(processed, {{1:4, 'FrontalL'}, {5:8, 'FrontalR'}});
-%   pf2.data.plot.roi(processed);
-%
-%   % Plot specific ROI with baseline correction
-%   pf2.data.plot.roi(processed, 'FrontalL', true, {'HbO'}, 10);
-%
-%   % Plot multiple biomarkers with custom y-limits
-%   pf2.data.plot.roi(processed, 1:2, false, {'HbO','HbR','HbDiff'}, false, [-5 5]);
-%
-% Notes:
-%   - ROIs must be built before plotting (see pf2.probe.roi.Build)
-%   - Rejected ROIs (fchMask<=RejectLevel) shown with dashed lines
-%   - Uses standard biomarker colors from pf2_base.getBioColors()
-%   - Baseline window shown with vertical dashed lines when specified
+%   pf2.data.plot.roi(data)                      % Simple
+%   pf2.data.plot.roi(data, 'FrontalL')          % ROI by name
+%   pf2.data.plot.roi(data, 1:2)                 % ROIs 1-2
+%   pf2.data.plot.roi(data, 'baseline', 10)      % With 10s baseline
+%   pf2.data.plot.roi(data, 1, 'ylim', [-2 2])   % ROI 1, fixed y-axis
 %
 % See also: pf2.data.plot.oxy, pf2.probe.roi.Build, pf2.data.plot.auxData
 
-global PF2
-if(~isfield(PF2,'RejectLevel'))
-    pf2_base.pf2_initialize();
+% Validate fNIR input
+if ~isstruct(fNIR)
+    error('pf2:InvalidInput', 'First argument must be a fNIRS data structure');
 end
-if(isfield(fNIR,'fchMask'))
-    rejectLevel=PF2.RejectLevel;
+
+% Parameter names for detection
+% Note: Avoid naming ROIs with these reserved names
+paramNames = {'markers', 'showmarkers', 'biomarkers', 'biomlist', 'baseline', ...
+              'ylim', 'ylimit', 'lineprops', 'rejectedlineprops', 'interactive', ...
+              'savepath', 'savewidth', 'saveheight', 'savedpi', 'rejectlevel'};
+
+% Extract positional 'rois' argument if present
+rois2plot = [];
+nvStart = 1;
+
+if ~isempty(varargin)
+    firstArg = varargin{1};
+    if isnumeric(firstArg) || islogical(firstArg) || ...
+       (ischar(firstArg) && strcmpi(firstArg, 'all'))
+        rois2plot = firstArg;
+        nvStart = 2;
+    elseif iscell(firstArg)
+        % Cell array of ROI names
+        rois2plot = firstArg;
+        nvStart = 2;
+    elseif ischar(firstArg) || isstring(firstArg)
+        if ~ismember(lower(char(firstArg)), paramNames)
+            % Not a param name, treat as ROI name
+            rois2plot = firstArg;
+            nvStart = 2;
+        end
+    end
 end
+
+% Parse name-value pairs
+p = inputParser;
+p.CaseSensitive = false;
+addParameter(p, 'markers', true, @(x) islogical(x) || isnumeric(x));
+addParameter(p, 'showMarkers', [], @(x) islogical(x) || isnumeric(x) || isempty(x));  % Legacy
+addParameter(p, 'biomarkers', {'HbO', 'HbR'}, @(x) iscell(x) || ischar(x));
+addParameter(p, 'bioMlist', {}, @(x) iscell(x) || ischar(x));  % Legacy
+addParameter(p, 'baseline', false, @(x) isnumeric(x) || islogical(x) || isstruct(x));
+addParameter(p, 'ylim', [], @isnumeric);
+addParameter(p, 'ylimit', [], @isnumeric);  % Legacy
+addParameter(p, 'lineProps', {'LineWidth', 1}, @iscell);
+addParameter(p, 'rejectedLineProps', {'--', 'LineWidth', 1}, @iscell);
+addParameter(p, 'interactive', true, @islogical);
+addParameter(p, 'savePath', '', @(x) ischar(x) || isstring(x));
+addParameter(p, 'saveWidth', [], @(x) isempty(x) || isnumeric(x));
+addParameter(p, 'saveHeight', [], @(x) isempty(x) || isnumeric(x));
+addParameter(p, 'saveDPI', 150, @isnumeric);
+addParameter(p, 'rejectLevel', 0, @isnumeric);
+
+parse(p, varargin{nvStart:end});
+
+% Assign parsed values (with legacy fallbacks)
+showMarkers = p.Results.markers;
+if ~isempty(p.Results.showMarkers), showMarkers = p.Results.showMarkers; end
+bioMlist = p.Results.biomarkers;
+if ~isempty(p.Results.bioMlist), bioMlist = p.Results.bioMlist; end
+baseline = p.Results.baseline;
+ylimit = p.Results.ylim;
+if ~isempty(p.Results.ylimit), ylimit = p.Results.ylimit; end
+lineProps = p.Results.lineProps;
+rejectedLineProps = p.Results.rejectedLineProps;
+interactive = p.Results.interactive;
+savePath = p.Results.savePath;
+saveWidth = p.Results.saveWidth;
+saveHeight = p.Results.saveHeight;
+saveDPI = p.Results.saveDPI;
+
+rejectLevel = p.Results.rejectLevel;
 
 if(~isfield(fNIR,'ROI')||~isfield(fNIR.ROI,'info'))
-   error('No ROI information present'); 
+   error('pf2:data:plot:roi:noROI', 'No ROI information present');
 end
 
-
-
-if(nargin<8||isempty(rejectedLineProps))
-    rejectedLineProps={'--','LineWidth',1};
-end
-
-if(nargin<7||isempty(lineProps))
-    lineProps={'LineWidth',1};
-end
-
-
-if(nargin<6)
-   ylimit=[]; % will use max device info to plot
-end
-
-if(nargin<5)
-    baseline=false;
-end
-
-
-if(nargin<4||isempty(bioMlist))
-    bioMlist={'HbO','HbR'};
-end
-
-if(nargin<3)
-   showMarkers=true;  %will plot all markers 
-end
 
 if(~iscell(bioMlist))
     if(any(~ischar(bioMlist)))
-       error('Must specify biomarkers'); 
+       error('pf2:data:plot:roi:badBiomarkers', 'Must specify biomarkers');
     end
     if(strcmpi(bioMlist,'all'))
         bioMlist={'HbO','HbR','HbDiff','HbTotal','CBSI'};
@@ -121,7 +130,7 @@ end
 ROInames=fNIR.ROI.info.Properties.RowNames;
 
 
-if(nargin<2||isempty(rois2plot)||(ischar(rois2plot)&&strcmpi(rois2plot,'all')))
+if(isempty(rois2plot)||(ischar(rois2plot)&&strcmpi(rois2plot,'all')))
     rois2plot=[];
 end
 
@@ -133,7 +142,7 @@ if(iscell(rois2plot)||any(ischar(rois2plot)))
 end
 
 if(any(logical(rois2plot))&&~any(isnumeric(rois2plot))&&~any(ischar(rois2plot)))
-   rois2plot=find(rois2plot); 
+   rois2plot=find(rois2plot);
 end
 
 
@@ -142,37 +151,8 @@ end
 
 
 
-if(pf2_base.isnestedfield(fNIR,'info.probename')&&isfield(fNIR.info,'probename')&&~contains(fNIR.info.probename,'Unknown')) 
-    %try to load the probename cfg file
-    cfgFilePath=sprintf('%s.cfg',fNIR.info.probename);
-else
-    cfgFilePath='';
-end
-
-
-if(isempty(cfgFilePath)||~contains(cfgFilePath,'.cfg'))
-    
-    warning('Missing or invalid configuration file path\n')
-    
-    disp('No device specified. Please load device configuration');
-    probeInfo=pf2_base.loadDeviceCfg([],true);
-    if(~isempty(probeInfo))
-        error('No valid devices selected');
-    end
-    
-elseif(~isempty(cfgFilePath)) % If we're not looking at the GUI, doesn't matter
-    probeInfo=pf2_base.loadDeviceCfg(cfgFilePath,false);
-end
-
-if(pf2_base.isnestedfield(probeInfo,'Probe'))
-    deviceInfo=probeInfo.Info;
-    if(~isfield(deviceInfo,'numberProbes')||deviceInfo.numberProbes==1)
-        probeNum=1;
-    end
-    probeInfo=probeInfo.Probe{probeNum};
-else
-   error('Unable to identify probe'); 
-end
+% Load probe info using helper
+probeInfo = pf2_base.plot.loadProbeInfo(fNIR, false);
 
 
 if(isempty(rois2plot))
@@ -181,19 +161,19 @@ end
 
 for i=1:length(bioMlist)
    if(~isfield(fNIR,bioMlist{i}))
-       error('Biomarker %s does not exist',bioMlist{i});
+       error('pf2:data:plot:roi:missingBiomarker', 'Biomarker %s does not exist',bioMlist{i});
    end
    
    if(isempty(fNIR.(bioMlist{i})))
-       error('Biomarker %s is empty, please build ROI first',bioMlist{i});
+       error('pf2:data:plot:roi:emptyBiomarker', 'Biomarker %s is empty, please build ROI first',bioMlist{i});
    end
 end
     
     
 if(any(rois2plot>size(fNIR.ROI.info,1)))
-    error('Some indexes are higher than number of ROIs');
+    error('pf2:data:plot:roi:roiOutOfRange', 'Some indexes are higher than number of ROIs');
 elseif(any(rois2plot<0))
-    error('ROI index can not be negative');
+    error('pf2:data:plot:roi:negativeROI', 'ROI index can not be negative');
 end
 
 
@@ -205,117 +185,45 @@ if(isfield(fNIR,'time'))
     tmax=nanmax(t);
     tmean=nanmean(t)-tmin;
 else
-    error('Must have valid time field');
+    error('pf2:data:plot:roi:noTime', 'Must have valid time field');
 end
 
 idx2plot=ismember(probeInfo.ChannelList,rois2plot);
 
 
+sty = pf2_base.plot.PlotStyle.getDefault();
+
 if(~isempty(rois2plot))
     if(nargout>0)
-        figHandle=figure(); 
+        figHandle=figure('Color', sty.FigureColor);
     else
-        figure();
+        figure('Color', sty.FigureColor);
     end
 else
     warning('Nothing to Plot');
    return; 
 end
 
-if(~isfield(fNIR,'markers')||isempty(fNIR.markers))
-   showMarkers=false; 
-end
+% Process markers using helper
+tooManyMarkers = 100;
+tooManyLabels = 10;
+[showMarkers, showMarkersIdx, curMarkers, numMarkers] = ...
+    pf2_base.plot.processMarkers(fNIR, showMarkers, tooManyMarkers);
 
-if(ischar(showMarkers)&&strcmpi(showMarkers,'all'))
-    showMarkers=true;
-end
-
-if(islogical(showMarkers))
-    if(~showMarkers)
-        showMarkers=[];
+% Handle too many markers prompt
+plotTonsOfMarkers = false;
+if ~isempty(showMarkers) && any(numMarkers > tooManyMarkers)
+    if interactive
+        user_entry = input('Enable TonsOfMarkers Mode? (Can be VERY slow) y/n: ', 's');
+        plotTonsOfMarkers = ismember(lower(user_entry), {'1', 'y', 'yes'});
     else
-        [showMarkers,~,showMarkersIdx]=unique(fNIR.markers(:,2));
-    end
-elseif(isnumeric(showMarkers))
-    [uMarkers,~,showMarkersIdxTemp]=unique(fNIR.markers(:,2));
-    showMarkersIdx=nan(size(showMarkersIdxTemp));
-    showMarkersUidx=find(ismember(uMarkers,showMarkers));
-    for i=1:length(showMarkersUidx)
-        showMarkersIdx(showMarkersIdxTemp==(showMarkersUidx(i)))=i;
-    end
-    showMarkers=uMarkers(showMarkersUidx);
-end
-
-if(isfield(fNIR,'markers')&&~isempty(showMarkers))
-    curMarkers=fNIR.markers;
-    if(~isnumeric(curMarkers)&&isfield(curMarkers,'data'))
-        curMarkers=curMarkers.data;
+        warning('pf2:TooManyMarkers', 'Too many markers to display (>%d). Use ''interactive'', true to enable.', tooManyMarkers);
     end
 end
 
 
-tooManyMarkers=100;
-tooManyLabels=10;
-if(~isempty(showMarkers))
-    plotTonsOfMarkers=[];
-    numMarkers=zeros(1,length(showMarkers));
-    for i=1:length(showMarkers)
-        numMarkers(i)=sum(showMarkersIdx==i);
-        if(numMarkers(i)>tooManyMarkers&&isempty(plotTonsOfMarkers))
-            fprintf(2,'Warning: Over %i markers for marker %i\n',tooManyMarkers,i);
-            user_entry = input(sprintf('Enable TonsOfMarkers Mode?\n(Can be VERY slow)\ny/n: '), 's');
-            user_entry=lower(user_entry);
-            switch user_entry
-                case '1'
-                    plotTonsOfMarkers=true;
-                case '0'
-                    plotTonsOfMarkers=false;
-                case 'y'
-                    plotTonsOfMarkers=true;
-                case 'n'
-                    plotTonsOfMarkers=false;
-                case 'yes'
-                    plotTonsOfMarkers=true;
-                case 'no'
-                    plotTonsOfMarkers=false;
-            end
-        end
-    end
-    if(isempty(plotTonsOfMarkers))
-       plotTonsOfMarkers=false; 
-    end
-end
-
-
-if(islogical(baseline)&&baseline&&any(~isnumeric(baseline))) 
-    baseline=10;
-    fNIR=pf2.data.split(fNIR,'blLength',baseline,'relative',true);
-    baseline=[nan,baseline];
-elseif(~any(~isnumeric(baseline))&&length(baseline)==1&&baseline>0&&baseline<(tmax-tmin))
-    fNIR=pf2.data.split(fNIR,'blLength',baseline,'relative',true);
-    baseline=[nan,baseline];
-elseif(~any(~isnumeric(baseline))&&length(baseline)==1&&baseline<0&&baseline>(tmin-tmax)) %from end
-    if(baseline(1)<0)
-        baseline(1)=tmax-tmin+baseline(1);
-        baseline(2)=tmax-tmin;
-    end
-    fNIR=pf2.data.split(fNIR,'blStartTime',baseline(1),'blEndTime',baseline(2),'relative',true);
-    baseline=baseline+tmin;
-elseif(any(isnumeric(baseline))&&length(baseline)==2) %from end
-    if(baseline(1)<0)
-        baseline(1)=tmax+baseline(1)-tmin;
-    end
-    if(baseline(2)<0)
-        baseline(2)=tmax+baseline(2)-tmin; 
-    end
-    fNIR=pf2.data.split(fNIR,'blStartTime',baseline(1),'blEndTime',baseline(2),'relative',true);
-    baseline=baseline+tmin;
-elseif(isstruct(baseline)&&isfield(baseline,'time')&&isfield(baseline,bioMlist{1}))
-    fNIR=pf2.data.split(fNIR,tmin,tmax,'blfNIR',baseline);
-    baseline=[];
-else
-   baseline=[]; 
-end
+% Apply baseline correction using helper
+[fNIR, baseline] = pf2_base.plot.processBaseline(fNIR, baseline, bioMlist);
 
 
  t=fNIR.time;
@@ -372,7 +280,7 @@ for(roiIdx=1:length(rois2plot))
 
     
     if(oxyMaxValue>0&&oxyMinValue<0)
-        zeroH=plot([tmin,tmax],[0,0],'--k','HandleVisibility','off');
+        zeroH=plot([tmin,tmax],[0,0],'--','Color',sty.ZeroLineColor,'HandleVisibility','off');
         hold on;
     end
    
@@ -382,7 +290,7 @@ for(roiIdx=1:length(rois2plot))
         bio2plot=fNIR.ROI.(bioM)(:,roiIdx);
         if(isfield(fNIR.ROI,'fchMask')&&fNIR.ROI.fchMask(roiNum)<=rejectLevel)
             lh=plot(t,bio2plot,rejectedLineProps{:},'color',colorTable.(bioM),lineProps{:});
-            switch(fNIR.fchMask(roiNum))
+            switch(fNIR.ROI.fchMask(roiNum))
                 case 0.5
                     th=text(tmin+tmean*0.6,mean(ylimit),'~','FontSize',20,'color',[ 0.9100,0.4100,0.1700]);
                 case 0
@@ -398,8 +306,8 @@ for(roiIdx=1:length(rois2plot))
     end
     
     if(~isempty(baseline)||isempty(showMarkers))
-        maxH=plot([tmean],ylimit(2),'color',[1,1,1],'HandleVisibility','off');
-        minH=plot([tmean],ylimit(1),'color',[1,1,1],'HandleVisibility','off'); 
+        maxH=plot([tmean],ylimit(2),'color',sty.FigureColor,'HandleVisibility','off');
+        minH=plot([tmean],ylimit(1),'color',sty.FigureColor,'HandleVisibility','off'); 
     end
     
     if(~isempty(baseline))
@@ -418,9 +326,9 @@ for(roiIdx=1:length(rois2plot))
         for i=1:length(showMarkers)
             mrkName=sprintf('Mrk%i',showMarkers(i));
             if(numMarkers(i)<tooManyMarkers||plotTonsOfMarkers)
-                yLabelHeight=(1:length(showMarkers))*0.05+0.15;
+                yLabelHeight=min((1:length(showMarkers))*0.05+0.15, 0.95);
                 if(numMarkers(i)<tooManyLabels)
-                	pf2_base.external.vline(curMarkers(showMarkersIdx==i),'k',mrkName,yLabelHeight(i));
+                	pf2_base.external.vline(curMarkers(showMarkersIdx==i),sty.ForegroundColor,mrkName,yLabelHeight(i));
                 else
                     pf2_base.external.vline(curMarkers(showMarkersIdx==i),'lineTags',mrkName);
                     fprintf('Marker %i has too many instances to plot labels',showMarkers(i));
@@ -438,13 +346,13 @@ for(roiIdx=1:length(rois2plot))
     ylim(ylimit);
     
     
-    xlabel(sprintf('ROI%i: %s',roiNum,ROInames{roiNum}));
+    xlabel(sprintf('ROI%i: %s',roiNum,pf2_base.plot.escapeTeX(ROInames{roiNum})));
     
 
-    if(length(bioM)>1)
+    if(length(bioMlist)>1)
         ylblstring=sprintf('\\Delta[X]');
     else
-        ylblstring=sprintf('\\Delta[%s]',bioM{1});
+        ylblstring=sprintf('\\Delta[%s]',bioMlist{1});
     end
     
     if(isfield(fNIR,'units'))
@@ -457,6 +365,18 @@ for(roiIdx=1:length(rois2plot))
     if(roiIdx==length(rois2plot))
         legend(bioMlist);
     end
+end
+
+% Add figure title from processingInfo if available
+pf2_base.plot.addProcessingInfoTitle(fNIR, gcf());
+
+% Apply theme styling
+sty.applyToFigure(gcf());
+
+% Save figure if requested
+if ~isempty(savePath)
+    fig = gcf();
+    pf2_base.plot.saveFigure(fig, savePath, saveWidth, saveHeight, saveDPI);
 end
 
 end

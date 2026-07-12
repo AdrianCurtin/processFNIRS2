@@ -114,16 +114,20 @@ classdef DataStructureTest < matlab.unittest.TestCase
                 'Time vector must be monotonically increasing');
         end
 
-        function testMarkersHasThreeColumns(testCase)
-            % Verify markers matrix has exactly 3 columns when not empty
-            %
-            % Marker format: [time, value, duration]
+        function testMarkersHasExpectedColumns(testCase)
+            % Verify markers are a canonical table with the canonical
+            % variables Time, Code, Duration, Amplitude (in that order) when
+            % not empty.
 
             data = testCase.rawData;
 
             if ~isempty(data.markers)
-                testCase.verifyEqual(size(data.markers, 2), 3, ...
-                    'Markers must have 3 columns: [time, value, duration]');
+                % Markers are stored as a canonical table
+                testCase.verifyTrue(istable(data.markers), ...
+                    'Markers must be a table');
+                testCase.verifyEqual(data.markers.Properties.VariableNames(1:4), ...
+                    {'Time','Code','Duration','Amplitude'}, ...
+                    'Markers must lead with the canonical variables');
             else
                 testCase.verifyTrue(true, 'Empty markers array is valid');
             end

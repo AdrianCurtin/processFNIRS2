@@ -54,9 +54,6 @@ function [data1f,data2f,valica]=icaClean(data1,data2,use_fast_ica)
 %
 % See also: pf2_ambient_ICA_clean, fastica, runica, pf2_subtractAmbient
 
-%addpath('C:\Meltem\MeltemPC\fNIR\K9\RunICA')
-%addpath('C:\Kurtulus PC\DOCUMENTS\Anesth\RunICA');
-
 if(nargin<3)
    use_fast_ica=true; 
 end
@@ -121,10 +118,6 @@ CC12=corrcoef(mixedsign(1,:),icasig(2,:));
 CC21=corrcoef(mixedsign(2,:),icasig(1,:));
 CC22=corrcoef(mixedsign(2,:),icasig(2,:));
 [m,i]=max([(abs(CC12(1,2))+abs(CC21(1,2)))/abs(CC22(1,2)) (abs(CC11(1,2))+abs(CC22(1,2)))/abs(CC21(1,2)) ]');
-%[m,i]=max([abs(CC22(1,2)) abs(CC21(1,2)) ]');
-%[m,i]=max([(abs(CC12(1,2))+abs(CC21(1,2)))-abs(CC22(1,2)) (abs(CC11(1,2))+abs(CC22(1,2)))-abs(CC21(1,2)) ]');
-%[m,i]=max([(abs(CC12(1,2))+abs(CC21(1,2))) (abs(CC11(1,2))+abs(CC22(1,2))) ]');
-%[m,i]=max([(abs(CC12(1,2))-abs(CC22(1,2))) (abs(CC11(1,2))-abs(CC21(1,2))) ]');
 if i==1
     i2=2;
 elseif i==2
@@ -134,13 +127,7 @@ end
 CCerr=corrcoef(mixedsign(2,:),icasig(i,:));
 CCsig=corrcoef(mixedsign(1,:),icasig(i2,:));
 CCes=corrcoef(mixedsign(2,:),icasig(i2,:));
-%valica=(abs(CCerr(1,2))+abs(CCsig(1,2)))/(abs(CCes(1,2)));
 valica=(abs(CCes(1,2)));
-%valica=(abs(CCerr(1,2))+abs(CCsig(1,2)))-(abs(CCes(1,2)));
-%valica=(abs(CCerr(1,2)));
-%val=(abs(CCerr(1,2)))/(abs(CCes(1,2)))
-%val=(abs(CCsig(1,2)))/(abs(CCes(1,2)))
-%pause;
 
 vec=A(1,i)*icasig(i,:);
 vec2=A(2,i2)*icasig(i2,:);

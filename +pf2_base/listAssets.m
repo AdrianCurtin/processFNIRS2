@@ -49,7 +49,7 @@ assets = {
 if ~strcmp(category, 'all')
     validCategories = {'brain', 'profile'};
     if ~ismember(category, validCategories)
-        error('Invalid category. Use: %s', strjoin(validCategories, ', '));
+        error('pf2_base:listAssets:invalidCategory', 'Invalid category. Use: %s', strjoin(validCategories, ', '));
     end
     idx = strcmp(assets(:,3), category);
     assets = assets(idx, :);

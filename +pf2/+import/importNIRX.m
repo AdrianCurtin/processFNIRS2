@@ -1,4 +1,4 @@
-function [fNIR] = importNIRX(folderDIR,channelCheck)
+function [fNIR] = importNIRX(folderDIR,channelCheck,varargin)
 % IMPORTNIRX Import fNIRS data from NIRx system recordings
 %
 % Reads fNIRS data from NIRx systems (NIRScout, NIRSport) which store data
@@ -29,7 +29,7 @@ function [fNIR] = importNIRX(folderDIR,channelCheck)
 %          .raw       - Raw intensity data [T x C double]
 %          .time      - Time vector in seconds [T x 1 double]
 %          .fs        - Sampling frequency in Hz [double]
-%          .markers   - Event markers [M x 2: time, value]
+%          .markers   - Event marker table (.Time, .Code, .Duration, .Amplitude)
 %          .fchMask   - Channel quality mask [1 x C: 1=good, 0=bad]
 %          .info      - Recording metadata and probe information
 %          .probeinfo - Device and probe geometry structure
@@ -62,11 +62,20 @@ function [fNIR] = importNIRX(folderDIR,channelCheck)
 %
 % See also: pf2.import.importSNIRF, pf2.import.importNIR, pf2.import.importHitachiMES
 
+pf2_base.ensureStatsFallbacks();  % ensure stats-toolbox fallbacks (nan*) are on the path before use
+
 if(nargin<2)
-   channelCheck=true; 
+   channelCheck=true;
    forceChannelCheck=false;
 else
-   forceChannelCheck=true; 
+   forceChannelCheck=true;
+end
+
+channelCheckVersion=pf2_base.channelCheckVersion();
+for vi_=1:2:numel(varargin)
+    if ischar(varargin{vi_}) && strcmpi(varargin{vi_},'ChannelCheckVersion')
+        channelCheckVersion=varargin{vi_+1};
+    end
 end
 
 includeSSchannels=true;
@@ -77,7 +86,7 @@ if nargin < 1
    [folderDIR,pathname] = uigetfile({'*.hdr;*.nirs';'*.*'},'Open NIRX Config file');
   %error('Function requires at least one input argument');
 elseif ~ischar(folderDIR)
-  error('Input must be a string representing a filename');
+  error('pf2:importNIRX:badInput', 'Input must be a string representing a filename');
 else
    pathname=''; 
 end
@@ -96,6 +105,7 @@ if(isempty(pathname))
 end
 
 curdir=cd;
+cdCleanup = onCleanup(@() cd(curdir));
 if(~isempty(pathname))
     cd(pathname);
 end
@@ -104,7 +114,7 @@ d=dir;
 if(length(d)>2)
     files=cell(length(d)-2,2);
 else
-    error('No files found');
+    error('pf2:importNIRX:noFilesFound', 'No files found');
 end
 
 x=0;
@@ -177,6 +187,7 @@ for i=1:size(files,1)
             end
             [~,sortIdx]=sort(mrk(:,1));
             fNIR.markers=mrk(sortIdx,:);
+            fNIR.markers = pf2_base.normalizeMarkers(fNIR.markers);
             fNIR.Aux.NIRx=probeInfo.aux;
         end
         
@@ -374,8 +385,11 @@ for i=1:size(files,1)
                 splitLine=strsplit(NIRX_mrk{l},'\t');
                 if(length(splitLine)>1)
                     numL=numL+1;
-                    fNIR.markers(numL,:)=str2double(splitLine);
+                    mrkRows(numL,:)=str2double(splitLine); %#ok<AGROW>
                 end
+            end
+            if(numL>0)
+                fNIR.markers=pf2_base.normalizeMarkers(mrkRows);
             end
         end
         
@@ -490,7 +504,7 @@ if(isempty(fNIR.raw))
        sampleNum=size(wvCell{1},1);
        numCh=size(wvCell{1},2);
     else
-       error('Unable to find any .wv* files'); 
+       error('pf2:importNIRX:noWavelengthFiles', 'Unable to find any .wv* files');
     end
 
     fNIR.raw=nan(sampleNum,numCh*numWv+1);
@@ -505,7 +519,7 @@ if(isempty(fNIR.raw))
     if(isfield(fNIR,'fs'))
         fNIR.raw(:,1)=[1:sampleNum]'./fNIR.fs;
     else
-       error('Sampling Frequency is missing'); 
+       error('pf2:importNIRX:missingSamplingRate', 'Sampling Frequency is missing');
     end
     
     
@@ -524,7 +538,7 @@ if(isempty(fNIR.raw))
 
     switch(numRawChannels)
         case 49
-            fNIR.info.probename='NIRX_Sport_8x8_Frontal';
+            fNIR.info.probename='NIRX_Sport_8x8_frontal';
         otherwise
             warning('Unidentified Probe\n');
             fNIR.info.probename='Unidentified .nirx file';
@@ -537,6 +551,9 @@ fNIR.fchMask=ones(1,numCh);
 
 
 fNIR.probeinfo=device;
+
+% Attach Device object for self-describing data
+fNIR.device = pf2.Device.fromProbeInfo(device);
 
 if(~channelCheck)
     ch_mask_file=sprintf('%s_CH.mat',fileroot);
@@ -553,11 +570,21 @@ else
    fmask=[]; 
 end
 
-if(channelCheck)
-    fNIR=probeCheckGUI(fNIR,sprintf('%s.nirs',fileroot),forceChannelCheck);
+if(channelCheck && pf2_base.allowChannelCheckGUI())
+    if channelCheckVersion == 2
+        app = pf2.qc.ChannelCheck(fNIR, 'CalledFromImport', true, 'SkipConfirmation', true);
+        if isvalid(app), fNIR = app.OutputData; delete(app); end
+    else
+        fNIR=probeCheckGUI(fNIR,sprintf('%s.nirs',fileroot),forceChannelCheck);
+    end
+elseif(channelCheck)
+    % Requested but the GUI is unavailable/suppressed (headless, under test,
+    % or disabled): honor a saved sidecar mask if present, otherwise the
+    % all-good default already in fNIR.fchMask.
+    fNIR=pf2_base.loadExistingMaskOrCheck(fNIR,sprintf('%s.nirs',fileroot),channelCheckVersion);
 else
    if(~isempty(fmask))
-       fNIR.fchMask=fmask; 
+       fNIR.fchMask=fmask;
    end
 end
 
@@ -574,7 +601,7 @@ if(isfield(fNIR,'probeinfo'))
    
 end
 
-cd(curdir);
+% cd restored automatically by cdCleanup
 end
 
 

@@ -1,4 +1,4 @@
-function [outFNIR, pFit] = resample(varargin)
+function [outFNIR, pFit] = resample(fNIR, segmentLength, blLength, opts)
 % RESAMPLE Downsample and time-average fNIRS data
 %
 % Resamples fNIRS data to a lower sampling rate by averaging samples within
@@ -60,38 +60,27 @@ function [outFNIR, pFit] = resample(varargin)
 %
 % See also: pf2.data.split, pf2.data.setT0, pf2.data.concatenate
 
-p=inputParser;
+arguments
+    fNIR
+    segmentLength (1,1) {mustBeNumeric, mustBePositive} = 1
+    blLength {mustBeNumeric} = []
+    opts.blfNIR = []
+    opts.centerOnT0 (1,1) logical = false
+    opts.timeOutMode {mustBeMember(opts.timeOutMode, {'mid','start','end'})} = 'start'
+    opts.nanRejectionLevel (1,1) {mustBeNumeric, mustBeNonnegative} = 0.7
+    opts.averageAux (1,1) logical = false
+    opts.flattenAux (1,1) logical = false
+    opts.trimAux (1,1) logical = false
+    opts.polyDegree (1,1) {mustBeNumeric, mustBeNonnegative} = 1
+    opts.centerOnTime {mustBeNumeric} = NaN
+    opts.specifiedTimepoints {mustBeNumeric} = []
+end
 
-validfNIRInput = @(x) (isnumeric(x)&&length(x)>1) || (isstruct(x) && (isfield(x,'raw')||isfield(x,'time')||isfield(x,'info')));
-validScalarPosNum = @(x) isnumeric(x) && isscalar(x) && (x >= 0);
-validTimeOutMode = @(x) ischar(x)&&(ismember(x,{'mid','start','end'}));
-validTimepoints = @(x) isnumeric(x) && isvector(x) && issorted(x);
-
-
-addRequired(p,'fNIR',validfNIRInput);
-addOptional(p,'segmentLength',1,validScalarPosNum);
-addOptional(p,'blLength',[],validScalarPosNum);
-addOptional(p,'blfNIR',[],validfNIRInput);
-addParameter(p,'centerOnT0',false,@islogical);
-addParameter(p,'timeOutMode','start',validTimeOutMode);
-addParameter(p,'nanRejectionLevel',0.7,validScalarPosNum);
-addParameter(p,'averageAux',false,@islogical);
-addParameter(p,'flattenAux',false,@islogical);
-addParameter(p,'trimAux',false,@islogical);
-addParameter(p,'polyDegree',1,validScalarPosNum);
-addParameter(p,'centerOnTime',NaN,@isnumeric);
-addParameter(p,'specifiedTimepoints',[],validTimepoints);
-
-parse(p,varargin{:});
-
-fNIR=p.Results.fNIR;
-segLength=p.Results.segmentLength; % How long is each segment, ie: 1 sample
-blLength=p.Results.blLength; % how long is the baseline
-blfNIR=p.Results.blfNIR; % a baseline fNIR struct
-%getPolyAvg=p.Results.getPolyAvg;
-centerOnT0=p.Results.centerOnT0; % should the resample include t=0 as the start point
-centerOnTime=p.Results.centerOnTime;
-specifiedTimepoints = p.Results.specifiedTimepoints;
+segLength=segmentLength; % How long is each segment, ie: 1 sample
+blfNIR=opts.blfNIR; % Separate baseline source struct/array (mutated as a local below)
+centerOnT0=opts.centerOnT0; % should the resample include t=0 as the start point
+centerOnTime=opts.centerOnTime;
+specifiedTimepoints = opts.specifiedTimepoints;
 
 if(centerOnT0)
     centerOnTime=0;
@@ -100,12 +89,12 @@ if(isempty(centerOnTime))
     centerOnTime=nan;
 end
 
-timeOutMode=p.Results.timeOutMode; % should time include or center on a point (ex: t=1 := t[0.051...1.4999]
-nanRejectionLevel=p.Results.nanRejectionLevel; % number of NaNs in segment to entirely reject it
-averageAux=p.Results.averageAux; % Also average/ resample the Aux channels
-flattenAux=p.Results.flattenAux; % Unroll nested Aux data into tables within the Aux struct, also map times to non-time columns
-trimAux=p.Results.trimAux; % Clear all Aux samples before and after fNIRS time series
-polyDegree=p.Results.polyDegree; % degree for polyfit
+timeOutMode=opts.timeOutMode; % should time include or center on a point (ex: t=1 := t[0.051...1.4999]
+nanRejectionLevel=opts.nanRejectionLevel; % number of NaNs in segment to entirely reject it
+averageAux=opts.averageAux; % Also average/ resample the Aux channels
+flattenAux=opts.flattenAux; % Unroll nested Aux data into tables within the Aux struct, also map times to non-time columns
+trimAux=opts.trimAux; % Clear all Aux samples before and after fNIRS time series
+polyDegree=opts.polyDegree; % degree for polyfit
 
 
 if(~isstruct(fNIR))
@@ -131,9 +120,6 @@ if(~isfield(fNIR,'time')&&isfield(fNIR,'raw'))
 end
 
 fNIR.time=round(fNIR.time,5);
-
-%minfTime=min(fNIR.time);
-%maxfTime=max(fNIR.time);
 
 fTime=fNIR.time;
 
@@ -165,7 +151,7 @@ end
 
 if(~isfield(fNIR,'HbR')&&isfield(fNIR,'raw'))
     % out of principle we don't resample the raw data
-    error('Raw data averaging not supported');
+    error('pf2:resample:rawNotSupported', 'Raw data averaging not supported');
 elseif(~isfield(fNIR,'HbR')&&~isfield(fNIR,'raw'))
     warning('No fNIRS data');
     outFNIR=fNIR;
@@ -174,11 +160,6 @@ elseif(~isfield(fNIR,'HbR')&&~isfield(fNIR,'raw'))
 else
     numCh=size(fNIR.HbR,2); 
 end
-
-%if(isfield(fNIR,'raw')&&isempty(fNIR.raw))
-    %fNIR.raw=nan(size(fNIR.HbR));
-    %prevent resampling of raw
-%end
 
 if(isnan(centerOnTime))  % foces time blocks to start from t=0 or if undefined, just start from where they started from
     centerOnTime=min(fTime);
@@ -192,12 +173,9 @@ else
     [fTimeInd, timeSeries] = getTimeIdx(fNIR.time, segLength, centerOnTime);
 end
 
-%minSegTime=timeSeries(1);
-%maxSegTime=timeSeries(end);
-
 numSegs=length(timeSeries);
 
-if(pf2_base.isnestedfield(fNIR,'ROI.HbR')&&~isempty(fNIR.ROI.HbR))
+if isfield(fNIR,'ROI') && isstruct(fNIR.ROI) && isfield(fNIR.ROI,'HbR') && ~isempty(fNIR.ROI.HbR)
     calcROI=true;
     numROI=size(fNIR.ROI.HbR,2);
 else
@@ -205,20 +183,6 @@ else
     numROI=0;
 end
 
-
-if(getPolyAvg)
-    phbr=nan([numSegs,numCh,polyDegree+1]);
-    phbo=nan([numSegs,numCh,polyDegree+1]);
-    poxy=nan([numSegs,numCh,polyDegree+1]);
-    ptotal=nan([numSegs,numCh,polyDegree+1]);
-    pcbsi=nan([numSegs,numCh,polyDegree+1]);
-    
-    phbrfit=nan(numSegs,numCh,3);
-    phbofit=nan(numSegs,numCh,3);
-    poxyfit=nan(numSegs,numCh,3);
-    ptotalfit=nan(numSegs,numCh,3);
-    pcbsifit=nan(numSegs,numCh,3);
-end
 
 if(isfield(fNIR,'Aux'))
     if(~averageAux)
@@ -232,6 +196,11 @@ else
 end
 
 
+validCh=1:numCh;
+if(calcROI)
+    validCh_roi=1:numROI;
+end
+
 if(blLength>0) % if baseline is present
     bioMlist={'HbO','HbR','HbDiff','HbTotal','CBSI'};
 
@@ -244,12 +213,13 @@ if(blLength>0) % if baseline is present
 
         fB=blfNIR.(curB);
    
-        blNanCheck=sum(isnan(fB),1)/length(fB)<nanRejectionLevel; %calculate percentage of invalid values in baseline
+        blNanCheck=sum(isnan(fB),1)/size(fB,1)<nanRejectionLevel; %calculate percentage of invalid values in baseline
 
         blRejectedCount=sum(~blNanCheck);
         
         if(blRejectedCount>1)
-            warning('Baseline Period in %i channels was invalid',blRejectedCount); 
+            warning('pf2:resample:invalidBaseline', ...
+                'Baseline Period in %i channels was invalid', blRejectedCount);
         end
         
         validCh=find(blNanCheck==1);
@@ -261,27 +231,32 @@ if(blLength>0) % if baseline is present
             blfNIR.(curB)=nan;
         end
 
-        if(calcROI)
+        % Per-iteration ROI guard. Using a loop-wide calcROI mutation here
+        % latched false on the first missing ROI biomarker and silently
+        % skipped ROI baseline subtraction for every subsequent biomarker
+        % in the second loop. Scope the "skip" to this iteration only.
+        roiOK = calcROI;
+        if(roiOK)
 
-            if(pf2_base.isnestedfield(blfNIR,strcat('ROI.',+curB)))
+            if isfield(blfNIR,'ROI') && isstruct(blfNIR.ROI) && isfield(blfNIR.ROI, curB)
                 fB=blfNIR.ROI.(curB);
             else
                 warning('ROI mismatch: ROI is not defined in baseline file');
-                calcROI=false;
-                continue;
+                roiOK=false;
             end
 
-            if(size(fB,2)~=numROI)
+            if(roiOK && size(fB,2)~=numROI)
                 warning('ROI mismatch: ROI as defined in baseline not present in main fNIRS segment, calculations not performed');
-                calcROI=false;
-                continue;
+                roiOK=false;
             end
+        end
+        if(roiOK)
 
-            blNanCheck_roi=sum(isnan(fB),1)/length(fB)<nanRejectionLevel; %calculate percentage of invalid values in baseline
+            blNanCheck_roi=sum(isnan(fB),1)/size(fB,1)<nanRejectionLevel; %calculate percentage of invalid values in baseline
 
             blRejectedCount_roi=sum(~blNanCheck_roi);
             if(blRejectedCount_roi>1)
-                warning('ROI Baseline Period in %i channels was invalid',blRejectedCount_roi); 
+                warning('pf2:resample:invalidBaseline', 'ROI Baseline Period in %i channels was invalid',blRejectedCount_roi);
             end
             validCh_roi=find(blNanCheck_roi==1);
             
@@ -325,22 +300,9 @@ else
     times_end=timeSeries+segLength-1e-10;
 end
 
-%minSegTime=times_start(1);
-%maxSegTime=times_start(end);
-
-%calculate index for each sample
-%fTimeInd=floor((fTime-minfTime-rem(fTime-minfTime,segLength))/segLength)+1;
-
-
 if(calcROI)
-    %fTimeInd_numROI=repmat(fTimeInd,[numROI,1]);
-    %fTimeInd_numROI=fTimeInd_numROI+numSegs*repelem([0:numROI-1]',nTime,1);
-
     outFNIR.ROI.info=fNIR.ROI.info;
 end
-
-
-ptime=zeros(numSegs,1); %polynomial time
 
 bioMlist={'raw','HbO','HbR','HbDiff','HbTotal','CBSI'};
 
@@ -391,8 +353,6 @@ for b = 1:length(bioMlist)
             pFit.(curB)=pFit.(curB)-repmat(blfNIR.(curB),[numSegs,1]);
         elseif(~isempty(blLength)&&isnan(blLength)&&~isRaw)
             pFit.(curB)=nan([numSegs,numCh]);
-        else
-            %pFit.(curB)=pFit.(curB);
         end
     end
 
@@ -401,7 +361,15 @@ for b = 1:length(bioMlist)
 
         fB_resample=resample_internal(fB,fTimeInd,numROI,numSegs,nanRejectionLevel);
 
-        if(~isempty(blLength)&&blLength>0)
+        % Only subtract a ROI baseline mean for this biomarker if the
+        % first loop successfully reduced blfNIR.ROI.(curB) to a 1xnROI
+        % row. When it didn't (missing field, size mismatch, etc.) the
+        % field is either absent or still holds the raw [T_bl x nROI]
+        % split slice — subtracting that would produce wrong-sized output.
+        hasROIBaseline = isfield(blfNIR,'ROI') && isstruct(blfNIR.ROI) && ...
+            isfield(blfNIR.ROI, curB) && size(blfNIR.ROI.(curB), 1) == 1;
+
+        if(~isempty(blLength)&&blLength>0&&hasROIBaseline)
             outFNIR.ROI.(curB)=fB_resample-repmat(blfNIR.ROI.(curB),[numSegs,1]);
         elseif(~isempty(blLength)&&isnan(blLength))
             outFNIR.ROI.(curB)=nan([numSegs,numROI]);
@@ -427,12 +395,10 @@ for b = 1:length(bioMlist)
                 end
             end
 
-            if(~isempty(blLength)&&blLength>0)
+            if(~isempty(blLength)&&blLength>0&&hasROIBaseline)
                 pFit.ROI.(curB)=pFit.ROI.(curB)-repmat(blfNIR.ROI.(curB),[numSegs,1]);
             elseif(~isempty(blLength)&&isnan(blLength))
                 pFit.ROI.(curB)=nan([numSegs,numROI]);
-            else
-                %pFit.ROI.(curB)=pFit.ROI.(curB);
             end
         end
     end
@@ -478,7 +444,7 @@ if(isfield(fNIR,'Aux')&&~isempty(fNIR.Aux)&&length(fields(fNIR.Aux))>1)
      
                 if(istable(curVar))
                     curTableVarNames=curVar.Properties.VariableNames;
-                    cur_time_ind=find(~isempty(intersect(validTimeFields,curTableVarNames)));
+                    cur_time_ind=find(ismember(validTimeFields,curTableVarNames),1);
                     t2trim=curVar{:,cur_time_ind};
                     minftime=times_start(1);
                     maxftime=times_end(end);
@@ -488,7 +454,7 @@ if(isfield(fNIR,'Aux')&&~isempty(fNIR.Aux)&&length(fields(fNIR.Aux))>1)
             end
             
         else
-             error('Trimming requires Aux series to be flattened first!');
+             error('pf2:resample:trimRequiresFlatten', 'Trimming requires Aux series to be flattened first!');
         end
     
     end
@@ -538,20 +504,14 @@ end
 outFNIR.fs=1/segLength; %new "effective sampling frequency
 
 if(getPolyAvg) % returns a time X channel X coefficient array
-    pFit=outFNIR;
-    pFit.HbR_poly=phbr;
-    pFit.HbO_poly=phbo;
-    pFit.HbDiff_poly=poxy;
-    pFit.HbTotal_poly=ptotal;
-    pFit.CBSI_poly=pcbsi;
-    pFit.time=ptime;
-    %pFit.time(end+1)=outFNIR.segmentTimes(end,3);
-    
-    pFit.HbR=phbrfit;
-    pFit.HbO=phbofit;
-    pFit.HbDiff=poxyfit;
-    pFit.HbTotal=ptotalfit;
-    pFit.CBSI=pcbsifit;
+    % Merge metadata from outFNIR into pFit (preserving polynomial data from loop)
+    outFields = fieldnames(outFNIR);
+    for fi = 1:length(outFields)
+        fn = outFields{fi};
+        if ~isfield(pFit, fn)
+            pFit.(fn) = outFNIR.(fn);
+        end
+    end
 else
     pFit=[];
 end
@@ -592,7 +552,7 @@ function [outAuxStruct] = recursiveAuxResample(aux_in,flattenAux,segLength,cente
 
     validTimeFields={'time','t','Time'};
 
-    cur_time_ind=find(~isempty(intersect(validTimeFields,auxFields)));
+    cur_time_ind=find(ismember(validTimeFields,auxFields),1);
 
     if(isempty(cur_time_ind))
         local_time=[];
@@ -603,19 +563,25 @@ function [outAuxStruct] = recursiveAuxResample(aux_in,flattenAux,segLength,cente
         outAuxStruct.(validTimeFields{cur_time_ind})=localTime_resample;
     end
 
-    szLocalTime(:)=size(local_time);
-    szParentTime(:)=size(parent_time_in);
-    szNIRTime(:)=size(nir_time);
+    szLocalTime=size(local_time);
+    szParentTime=size(parent_time_in);
+    szNIRTime=size(nir_time);
 
 
     % look through each aux field for timeSeries
     for f=1:length(auxFields)
-        
+
         curFieldName=auxFields{f};
         curField=aux_in.(curFieldName);
 
+        % Skip metadata fields (used for labeling, not time-series data)
+        if ismember(curFieldName, {'varNames', 'unit'}) || endsWith(curFieldName, '_unit')
+            continue;
+        end
+
         if(isempty(curField))
-            fprintf('Unable to average signal .Aux.%s, no data present\n',curFieldName);
+            warning('pf2:resample:emptyAux', ...
+                'Unable to average signal .Aux.%s, no data present', curFieldName);
             auxFieldIsEmpty(f)=true;
             outAuxStruct.(curFieldName)=curField;
             continue;
@@ -665,15 +631,14 @@ function [outAuxStruct] = recursiveAuxResample(aux_in,flattenAux,segLength,cente
                 warning('Non-explicit match for Aux resampling, please use Aux.time variable or ''time'' table column ');
             else % maybe if the first column is constantly incrementing we use that?
 
-                possibleTimeField=all(diff(curField(:,1)>0));
+                possibleTimeField=all(diff(curField(:,1))>0);
                 if(possibleTimeField)
                     t_aux=curField(:,1);
                     auxFieldHasTime(f)=true;
                     warning('Non-explicit match for Aux resampling, please use Aux.time variable or ''time'' table column ');
                 else
-                    %fprintf('Unable to resample this field!');
                     outAuxStruct.(curFieldName)=['Unable to resample this field!'];
-                    
+
                     continue;
                 end
             end
@@ -681,14 +646,13 @@ function [outAuxStruct] = recursiveAuxResample(aux_in,flattenAux,segLength,cente
             nAuxChan=size(curField,2);
             
 
-            %create t_ind if missing
-            if(isempty(t_ind)) % if not using fNIR time, we have to figure out where time is logically
-                %calculate index for each sample
-    
-                [t_ind,t_aux_resample]=getTimeIdx(t_aux,segLength,centerOnTime);
+            %create t_ind if missing, always compute t_aux_resample for flattening
+            [t_ind_computed, t_aux_resample] = getTimeIdx(t_aux, segLength, centerOnTime);
+            if(isempty(t_ind))
+                t_ind = t_ind_computed;
             end
-            
-            
+
+
             numSegs_aux=max(t_ind);
 
             auxDat=curField(:);
@@ -706,19 +670,39 @@ function [outAuxStruct] = recursiveAuxResample(aux_in,flattenAux,segLength,cente
             end
 
             if(flattenAux)
-                newVarNames={};
-                for nV=1:(nAuxChan-auxFieldHasTime(f))
-                    newVarNames{nV}=sprintf('val%i',nV);
+                nDataCols=nAuxChan-auxFieldHasTime(f);
+                % Use varNames from parent struct if available
+                if isfield(aux_in,'varNames') && iscell(aux_in.varNames) && length(aux_in.varNames)==nDataCols
+                    newVarNames=aux_in.varNames(1:nDataCols);
+                else
+                    newVarNames={};
+                    for nV=1:nDataCols
+                        newVarNames{nV}=sprintf('val%i',nV);
+                    end
                 end
 
+                % Guard: ensure name count matches column count
+                nResampleCols=size(auxDat_resample,2);
                 if(auxFieldHasTime(f))
+                    expectedCols=1+numel(newVarNames);
+                    if nResampleCols~=expectedCols
+                        newVarNames={};
+                        for nV=1:nResampleCols-1
+                            newVarNames{nV}=sprintf('val%i',nV);
+                        end
+                    end
                     newVarNames=['time',newVarNames(:)];
                     auxDat_rsTable=array2table(auxDat_resample,'VariableNames',newVarNames);
                     outAuxStruct.(curFieldName)=auxDat_rsTable;
                 else
-                    outAuxStruct.(curFieldName)=table(t_aux_resample,'VariableNames',{'time'});
-                    auxDat_rsTable=array2table(auxDat_resample,'VariableNames',newVarNames);
-                    outAuxStruct.(curFieldName)=[outAuxStruct.(curFieldName),auxDat_rsTable];
+                    if numel(newVarNames)~=nResampleCols
+                        newVarNames={};
+                        for nV=1:nResampleCols
+                            newVarNames{nV}=sprintf('val%i',nV);
+                        end
+                    end
+                    outAuxStruct.(curFieldName)=array2table([t_aux_resample, auxDat_resample], ...
+                        'VariableNames', [{'time'}, newVarNames(:)']);
                 end
             else
                 outAuxStruct.(curFieldName)=auxDat_resample;
@@ -757,33 +741,34 @@ function [outAuxStruct] = recursiveAuxResample(aux_in,flattenAux,segLength,cente
             else % maybe if the first column is constantly incrementing we use that?
 
                 
-                possibleTimeField=isnumeric(curField(:,1))&&all(diff(curField(:,1)>0));
+                possibleTimeField=isnumeric(curField(:,1))&&all(diff(curField(:,1))>0);
                 if(possibleTimeField&&~alreadyFlattened)
                     t_aux=curField(:,1);
                     auxFieldHasTime(f)=true;
                     warning('Non-explicit match for Aux resampling, please use Aux.time variable or ''time'' table column ');
                 else
-                    %fprintf('Unable to resample this field!');
                     if(~alreadyFlattened)
                         outAuxStruct.(curFieldName)=['Unable to resample this field!'];
                     else
                         outAuxStruct.(curFieldName)=curField;
                     end
-                    
+
                     continue;
                 end
             end
 
-            
+            %create t_ind if missing, always compute t_aux_resample for flattening
+            [t_ind_computed, t_aux_resample] = getTimeIdx(t_aux, segLength, centerOnTime);
+            if(isempty(t_ind))
+                t_ind = t_ind_computed;
+            end
 
-            %create t_ind if missing
-            if(isempty(t_ind)) % if not using fNIR time, we have to figure out where time is logically
-                %calculate index for each sample
-    
-                [t_ind,t_aux_resample]=getTimeIdx(t_aux,segLength,centerOnTime);
-                outAuxStruct.(curFieldName)=table(t_aux_resample,'VariableNames',curTimeNames);
-            elseif(flattenAux)
-                outAuxStruct.(curFieldName)=table(t_aux_resample,'VariableNames',curTimeNames);
+            if(auxFieldHasTime(f)||flattenAux)
+                if(exist('curTimeNames','var')&&~isempty(curTimeNames))
+                    outAuxStruct.(curFieldName)=table(t_aux_resample,'VariableNames',curTimeNames);
+                else
+                    outAuxStruct.(curFieldName)=table(t_aux_resample,'VariableNames',{'time'});
+                end
             else
                 outAuxStruct.(curFieldName)=table();
             end
@@ -842,12 +827,12 @@ function [outAuxStruct] = recursiveAuxResample(aux_in,flattenAux,segLength,cente
                     auxDat_resample=resample_internal(auxDat,t_ind,nAuxChan_col,numSegs_aux,nanRejectionLevel);
 
                     if(flattenAux)
-                        numCols=length(numericIdx);
+                        numCols=sum(numericIdx);
 
                         if(numCols>1)
-                            newVarNames=cell(size(numericIdx));
-                        
-                           for nName=1:length(newVarNames)
+                            newVarNames=cell(1,numCols);
+
+                           for nName=1:numCols
                                newVarNames{nName}=sprintf('%s_%i',curVarName,nName);
                             end
                         else
@@ -927,7 +912,7 @@ function [outAuxStruct] = recursiveAuxFlatten(aux_in,nir_time,parent_time_in)
 
     validTimeFields={'time','t','Time'};
 
-    cur_time_ind=find(~isempty(intersect(validTimeFields,auxFields)));
+    cur_time_ind=find(ismember(validTimeFields,auxFields),1);
 
     if(isempty(cur_time_ind))
         local_time=[];
@@ -937,9 +922,9 @@ function [outAuxStruct] = recursiveAuxFlatten(aux_in,nir_time,parent_time_in)
         outAuxStruct.(validTimeFields{cur_time_ind})=local_time;
     end
 
-    szLocalTime(:)=size(local_time);
-    szParentTime(:)=size(parent_time_in);
-    szNIRTime(:)=size(nir_time);
+    szLocalTime=size(local_time);
+    szParentTime=size(parent_time_in);
+    szNIRTime=size(nir_time);
 
 
     % look through each aux field for timeSeries
@@ -985,13 +970,12 @@ function [outAuxStruct] = recursiveAuxFlatten(aux_in,nir_time,parent_time_in)
                 warning('Non-explicit match for Aux resampling, please use Aux.time variable or ''time'' table column ');
             else % maybe if the first column is constantly incrementing we use that?
 
-                possibleTimeField=all(diff(curField(:,1)>0));
+                possibleTimeField=all(diff(curField(:,1))>0);
                 if(possibleTimeField)
                     t_aux=curField(:,1);
                     auxFieldHasTime(f)=true;
                     warning('Non-explicit match for Aux resampling, please use Aux.time variable or ''time'' table column ');
                 else
-                    %fprintf('Unable to resample this field!');
                     outAuxStruct.(curFieldName)=['Unable to align this field!'];
                     
                     continue;
@@ -1047,13 +1031,12 @@ function [outAuxStruct] = recursiveAuxFlatten(aux_in,nir_time,parent_time_in)
             else % maybe if the first column is constantly incrementing we use that?
 
                 
-                possibleTimeField=isnumeric(curField(:,1))&&all(diff(curField(:,1)>0));
+                possibleTimeField=isnumeric(curField(:,1))&&all(diff(curField(:,1))>0);
                 if(possibleTimeField&&~alreadyFlattened)
                     t_aux=curField(:,1);
                     auxFieldHasTime(f)=true;
                     warning('Non-explicit match for Aux time variable alignment, please use Aux.time variable or ''time'' table column ');
                 else
-                    %fprintf('Unable to resample this field!');
                     if(~alreadyFlattened)
                         outAuxStruct.(curFieldName)=['Unable to resample this field!'];
                     else
@@ -1102,13 +1085,13 @@ function [outAuxStruct] = recursiveAuxFlatten(aux_in,nir_time,parent_time_in)
                    
                     auxDat_resample=rsArr;
 
-                    
-                    numCols=length(numericIdx);
+
+                    numCols=sum(numericIdx);
 
                     if(numCols>1)
-                        newVarNames=cell(size(numericIdx));
-                    
-                       for nName=1:length(newVarNames)
+                        newVarNames=cell(1,numCols);
+
+                       for nName=1:numCols
                            newVarNames{nName}=sprintf('%s_%i',curVarName,nName);
                         end
                     else
@@ -1154,33 +1137,27 @@ function [fTimeInd,timeSeries]=getTimeIdx(times_in,segLength,centerTime)
         % samples around that time were collected
 
     if(any(diff(times_in)<0))
-        error('Time series should be increasing in order to resample!');
+        error('pf2:resample:timeNotIncreasing', 'Time series should be increasing in order to resample!');
     end
 
 
  
     t1=times_in(1);
-    %te=times_in(end);
 
     times_in=times_in(:);
-
-    %tRange_in=te-t1;
 
     if(nargin<3) % just use min time
         centerTime=t1;
     end
 
-   
-
     minSegTime=centerTime+floor((t1-centerTime)/segLength)*segLength;
-    % minimum SegTime is the first value that meets the crieria
-    %       t0_rs = centerTime+segLength*N  (where N is some number of samples
-    %       and t0_sample > t0_rs  but t0_sample < t0_rs +segLength
-    
-    %maxSegTime=centerTime+floor((te-centerTime)/segLength)*segLength;
+    % minimum SegTime is the first value that meets the criteria:
+    %   t0_rs = centerTime+segLength*N  (where N is some integer)
+    %   and t0_sample >= t0_rs  but t0_sample < t0_rs + segLength
 
+    % 1e-10 epsilon prevents floating-point bin-boundary misassignment
+    % where floor returns n-1 instead of n for values at exact boundaries
     fTimeInd=[floor((times_in-minSegTime)/segLength+1+1e-10)];
-    % 1e-10 helps fix conditions where floor returns n-1 instead of n
     % fTimeInd(end) is the highest value here, faster than max()
     
     maxSegTime=minSegTime+(fTimeInd(end)-1)*segLength;
@@ -1207,27 +1184,29 @@ function [rsData] = resample_internal(rsData_in,fTimeInd,numCh,numSegs,nanReject
     
     nTime=length(fTimeInd);
     fTimeInd_numCh=repmat(fTimeInd,[numCh,1]);
-    fTimeInd_numCh=fTimeInd_numCh+numSegs*repelem([0:numCh-1]',nTime,1);
+    fTimeInd_numCh=fTimeInd_numCh+numSegs*repelem((0:numCh-1)',nTime,1);
+
+    flat = rsData_in(:);
+    nanMask = isnan(flat);
+    sz = [numCh * numSegs, 1];
 
 try
-    fB_isNA=accumarray(fTimeInd_numCh,isnan(rsData_in(:)));
+    fB_isNA=accumarray(fTimeInd_numCh, double(nanMask), sz);
 catch
     rsData=[];
     return;
 end
-    fB_count=accumarray(fTimeInd_numCh,ones(size(fTimeInd_numCh)));
+    fB_count=accumarray(fTimeInd_numCh, ones(size(fTimeInd_numCh)), sz);
 
-    % Check edge case where last sample does not include last index, pad
-    % with 0s
-    diffCheck=(numCh*numSegs)-length(fB_isNA);
-    if(diffCheck>0)
-        fB_isNA=[fB_isNA;zeros([diffCheck,1])];
-        fB_count=[fB_count;zeros([diffCheck,1])];
-    end
+    fB_nanCheck= reshape(fB_isNA./fB_count,[numSegs,numCh])<=nanRejectionLevel;
 
-    fB_nanCheck= reshape(fB_isNA./fB_count,[numCh,numSegs])<=nanRejectionLevel;
-
-    rsData=reshape(accumarray(fTimeInd_numCh,rsData_in(:),[numCh*numSegs',1],@(x)nanmean(x)),[numSegs,numCh]);
+    % Vectorized nanmean: sum non-NaN values, divide by valid count.
+    % Avoids 1-per-bin function calls to nanmean/mean/parseFlag.
+    flat(nanMask) = 0;
+    fB_sum = accumarray(fTimeInd_numCh, flat, sz);
+    fB_validCount = fB_count - fB_isNA;
+    fB_validCount(fB_validCount == 0) = NaN;
+    rsData = reshape(fB_sum ./ fB_validCount, [numSegs, numCh]);
 
     rsData(~fB_nanCheck)=NaN;
 
@@ -1250,7 +1229,7 @@ if(size(x,1)==1&&size(x,2)>1)
 end
 
 if(size(y,1)~=size(x,1))
-   error('Size of x and y matricies must be the same'); 
+   error('pf2:resample:xySizeMismatch', 'Size of x and y matricies must be the same');
 end
     m = size(x,2); % number of polynomials to fit
     c = zeros(n+1,m); 

@@ -36,7 +36,7 @@ function [ dataf ] = pf2_lpf( data,ft,fs,freq_cut,Nf, NaN_mode)
 %   - Uses zero-phase filtering (filtfilt) to avoid phase distortion
 %   - Data length must be at least 3*Nf samples; shorter data returns NaN
 %   - For IIR filters (ft=3), Nf is filter order (effective order = 2*Nf)
-%   - Falls back to MATLAB R2018a filtfilt if current version fails
+%   - Falls back to the in-house zero-phase filter (filtfilt_classic)
 %
 % Example:
 %   % Remove cardiac artifact with FIR filter
@@ -45,7 +45,7 @@ function [ dataf ] = pf2_lpf( data,ft,fs,freq_cut,Nf, NaN_mode)
 %   % Butterworth filter for hemodynamic isolation
 %   filtered = pf2_lpf(hbData, 3, 10, 0.1, 4);
 %
-% See also: pf2_hpf, pf2_bpf_butter, filtfilt
+% See also: pf2_hpf, pf2_bpf_butter, pf2_base.external.filtfilt_classic
 
 [Mini,Nini]=size(data);
 if Mini==1 %if the data is a row vector converts it to column vector
@@ -64,7 +64,7 @@ end
 half_fs = fs/2;    %half of sampling freq. equal to pi
 
 if ft==1
-    [b,a] = fir1(Nf,freq_cut/half_fs);  % use FIR1 to obtain linear phase filter; b=impulse response
+    [b,a] = pf2_base.external.fir1(Nf,freq_cut/half_fs);  % use FIR1 to obtain linear phase filter; b=impulse response
 
 elseif ft==2
     dp=0.01; %pass-band ripple
@@ -76,7 +76,13 @@ elseif ft==2
     [b,delta]=remez(N1, F0, M0, W);
     a=1;
 elseif ft==3
-    [b,a] = butter(Nf,freq_cut/half_fs);
+    % Use zero-pole-gain -> second-order-section form for numerical stability.
+    % The transfer-function form [b,a]=butter is ill-conditioned at the low
+    % normalized cutoffs common in fNIRS and can produce NaN/unstable output;
+    % filtfilt_classic accepts an SOS matrix with unit gain (a=1).
+    [z,p,k] = pf2_base.external.butter(Nf,freq_cut/half_fs,'low');
+    b = pf2_base.external.zp2sos(z,p,k);
+    a = 1;
 end
 
 %-----------------------------------------------------------------
@@ -97,20 +103,16 @@ if(size(data,1)>3*Nf)
 			try
 				dataf=pf2_base.filtfilt_interp(b,a,data);
 			catch
-				dataf=pf2_base.external.filtfilt_classic(b,a,data); % Use matlab 2018a filtfilt if current version fails due to nans
+				dataf=pf2_base.external.filtfilt_classic(b,a,data); % Fall back to in-house zero-phase filter if the NaN-aware path errors
 			end
 		case 'Piecewise'
 			try
 				dataf=pf2_base.filtfilt_piecewise(b,a,data,3*Nf);
 			catch
-				dataf=pf2_base.external.filtfilt_classic(b,a,data); % Use matlab 2018a filtfilt if current version fails due to nans
+				dataf=pf2_base.external.filtfilt_classic(b,a,data); % Fall back to in-house zero-phase filter if the NaN-aware path errors
 			end
 		case 'Leave'
-			try
-				dataf=filtfilt(b,a,data);
-			catch
-				dataf=pf2_base.external.filtfilt_classic(b,a,data); % Use matlab 2018a filtfilt if current version fails due to nans
-			end
+			dataf=pf2_base.external.filtfilt_classic(b,a,data);
 	end
 else
     dataf=nan(size(data));
@@ -121,18 +123,4 @@ if Mini==1 %if the data is a row vector converts it to column vector
     dataf=dataf';
 end
 
-end
-
-function dataf=nantolerant_filtfilt(b,a,data)
-    datamask=isnan(data)|isinf(data);
-
-    data(datamask)=nanmedian(data(:));
-    for i=1:size(data,2)
-       data(datamask(:,i),i)=nanmedian(data(:,i));
-    end
-    data(isnan(data))=0;
-
-    dataf=filtfilt(b,a,data);
-
-    dataf(datamask)=nan;
 end

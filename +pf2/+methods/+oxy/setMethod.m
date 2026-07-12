@@ -1,4 +1,4 @@
-function setMethod(oxy_method)
+function setMethod(oxy_method, ctx)
 % SETMETHOD Select the active oxy processing method for Stage 3 processing
 %
 % Sets the hemoglobin processing method used during Stage 3 of processFNIRS2.
@@ -37,6 +37,8 @@ function setMethod(oxy_method)
 %           pf2.methods.oxy.configureMethods, pf2.methods.raw.setMethod,
 %           processFNIRS2
 
+if nargin < 2, ctx = []; end
+
 if(nargin<1)
     fprintf(2,'No method provided, Please select a method\n');
 	pf2.methods.oxy();
@@ -45,21 +47,55 @@ if(nargin<1)
 end
 
 if(isnumeric(oxy_method)) % Lookup method based on index
-	global PF2
-	if(pf2_base.isnestedfield(PF2,'myOxyMethods.cfg.Sections'))
-        if(oxy_method<=length(PF2.myOxyMethods.cfg.Sections))
+	methodsLib = pf2_base.resolveMethodsLib('oxy', ctx);
+	% methodsLib.cfg may be a struct or a pf2_base.external.INI object; the
+	% latter exposes Sections as a property (isfield is false for objects), so
+	% probe with a struct-or-object safe check before reading it.
+	cfgHasSections = isfield(methodsLib,'cfg') && ...
+	    ((isstruct(methodsLib.cfg) && isfield(methodsLib.cfg,'Sections')) || ...
+	     (isobject(methodsLib.cfg) && isprop(methodsLib.cfg,'Sections')));
+	if(cfgHasSections)
+        if(oxy_method<=length(methodsLib.cfg.Sections))
             if(oxy_method==0)
                 oxy_method=1;
             end
-            oxy_method=PF2.myOxyMethods.cfg.Sections{oxy_method};
+            oxy_method=methodsLib.cfg.Sections{oxy_method};
         end
 	end
 	
 	if(isnumeric(oxy_method))
-		error('Unable to find method %i',oxy_method);
+		error('pf2:methods:oxy:setMethod:methodNotFound', 'Unable to find method %i',oxy_method);
 	end
 end
 
 if(isstring(oxy_method)||ischar(oxy_method))
-    processFNIRS2('Oxy_Method',oxy_method);
+	oxy_method = char(oxy_method);
+
+	% When a ProcessingContext is supplied, set the method ON the context
+	% (isolated state, validated against its own methods library) rather than
+	% mutating the global PF2 -- this keeps parallel/reproducible processing
+	% free of shared global state.
+	if(~isempty(ctx) && isa(ctx,'pf2_base.ProcessingContext'))
+		ctx.setOxyMethod(oxy_method);
+		return;
+	end
+
+	% Write the selected method straight into the active stage. Previously
+	% this delegated to processFNIRS2('Oxy_Method',...), but that config-only
+	% call (no data) is intercepted by the noop pass-through early-return in
+	% processFNIRS2 and never reaches the method-assignment block, so the
+	% selection was silently dropped. Set the global directly instead, matching
+	% processFNIRS2's own oxy-method assignment.
+	methodsLib = pf2_base.resolveMethodsLib('oxy', ctx);
+	if(~pf2_base.isnestedfield(methodsLib,sprintf('cfg.%s',oxy_method)))
+		error('pf2:methods:oxy:setMethod:methodNotFound', ...
+			'Unable to find method named: %s', oxy_method);
+	end
+
+	global PF2 %#ok<GVMIS>
+	if(pf2_base.isnestedfield(PF2,'stageOxyMethod.name')&&~strcmpi(PF2.stageOxyMethod.name,oxy_method))
+		fprintf('Setting Oxy Method to: %s\n',oxy_method);
+	end
+	PF2.stageOxyMethod=pf2_base.pf2_unpackMethod(methodsLib.cfg.(oxy_method));
+	PF2.stageOxyMethod.name=oxy_method;
 end

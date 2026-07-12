@@ -103,7 +103,7 @@ for i=1:size(x,2)
         
         xIdx=cleanBlockStart(j):cleanBlockEnd(j);
         if(length(xIdx)>minFilt)
-            y(xIdx,i)=filtfilt(b,a,x(xIdx,i)')';
+            y(xIdx,i)=pf2_base.external.filtfilt_classic(b,a,x(xIdx,i)')';
             
             if(restoreMean)
                 y(xIdx,i)=y(xIdx,i)+nanmean(x(xIdx,i));

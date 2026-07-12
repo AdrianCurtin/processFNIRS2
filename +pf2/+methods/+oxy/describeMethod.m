@@ -1,4 +1,4 @@
-function [descrip,functions]=describeMethod(oxyMethod)
+function [descrip,functions]=describeMethod(oxyMethod, ctx)
 % DESCRIBEMETHOD Display detailed information about an oxy processing method
 %
 % Shows the complete configuration of an oxy (hemoglobin) processing method,
@@ -44,14 +44,13 @@ function [descrip,functions]=describeMethod(oxyMethod)
 % See also: pf2.methods.oxy.list, pf2.methods.oxy.setMethod,
 %           pf2.methods.raw.describeMethod, pf2.methods.describeCurrentMethods
 
-global PF2
+if nargin < 2, ctx = []; end
 
-if(isempty(PF2))
-   pf2_base.pf2_initialize(); 
-end
+% Resolve methods library (uses Context if provided, otherwise global PF2)
+methodsLib = pf2_base.resolveMethodsLib('oxy', ctx);
 
 if(nargin<1)
-   oxyMethod=pf2.methods.oxy(true); 
+   oxyMethod=pf2.methods.oxy(true);
    getByIndex=false;
 elseif(isnumeric(oxyMethod))
     getByIndex=true;
@@ -59,22 +58,43 @@ else
     getByIndex=false;
 end
 
+% No current method selected (e.g. fresh install): report gracefully
+% rather than failing the cfg lookup below.
+if(~getByIndex && (isempty(oxyMethod) || (ischar(oxyMethod) && isempty(strtrim(oxyMethod)))))
+    msg=sprintf(['No current Oxy Method selected.\n' ...
+        'Use pf2.methods.oxy.setMethod(...) to select one, ' ...
+        'or pf2.methods.oxy.list() to see available methods.\n']);
+    if(nargout>0)
+        descrip=msg;
+        functions={};
+    else
+        fprintf(2,'%s',msg);
+    end
+    return;
+end
+
     
-if(pf2_base.isnestedfield(PF2,'myOxyMethods.cfg.Sections')&&~isempty(PF2.myOxyMethods.cfg.Sections))
-    oxyMethods=PF2.myOxyMethods.cfg.Sections;
+% methodsLib.cfg may be a struct or a pf2_base.external.INI object; the
+% latter exposes Sections as a property (isfield is false for objects), so
+% probe with a struct-or-object safe check before reading it.
+cfgHasSections = isfield(methodsLib,'cfg') && ...
+    ((isstruct(methodsLib.cfg) && isfield(methodsLib.cfg,'Sections')) || ...
+     (isobject(methodsLib.cfg) && isprop(methodsLib.cfg,'Sections')));
+if(cfgHasSections&&~isempty(methodsLib.cfg.Sections))
+    oxyMethods=methodsLib.cfg.Sections;
     
     if(getByIndex)
         if(oxyMethod>0&&oxyMethod<=length(oxyMethods))
             oxyMethod=oxyMethods{oxyMethod};
         else
-            error('Unable to find Oxy Method at Index %i',oxyMethod);
+            error('pf2:methods:oxy:describeMethod:badIndex', 'Unable to find Oxy Method at Index %i',oxyMethod);
         end
     end
     
-    if(ismember(oxyMethod,oxyMethods)&&~isempty(PF2.myOxyMethods.cfg.(oxyMethod)))
-        oxyMethodCfg=PF2.myOxyMethods.cfg.(oxyMethod);
+    if(ismember(oxyMethod,oxyMethods)&&~isempty(methodsLib.cfg.(oxyMethod)))
+        oxyMethodCfg=methodsLib.cfg.(oxyMethod);
     else
-       error('Unable to find current Oxy Method name %s',oxyMethod); 
+       error('pf2:methods:oxy:describeMethod:methodNotFound', 'Unable to find current Oxy Method name %s',oxyMethod);
     end
     
     
@@ -83,6 +103,11 @@ if(pf2_base.isnestedfield(PF2,'myOxyMethods.cfg.Sections')&&~isempty(PF2.myOxyMe
     descripStr=sprintf('Oxy Method: %s\n',oxyMethod);
     for f=1:length(funcs)
         curFunc=funcs{f};
+        % Function entries may be plain structs or PipelineFunction objects;
+        % normalize to the struct shape (.f/.args/.argvals/.output) below.
+        if(isa(curFunc,'pf2_base.PipelineFunction'))
+            curFunc=curFunc.toStruct();
+        end
         funcDescripStr=sprintf('%i. Function: %s\n',f,curFunc.f);
         for a=1:length(curFunc.args)
             if(~iscell(curFunc.args))
@@ -114,6 +139,16 @@ if(pf2_base.isnestedfield(PF2,'myOxyMethods.cfg.Sections')&&~isempty(PF2.myOxyMe
         functions=funcs;
     else
         fprintf(descripStr);
+    end
+else
+    % No methods library / Sections available: report gracefully rather than
+    % returning with unassigned outputs.
+    msg=sprintf('No Oxy Methods available to describe.\n');
+    if(nargout>0)
+        descrip=msg;
+        functions={};
+    else
+        fprintf(2,'%s',msg);
     end
 end
 

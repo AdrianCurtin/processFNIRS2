@@ -6,7 +6,7 @@ end
 
 
 fprintf('Calculating PCA...\n');
-[coef,score,latent,tsquared,explained,mu1]=pca(x,'Algorithm','svd');
+[coef,score,latent,tsquared,explained,mu1]=pf2_base.compat.pca(x,'Algorithm','svd');
 
 
 if(isnan((explained(componentNumber))))

@@ -64,6 +64,10 @@ function probeInfo=loadDeviceCfg(deviceCfgFilename,includeSSchannels,loadFromGlo
 % See also: buildProbeLayout, loadProbeInfo, pf2.settings.selectDevice,
 %           fitProbe2D, pf2_initialize
 
+% Ensure stats-toolbox fallbacks (nansum/nanmean/...) are reachable when
+% importing on a toolbox-less machine before pf2_initialize has run.
+pf2_base.ensureStatsFallbacks();
+
 % Set default values for input arguments
 if nargin < 1
     deviceCfgFilename = '';
@@ -188,7 +192,7 @@ function [probeInfo, name] = loadDeviceConfig(deviceCfgFilename, pF2_folder)
                                      'Select Device Configuration File', ...
                                      fullfile(pF2_folder, 'devices'));
         if isequal(file, 0)
-            error('User cancelled file selection');
+            error('pf2_base:loadDeviceCfg:userCancelled', 'User cancelled file selection');
         end
         deviceCfgFilename = fullfile(pathname, file);
     elseif(~contains(lower(deviceCfgFilename),'.cfg'))
@@ -204,7 +208,7 @@ function [probeInfo, name] = loadDeviceConfig(deviceCfgFilename, pF2_folder)
         if exist(altPath, 'file')
             deviceCfgFilename = altPath;
         else
-            error('Configuration file not found: %s', deviceCfgFilename);
+            error('pf2_base:loadDeviceCfg:fileNotFound', 'Configuration file not found: %s', deviceCfgFilename);
         end
     end
 
@@ -212,11 +216,30 @@ function [probeInfo, name] = loadDeviceConfig(deviceCfgFilename, pF2_folder)
     try
         probeInfo.cfg = pf2_base.external.INI('File', deviceCfgFilename);
     catch ME
-        error('Error loading configuration file: %s', ME.message);
+        error('pf2_base:loadDeviceCfg:loadFailed', 'Error loading configuration file: %s', ME.message);
     end
 end
 
 function probeInfo = processProbeInfo(probeInfo, includeSSchannels)
+    % Declared 3D coordinate units + a device label, for the unit-aware
+    % 2D-from-3D fallback in processPositionInfo.
+    coordUnits = '';
+    coordSys = '';
+    devLabel = '';
+    if isfield(probeInfo, 'Info')
+        if isfield(probeInfo.Info, 'CoordinateUnits')
+            coordUnits = probeInfo.Info.CoordinateUnits;
+        end
+        if isfield(probeInfo.Info, 'CoordinateSystem')
+            coordSys = probeInfo.Info.CoordinateSystem;
+        end
+        if isfield(probeInfo.Info, 'CfgName') && ~isempty(probeInfo.Info.CfgName)
+            devLabel = probeInfo.Info.CfgName;
+        elseif isfield(probeInfo.Info, 'Name')
+            devLabel = probeInfo.Info.Name;
+        end
+    end
+
     probeCount = 0;
     for j = 1:length(probeInfo.cfg.Sections)
         sectionName = probeInfo.cfg.Sections{j};
@@ -225,23 +248,52 @@ function probeInfo = processProbeInfo(probeInfo, includeSSchannels)
             p = get(probeInfo.cfg, sectionName);
             p = initializeProbeStructure(p);
             p = processChannelInfo(p);
-            p = processPositionInfo(p);
-            p = calculateSourceDetectorSeparation(p);
-            p = generateProbeLayout(p, includeSSchannels);
+
+            % A device may be "layout-only": defined by channels (+ an optional
+            % grid) with NO physical optode coordinates. Route those around the
+            % position/projection pipeline so they still load as plottable
+            % grid devices instead of erroring on missing positions.
+            has2D = isfield(p, 'DetPosX') && isfield(p, 'SrcPosX');
+            has3D = isfield(p, 'DetPos3DX') && isfield(p, 'SrcPos3DX');
+            anyPos = isfield(p, 'DetPosX') || isfield(p, 'SrcPosX') ...
+                || isfield(p, 'DetPos3DX') || isfield(p, 'SrcPos3DX');
+            if anyPos && ~(has2D || has3D)
+                lbl = devLabel; if isempty(lbl), lbl = 'this device'; end
+                warning('pf2:loadDeviceCfg:partialPositions', ...
+                    ['%s: partial position fields present but a complete ' ...
+                     'detector+source set is missing; treating as layout-only ' ...
+                     'and ignoring the partial coordinates.'], lbl);
+            end
+            if has2D || has3D
+                p = processPositionInfo(p, coordUnits, devLabel);
+                p = calculateSourceDetectorSeparation(p);
+                p = generateProbeLayout(p, includeSSchannels);
+            else
+                p = buildLayoutOnlyProbe(p);
+            end
 
             p = sortOptodes(p); % and drop any in DropOptodes
- 
+
+            % Declared/auto flat "schematic" layout (clean grid for explanatory
+            % plotting), independent of the affine 3D->2D projection above.
+            p = generateSchematicLayout(p);
+
+            % Sanity-check 3D coordinates against MNI expectations (warn only).
+            checkCoordinateBounds(p, coordSys, devLabel);
+
             fieldsToRemove={'SrcPosX','SrcPosY','SrcPosZ','SrcPos3DX','SrcPos3DY','SrcPos3DZ' ...
                 'DetPosX','DetPosY','DetPosZ','DetPos3DX','DetPos3DY','DetPos3DZ'...
                 'OptPosX','OptPosY','OptPosZ','OptPos3DX','OptPos3DY','OptPos3DZ'...
-                'sI','dI','ChannelList','SD','IsShortSeparation','OptLayout2D','Wavelength','ChannelNumbers','OptPos3D_mean'};
-    
-            p=rmfield(p,fieldsToRemove);
-    
-            if(includeSSchannels)
+                'sI','dI','ChannelList','SD','IsShortSeparation','OptLayout2D','Wavelength','ChannelNumbers','OptPos3D_mean','PlotStructure'};
+
+            % Only remove fields that are actually present (layout-only devices
+            % never create the position/projection fields).
+            p = rmfield(p, fieldsToRemove(isfield(p, fieldsToRemove)));
+
+            if(includeSSchannels) && isfield(p, 'OptLayout2D_ss')
                 p=rmfield(p,'OptLayout2D_ss');
             end
-    
+
             probeInfo.Probe{probeCount} = p;
         end
     end
@@ -252,7 +304,7 @@ function p = initializeProbeStructure(p)
       if(~isfield(p,'ChannelList'))
             p.ChannelList=tempChannels(tempChannels>0);
         elseif(length(tempChannels(tempChannels>0))~=length(p.ChannelList))
-            error('Manually defined channel list different number of channels than found in Channel Numbers list');
+            error('pf2_base:loadDeviceCfg:channelCountMismatch', 'Manually defined channel list different number of channels than found in Channel Numbers list');
       end
     p.NumOptodes = length(p.ChannelList);
     p.TableOpt = table('Size', [p.NumOptodes, 1], 'VariableTypes', {'double'}, 'VariableNames', {'OptodeNum'});
@@ -294,7 +346,7 @@ function p = processChannelInfo(p)
                     if isKey(channelMap, channelIdx(i))
                         mappedIndices(i) = channelMap(channelIdx(i));
                     else
-                        error('Channel %d not found in channelList', channelIdx(i));
+                        error('pf2_base:loadDeviceCfg:channelNotFound', 'Channel %d not found in channelList', channelIdx(i));
                     end
                 end
 
@@ -305,8 +357,12 @@ function p = processChannelInfo(p)
     p.TableCh.Wavelength = p.Wavelength(:);
     p.TableCh.SourceIndex = nan(size(p.TableCh.OptodeNumber));
     p.TableCh.DetectorIndex = nan(size(p.TableCh.OptodeNumber));
-    p.TableCh.SourceIndex(validCols) = p.sI(channelIdx);
-    p.TableCh.DetectorIndex(validCols) = p.dI(channelIdx);
+    % Source/detector wiring is optional: layout-only devices (grid montage,
+    % no physical optode positions) may omit sI/dI. Leave indices NaN then.
+    if isfield(p, 'sI') && isfield(p, 'dI')
+        p.TableCh.SourceIndex(validCols) = p.sI(channelIdx);
+        p.TableCh.DetectorIndex(validCols) = p.dI(channelIdx);
+    end
     
     p.TableCh.isDark = (isnan(p.TableCh.Wavelength) | p.TableCh.Wavelength == 0) & validCols;
     p.TableCh.isCh = validCols(:);
@@ -333,16 +389,25 @@ function p = assignChannelLabels(p)
     end
 end
 
-function p = processPositionInfo(p)
-    % If no 2D info, use 3D
+function p = processPositionInfo(p, coordUnits, devLabel)
+    if nargin < 2, coordUnits = ''; end
+    if nargin < 3, devLabel = ''; end
+
+    % If no 2D info but 3D is present, derive a 2D layout from the 3D
+    % coordinates, converting the DECLARED 3D units to the centimetre scale the
+    % 2D layout engine expects (legacy behaviour assumed mm, i.e. /10).
     if ~isfield(p, 'DetPosX') && ~isfield(p, 'SrcPosX') && isfield(p, 'DetPos3DX') && isfield(p, 'SrcPos3DX')
-        warning('No 2D position info available, plotting in 2D may not work');
-        p.SrcPosX = p.SrcPos3DX / 10;
-        p.SrcPosY = p.SrcPos3DY / 10;
-        p.SrcPosZ = p.SrcPos3DZ / 10;
-        p.DetPosX = p.DetPos3DX / 10;
-        p.DetPosY = p.DetPos3DY / 10;
-        p.DetPosZ = p.DetPos3DZ / 10;
+        [scale, unitStr] = unitsToCmScale(coordUnits);
+        if isempty(devLabel), devLabel = 'this device'; end
+        warning('pf2:loadDeviceCfg:no2DPositions', ...
+            ['No 2D position info for %s; deriving a 2D layout from 3D ' ...
+             '(%s) coordinates scaled by %.4g to cm.'], devLabel, unitStr, scale);
+        p.SrcPosX = p.SrcPos3DX * scale;
+        p.SrcPosY = p.SrcPos3DY * scale;
+        p.SrcPosZ = p.SrcPos3DZ * scale;
+        p.DetPosX = p.DetPos3DX * scale;
+        p.DetPosY = p.DetPos3DY * scale;
+        p.DetPosZ = p.DetPos3DZ * scale;
     end
 
     hasX= isfield(p, 'DetPosX') && isfield(p, 'SrcPosX');
@@ -351,7 +416,7 @@ function p = processPositionInfo(p)
     xyz=(hasX+hasY+hasZ);
 
     if(xyz<1)
-       error('No position information provided for device');
+       error('pf2_base:loadDeviceCfg:noPositionInfo', 'No position information provided for device');
     end
 
     if(xyz==1)
@@ -388,7 +453,7 @@ function p = processPositionInfo(p)
     if isfield(p, 'DetPosX') && isfield(p, 'SrcPosX')
         return;
     else
-        error('No position info is available');
+        error('pf2_base:loadDeviceCfg:noPositionInfo', 'No position info is available');
     end
 end
 
@@ -591,15 +656,15 @@ function  p=generateProbeLayout(p,includeSSchannels)
     p.DetPos.y=p.DetPos3DY(:);
     p.DetPos.z=p.DetPos3DZ(:);
     
+    % OptPos coordinate columns (x/y/z, x_2d/y_2d/z_2d) are a derived view of
+    % the canonical TableOpt.Pos3D_*/Pos2D_* -- written through one helper so
+    % the two stores cannot diverge.
     p.OptPos=table();
-    p.OptPos.x_2d=p.OptPosX(:);
-    p.OptPos.y_2d=p.OptPosY(:);
-    p.OptPos.z_2d=p.OptPosZ(:);
-    p.OptPos.x=p.OptPos3DX(:);
-    p.OptPos.y=p.OptPos3DY(:);
-    p.OptPos.z=p.OptPos3DZ(:);
-    
-    p.OptPos.subplot_layout(:)=cell(size(p.OptPos.z));
+    p = pf2_base.syncOptodeCoords(p);
+
+    % Size the layout off the channel count, not a coordinate column, so a
+    % 2D-only device (no Pos3D -> no OptPos.z) still builds a layout.
+    p.OptPos.subplot_layout(:)=cell(p.NumOptodes,1);
     p.OptPos.subplot_layout(~p.IsShortSeparation)=p.OptLayout2D(:);
     if(includeSSchannels)
         p.OptPos.subplot_layout_ss=p.OptLayout2D_ss(:);
@@ -608,6 +673,293 @@ function  p=generateProbeLayout(p,includeSSchannels)
     end
     
    
+end
+
+function checkCoordinateBounds(p, coordSys, devLabel)
+% CHECKCOORDINATEBOUNDS Two-tier sanity check on declared-MNI 3D coordinates.
+%
+% Warns (never errors) when optode coordinates look inconsistent with MNI-space
+% millimetres: too large (likely cm read as mm, a voxel index, or a swapped
+% axis) or too small in extent (likely cm mislabelled as mm). Only runs when
+% the device declares CoordinateSystem = 'MNI'.
+    if isempty(coordSys) || ~strcmpi(strtrim(char(coordSys)), 'MNI')
+        return;
+    end
+    if ~isfield(p, 'TableOpt') || ~istable(p.TableOpt)
+        return;
+    end
+    vn = p.TableOpt.Properties.VariableNames;
+    if ~all(ismember({'Pos3D_x','Pos3D_y','Pos3D_z'}, vn))
+        return;
+    end
+    XYZ = [p.TableOpt.Pos3D_x(:), p.TableOpt.Pos3D_y(:), p.TableOpt.Pos3D_z(:)];
+    XYZ = XYZ(all(~isnan(XYZ), 2), :);
+    if isempty(XYZ)
+        return;
+    end
+    if isempty(devLabel), devLabel = 'this device'; end
+
+    % Tier 1 - implausibly large for a scalp-mounted MNI montage (mm).
+    maxAbs = max(abs(XYZ(:)));
+    if maxAbs > 150
+        warning('pf2:loadDeviceCfg:coordsTooLarge', ...
+            ['%s: MNI optode coordinate magnitude %.1f mm exceeds ~150 mm. ' ...
+             'Check units (cm/voxel index?) or axis assignment.'], devLabel, maxAbs);
+    end
+
+    % Tier 2 - implausibly tight optode spacing: likely cm mislabelled as mm.
+    % Uses median nearest-neighbour spacing (robust to montage size) rather
+    % than total span, so a small but legitimate patch is not flagged while a
+    % cm-as-mm error (~3 mm spacing instead of ~30 mm) still is.
+    n = size(XYZ, 1);
+    if n > 1
+        nn = inf(n, 1);
+        for a = 1:n
+            for b = 1:n
+                if a == b, continue; end
+                d = norm(XYZ(a, :) - XYZ(b, :));
+                if d < nn(a), nn(a) = d; end
+            end
+        end
+        medNN = median(nn(isfinite(nn)));
+        if isfinite(medNN) && medNN < 8
+            warning('pf2:loadDeviceCfg:coordsTooSmall', ...
+                ['%s: median optode spacing is only %.1f mm; coordinates may be ' ...
+                 'in cm mislabelled as mm (CoordinateUnits).'], devLabel, medNN);
+        end
+    end
+end
+
+function [scale, unitStr] = unitsToCmScale(coordUnits)
+% UNITSTOCMSCALE Factor converting declared 3D coordinate units to centimetres.
+%
+% Returns the multiplicative scale and a human-readable unit string for the
+% warning. When units are undeclared the legacy mm assumption is preserved but
+% flagged as a guess.
+    u = lower(strtrim(char(coordUnits)));
+    switch u
+        case {'mm','millimeter','millimetre','millimeters','millimetres'}
+            scale = 0.1;  unitStr = 'mm';
+        case {'cm','centimeter','centimetre','centimeters','centimetres'}
+            scale = 1;    unitStr = 'cm';
+        case {'m','meter','metre','meters','metres'}
+            scale = 100;  unitStr = 'm';
+        case ''
+            scale = 0.1;  unitStr = 'mm (assumed; CoordinateUnits not declared)';
+        otherwise
+            scale = 0.1;  unitStr = sprintf('%s (unrecognized; assuming mm)', u);
+    end
+end
+
+function p = buildLayoutOnlyProbe(p)
+% BUILDLAYOUTONLYPROBE Assemble a device defined by channels + grid only.
+%
+% For devices with no physical optode coordinates (e.g. a montage described
+% solely by a PlotStructure grid). Produces the minimum TableOpt/OptPos needed
+% for grid plotting and the Device accessors, using the provided SD field for
+% short-separation classification. No Pos2D/Pos3D are created, so hasMNI()
+% stays false and the schematic grid becomes the device's only layout.
+
+    n = p.NumOptodes;
+
+    % Per-channel source-detector distance from the provided SD field, if it
+    % matches the channel count; otherwise unknown.
+    sd = nan(n, 1);
+    if isfield(p, 'SD') && numel(p.SD) == n
+        sd = p.SD(:);
+    end
+    isSS = sd < 2;          % NaN < 2 is false
+    isSS(isnan(sd)) = false;
+    p.SD = sd;
+    p.IsShortSeparation = isSS;
+    p.NumShortSeparation = sum(isSS);
+
+    p.TableOpt.SD = sd;
+    p.TableOpt.IsShortSeparation = isSS(:);
+
+    % Carry optional source/detector wiring through if the cfg declares it.
+    if isfield(p, 'sI') && isfield(p, 'dI') ...
+            && numel(p.sI) == n && numel(p.dI) == n
+        p.TableOpt.SrcIdx = p.sI(:);
+        p.TableOpt.DetIdx = p.dI(:);
+    end
+
+    % OptPos host table, sized to the channel count so sortOptodes can reorder
+    % it in step with TableOpt. No physical coordinates exist (layout-only), so
+    % the single NaN column is a row-count seed, not a real position.
+    p.OptPos = table();
+    p.OptPos.z = nan(n, 1);
+
+    % Per-channel raw-column map + labels (mirrors generateProbeLayout's tail).
+    hasLabel = ismember('Label', p.TableOpt.Properties.VariableNames);
+    for c = 1:n
+        chIdxMatch = find(p.ChannelNumbers == p.ChannelList(c));
+        p.TableOpt.Ch(c, 1:length(chIdxMatch)) = chIdxMatch;
+        p.TableOpt.wv(c, 1:length(chIdxMatch)) = p.Wavelength(chIdxMatch);
+        if ~hasLabel
+            p.TableOpt.Label{c} = sprintf('Opt%i', p.ChannelList(c));
+        end
+    end
+
+    % A PlotStructure grid ([row col channel] rows) becomes a declared layout.
+    if isfield(p, 'PlotStructure') && ~isempty(p.PlotStructure) && size(p.PlotStructure, 2) >= 3
+        ps = p.PlotStructure;
+        rows = max(ps(:, 1)); cols = max(ps(:, 2));
+        order = zeros(1, n);
+        for r = 1:size(ps, 1)
+            ci = find(p.ChannelList == ps(r, 3), 1);
+            if ~isempty(ci)
+                order(ci) = (ps(r, 1) - 1) * cols + ps(r, 2);
+            end
+        end
+        if all(order > 0)
+            p.LayoutRows = rows;
+            p.LayoutCols = cols;
+            p.LayoutOrder = order;
+        end
+    end
+end
+
+function p = generateSchematicLayout(p)
+% GENERATESCHEMATICLAYOUT Build a clean flat "schematic" montage layout.
+%
+% Produces subplot_layout_schematic (standard channels, aligned 1:1 with
+% subplot_layout) and subplot_layout_schematic_ss (all channels) on p.OptPos,
+% plus a p.LayoutDeclared flag. Unlike the affine 3D->2D projection, this is a
+% tidy grid intended for explanatory plotting (e.g. a 2x8 montage).
+%
+% Layout source, in priority order:
+%   1. Explicit per-channel Layout2D_x / Layout2D_y (normalized, any shape)
+%   2. Declared grid LayoutRows / LayoutCols (+ optional LayoutOrder)
+%   3. Auto near-square grid fallback (best-effort; NOT a declared montage)
+
+    nAll = p.NumOptodes;
+    if isfield(p, 'IsShortSeparation')
+        isSS = logical(p.IsShortSeparation(:));
+    else
+        isSS = false(nAll, 1);
+    end
+    if numel(isSS) ~= nAll
+        isSS = false(nAll, 1);
+    end
+    nNonSS = sum(~isSS);
+
+    hasXY   = isfield(p, 'Layout2D_x') && isfield(p, 'Layout2D_y');
+    hasGrid = isfield(p, 'LayoutRows') && isfield(p, 'LayoutCols');
+    p.LayoutDeclared = hasXY || hasGrid;
+
+    order = [];
+    if isfield(p, 'LayoutOrder')
+        order = p.LayoutOrder(:)';
+    end
+    pad = 0.15;  % fractional gap between grid cells
+
+    if hasXY
+        xv = p.Layout2D_x(:); yv = p.Layout2D_y(:);
+        if numel(xv) == nAll
+            cellsAll = buildXYCells(xv, yv);
+            cellsNon = cellsAll(~isSS);
+        elseif numel(xv) == nNonSS
+            cellsNon = buildXYCells(xv, yv);
+            cellsAll = buildAutoGridCells(nAll, order, pad);
+            cellsAll(~isSS) = cellsNon;
+        else
+            warning('pf2:loadDeviceCfg:layoutSize', ...
+                ['Layout2D_x/y length (%d) matches neither channel count ' ...
+                 '(%d all / %d standard); using auto grid.'], numel(xv), nAll, nNonSS);
+            p.LayoutDeclared = false;
+            cellsNon = buildAutoGridCells(nNonSS, [], pad);
+            cellsAll = buildAutoGridCells(nAll, [], pad);
+        end
+    elseif hasGrid
+        cellsNon = buildGridCells(nNonSS, p.LayoutRows, p.LayoutCols, order, pad);
+        cellsAll = buildGridCells(nAll, p.LayoutRows, p.LayoutCols, order, pad);
+    else
+        cellsNon = buildAutoGridCells(nNonSS, [], pad);
+        cellsAll = buildAutoGridCells(nAll, [], pad);
+    end
+
+    % Place into full-size cell columns indexed by optode row (matches the
+    % subplot_layout convention: standard channels filled, SS left empty).
+    schemNon = cell(nAll, 1);
+    schemNon(~isSS) = cellsNon(:);
+    p.OptPos.subplot_layout_schematic = schemNon;
+    p.OptPos.subplot_layout_schematic_ss = cellsAll(:);
+
+    % Layout-only devices have no affine projection: make the schematic grid the
+    % device's default layout too, so 'anatomical'/'auto' plots still work.
+    if ~ismember('subplot_layout', p.OptPos.Properties.VariableNames)
+        p.OptPos.subplot_layout = schemNon;
+    end
+    if ~ismember('subplot_layout_ss', p.OptPos.Properties.VariableNames)
+        p.OptPos.subplot_layout_ss = cellsAll(:);
+    end
+
+    % Drop the raw layout specs now that they are baked into the layout cells.
+    for fn = {'LayoutRows','LayoutCols','LayoutOrder','Layout2D_x','Layout2D_y'}
+        if isfield(p, fn{1})
+            p = rmfield(p, fn{1});
+        end
+    end
+end
+
+function cells = buildGridCells(n, rows, cols, order, pad)
+% Row-major rectangles in normalized [0,1] coords, row 1 at the top.
+    rows = double(rows); cols = double(cols);
+    if isempty(order) || numel(order) ~= n
+        order = 1:n;
+    end
+    if rows * cols < n   % declared grid too small: fall back to near-square
+        cols = ceil(sqrt(n));
+        rows = ceil(n / cols);
+        order = 1:n;
+    end
+    w = 1 / cols; h = 1 / rows;
+    cells = cell(n, 1);
+    for i = 1:n
+        slot = order(i);
+        rr = ceil(slot / cols);
+        cc = slot - (rr - 1) * cols;
+        x = (cc - 1) * w + pad * w / 2;
+        y = (rr - 1) * h + pad * h / 2;   % row 1 renders at the top (imageValues flips y)
+        cells{i} = [x, y, w * (1 - pad), h * (1 - pad)];
+    end
+end
+
+function cells = buildAutoGridCells(n, order, pad)
+% Near-square grid; a best-effort fallback, not a declared montage.
+    cols = ceil(sqrt(n));
+    rows = ceil(n / cols);
+    cells = buildGridCells(n, rows, cols, order, pad);
+end
+
+function cells = buildXYCells(xv, yv)
+% Normalize arbitrary 2D positions into [0,1] and build uniform rectangles.
+    xv = xv(:); yv = yv(:);
+    n = numel(xv);
+    rngx = max(xv) - min(xv); if rngx == 0, rngx = 1; end
+    rngy = max(yv) - min(yv); if rngy == 0, rngy = 1; end
+    m = 0.10;  % outer margin
+    nx = m + (1 - 2 * m) * (xv - min(xv)) / rngx;
+    ny = m + (1 - 2 * m) * (yv - min(yv)) / rngy;
+    % Cell size from nearest-neighbour spacing (keeps tiles from overlapping).
+    if n > 1
+        minD = inf;
+        for a = 1:n
+            for b = a+1:n
+                d = hypot(nx(a) - nx(b), ny(a) - ny(b));
+                if d < minD, minD = d; end
+            end
+        end
+        if ~isfinite(minD) || minD == 0, minD = 0.2; end
+        wch = max(0.04, min(0.18, 0.6 * minD));
+    else
+        wch = 0.18;
+    end
+    cells = cell(n, 1);
+    for i = 1:n
+        cells{i} = [nx(i) - wch / 2, ny(i) - wch / 2, wch, wch];
+    end
 end
 
 function p = sortOptodes(p)

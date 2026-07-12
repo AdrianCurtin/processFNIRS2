@@ -17,7 +17,7 @@ function [qvalues,k,passed]=performFDR_twostep(pvalues,pThreshold)
 % Inputs:
 %   pvalues    - Matrix or vector of uncorrected p-values
 %                Can be a numeric array or table (tables are converted)
-%                NaN values are ignored in calculations
+%                NaN values are excluded from calculations
 %   pThreshold - FDR threshold for significance (default: 0.05)
 %                Typical values: 0.01, 0.05, 0.10
 %
@@ -27,10 +27,9 @@ function [qvalues,k,passed]=performFDR_twostep(pvalues,pThreshold)
 %                Values > 1 are capped at 1
 %   k          - Critical rank from the FDR procedure
 %   passed     - Logical matrix indicating significant results
-%                true where qvalues <= pThreshold AND pvalues <= 0.05
 %
 % Algorithm (Two-step adaptive BH procedure):
-%   Step 1: Apply standard BH at level q' = q
+%   Step 1: Apply standard BH at level q
 %           Get initial set of rejections (r0)
 %   Step 2: If some (but not all) hypotheses rejected:
 %           - Estimate m0 = m - r0 (number of true nulls)
@@ -39,7 +38,6 @@ function [qvalues,k,passed]=performFDR_twostep(pvalues,pThreshold)
 %
 % Notes:
 %   - More powerful than standard BH when proportion of nulls is high
-%   - Results are constrained to raw p <= 0.05
 %   - Falls back to standard FDR if all or none pass step 1
 %   - Assumes tests are independent or positively dependent
 %
@@ -53,36 +51,24 @@ function [qvalues,k,passed]=performFDR_twostep(pvalues,pThreshold)
 %
 % See also: performFDR, exploreFNIRS.fx.autoContrast
 
-if(istable(pvalues))
+if istable(pvalues)
     pvalues=table2array(pvalues);
 end
 
-if(nargin<2)
+if nargin<2
     pThreshold=0.05;
 end
 
-m=length(pvalues(:));
-q_prime=pThreshold;
+% Count valid (non-NaN) tests
+m=sum(~isnan(pvalues(:)));
 
-% Step 1: Standard FDR at level q'
-[qvalues,k,passed]=exploreFNIRS.fx.performFDR(pvalues,q_prime);
+% Step 1: Standard FDR at level q
+[qvalues,k,passed]=exploreFNIRS.fx.performFDR(pvalues,pThreshold);
 
 % Step 2: If some (but not all) passed, adjust threshold
-if(sum(passed(:))>0&&sum(~passed(:))>0)
-    m=sum(~isnan(pvalues));
-    numPassed=sum(passed);
-    mo=m-numPassed;
-    q_star=q_prime*m/mo;  % Adjusted threshold
-
+numPassed=sum(passed(:));
+if numPassed>0 && numPassed<m
+    m0=m-numPassed;
+    q_star=min(pThreshold*m/m0, 1);
     [qvalues,k,passed]=exploreFNIRS.fx.performFDR(pvalues,q_star);
-end
-
-% Final adjustments
-if(m/k<m)
-    qvalues(qvalues>1)=1;
-    passed=passed&pvalues<=0.05;
-else
-   qvalues=pvalues;
-   qvalues(qvalues>1)=1;
-   passed=qvalues<=pThreshold&pvalues<=0.05;
 end

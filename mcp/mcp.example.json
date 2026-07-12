@@ -1,0 +1,25 @@
+{
+  "//": "Copy to .vscode/mcp.json (VS Code / Copilot). Keep ONE 'matlab' entry for your OS; edit the binary + MATLAB paths.",
+  "servers": {
+    "matlab": {
+      "//": "macOS / Linux",
+      "type": "stdio",
+      "command": "/Users/YOU/bin/matlab-mcp-server",
+      "args": [
+        "--matlab-root", "/Applications/MATLAB_R2025b.app",
+        "--matlab-display-mode=nodesktop",
+        "--disable-telemetry=true"
+      ]
+    },
+    "matlab-windows": {
+      "//": "Windows — rename to 'matlab' and delete the entry above. Backslashes are escaped.",
+      "type": "stdio",
+      "command": "C:\\Users\\YOU\\bin\\matlab-mcp-server-windows-x64.exe",
+      "args": [
+        "--matlab-root", "C:\\Program Files\\MATLAB\\R2025b",
+        "--matlab-display-mode=nodesktop",
+        "--disable-telemetry=true"
+      ]
+    }
+  }
+}

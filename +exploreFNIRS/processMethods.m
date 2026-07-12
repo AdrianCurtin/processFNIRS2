@@ -1,4 +1,25 @@
 function processMethods(rawMethodStr,oxyMethodStr)
+% PROCESSMETHODS Process all loaded fNIRS data with specified method pair
+%
+% Runs a raw+oxy method combination on all segments in the exploreFNIRS
+% dataset. Results are cached so re-selecting a previously processed
+% method pair returns instantly. On first load, ROI fields are
+% standardized across devices.
+%
+% Syntax:
+%   exploreFNIRS.processMethods(rawMethodStr, oxyMethodStr)
+%
+% Inputs:
+%   rawMethodStr - Name of the raw processing method, or empty [] to skip
+%                  raw processing and apply oxy-only
+%   oxyMethodStr - Name of the oxy processing method
+%
+% Example:
+%   exploreFNIRS.processMethods('x5_TDDR', 'takizawa_easy');
+%   exploreFNIRS.processMethods([], 'None');  % oxy-only reprocessing
+%
+% See also: processFNIRS2, pf2.methods.raw.list, pf2.methods.oxy.list,
+%           exploreFNIRS.dataset.standardizeROIs
 global ExFNIRS
 %global ProgressHandles
 
@@ -59,23 +80,36 @@ if(~any(curRawMatchIdx&curOxyMatchIdx))
     %fprintf('ExploreFNIRS\nProcessing Method %s x %s %i of %i\n',rawMethodStr_label,oxyMethodStr_label,1,numData);
     %hF=ProgressHandles.h.hF;
     
-    for i=1:numData
-       fprintf('ExploreFNIRS - Processing Method %s x %s %i of %i\n',rawMethodStr_label,oxyMethodStr_label,i,numData);
-       
-       if(~isempty(data{i})&&length(data{i}.time)>1)
-           if(processOxyOnly)
-               if(isfield(data{i},'HbO'))
-                   data{i}=pf2.process.processOxy(data{i});
-               else
-                   warning('Data file for item %i has no Oxy Data, attempting to process with ''None''\n',data{i});
-                   data{i}=pf2(data{i});
-               end
-           else
-               data{i}=pf2(data{i});
-           end
-           data{i}=pf2.data.applyChannelMask(data{i});
-           data{i}=pf2.data.resample(data{i},ExFNIRS.settings.grandavg_resample_size,'centerOnT0',true,'timeOutMode','end','averageAux',false,'flattenAux',true);
-       end
+    % Filter out empty/invalid segments
+    validIdx = find(cellfun(@(d) ~isempty(d) && length(d.time) > 1, data));
+
+    if processOxyOnly
+        % Oxy-only: must loop (processOxy doesn't support cell arrays)
+        for k = 1:numel(validIdx)
+            i = validIdx(k);
+            fprintf('ExploreFNIRS - Processing Method %s x %s %i of %i\n', rawMethodStr_label, oxyMethodStr_label, i, numData);
+            if isfield(data{i}, 'HbO')
+                data{i} = pf2.process.processOxy(data{i});
+            else
+                warning('Data file for item %i has no Oxy Data, attempting full processing', i);
+                data{i} = pf2(data{i});
+            end
+        end
+    else
+        % Full processing: use batch mode (processFNIRS2 handles parfor internally)
+        fprintf('ExploreFNIRS - Processing Method %s x %s (%d segments)\n', rawMethodStr_label, oxyMethodStr_label, numel(validIdx));
+        validData = data(validIdx);
+        validData = processFNIRS2(validData);
+        data(validIdx) = validData;
+    end
+
+    % Apply channel mask + resample
+    rsSize = ExFNIRS.settings.grandavg_resample_size;
+    for k = 1:numel(validIdx)
+        i = validIdx(k);
+        data{i} = pf2.data.applyChannelMask(data{i});
+        data{i} = pf2.data.resample(data{i}, rsSize, 'centerOnT0', true, ...
+            'timeOutMode', 'end', 'averageAux', false, 'flattenAux', true);
     end
 
     
@@ -87,6 +121,41 @@ else
     pf2('blLength',0);
     pf2('Raw_Method',rawMethodStr,'Oxy_Method',oxyMethodStr); 
    ExFNIRS.curProcessedData= ExFNIRS.processedData{curRawMatchIdx&curOxyMatchIdx,3};
+end
+
+% Update optode list from processed data (channels created by bvoxy)
+uOpt = [];
+for ii = 1:length(ExFNIRS.curProcessedData)
+    if ~isempty(ExFNIRS.curProcessedData{ii}) && isfield(ExFNIRS.curProcessedData{ii}, 'channels')
+        uOpt = [uOpt; ExFNIRS.curProcessedData{ii}.channels(:)]; %#ok<AGROW>
+    end
+end
+if ~isempty(uOpt)
+    uOpt = sort(unique(uOpt));
+    ExFNIRS.currentOpt = uOpt;
+    % Rebuild labels with short-sep markers
+    labels = arrayfun(@num2str, uOpt, 'UniformOutput', false);
+    try
+        dev = [];
+        for ii2 = 1:length(ExFNIRS.curProcessedData)
+            d = ExFNIRS.curProcessedData{ii2};
+            if ~isempty(d) && isfield(d,'device') && isa(d.device,'pf2.Device')
+                dev = d.device; break;
+            end
+        end
+        if ~isempty(dev) && dev.nShortSep > 0
+            ssMask = dev.isShortSep();
+            chList = dev.channelList();
+            for kk = 1:numel(uOpt)
+                idx = find(chList == uOpt(kk), 1);
+                if ~isempty(idx) && idx <= numel(ssMask) && ssMask(idx)
+                    labels{kk} = sprintf('%d (ss)', uOpt(kk));
+                end
+            end
+        end
+    catch
+    end
+    ExFNIRS.currentOptLabels = labels;
 end
 
 if(processOxyOnly)

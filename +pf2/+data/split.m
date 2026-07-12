@@ -59,6 +59,8 @@ function [outfNIR] = split(varargin)
 % See also: pf2.data.resample, pf2.data.getMarkers, pf2.data.setT0
 
 
+pf2_base.ensureStatsFallbacks();  % ensure stats-toolbox fallbacks (nan*) are on the path before use
+
 p=inputParser;
 
 validfNIRInput = @(x) (isnumeric(x)&&length(x)>1) || (isstruct(x) && (isfield(x,'raw')||isfield(x,'time')||isfield(x,'info')));
@@ -134,7 +136,7 @@ if(relative) % Convert to absolute units here
     if(isnan(startTime))
         startTime=min(fNIR.time);
     elseif(startTime<0)
-        error('Relative time cannot have a negative startTime');
+        error('pf2:split:negativeRelativeStart', 'Relative time cannot have a negative startTime');
     else
         startTime=min(fNIR.time)+startTime;  %Start time is X seconds from beginning
     end
@@ -164,17 +166,20 @@ end
 
 if(endTime>max(fNIR.time))
     %endTime=max(fNIR.time);
-    warning('End time excedes fNIR time');
+    warning('pf2:split:endTimeClamped', ...
+        ['End time (%.1f s) exceeds the recording length (%.1f s); ' ...
+         'the segment is truncated to the available data.'], ...
+        endTime, max(fNIR.time));
 end
 
 if(endTime<startTime)
-   error('End Time (%.1f) precedes Start Time (%.1f). Use ''segmentLength'' argument to allow relative from startTime',endTime,startTime); 
+   error('pf2:split:endBeforeStart', 'End Time (%.1f) precedes Start Time (%.1f). Use ''segmentLength'' argument to allow relative from startTime',endTime,startTime);
 end
 
 if(~isnan(blStartTime)&&~isnan(blEndTime))
     blLength=blEndTime-blStartTime;
     if(blLength<=0)
-       error('Baseline end must come after baseline start'); 
+       error('pf2:split:invalidBaselineWindow', 'Baseline end must come after baseline start');
     end
 end
 
@@ -343,7 +348,7 @@ else
                     outfNIR.ROI.HbTotal=outfNIR.ROI.HbTotal-nanmean(blfNIR.ROI.HbTotal,1);
                     outfNIR.ROI.CBSI=outfNIR.ROI.CBSI-nanmean(blfNIR.ROI.CBSI,1);
                 else
-                    error('Baseline has no Build ROI data');
+                    error('pf2:split:noBaselineROI', 'Baseline has no Build ROI data');
                 end
          
              elseif(exist('blIndexStart'))
@@ -418,7 +423,7 @@ if(isfield(outfNIR,'Aux')&&splitAux)
                                 maxftime=fNIR.t0+duration(0,0,endTime);
                              end
                         else
-                            error('Mismatched data');
+                            error('pf2:split:mismatchedAuxTime', 'Mismatched data');
                         end
     
                         t2trim_idx=t2trim>=minftime&t2trim<=maxftime;
@@ -436,17 +441,28 @@ elseif(isfield(outfNIR,'Aux')) % don't split or touch it
 end
 
 if(isfield(outfNIR,'markers')&&~isempty(outfNIR.time))
-    if(isfield(outfNIR.markers,'data')&&~isempty(outfNIR.markers.data))
+    if(istable(outfNIR.markers)&&~isempty(outfNIR.markers))
+        mTime=outfNIR.markers.Time;
+        validIndicies=(mTime<=max(outfNIR.time)&mTime>=min(outfNIR.time));
+        outfNIR.markers=outfNIR.markers(validIndicies,:);
+    elseif(isfield(outfNIR.markers,'data')&&~isempty(outfNIR.markers.data))
         validIndicies=(outfNIR.markers.data(:,1)<=max(outfNIR.time)&outfNIR.markers.data(:,1)>=min(outfNIR.time))==1;
         outfNIR.markers.data=outfNIR.markers.data(validIndicies,:);
     elseif(isnumeric(outfNIR.markers)&&~isempty(outfNIR.markers))
-        validIndicies=(fNIR.markers(:,1)<=max(outfNIR.time)&outfNIR.markers(:,1)>=min(outfNIR.time))==1;
-        outfNIR.markers=fNIR.markers(validIndicies,:);
+        validIndicies=(outfNIR.markers(:,1)<=max(outfNIR.time)&outfNIR.markers(:,1)>=min(outfNIR.time))==1;
+        outfNIR.markers=outfNIR.markers(validIndicies,:);
     end
 end
 
 if(isfield(outfNIR,'ftimeChMask'))
     outfNIR.ftimeChMask=outfNIR.ftimeChMask(indexStart:indexEnd,:);
+end
+
+if isfield(outfNIR, 'blocks') && ~isempty(outfNIR.blocks) && ~isempty(outfNIR.time)
+    tMin = min(outfNIR.time);
+    tMax = max(outfNIR.time);
+    keep = arrayfun(@(b) b.startTime <= tMax && b.endTime >= tMin, outfNIR.blocks);
+    outfNIR.blocks = outfNIR.blocks(keep);
 end
     
     
@@ -506,6 +522,11 @@ function [outAuxStruct] = recursiveAuxFlatten(aux_in,nir_time,parent_time_in)
         curFieldName=auxFields{f};
         curField=aux_in.(curFieldName);
 
+        % Skip metadata fields (used for labeling, not time-series data)
+        if ismember(curFieldName, {'varNames', 'unit'})
+            continue;
+        end
+
         if(isempty(curField))
             auxFieldIsEmpty(f)=true;
             outAuxStruct.(curFieldName)=curField;
@@ -557,11 +578,16 @@ function [outAuxStruct] = recursiveAuxFlatten(aux_in,nir_time,parent_time_in)
             end
 
             nAuxChan=size(curField,2);
-          
+            nDataCols=nAuxChan-auxFieldHasTime(f);
 
-            newVarNames={};
-            for nV=1:(nAuxChan-auxFieldHasTime(f))
-                newVarNames{nV}=sprintf('val%i',nV);
+            % Use varNames from parent struct if available
+            if isfield(aux_in,'varNames') && iscell(aux_in.varNames) && length(aux_in.varNames)>=nDataCols
+                newVarNames=aux_in.varNames(1:nDataCols);
+            else
+                newVarNames={};
+                for nV=1:nDataCols
+                    newVarNames{nV}=sprintf('val%i',nV);
+                end
             end
 
             if(auxFieldHasTime(f))

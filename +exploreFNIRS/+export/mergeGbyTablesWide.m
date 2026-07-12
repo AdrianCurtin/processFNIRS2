@@ -106,6 +106,7 @@ for g=1:length(gbyTables)
     if(emptyChannelFlag&&exportFNIR)
         numCh=size(curBarGA.HbO.data,2);
         channels=1:numCh;
+        optodeNames=cellstr(num2str(channels(:)));
     elseif(exportFNIR)
        numCh=length(channels); 
     else

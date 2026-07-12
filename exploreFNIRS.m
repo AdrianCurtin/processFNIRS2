@@ -54,6 +54,12 @@ function varargout = exploreFNIRS(varargin) % exploreFNIRS(data,timeShiftTo0,blS
 
 % Last Modified by GUIDE v2.5 26-Aug-2019 17:40:22
 
+if pf2_base.env.isOctave()
+    error('pf2:gui:octaveUnsupported', ...
+        ['exploreFNIRS requires MATLAB. Under Octave, use the programmatic ' ...
+         'group-analysis API instead of the GUI.']);
+end
+
 % Begin initialization code - DO NOT EDIT
 gui_Singleton = 1;
 gui_State = struct('gui_Name',       mfilename, ...
@@ -87,6 +93,13 @@ handles.output = hObject;
 % Update handles structure
 guidata(hObject, handles);
 
+pf2_base.applyLightTheme(hObject);
+
+% Add File menu with Import options
+mFile = uimenu(hObject, 'Label', 'File');
+uimenu(mFile, 'Label', 'Import File...', 'Callback', @(s,e) menu_import_file_Callback(handles));
+uimenu(mFile, 'Label', 'Import Directory...', 'Callback', @(s,e) menu_import_dir_Callback(handles));
+
 initialize_gui(hObject, handles, false);
 
 global ExFNIRS
@@ -99,6 +112,10 @@ if(~isfield(ExFNIRS,'defaultRootPath'))
     addpath('base_functions','GUI','functions');
     cd(curdir);
 end
+
+% Self-healing: ensure stats-toolbox fallbacks (nan*) are on the path when
+% the toolbox is absent (END of path, so the toolbox wins when present).
+pf2_base.ensureStatsFallbacks();
 
 set(handles.text_versInfo,'String',exploreFNIRS.versInfo());
 
@@ -122,6 +139,13 @@ if(~isfield(ExFNIRS,'settings')||~isfield(ExFNIRS.settings,'baseline_start'))
     ExFNIRS.settings.processRaw=get(handles.checkbox_process_raw,'Value');
     ExFNIRS.settings.LME_use_intercept=get(handles.checkbox_LME_use_intercept,'Value');
     ExFNIRS.settings.LME_use_discreteTime=get(handles.checkbox_discreteTime,'Value');
+    % Map legacy checkbox to new TimeModel setting
+    if ExFNIRS.settings.LME_use_discreteTime
+        ExFNIRS.settings.LME_timeModel = 'discrete';
+    else
+        ExFNIRS.settings.LME_timeModel = 'polynomial';
+    end
+    ExFNIRS.settings.LME_polyOrder = 2;
     ExFNIRS.settings.LME_randomFxStr='1|SubjectID';
     ExFNIRS.settings.LME_use_customStr=get(handles.checkbox_lme_usecustom,'Value');
     ExFNIRS.settings.topoSigThrehold={'p',0.05};
@@ -136,7 +160,7 @@ end
 addParameter(p,'filename','',@ischar);
 
 
-addOptional(p,'data',[],@iscell); % Your data, as a cell of FNIRS structs (ideally with populated info fields and the task of interest starting at t=0)
+addOptional(p,'data',[],@(x) iscell(x) || isa(x, 'exploreFNIRS.core.Experiment')); % Cell of FNIRS structs, or an Experiment object
 addOptional(p,'timeShiftTo0',ExFNIRS.settings.timeShiftTo0,@islogical); %Specifies whether to automatically shift the start of the FNIRS period to 0, 
 		%best practice though is to turn this off and do it yourself before hand so that task starts at 0s and the baseline is before/after/during. See setT0fnirs()
 addOptional(p,'blStart', ExFNIRS.settings.baseline_start,validScalarNum);  %Time at which baseline starts (absolute)
@@ -150,29 +174,85 @@ addOptional(p,'resampleSize',nan,validScalarPosNum); % ExFNIRS.settings.grandavg
 
 parse(p,varargin{:});
 
-if(~isempty(p.Results.data)||~isfield(ExFNIRS,'data'))
-    ExFNIRS.data=p.Results.data;
-    
-    if(size(ExFNIRS.data,2)>size(ExFNIRS.data,1))
-        ExFNIRS.data=ExFNIRS.data';
+% Detect Experiment object and extract data + settings
+inputData = p.Results.data;
+experimentSource = [];
+
+if isa(inputData, 'exploreFNIRS.core.Experiment')
+    experimentSource = inputData;
+    inputData = experimentSource.data;
+
+    % Map Experiment settings → ExFNIRS settings
+    exS = experimentSource.settings;
+    ExFNIRS.settings.baseline_start = exS.baseline(1);
+    ExFNIRS.settings.baseline_end = exS.baseline(2);
+    ExFNIRS.settings.block_start = exS.taskStart;
+    ExFNIRS.settings.use_baseline = exS.useBaseline;
+    ExFNIRS.settings.timeShiftTo0 = false;
+    ExFNIRS.dataHierarchy = experimentSource.hierarchy;
+
+    if exS.barBinSize > 0
+        ExFNIRS.settings.barchart_resample_size = exS.barBinSize;
+    else
+        % barBinSize=0 means full task window; derive from task duration
+        ExFNIRS.settings.barchart_resample_size = -1; % placeholder, resolved below
     end
-elseif(~isempty(p.Results.filename))
-   exploreFNIRS.LoadEx(p.results.filename);
+    if exS.resampleRate > 0
+        ExFNIRS.settings.grandavg_resample_size = exS.resampleRate;
+    end
+
+    % Map avgMode → within_sub_avg_mode popup index
+    switch lower(exS.avgMode)
+        case 'none',      ExFNIRS.settings.within_sub_avg_mode = 1;
+        case 'flat',      ExFNIRS.settings.within_sub_avg_mode = 2;
+        case 'hierarchy', ExFNIRS.settings.within_sub_avg_mode = 3;
+    end
+
+    fprintf('Loaded Experiment object (%d segments)\n', length(inputData));
+end
+
+if ~isempty(inputData) || ~isfield(ExFNIRS, 'data')
+    ExFNIRS.data = inputData;
+    if size(ExFNIRS.data,2) > size(ExFNIRS.data,1)
+        ExFNIRS.data = ExFNIRS.data';
+    end
+elseif ~isempty(p.Results.filename)
+    exploreFNIRS.loadEx(p.Results.filename);
 end
 
 
 
-    
 
 
-ExFNIRS.settings.baseline_start=p.Results.blStart;
-ExFNIRS.settings.baseline_end=p.Results.blEnd;
-ExFNIRS.settings.block_start=p.Results.blockStart;
-ExFNIRS.settings.block_end=p.Results.blockEnd;
-ExFNIRS.settings.plot_start=p.Results.plotStart;
-ExFNIRS.settings.plot_end=p.Results.plotEnd;
-ExFNIRS.settings.barchart_resample_size=p.Results.barSegmentLength;
-ExFNIRS.settings.grandavg_resample_size=p.Results.resampleSize;
+
+if isempty(experimentSource)
+    ExFNIRS.settings.baseline_start=p.Results.blStart;
+    ExFNIRS.settings.baseline_end=p.Results.blEnd;
+    ExFNIRS.settings.block_start=p.Results.blockStart;
+    ExFNIRS.settings.block_end=p.Results.blockEnd;
+    ExFNIRS.settings.plot_start=p.Results.plotStart;
+    ExFNIRS.settings.plot_end=p.Results.plotEnd;
+    ExFNIRS.settings.barchart_resample_size=p.Results.barSegmentLength;
+    ExFNIRS.settings.grandavg_resample_size=p.Results.resampleSize;
+else
+    % Use Experiment taskEnd if set, otherwise derive from data
+    exS = experimentSource.settings;
+    if isfinite(exS.taskEnd)
+        ExFNIRS.settings.block_end = exS.taskEnd;
+    else
+        firstSeg = ExFNIRS.data{1};
+        if isfield(firstSeg, 'time') && ~isempty(firstSeg.time)
+            ExFNIRS.settings.block_end = max(firstSeg.time);
+        end
+    end
+    % Derive bar bin size from task window if not explicitly set
+    if ExFNIRS.settings.barchart_resample_size <= 0
+        ExFNIRS.settings.barchart_resample_size = ...
+            ExFNIRS.settings.block_end - ExFNIRS.settings.block_start;
+    end
+    ExFNIRS.settings.plot_start = min(0, ExFNIRS.settings.block_start);
+    ExFNIRS.settings.plot_end = ExFNIRS.settings.block_end;
+end
 
 
 
@@ -206,11 +286,16 @@ end
 
 
 
-ExFNIRS.settings.within_sub_avg_mode=get(handles.popupmenu_within_sub_avg,'Value'); %0 none, 1 flat, 2 hierarchy
+if ~isempty(experimentSource)
+    % Set GUI widgets to match Experiment-provided values
+    set(handles.popupmenu_within_sub_avg,'Value', ExFNIRS.settings.within_sub_avg_mode);
+    set(handles.checkbox_usebaseline,'Value', ExFNIRS.settings.use_baseline);
+else
+    ExFNIRS.settings.within_sub_avg_mode=get(handles.popupmenu_within_sub_avg,'Value');
+    ExFNIRS.settings.timeShiftTo0=p.Results.timeShiftTo0;
+end
 
 set(handles.listbox_hierarchy,'String',ExFNIRS.dataHierarchy(2:end));
-
-ExFNIRS.settings.timeShiftTo0=p.Results.timeShiftTo0;
 
 set(handles.edit_baseline_start,'String',sprintf('%.2f',ExFNIRS.settings.baseline_start));
 set(handles.edit_baseline_end,'String',sprintf('%.2f',ExFNIRS.settings.baseline_end));
@@ -257,6 +342,32 @@ initializeGUIvalues(handles);
 % UIWAIT makes exploreFNIRS wait for user response (see UIRESUME)
 % uiwait(handles.figure1);
 
+
+function menu_import_file_Callback(handles)
+% Import a single fNIRS file and open a new exploreFNIRS instance
+try
+    data = pf2.import.import();
+catch ME
+    errordlg(ME.message, 'Import Error');
+    return;
+end
+if isempty(data), return; end
+if isstruct(data), data = {data}; end
+exploreFNIRS(data);
+
+function menu_import_dir_Callback(handles)
+% Import a directory of fNIRS files and open a new exploreFNIRS instance
+dirPath = uigetdir('', 'Select fNIRS Data Directory');
+if isequal(dirPath, 0), return; end
+try
+    data = pf2.import.import(dirPath);
+catch ME
+    errordlg(ME.message, 'Import Error');
+    return;
+end
+if isempty(data), return; end
+if isstruct(data), data = {data}; end
+exploreFNIRS(data);
 
 function PopulateGUIfields(dataTable,handles)
 
@@ -738,6 +849,7 @@ global ExFNIRS
 ExFNIRS.settings.block_start=str2num(get(handles.edit_block_start,'String'));
 set(handles.edit_block_start,'String',sprintf('%.2f',ExFNIRS.settings.block_start));
 
+syncBlockSettingsUI(handles);
 exploreFNIRS.plotExTimeline();
 
 
@@ -774,6 +886,7 @@ global ExFNIRS
 ExFNIRS.settings.block_end=str2num(get(handles.edit_block_end,'String'));
 set(handles.edit_block_end,'String',sprintf('%.2f',ExFNIRS.settings.block_end));
 
+syncBlockSettingsUI(handles);
 exploreFNIRS.plotExTimeline();
 
 % --- Executes during object creation, after setting all properties.
@@ -1205,95 +1318,175 @@ function preprocessFNIRSData()
 global ExFNIRS
 if(ExFNIRS.UpdateNeeded==2||~isfield(ExFNIRS,'curPreprocessedFNIR'))
     exploreFNIRS.plotExTimeline();
-    %pf2_base.closeProgressHandles();
 
-     numSegs2Process=size(ExFNIRS.curProcessedData,1);
+    numSegs = size(ExFNIRS.curProcessedData, 1);
+    fprintf('ExploreFNIRS - Resampling and baselining %d segments\n', numSegs);
 
-    fprintf('ExploreFNIRS - Resampling and baselining fNIRS\n');
-    %hF=ProgressHandles.h.hF;
+    fNIR = ExFNIRS.curProcessedData;
+    baseline = cell(size(fNIR));
+    gbyFNIRS = fNIR;
+    gbyFNIRS_blk = cell(size(fNIR));
 
-   
-    ExFNIRS.curPreprocessedFNIR=[];
-    ExFNIRS.curPreprocessedFNIR.fNIR=ExFNIRS.curProcessedData;
-    ExFNIRS.curPreprocessedFNIR.baseline=cell(size(ExFNIRS.curProcessedData));
-    ExFNIRS.curPreprocessedFNIR.gbyFNIRS=ExFNIRS.curProcessedData;
-    ExFNIRS.curPreprocessedFNIR.gbyFNIRS_blk=cell(size(ExFNIRS.curProcessedData));
+    useBL    = ExFNIRS.settings.use_baseline;
+    blStart  = ExFNIRS.settings.baseline_start;
+    blEnd    = ExFNIRS.settings.baseline_end;
+    barRS    = ExFNIRS.settings.barchart_resample_size;
+    gaRS     = ExFNIRS.settings.grandavg_resample_size;
+    blkStart = ExFNIRS.settings.block_start;
 
-    for i=1:numSegs2Process
+    [canPar, poolOn] = pf2_base.accel.canParfor();
+    useParfor = canPar && poolOn && numSegs > 2;
 
-       fprintf('Resampling and baselining fNIRS %i of %i\n',i,numSegs2Process);
-       
-       if(ExFNIRS.settings.use_baseline)
-            ExFNIRS.curPreprocessedFNIR.baseline{i}=pf2.data.split(ExFNIRS.curPreprocessedFNIR.fNIR{i},ExFNIRS.settings.baseline_start,ExFNIRS.settings.baseline_end); %baselining is handled in processing section
-            ExFNIRS.curPreprocessedFNIR.gbyFNIRS_blk{i}=pf2.data.resample(ExFNIRS.curPreprocessedFNIR.gbyFNIRS{i}, ExFNIRS.settings.barchart_resample_size,'centerOnTime',ExFNIRS.settings.block_start,'timeOutMode','start','blfNIR',ExFNIRS.curPreprocessedFNIR.baseline{i},'averageAux',true,'flattenAux',true,'trimAux',false);
-            
-            ExFNIRS.curPreprocessedFNIR.gbyFNIRS{i}=pf2.data.resample(ExFNIRS.curPreprocessedFNIR.gbyFNIRS{i}, ExFNIRS.settings.grandavg_resample_size,'centerOnTime',ExFNIRS.settings.block_start,'timeOutMode','start','blfNIR',ExFNIRS.curPreprocessedFNIR.baseline{i},'averageAux',true,'flattenAux',true,'trimAux',false);
-            ExFNIRS.curPreprocessedFNIR.gbyFNIRS{i}.time=ExFNIRS.curPreprocessedFNIR.gbyFNIRS{i}.time+ExFNIRS.settings.block_start; %change time so that 0 is start of block
-       else
-            ExFNIRS.curPreprocessedFNIR.baseline{i}=[];
-            ExFNIRS.curPreprocessedFNIR.gbyFNIRS_blk{i}=pf2.data.resample(ExFNIRS.curPreprocessedFNIR.gbyFNIRS{i}, ExFNIRS.settings.barchart_resample_size,'centerOnTime',ExFNIRS.settings.block_start,'timeOutMode','start','averageAux',true,'flattenAux',true,'trimAux',false);
-            
-            ExFNIRS.curPreprocessedFNIR.gbyFNIRS{i}=pf2.data.resample(ExFNIRS.curPreprocessedFNIR.gbyFNIRS{i}, ExFNIRS.settings.grandavg_resample_size,'centerOnTime',ExFNIRS.settings.block_start,'timeOutMode','start','averageAux',true,'flattenAux',true,'trimAux',false);
-       end
+    if useParfor
+        parfor i = 1:numSegs
+            if useBL
+                bl = pf2.data.split(fNIR{i}, blStart, blEnd);
+                baseline{i} = bl;
+                gbyFNIRS_blk{i} = pf2.data.resample(fNIR{i}, barRS, ...
+                    'centerOnTime', blkStart, 'timeOutMode', 'start', ...
+                    'blfNIR', bl, 'averageAux', true, 'flattenAux', true, 'trimAux', false);
+                rs = pf2.data.resample(fNIR{i}, gaRS, ...
+                    'centerOnTime', blkStart, 'timeOutMode', 'start', ...
+                    'blfNIR', bl, 'averageAux', true, 'flattenAux', true, 'trimAux', false);
+                rs.time = rs.time + blkStart;
+                gbyFNIRS{i} = rs;
+            else
+                baseline{i} = [];
+                gbyFNIRS_blk{i} = pf2.data.resample(fNIR{i}, barRS, ...
+                    'centerOnTime', blkStart, 'timeOutMode', 'start', ...
+                    'averageAux', true, 'flattenAux', true, 'trimAux', false);
+                gbyFNIRS{i} = pf2.data.resample(fNIR{i}, gaRS, ...
+                    'centerOnTime', blkStart, 'timeOutMode', 'start', ...
+                    'averageAux', true, 'flattenAux', true, 'trimAux', false);
+            end
+        end
+    else
+        for i = 1:numSegs
+            fprintf('Resampling and baselining fNIRS %i of %i\n', i, numSegs);
+            if useBL
+                bl = pf2.data.split(fNIR{i}, blStart, blEnd);
+                baseline{i} = bl;
+                gbyFNIRS_blk{i} = pf2.data.resample(fNIR{i}, barRS, ...
+                    'centerOnTime', blkStart, 'timeOutMode', 'start', ...
+                    'blfNIR', bl, 'averageAux', true, 'flattenAux', true, 'trimAux', false);
+                rs = pf2.data.resample(fNIR{i}, gaRS, ...
+                    'centerOnTime', blkStart, 'timeOutMode', 'start', ...
+                    'blfNIR', bl, 'averageAux', true, 'flattenAux', true, 'trimAux', false);
+                rs.time = rs.time + blkStart;
+                gbyFNIRS{i} = rs;
+            else
+                baseline{i} = [];
+                gbyFNIRS_blk{i} = pf2.data.resample(fNIR{i}, barRS, ...
+                    'centerOnTime', blkStart, 'timeOutMode', 'start', ...
+                    'averageAux', true, 'flattenAux', true, 'trimAux', false);
+                gbyFNIRS{i} = pf2.data.resample(fNIR{i}, gaRS, ...
+                    'centerOnTime', blkStart, 'timeOutMode', 'start', ...
+                    'averageAux', true, 'flattenAux', true, 'trimAux', false);
+            end
+        end
     end
 
-    ExFNIRS.UpdateNeeded=true; % mark that data was preprocesed, but not averaged into groups
-else
+    ExFNIRS.curPreprocessedFNIR = struct();
+    ExFNIRS.curPreprocessedFNIR.fNIR = fNIR;
+    ExFNIRS.curPreprocessedFNIR.baseline = baseline;
+    ExFNIRS.curPreprocessedFNIR.gbyFNIRS = gbyFNIRS;
+    ExFNIRS.curPreprocessedFNIR.gbyFNIRS_blk = gbyFNIRS_blk;
 
-    ExFNIRS.UpdateNeeded=true; % mark that data was preprocesed, but not averaged into groups
+    ExFNIRS.UpdateNeeded = true; % mark that data was preprocessed, but not averaged into groups
+else
+    ExFNIRS.UpdateNeeded = true;
 end
 
 function processSelectedTable(handles,sellFullIdx,gbyIdx)
 global ExFNIRS
 pf2_base.closeProgressHandles();
 
-
 fprintf('ExploreFNIRS - Processing Groups\n');
-%hF=ProgressHandles.h.hF;
 
-numSegs2Process=size(ExFNIRS.selectedTable,1);
+numSegs = size(ExFNIRS.selectedTable, 1);
+numGroups = max(gbyIdx);
 
-ExFNIRS.gbyFlat=[];
-ExFNIRS.gbyFlat.fNIR=ExFNIRS.curPreprocessedFNIR.fNIR(sellFullIdx,:);
-ExFNIRS.gbyFlat.baseline=ExFNIRS.curPreprocessedFNIR.baseline(sellFullIdx,:);
-ExFNIRS.gbyFlat.gbyFNIRS=ExFNIRS.curPreprocessedFNIR.gbyFNIRS(sellFullIdx,:);
-ExFNIRS.gbyFlat.gbyFNIRS_blk=ExFNIRS.curPreprocessedFNIR.gbyFNIRS_blk(sellFullIdx,:);
-ExFNIRS.gbyFlat.gbyIndex=gbyIdx;
+ExFNIRS.gbyFlat = struct();
+ExFNIRS.gbyFlat.fNIR = ExFNIRS.curPreprocessedFNIR.fNIR(sellFullIdx,:);
+ExFNIRS.gbyFlat.baseline = ExFNIRS.curPreprocessedFNIR.baseline(sellFullIdx,:);
+ExFNIRS.gbyFlat.gbyFNIRS = ExFNIRS.curPreprocessedFNIR.gbyFNIRS(sellFullIdx,:);
+ExFNIRS.gbyFlat.gbyFNIRS_blk = ExFNIRS.curPreprocessedFNIR.gbyFNIRS_blk(sellFullIdx,:);
+ExFNIRS.gbyFlat.gbyIndex = gbyIdx;
 
+% Set the mode label once (not per-group)
+avgMode = ExFNIRS.settings.within_sub_avg_mode;
+if avgMode == 1
+    ExFNIRS.settings.within_sub_avg_mode_label = 'None';
+elseif avgMode == 2
+    ExFNIRS.settings.within_sub_avg_mode_label = 'Flat';
+elseif avgMode == 3
+    ExFNIRS.settings.within_sub_avg_mode_label = 'Hierarchy';
+end
 
-for i=1:max(gbyIdx)
-    fprintf('Processing Group %i of %i\n',i,max(gbyIdx));
-    
-    ExFNIRS.gby(i).gbyTables=ExFNIRS.selectedTable(gbyIdx==i,:); 
-    ExFNIRS.gby(i).gbyFNIRS=ExFNIRS.gbyFlat.gbyFNIRS(gbyIdx==i,:);
-    ExFNIRS.gby(i).gbyFNIRS_blk=ExFNIRS.gbyFlat.gbyFNIRS_blk(gbyIdx==i,:);
-    
-    missingFNIRSIdx=ExFNIRS.gby(i).gbyTables.missingFNIRS==1;
-    
-    if(ExFNIRS.settings.within_sub_avg_mode==1)
-       hArg=[]; 
-       ExFNIRS.settings.within_sub_avg_mode_label='None';
-    elseif(ExFNIRS.settings.within_sub_avg_mode==2)
-        hArg=ExFNIRS.gby(i).gbyTables(~missingFNIRSIdx,'SubjectID');
-        ExFNIRS.settings.within_sub_avg_mode_label='Flat';
-    elseif(ExFNIRS.settings.within_sub_avg_mode==3)
-        hArg=ExFNIRS.gby(i).gbyTables(~missingFNIRSIdx,ExFNIRS.dataHierarchy);
-        ExFNIRS.settings.within_sub_avg_mode_label='Hierarchy';
+% Pre-extract per-group data into locals (can't index globals inside parfor)
+grpTables    = cell(1, numGroups);
+grpFNIRS     = cell(1, numGroups);
+grpFNIRS_blk = cell(1, numGroups);
+grpHArg      = cell(1, numGroups);
+grpFlatArg   = cell(1, numGroups);
+barRS        = ExFNIRS.settings.barchart_resample_size;
+dataHierarchy = ExFNIRS.dataHierarchy;
+
+for i = 1:numGroups
+    grpTables{i}    = ExFNIRS.selectedTable(gbyIdx==i,:);
+    grpFNIRS{i}     = ExFNIRS.gbyFlat.gbyFNIRS(gbyIdx==i,:);
+    grpFNIRS_blk{i} = ExFNIRS.gbyFlat.gbyFNIRS_blk(gbyIdx==i,:);
+
+    missMask = grpTables{i}.missingFNIRS == 1;
+
+    if avgMode == 1
+        grpHArg{i} = [];
+    elseif avgMode == 2
+        grpHArg{i} = grpTables{i}(~missMask, 'SubjectID');
+    elseif avgMode == 3
+        grpHArg{i} = grpTables{i}(~missMask, dataHierarchy);
     end
-    
-    ExFNIRS.gby(i).gbyGrand=grandAvgFNIRS(ExFNIRS.gby(i).gbyFNIRS(~missingFNIRSIdx),false,[],false,hArg,false,true);
-    ExFNIRS.gby(i).gbyGrandBar=grandAvgFNIRS(ExFNIRS.gby(i).gbyFNIRS_blk(~missingFNIRSIdx),false, ExFNIRS.settings.barchart_resample_size,false,hArg,false,true);
-    ExFNIRS.gby(i).gbyGrandBarFlat=grandAvgFNIRS(ExFNIRS.gby(i).gbyFNIRS_blk(~missingFNIRSIdx),false, ExFNIRS.settings.barchart_resample_size,false,ExFNIRS.gby(i).gbyTables(~missingFNIRSIdx,'SubjectID'),false,true);
-    try
-        close(eHf);
-    catch
+    grpFlatArg{i} = grpTables{i}(~missMask, 'SubjectID');
+end
+
+% Grand averaging (parallel when pool available)
+gbyGrand        = cell(1, numGroups);
+gbyGrandBar     = cell(1, numGroups);
+gbyGrandBarFlat = cell(1, numGroups);
+
+[canPar, poolOn] = pf2_base.accel.canParfor();
+useParfor = canPar && poolOn && numGroups > 1;
+
+if useParfor
+    parfor i = 1:numGroups
+        missMask = grpTables{i}.missingFNIRS == 1;
+        gbyGrand{i}        = grandAvgFNIRS(grpFNIRS{i}(~missMask), false, [], false, grpHArg{i}, false, true);
+        gbyGrandBar{i}     = grandAvgFNIRS(grpFNIRS_blk{i}(~missMask), false, barRS, false, grpHArg{i}, false, true);
+        gbyGrandBarFlat{i} = grandAvgFNIRS(grpFNIRS_blk{i}(~missMask), false, barRS, false, grpFlatArg{i}, false, true);
+    end
+else
+    for i = 1:numGroups
+        fprintf('Processing Group %i of %i\n', i, numGroups);
+        missMask = grpTables{i}.missingFNIRS == 1;
+        gbyGrand{i}        = grandAvgFNIRS(grpFNIRS{i}(~missMask), false, [], false, grpHArg{i}, false, true);
+        gbyGrandBar{i}     = grandAvgFNIRS(grpFNIRS_blk{i}(~missMask), false, barRS, false, grpHArg{i}, false, true);
+        gbyGrandBarFlat{i} = grandAvgFNIRS(grpFNIRS_blk{i}(~missMask), false, barRS, false, grpFlatArg{i}, false, true);
     end
 end
 
-set(handles.text_status,'String',sprintf('%i Segments in\n%i Group(s)',numSegs2Process,max(gbyIdx)));
+% Write back to ExFNIRS.gby
+for i = 1:numGroups
+    ExFNIRS.gby(i).gbyTables      = grpTables{i};
+    ExFNIRS.gby(i).gbyFNIRS       = grpFNIRS{i};
+    ExFNIRS.gby(i).gbyFNIRS_blk   = grpFNIRS_blk{i};
+    ExFNIRS.gby(i).gbyGrand       = gbyGrand{i};
+    ExFNIRS.gby(i).gbyGrandBar    = gbyGrandBar{i};
+    ExFNIRS.gby(i).gbyGrandBarFlat = gbyGrandBarFlat{i};
+end
 
+set(handles.text_status, 'String', sprintf('%i Segments in\n%i Group(s)', numSegs, numGroups));
 
-flagForUpdate(false,handles);
+flagForUpdate(false, handles);
 
 
 function updateInfoGroupByVars(handles)
@@ -1349,6 +1542,17 @@ set(handles.listbox_oxy_methods,'String',strsOxy);
 set(handles.listbox_oxy_methods,'Value',find(iOxy));
 set(handles.listbox_raw_methods,'String',strsRaw);
 set(handles.listbox_raw_methods,'Value',find(iRaw));
+
+% Refresh optode list from processed data
+if isfield(ExFNIRS,'currentOpt') && ~isempty(ExFNIRS.currentOpt) ...
+        && strcmp(ExFNIRS.settings.ChannelMode,'fNIR')
+    if isfield(ExFNIRS,'currentOptLabels') && ~isempty(ExFNIRS.currentOptLabels)
+        set(handles.listbox_optode,'String',ExFNIRS.currentOptLabels);
+    else
+        set(handles.listbox_optode,'String',ExFNIRS.currentOpt);
+    end
+    set(handles.listbox_optode,'Value',1:length(ExFNIRS.currentOpt));
+end
 
 ExFNIRS.UpdateNeeded=2; % 2 indicates that data needs to be resampled
 
@@ -1985,11 +2189,35 @@ end
 
 estimatedFS=nanmedian(fsArray(:));
 
+% Resolve device and attach to all segments that lack one
+try
+    firstWithDevice = [];
+    for i = 1:length(ExFNIRS.data)
+        if isfield(ExFNIRS.data{i}, 'device') && isa(ExFNIRS.data{i}.device, 'pf2.Device')
+            firstWithDevice = ExFNIRS.data{i}.device;
+            break;
+        end
+    end
+    if isempty(firstWithDevice) && ~isempty(ExFNIRS.data)
+        firstWithDevice = pf2.Device.load(ExFNIRS.data{1});
+    end
+    if ~isempty(firstWithDevice)
+        for i = 1:length(ExFNIRS.data)
+            if ~isfield(ExFNIRS.data{i}, 'device') || ~isa(ExFNIRS.data{i}.device, 'pf2.Device')
+                ExFNIRS.data{i}.device = firstWithDevice;
+            end
+        end
+        fprintf('Device: %s (%d channels)\n', firstWithDevice.name, firstWithDevice.nChannels);
+    end
+catch ME
+    warning('exploreFNIRS:DeviceResolve', 'Could not resolve device: %s', ME.message);
+end
+
 subIdAuto=1;
 
 fprintf('Building experimental data array\n');
 numEx=length(ExFNIRS.data);
-for i=1:length(numEx)
+for i=1:numEx
     fprintf('Preprocessing record %i of %i\n',i,numEx);
 
    if((~isfield(ExFNIRS.data{i},'raw')&&~isfield(ExFNIRS.data{i},'HbO'))||all(isnan(ExFNIRS.data{i}.time))||(length(ExFNIRS.data{i}.time)==1&&(isnan(ExFNIRS.data{i}.time)))||sum(sum(~isnan(ExFNIRS.data{i}.raw(:,2:end)),1),2)==0) %info only
@@ -2181,8 +2409,19 @@ strsOxy=get(handles.listbox_oxy_methods,'String');
 ExFNIRS.processedData=cell(length(strsOxy)*length(strsRaw),3);
 ExFNIRS.numProcessed=0;
 
-if(isfield(ExFNIRS,'UpdateNeeded')&&ExFNIRS.UpdateNeeded==4)
-    ExFNIRS.UpdateNeeded=3;
+if isfield(ExFNIRS,'UpdateNeeded') && ExFNIRS.UpdateNeeded==4
+    ExFNIRS.UpdateNeeded = 3;
+elseif ~isfield(ExFNIRS,'UpdateNeeded')
+    ExFNIRS.UpdateNeeded = 3;
+end
+
+% Create Experiment object for settings persistence and CLI round-trip
+try
+    ExFNIRS.experiment = exploreFNIRS.core.Experiment(ExFNIRS.data);
+    syncSettingsToExperiment();
+catch ME
+    warning('exploreFNIRS:ExperimentInit', ...
+        'Could not create Experiment object: %s', ME.message);
 end
 
 if(ExFNIRS.settings.updateOnChange)
@@ -2195,8 +2434,96 @@ end
 
 
 
+function syncSettingsToExperiment()
+% Sync current ExFNIRS.settings into the Experiment object
+global ExFNIRS
+if ~isfield(ExFNIRS, 'experiment'), return; end
+ex = ExFNIRS.experiment;
+s = ExFNIRS.settings;
 
+ex.settings.baseline = [s.baseline_start, s.baseline_end];
+ex.settings.useBaseline = s.use_baseline;
+ex.settings.resampleRate = s.grandavg_resample_size;
+ex.settings.barBinSize = s.barchart_resample_size;
+ex.settings.taskStart = s.block_start;
+modes = {'none', 'flat', 'hierarchy'};
+if s.within_sub_avg_mode >= 1 && s.within_sub_avg_mode <= 3
+    ex.settings.avgMode = modes{s.within_sub_avg_mode};
+end
+ex.settings.taskEnd = s.block_end;
+if isfield(s, 'LME_timeModel') && ~isempty(s.LME_timeModel)
+    ex.settings.timeModel = s.LME_timeModel;
+end
+if isfield(s, 'LME_polyOrder') && ~isempty(s.LME_polyOrder)
+    ex.settings.polyOrder = s.LME_polyOrder;
+end
+ExFNIRS.experiment = ex;
 
+function syncBlockSettingsUI(handles)
+% Offer to update bar chart size and plot time when block times change
+global ExFNIRS
+s = ExFNIRS.settings;
+taskDuration = s.block_end - s.block_start;
+
+% Build list of proposed changes
+changes = {};
+if abs(s.barchart_resample_size - taskDuration) > 0.01
+    changes{end+1} = sprintf('Update bar chart bin size to %.2fs (currently %.2fs)', ...
+        taskDuration, s.barchart_resample_size);
+end
+if s.plot_end < s.block_end
+    changes{end+1} = sprintf('Extend plot end to %.2fs (currently %.2fs)', ...
+        s.block_end, s.plot_end);
+end
+if s.plot_start > s.block_start
+    changes{end+1} = sprintf('Extend plot start to %.2fs (currently %.2fs)', ...
+        s.block_start, s.plot_start);
+end
+
+if isempty(changes), return; end
+
+msg = sprintf('Block (Task) window changed. Update these settings to match?\n\n%s', ...
+    strjoin(changes, '\n'));
+answer = questdlg(msg, 'Update Settings', 'Yes', 'No', 'Yes');
+if ~strcmp(answer, 'Yes'), return; end
+
+if abs(s.barchart_resample_size - taskDuration) > 0.01
+    ExFNIRS.settings.barchart_resample_size = taskDuration;
+    set(handles.edit_barchart_resample_size, 'String', sprintf('%.2f', taskDuration));
+end
+if s.plot_end < s.block_end
+    ExFNIRS.settings.plot_end = s.block_end;
+    set(handles.edit_plot_end, 'String', sprintf('%.2f', s.block_end));
+end
+if s.plot_start > s.block_start
+    ExFNIRS.settings.plot_start = s.block_start;
+    set(handles.edit_plot_start, 'String', sprintf('%.2f', s.block_start));
+end
+
+function labels = buildOptodeLabels(uOpt, data)
+% Build display labels for optode listbox, marking short-sep channels
+labels = arrayfun(@num2str, uOpt, 'UniformOutput', false);
+try
+    dev = [];
+    for i = 1:length(data)
+        if isfield(data{i},'device') && isa(data{i}.device,'pf2.Device')
+            dev = data{i}.device;
+            break;
+        end
+    end
+    if ~isempty(dev) && dev.nShortSep > 0
+        ssMask = dev.isShortSep();
+        chList = dev.channelList();
+        for k = 1:numel(uOpt)
+            idx = find(chList == uOpt(k), 1);
+            if ~isempty(idx) && idx <= numel(ssMask) && ssMask(idx)
+                labels{k} = sprintf('%d (ss)', uOpt(k));
+            end
+        end
+    end
+catch
+    % Fall back to plain numeric labels
+end
 
 % --- Executes on button press in checkbox_plot_all_data.
 function checkbox_plot_all_data_Callback(hObject, eventdata, handles)
@@ -3938,15 +4265,29 @@ switch (ExFNIRS.settings.ChannelMode)
         if(initOPT||~isfield(ExFNIRS,'currentOpt')||isempty(ExFNIRS.currentOpt))
             uOpt=[];
             for i=1:length(ExFNIRS.data)
-                if(isfield(ExFNIRS.data{i},'channels'))
-                    uOpt=[uOpt;ExFNIRS.data{i}.channels(:)];
+                d=ExFNIRS.data{i};
+                if isfield(d,'channels')
+                    uOpt=[uOpt;d.channels(:)];
+                elseif isfield(d,'device') && ~isempty(d.device)
+                    uOpt=[uOpt;d.device.channelNumbers()'];
+                elseif isfield(d,'HbO')
+                    nCh=size(d.HbO,2)-1; % subtract marker column
+                    if nCh>0; uOpt=[uOpt;(1:nCh)']; end
+                elseif isfield(d,'raw') && isfield(d,'fchMask')
+                    nCh=length(d.fchMask);
+                    if nCh>0; uOpt=[uOpt;(1:nCh)']; end
                 end
             end
+            uOpt=uOpt(uOpt>0); % exclude marker column (-1) and time (0)
             uOpt=sort(unique(uOpt));
 
             ExFNIRS.currentOpt=uOpt;
+            ExFNIRS.currentOptLabels=buildOptodeLabels(uOpt,ExFNIRS.data);
         else
             uOpt=ExFNIRS.currentOpt;
+            if ~isfield(ExFNIRS,'currentOptLabels')||isempty(ExFNIRS.currentOptLabels)
+                ExFNIRS.currentOptLabels=buildOptodeLabels(uOpt,ExFNIRS.data);
+            end
         end
 
         set(handles.text_optode_label,'String','Optode');
@@ -3957,9 +4298,9 @@ switch (ExFNIRS.settings.ChannelMode)
         set(handles.listbox_optode,'Enable','on');
         set(handles.pushbutton_optodes_select_all,'Enable','on');
         set(handles.pushbutton_optodes_select_none,'Enable','on');
-        
-        
-        set(handles.listbox_optode,'String',uOpt);
+
+
+        set(handles.listbox_optode,'String',ExFNIRS.currentOptLabels);
         set(handles.listbox_optode,'Value',1);
         set(handles.listbox_optode,'UserData',[]);
 
@@ -3986,6 +4327,7 @@ switch (ExFNIRS.settings.ChannelMode)
         
         if(isempty(uROI))
             warning('No ROIs present in data');
+            warndlg('No ROIs defined in loaded data. Define ROIs first.', 'Channel Mode');
             set(handles.popupmenu_ChannelMode,'Value',1);
             setExChannelMode('fNIR',handles,false,false);
         else
@@ -4018,6 +4360,8 @@ switch (ExFNIRS.settings.ChannelMode)
             cacheAuxVarNames={};
     
             fprintf('Scanning Aux fields...\n');
+            uAuxNames = {};
+            uAuxVarNames = {};
 
             if(pf2_base.isnestedfield(ExFNIRS,'curPreprocessedFNIR.fNIR')&&~isempty(ExFNIRS.curPreprocessedFNIR.fNIR))
     
@@ -4087,6 +4431,7 @@ switch (ExFNIRS.settings.ChannelMode)
                 uAuxVarNames=auxVarTable.Properties.VariableNames;
             else
                 warning('fNIRS data must be processed at least once first in order to flatten Aux data');
+                warndlg('Process data first to access auxiliary channels.', 'Channel Mode');
             end
             
         else
@@ -4102,6 +4447,7 @@ switch (ExFNIRS.settings.ChannelMode)
 
         if(isempty(uAuxVarNames)||isempty(auxVarNamesNoTime))
             warning('No Auxillary channels or data present in data');
+            warndlg('No auxiliary data present in loaded data.', 'Channel Mode');
             set(handles.popupmenu_ChannelMode,'Value',1);
             setExChannelMode('fNIR',handles,false,false);
         else
@@ -4185,6 +4531,12 @@ function checkbox_discreteTime_Callback(hObject, eventdata, handles)
 % Hint: get(hObject,'Value') returns toggle state of checkbox_discreteTime
 global ExFNIRS
 ExFNIRS.settings.LME_use_discreteTime=get(handles.checkbox_discreteTime,'Value');
+% Map legacy checkbox to new TimeModel setting
+if ExFNIRS.settings.LME_use_discreteTime
+    ExFNIRS.settings.LME_timeModel = 'discrete';
+else
+    ExFNIRS.settings.LME_timeModel = 'polynomial';
+end
 
 
 % --- Executes on selection change in popupmenu_lmer_randomeffects.
@@ -4328,7 +4680,7 @@ function pushbutton_exLoad_Callback(hObject, eventdata, handles)
 % eventdata  reserved - to be defined in a future version of MATLAB
 % handles    structure with handles and user data (see GUIDATA)
 
-exploreFNIRS.LoadEx();
+exploreFNIRS.loadEx();
 
 % --- Executes on button press in pushbutton_exSave.
 function pushbutton_exSave_Callback(hObject, eventdata, handles)
@@ -4336,7 +4688,7 @@ function pushbutton_exSave_Callback(hObject, eventdata, handles)
 % eventdata  reserved - to be defined in a future version of MATLAB
 % handles    structure with handles and user data (see GUIDATA)
 
-exploreFNIRS.SaveEx();
+exploreFNIRS.saveEx();
 
 
 % --- Executes on button press in pushbutton_plot_scatter_topo.

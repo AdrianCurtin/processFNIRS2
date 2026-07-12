@@ -39,18 +39,18 @@ function [filename] = saveEx(filename)
 %
 % Example:
 %   % Save session with file dialog
-%   exploreFNIRS.SaveEx();
+%   exploreFNIRS.saveEx();
 %
 %   % Save to specific file
-%   exploreFNIRS.SaveEx('/path/to/myexperiment_exf.mat');
+%   exploreFNIRS.saveEx('/path/to/myexperiment_exf.mat');
 %
 %   % Save and capture filename for logging
-%   savedFile = exploreFNIRS.SaveEx();
+%   savedFile = exploreFNIRS.saveEx();
 %   fprintf('Session saved to: %s\n', savedFile);
 %
 %   % Typical workflow: process data, then save
 %   % ... perform analysis in exploreFNIRS GUI ...
-%   exploreFNIRS.SaveEx('study_analysis_exf.mat');
+%   exploreFNIRS.saveEx('study_analysis_exf.mat');
 %
 % Notes:
 %   - Uses MATLAB v7.3 format (HDF5) to support large datasets (>2GB)
@@ -58,7 +58,7 @@ function [filename] = saveEx(filename)
 %   - Progress messages printed to console during save operation
 %   - File can be loaded by LoadEx or standard MATLAB load() function
 %
-% See also: exploreFNIRS.LoadEx, exploreFNIRS, exploreFNIRS.BrowseEx
+% See also: exploreFNIRS.loadEx, exploreFNIRS, exploreFNIRS.browseEx
 pathname='';
 
 if(nargin<1)
@@ -73,7 +73,7 @@ end
 global ExFNIRS
 
 if(~isfield(ExFNIRS,'data'))
-    error('No data present in ExFNIRS');
+    error('exploreFNIRS:saveEx:noData', 'No data present in ExFNIRS');
 end
 
 if(~isempty(pathname))

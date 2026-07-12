@@ -189,6 +189,146 @@ exploreFNIRS(allData);
 ```
 
 ### Scriptable Analysis (Headless)
+The `Experiment` class enables complete group analysis without the GUI:
+
+```matlab
+% Create experiment from processed data
+ex = exploreFNIRS.core.Experiment(allData);
+
+% Filter and organize
+ex.select('Group', {'Control', 'Treatment'}, 'Condition', 'Task');
+ex.groupby({'Group', 'Condition'});
+ex.aggregate();
+
+% Headless temporal plot
+fig = ex.plotTemporal('Biomarkers', {'HbO'}, 'Channels', [1 5 10], ...
+    'SavePath', 'temporal.png', 'SaveDPI', 300);
+
+% Headless bar chart with time window
+fig = ex.plotBar('Biomarker', 'HbO', 'TimeWindow', [5 25], ...
+    'SavePath', 'bar.png');
+
+% ROI-based plotting
+fig = ex.plotTemporal('Biomarkers', {'HbO'}, 'ROIs', 'all');
+fig = ex.plotBar('Biomarker', 'HbO', 'ROIs', {'DLPFC_L', 'DLPFC_R'});
+
+% LME analysis with ANOVA tables and topo maps
+[fig, results] = ex.plotLME('Biomarkers', {'HbO'}, 'ShowTopo', true);
+
+% Scatter correlation of behavioral variable vs biomarker
+[fig, stats] = ex.plotScatter('reactionTime', 'Biomarkers', {'HbO'});
+
+% Auxiliary channel plots (accelerometer, heart rate, etc.)
+fig = ex.plotAux('accelerometer', 'Layout', 'grid');
+
+% Export for external analysis
+longTable = ex.toLongTable();
+wideTable = ex.toWideTable();
+writetable(longTable, 'export_for_R.csv');
+```
+
+### Statistical Analysis Module
+```matlab
+% Standalone LME fitting (no visualization)
+results = ex.statsFitLME('Biomarkers', {'HbO'}, 'Channels', 1:5);
+
+% ANOVA summary table
+T = ex.statsSummarize(results, 'Type', 'anova');
+disp(T);
+
+% APA-formatted strings for manuscripts
+T = ex.statsSummarize(results, 'Type', 'anova', 'Format', 'apa');
+disp(T.APA);
+
+% Post-hoc contrasts with FDR correction across channels
+cr = ex.statsRunContrasts(results, 'FDRThreshold', 0.05);
+
+% Fixed-effect coefficients
+T = ex.statsSummarize(results, 'Type', 'coefficients');
+
+% Model fit statistics (AIC, BIC, null model LRT)
+T = ex.statsSummarize(results, 'Type', 'fit');
+writetable(T, 'model_fit.csv');
+
+% Direct function calls (without Experiment)
+results = exploreFNIRS.stats.fitLME(groups, {'Group','Condition'});
+T = exploreFNIRS.stats.summarize(results, 'Type', 'anova', 'IncludeFDR', true);
+cr = exploreFNIRS.stats.runContrasts(results, 'FDRMethod', 'twostep');
+```
+
+### Advanced Visualization
+```matlab
+% Topographic maps (auto-uses probe geometry, excludes short-sep channels)
+fig = ex.plotTopo('Biomarker', 'HbO', 'Time', 15, 'SavePath', 'topo.png');
+fig = ex.plotTopo('Layout', 'pergroup', 'TimeWindow', [10, 20]);
+
+% Channel × time heatmap
+fig = ex.plotHeatmap('Biomarker', 'HbO', 'SortChannels', 'amplitude');
+
+% Multi-panel composite figures
+panels = {
+    struct('type', 'temporal', 'args', {{'Biomarkers', {'HbO'}}}), ...
+    struct('type', 'bar', 'args', {{'Biomarker', 'HbO'}})
+};
+fig = ex.plotComposite(panels, 'Layout', [1, 2], 'SavePath', 'composite.png');
+```
+
+### Connectivity Analysis
+```matlab
+% Compute connectivity matrices
+connResults = ex.connectivity('Method', 'pearson');
+fig = exploreFNIRS.connectivity.plotMatrix(connResults);
+
+% Directed connectivity (Granger causality)
+connResults = ex.connectivity('Method', 'granger');
+fig = exploreFNIRS.connectivity.plotDirected(connResults, 'Layout', 'circular');
+
+% Dynamic functional connectivity with brain state detection
+dfc = exploreFNIRS.connectivity.computeDynamicFC(data, 'WindowSize', 30);
+states = exploreFNIRS.connectivity.detectStates(dfc, 'K', 3);
+fig = exploreFNIRS.connectivity.plotDynamicFC(dfc, 'States', states);
+
+% Intra-ROI and inter-ROI connectivity
+intraResult = ex.intraROI('Method', 'pearson');
+fig = exploreFNIRS.connectivity.plotIntraROI(intraResult, 'PlotType', 'radar');
+
+interResult = ex.interROI('Method', 'pearson');
+fig = exploreFNIRS.connectivity.plotInterROI(interResult, 'PlotType', 'chord');
+
+% Block-wise connectivity
+connBlocks = ex.connectivity('Method', 'coherence', 'Blocks', blocks);
+fig = exploreFNIRS.connectivity.plotBlockComparison(connBlocks);
+
+% Export connectivity as table
+T = exploreFNIRS.export.connectivityToTable(connResults);
+writetable(T, 'connectivity_results.csv');
+```
+
+### Hyperscanning Analysis
+```matlab
+% Pair subjects (matched by .info.DyadID / .info.Role) and compute coupling
+hsResults = ex.hyperscanning('Method', 'wcoherence');
+
+% Group-level statistics with permutation testing. The package functions take
+% the data cell array plus a pairs struct (from pairSubjects), not the
+% Experiment result:
+pairs      = exploreFNIRS.hyperscanning.pairSubjects(allData);
+groupStats = exploreFNIRS.hyperscanning.computeGroup(allData, pairs, 'Method', 'wcoherence');
+permStats  = exploreFNIRS.hyperscanning.permutationTest(allData, pairs, 'Permutations', 1000);
+fig = exploreFNIRS.hyperscanning.plotGroup(groupStats);
+
+% Dual-brain topographic display
+fig = exploreFNIRS.hyperscanning.plotInterBrainTopo(groupStats, ...
+    'BrainLabels', {'Speaker', 'Listener'});
+
+% Dyad-level heatmap
+fig = exploreFNIRS.hyperscanning.plotDyadMatrix(groupStats, 'SortDyads', 'mean');
+
+% Time-resolved group coupling (requires windowed coupling)
+fig = exploreFNIRS.hyperscanning.plotGroupTemporal(groupStats, 'ErrorType', 'SEM');
+```
+
+### Other Scriptable Functions
 
 ```matlab
 % Build segment info table
@@ -196,10 +336,6 @@ segmentTable = exploreFNIRS.dataset.buildSegmentInfoTable(allData);
 
 % Standardize ROIs across subjects
 allData = exploreFNIRS.dataset.standardizeROIs(allData);
-
-% Export for external analysis
-longData = exploreFNIRS.export.mergeGbyTablesLong(gbyData);
-writetable(longData, 'export_for_R.csv');
 ```
 
 ## Scriptable Functions
@@ -208,10 +344,47 @@ The following functions can be used outside the GUI:
 
 | Package | Function | Purpose |
 |---------|----------|---------|
+| `+core` | `Experiment` | Main experiment container class |
+| `+core` | `plotTemporal` | Headless temporal plots with ROI support |
+| `+core` | `plotBar` | Headless bar charts with ROI support |
+| `+core` | `plotTopo` | Headless topographic maps (probe-aware layout, excludes short-sep) |
+| `+core` | `plotHeatmap` | Channel × time heatmap |
+| `+core` | `plotComposite` | Multi-panel publication figures |
+| `+core` | `plotLME` | LME analysis with bar charts and topo F-maps |
+| `+core` | `plotScatter` | Scatter correlation with regression and topo maps |
+| `+core` | `plotAux` | Headless auxiliary channel temporal plots |
+| `+core` | `getGroupColors` | Consistent group coloring |
+| `+stats` | `fitLME` | Standalone channel-wise LME fitting (no visualization) |
+| `+stats` | `runContrasts` | Post-hoc contrasts with FDR correction across channels |
+| `+stats` | `summarize` | Publication-ready tables (ANOVA, contrasts, coefficients, fit, APA) |
+| `+connectivity` | `computeMatrix` | Channel-pair connectivity matrices (symmetric + directed) |
+| `+connectivity` | `computeDynamicFC` | Sliding-window dynamic functional connectivity |
+| `+connectivity` | `detectStates` | K-means brain state detection from dynamic FC |
+| `+connectivity` | `computeIntraROI` | Within-ROI pairwise coupling analysis |
+| `+connectivity` | `computeInterROI` | Between-ROI coupling analysis |
+| `+connectivity` | `plotMatrix` | Matrix visualization |
+| `+connectivity` | `plotBlockComparison` | Block-wise comparison |
+| `+connectivity` | `plotDirected` | Directed connectivity (matrix + circular) |
+| `+connectivity` | `plotDynamicFC` | Dynamic FC with brain state visualization |
+| `+connectivity` | `plotChord` | Chord diagram for connectivity |
+| `+connectivity` | `plotIntraROI` | Intra-ROI bar/radar visualization |
+| `+connectivity` | `plotInterROI` | Inter-ROI chord/matrix visualization |
+| `+coupling` | `pearson`, `spearman`, `xcorr`, `coherence`, `wcoherence` | Undirected coupling |
+| `+coupling` | `granger`, `transferEntropy` | Directed coupling (Granger causality, transfer entropy) |
+| `+coupling` | `plotWcoherence`, `plotWindowed` | Coupling visualization |
+| `+hyperscanning` | `pairSubjects` | Pair subjects by criteria |
+| `+hyperscanning` | `computeDyad` | Dyad-level coupling |
+| `+hyperscanning` | `computeGroup` | Group-level statistics |
+| `+hyperscanning` | `permutationTest` | Permutation significance testing |
+| `+hyperscanning` | `plotGroup` | Group bar chart visualization |
+| `+hyperscanning` | `plotInterBrainTopo` | Dual-brain topographic display |
+| `+hyperscanning` | `plotDyadMatrix` | Dyad-level coupling heatmap |
+| `+hyperscanning` | `plotGroupTemporal` | Time-resolved group coupling |
 | `+dataset` | `buildSegmentInfoTable` | Create metadata table from structs |
 | `+dataset` | `standardizeROIs` | Align ROI definitions across subjects |
 | `+export` | `mergeGbyTablesLong` | Export to long format |
 | `+export` | `mergeGbyTablesWide` | Export to wide format |
+| `+export` | `connectivityToTable` | Export connectivity results |
 | `+fx` | `performFDR` | Benjamini-Hochberg FDR correction |
 | `+fx` | `performFDR_twostep` | Adaptive two-step FDR |
 | `+fx` | `autoContrast` | Generate post-hoc contrasts |
@@ -234,7 +407,7 @@ The following functions can be used outside the GUI:
 
 ## License
 
-exploreFNIRS is part of processFNIRS2 and is free for academic and non-commercial use.
+exploreFNIRS is part of processFNIRS2 and is released under the GNU General Public License v3.0 (GPLv3). See the [LICENSE](LICENSE) file for details.
 
 ## Contact
 

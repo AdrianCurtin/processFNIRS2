@@ -1,90 +1,136 @@
 function r = vrrotvec(a, b, options)
-%VRROTVEC Calculate a rotation between two vectors.
-%   R = VRROTVEC(A, B) calculates a rotation needed to transform 
-%   a 3d vector A to a 3d vector B.
+% VRROTVEC Axis-angle rotation that maps one 3-D vector onto another
 %
-%   R = VRROTVEC(A, B, OPTIONS) calculates the rotation with the default 
-%   algorithm parameters replaced by values defined in the structure
-%   OPTIONS.
+% Computes the rotation needed to transform the 3-D vector A so that it points
+% in the same direction as the 3-D vector B, returned as a 4-element
+% axis-angle row vector [x y z theta]. The rotation axis is the normalized
+% cross product of the two (unit) vectors and the angle is the angle between
+% them. This is a clean-room implementation based on the standard relationship
+% between two unit vectors and the axis-angle (Rodrigues) rotation, replacing
+% the third-party Simulink 3D Animation function of the same name so the
+% toolbox has no external dependency.
 %
-%   The OPTIONS structure contains the following parameters:
+% Reference:
+%   Rodrigues' rotation formula (standard result; see e.g. any rigid-body
+%   kinematics text). The axis is u = (a x b)/|a x b| and the angle is
+%   theta = atan2(|a x b|, a.b) for unit a, b.
 %
-%     'epsilon'
-%        Minimum value to treat a number as zero. 
-%        Default value of 'epsilon' is 1e-12.
+% Syntax:
+%   r = vrrotvec(a, b)
+%   r = vrrotvec(a, b, options)
 %
-%   The result R is a 4-element axis-angle rotation row vector.
-%   First three elements specify the rotation axis, the last element
-%   defines the angle of rotation.
+% Inputs:
+%   a       - Source vector [3 x 1] or [1 x 3] real.
+%   b       - Target vector [3 x 1] or [1 x 3] real.
+%   options - Optional struct with field 'epsilon', the magnitude below which
+%             a vector or cross product is treated as zero (default: 1e-12).
 %
-%   See also VRROTVEC2MAT, VRROTMAT2VEC, VRORI2DIR, VRDIR2ORI.
+% Outputs:
+%   r - Axis-angle rotation [1 x 4] = [ux uy uz theta]. The first three
+%       elements are the unit rotation axis; theta is the rotation angle in
+%       radians. For parallel inputs r = [0 0 0 0]; for antiparallel inputs an
+%       arbitrary axis perpendicular to a is chosen with theta = pi.
+%
+% Algorithm:
+%   1. Normalize a and b to unit vectors an, bn.
+%   2. Compute c = an x bn and the angle theta = atan2(|c|, an.bn).
+%   3. If |c| is non-negligible use axis = c/|c|; otherwise (parallel or
+%      antiparallel) pick axis = 0 for theta ~ 0, or any unit vector
+%      perpendicular to an for theta ~ pi.
+%
+% Example:
+%   r = pf2_base.external.vrrotvec([0 0 1], [0 1 0]);   % -> [-1 0 0 pi/2]
+%
+% Notes:
+%   - Using atan2 (rather than acos) keeps the angle numerically robust near
+%     0 and pi.
+%
+% See also: pf2_base.external.vrrotvec2mat, cross, dot
 
-%   Copyright 1998-2007 HUMUSOFT s.r.o. and The MathWorks, Inc.
-%   $Revision: 1.1.6.2 $ $Date: 2007/06/04 21:15:52 $ $Author: batserve $
-
-% test input arguments
-error(nargchk(2, 3, nargin, 'struct'));
-
-if any(~isreal(a) || ~isnumeric(a))
-  error('VR:argnotreal','Input argument contains non-real elements.');
+if nargin < 2
+    error('pf2_base:vrrotvec:nargin', 'Two input vectors are required.');
 end
 
-if (length(a) ~= 3)
-  error('VR:argwrongdim','Wrong dimension of input argument.');
+if ~isnumeric(a) || ~isreal(a) || numel(a) ~= 3
+    error('pf2_base:vrrotvec:badInput', 'A must be a real 3-element vector.');
+end
+if ~isnumeric(b) || ~isreal(b) || numel(b) ~= 3
+    error('pf2_base:vrrotvec:badInput', 'B must be a real 3-element vector.');
 end
 
-if any(~isreal(b) || ~isnumeric(b))
-  error('VR:argnotreal','Input argument contains non-real elements.');
-end
-
-if (length(b) ~= 3)
-  error('VR:argwrongdim','Wrong dimension of input argument.');
-end
-
-if nargin == 2
-  % default options values
-  epsilon = 1e-12;
-else
-  if ~isstruct(options)
-     error('VR:optsnotstruct','OPTIONS is not a structure.');
-  else
-    % check / read the 'epsilon' option
-    if ~isfield(options,'epsilon') 
-      error('VR:optsfieldnameinvalid','Invalid OPTIONS field name(s).'); 
-    elseif (~isreal(options.epsilon) || ~isnumeric(options.epsilon) || options.epsilon < 0)
-      error('VR:optsfieldvalueinvalid','Invalid OPTIONS field(s).');   
-    else
-      epsilon = options.epsilon;
+epsilon = 1e-12;
+if nargin == 3
+    if ~isstruct(options) || ~isfield(options, 'epsilon')
+        error('pf2_base:vrrotvec:badOptions', ...
+            'OPTIONS must be a struct with an ''epsilon'' field.');
     end
-  end
+    if ~isnumeric(options.epsilon) || ~isreal(options.epsilon) || options.epsilon < 0
+        error('pf2_base:vrrotvec:badOptions', 'OPTIONS.epsilon must be real >= 0.');
+    end
+    epsilon = options.epsilon;
 end
 
-% compute the rotation, vectors must be normalized
-an = vrnormalize(a, epsilon);
-bn = vrnormalize(b, epsilon);
-axb = vrnormalize(cross(an, bn), epsilon);
-ac = acos(dot(an, bn));
+an = normalizeVec(a(:).', epsilon);
+bn = normalizeVec(b(:).', epsilon);
 
-% Be tolerant to column vector arguments, produce a row vector
-r = [axb(:)' ac];
+c = cross(an, bn);
+nc = norm(c);
+theta = atan2(nc, dot(an, bn));
 
-
-
-function vec_n = vrnormalize(vec, maxzero)
-%VRNORMALIZE Normalize a vector.
-%   Y = VRNORMALIZE(X,MAXZERO) returns a unit vector Y parallel to the 
-%   input vector X. Input X can be vector of any size. If the modulus of
-%   the input vector is <= MAXZERO, the output is set to zeros(size(X)).
-%
-%   Not to be called directly.
-
-%   Copyright 1998-2007 HUMUSOFT s.r.o. and The MathWorks, Inc.
-%   $Revision: 1.1.6.1 $ $Date: 2007/06/04 21:16:04 $ $Author: batserve $
-
-norm_vec = norm(vec);
-if (norm_vec <= maxzero)
-  vec_n = zeros(size(vec));
+if nc > epsilon
+    axis = c / nc;
 else
-  vec_n = vec ./ norm_vec;
+    % Parallel or antiparallel.
+    if theta < epsilon
+        % Same direction: no rotation, axis is arbitrary.
+        axis = [0 0 0];
+        theta = 0;
+    else
+        % Opposite direction (theta ~ pi): choose any unit vector
+        % perpendicular to an.
+        axis = perpendicular(an);
+    end
 end
 
+r = [axis(:).', theta];
+
+end
+
+%%_Subfunctions_____________________________________________________________
+
+function vn = normalizeVec(v, maxzero)
+% NORMALIZEVEC Return a unit vector parallel to v
+%
+% Inputs:
+%   v       - Input vector (any size)
+%   maxzero - Norm threshold below which the result is all zeros
+%
+% Outputs:
+%   vn - Unit vector v/|v|, or zeros(size(v)) when |v| <= maxzero
+
+nv = norm(v);
+if nv <= maxzero
+    vn = zeros(size(v));
+else
+    vn = v / nv;
+end
+
+end
+
+function p = perpendicular(u)
+% PERPENDICULAR Return a unit vector orthogonal to u
+%
+% Inputs:
+%   u - Unit (or non-zero) 3-element row vector
+%
+% Outputs:
+%   p - Unit row vector with dot(p, u) ~ 0
+
+% Cross u with whichever axis is least aligned with it for stability.
+[~, idx] = min(abs(u));
+e = [0 0 0];
+e(idx) = 1;
+p = cross(u, e);
+p = p / norm(p);
+
+end

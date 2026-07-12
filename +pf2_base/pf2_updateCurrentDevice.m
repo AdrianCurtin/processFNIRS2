@@ -66,7 +66,7 @@ if(nargin>1&&isempty(cfgFilePath)||~contains(cfgFilePath,'.cfg'))&&(~isempty(fDa
     disp('No device specified. Please load device configuration');
     pf2_base.loadDeviceCfg();
     if(~isfield(setF,'device'))
-        error('No valid devices selected');
+        error('pf2_base:pf2_updateCurrentDevice:noValidDevices', 'No valid devices selected');
     end
     
 elseif(nargin>1&&~isempty(cfgFilePath)) 
@@ -100,7 +100,7 @@ elseif(nargin==1)
         disp('No device specified. Please load device configuration');
         pf2_base.loadDeviceCfg();
         if(~isfield(setF,'device'))
-            error('No valid devices selected');
+            error('pf2_base:pf2_updateCurrentDevice:noValidDevices', 'No valid devices selected');
         end
     end
     
@@ -129,7 +129,7 @@ if(PF2.mergedProbe) %All channel numbers are unique for merged probes
         PF2.timeIndex=0;
     end
 else
-    error('Not yet implemented for seperate probe data,\nAssumes concatenated datasets with unique channels in the config file'); 
+    error('pf2_base:pf2_updateCurrentDevice:notImplemented', 'Not yet implemented for seperate probe data,\nAssumes concatenated datasets with unique channels in the config file'); 
 end
 
 [~,i]=unique(PF2.curChSet);
@@ -181,6 +181,6 @@ if(PF2.mergedProbe) %All channel numbers are unique for merged probes
     end
 
 else
-   error('Not Yet Implemented for seperate probe data,\nAssumes concatenated datasets with unique channels in the config file'); 
+   error('pf2_base:pf2_updateCurrentDevice:notImplemented', 'Not Yet Implemented for seperate probe data,\nAssumes concatenated datasets with unique channels in the config file'); 
 end
 end

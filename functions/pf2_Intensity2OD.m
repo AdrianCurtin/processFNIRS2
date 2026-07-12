@@ -10,6 +10,13 @@ function dod = pf2_Intensity2OD( d )
 %   Imported from HomerLibrary, modified to use log10 instead of natural log.
 %   Standard Beer-Lambert law: OD = -log10(I / I0)
 %
+% Convention note:
+%   This function uses log10 (common logarithm), not log (natural logarithm).
+%   Most fNIRS literature and Homer2/3 use natural log. The extinction
+%   coefficient matrix in pf2's bvoxy is matched to this log10 convention.
+%   If integrating with external toolboxes that assume natural log, scale
+%   OD values by ln(10) ~ 2.303.
+%
 % Syntax:
 %   dod = pf2_Intensity2OD(d)
 %
@@ -47,10 +54,23 @@ function dod = pf2_Intensity2OD( d )
 % See also: pf2_base.fnirs.bvoxy, processStageRaw2OD, pf2_base.fnirs.processStageOD2Hb
 
 % convert to dod
-dm = nanmean(abs(d),1);
 nTpts = size(d,1);
-dod = -log10(abs(d)./(ones(nTpts,1)*dm));
 
-if ~isempty(find(d(:)<=0))
+% Compute baseline mean from positive values only so that zero-padded
+% regions do not drag down the mean and distort good samples' OD.
+dAbs = abs(d);
+dPos = dAbs;
+dPos(dPos <= 0) = NaN;
+dm = mean(dPos, 1, 'omitnan');
+
+% Dead channels (no positive samples) → NaN baseline
+dm(dm == 0 | isnan(dm)) = NaN;
+
+dod = -log10(dAbs ./ (ones(nTpts,1) * dm));
+
+% Replace any remaining non-finite values (from zero/negative raw) with NaN
+dod(~isfinite(dod)) = NaN;
+
+if any(d(:) <= 0)
     disp( 'OD conversion WARNING: Some data points in d are zero or negative.' );
 end

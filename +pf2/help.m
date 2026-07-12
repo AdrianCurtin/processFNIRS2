@@ -1,4 +1,25 @@
 function help()
+% HELP Print a getting-started overview for processFNIRS2 to the console
+%
+% Displays the toolbox version followed by a guided walkthrough of the
+% typical workflow: importing data, configuring and selecting raw/oxy
+% processing methods, and running the three-stage processing pipeline. Use
+% this as a first stop when getting oriented in the toolbox.
+%
+% Syntax:
+%   pf2.help()
+%
+% Inputs:
+%   None
+%
+% Outputs:
+%   None. The overview is printed to the command window.
+%
+% Example:
+%   % Show the getting-started overview
+%   pf2.help();
+%
+% See also: processFNIRS2, pf2.methods, pf2.process, pf2.import.importNIR
 
 [~,vers]=pf2_base.pf2version();
 fprintf('<strong>Welcome to processFNIRS2 %s</strong>\n',vers);

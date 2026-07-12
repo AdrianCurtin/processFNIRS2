@@ -1,4 +1,4 @@
-function [snirfData] = asSNIRF(fNIRcells, filepath, normalizeRaw, stripExtraRawChannels)
+function [snirfData] = asSNIRF(fNIRcells, filepath, varargin)
 % ASSNIRF Export fNIRS data to SNIRF format
 %
 % Converts pf2 fNIRS data structures to the standardized SNIRF format for
@@ -14,18 +14,28 @@ function [snirfData] = asSNIRF(fNIRcells, filepath, normalizeRaw, stripExtraRawC
 %   snirfData = pf2.export.asSNIRF(fNIR, filepath)          % Save to path
 %   snirfData = pf2.export.asSNIRF(fNIRcells, filepath)     % Multiple runs
 %   snirfData = pf2.export.asSNIRF(..., normalizeRaw, stripExtraRawChannels)
+%   pf2.export.asSNIRF(allData, 'output/')                  % Batch to directory
+%   pf2.export.asSNIRF(allData, 'output/', 'Dir1', 'Group') % With subdirs
 %
 % Inputs:
 %   fNIRcells            - fNIRS data structure or cell array of structures
 %                          Each structure should contain .raw, .time, .fs, etc.
 %                          Multiple structures create multiple /nirs groups.
-%   filepath             - Output file path (optional)
+%   filepath             - Output file path or directory (optional)
 %                          If not provided, opens save dialog.
-%                          Extension .snirf is added if missing.
+%                          Cell array + directory path (no .snirf ext) = batch mode.
+%                          Extension .snirf is added if missing in single-file mode.
 %   normalizeRaw         - Normalize raw data before export (default: false)
 %                          If true, scales data for improved compatibility.
 %   stripExtraRawChannels - Remove dark/ambient channels from export (default: false)
 %                          Time and marker columns are always removed.
+%
+% Batch Mode Name-Value Parameters:
+%   'Dir1'..'Dir4'           - Info field names mapped to subdirectories
+%   'Prefix'                 - Cell array of info field names for filename
+%   'NormalizeRaw'           - Normalize raw data (default: false)
+%   'StripExtraRawChannels'  - Strip dark/ambient channels (default: false)
+%   'Verbose'                - Print progress messages (default: true)
 %
 % Outputs:
 %   snirfData            - Generated SNIRF data structure
@@ -55,26 +65,58 @@ function [snirfData] = asSNIRF(fNIRcells, filepath, normalizeRaw, stripExtraRawC
 %   % Export multiple runs in one file
 %   pf2.export.asSNIRF({run1, run2, run3}, 'session.snirf');
 %
+%   % Batch export to directory
+%   pf2.export.asSNIRF(allData, 'output/');
+%   pf2.export.asSNIRF(allData, 'output/', 'Dir1', 'Group', 'Prefix', {'SubjectID'});
+%
 %   % Export with GUI file selection
 %   snirfStruct = pf2.export.asSNIRF(data);
 %
 % See also: pf2.import.importSNIRF, pf2.export.asNIR, savesnirf
 
 if(nargin < 1)
-    error('No fnir file specified!');
+    error('pf2:asSNIRF:noData', 'No fnir file specified!');
 end
 
 if nargin < 2
-   [filename, path] = uiputfile(['*.snirf']); 
+   [filename, path] = uiputfile(['*.snirf']);
    filepath = [path filename];
 end
 
-if(nargin < 3)
-    normalizeRaw = false;
+% --- Detect batch mode: cell array + directory path (no .snirf extension) ---
+[~, ~, extCheck] = fileparts(filepath);
+isBatchMode = iscell(fNIRcells) && ~strcmpi(extCheck, '.snirf');
+
+if isBatchMode
+    % Parse batch name-value parameters
+    batchOpts = parseBatchOpts(varargin{:});
+    paths = pf2_base.buildExportPaths(fNIRcells, filepath, '.snirf', batchOpts);
+    n = numel(fNIRcells);
+    for i = 1:n
+        if batchOpts.Verbose
+            fprintf('  Exporting %d/%d: %s\n', i, n, paths{i});
+        end
+        pf2.export.asSNIRF(fNIRcells{i}, paths{i}, ...
+            batchOpts.NormalizeRaw, batchOpts.StripExtraRawChannels);
+    end
+    if batchOpts.Verbose
+        fprintf('Batch export complete: %d files written to %s\n', n, filepath);
+    end
+    snirfData = [];
+    return;
 end
 
-if(nargin < 4)
-    stripExtraRawChannels = false;
+% --- Single/multi-run mode: parse legacy positional or name-value args ---
+normalizeRaw = false;
+stripExtraRawChannels = false;
+if ~isempty(varargin)
+    % Legacy positional: asSNIRF(data, path, true, false)
+    if islogical(varargin{1}) || isnumeric(varargin{1})
+        normalizeRaw = varargin{1};
+        if numel(varargin) >= 2
+            stripExtraRawChannels = varargin{2};
+        end
+    end
 end
 
 [ filepathdir, filename, ext ] = fileparts(filepath);
@@ -92,7 +134,7 @@ snirfData.formatVersion = c2v('1.1');
 if(~iscell(fNIRcells) && isstruct(fNIRcells))
     fNIRcells = {fNIRcells};
 elseif ~iscell(fNIRcells) || isempty(fNIRcells)
-    error('Invalid fnirs data: Must be a structure or non-empty cell array of structures');
+    error('pf2:asSNIRF:invalidInput', 'Invalid fnirs data: Must be a structure or non-empty cell array of structures');
 end
 
 curNIR_fieldname = 'nirs';
@@ -196,55 +238,78 @@ for n = 1:numNIRS
     % Set up stimulus data
     stim = [];
 
+    % Resolve the dataset marker dictionary (code->label) so condition names
+    % are serialized even when the markers table carries no label column.
+    dictTbl = [];
+    if isfield(curStruct, 'info') && isstruct(curStruct.info)
+        if isfield(curStruct.info, 'markerDict') && ~isempty(curStruct.info.markerDict)
+            dictTbl = pf2_base.normalizeMarkerDict(curStruct.info.markerDict);
+        elseif isfield(curStruct.info, 'eventTypes') && ~isempty(curStruct.info.eventTypes)
+            dictTbl = pf2_base.normalizeMarkerDict(curStruct.info.eventTypes);
+        end
+    end
+
     if isfield(curStruct, 'markers') && ~isempty(curStruct.markers)
         % Check if markers is a table or numeric array
         if istable(curStruct.markers)
-            % Handle table format
-            markerNames = curStruct.markers.Properties.VariableNames;
-            
-            % Find columns that could contain marker values
-            valueCol = find(contains(lower(markerNames), {'value', 'type', 'code', 'id'}), 1);
-            if isempty(valueCol), valueCol = 2; end
-            
-            % Find time column
-            timeCol = find(contains(lower(markerNames), {'time', 'onset'}), 1);
-            if isempty(timeCol), timeCol = 1; end
-            
-            % Find duration column 
-            durationCol = find(contains(lower(markerNames), {'duration', 'length'}), 1);
-            if isempty(durationCol), durationCol = 3; end
-            
-            % Convert to numeric array if possible
-            markerData = table2array(curStruct.markers);
-            [uniqueMarkers, ~, markerIndices] = unique(markerData(:, valueCol));
-            
-            % Create stim entries for each unique marker
-            for m = 1:length(uniqueMarkers)
-                markerIdx = markerData(:, valueCol) == uniqueMarkers(m);
-                stimItem = [];
-                
-                % Use name from table if available, otherwise generate
-                if isfield(curStruct.markers, 'name')
-                    stimNames = unique(curStruct.markers.name(markerIdx));
-                    stimItem.name = c2v(stimNames{1});
-                else
-                    stimItem.name = c2v(sprintf('marker%i', uniqueMarkers(m)));
+            % Canonical marker table: Time, Code, Duration, Amplitude (+extras)
+            mt = pf2_base.normalizeMarkers(curStruct.markers);
+            times = mt.Time; codes = mt.Code; durs = mt.Duration;
+
+            % Classify extra columns (everything beyond Time/Code/Duration).
+            % Numeric/logical extras (e.g. Amplitude, GameScore, isDeviceMarker)
+            % are carried as additional numeric stim-data columns labeled with
+            % their variable names. Text/categorical extras cannot live in
+            % SNIRF's numeric stim matrix, so they are skipped (no error); the
+            % first such column, if any, is used to name the stim conditions.
+            coreVars = {'Time', 'Code', 'Duration'};
+            extraVars = setdiff(mt.Properties.VariableNames, coreVars, 'stable');
+            numericExtra = {};
+            labelVar = '';
+            for v = 1:numel(extraVars)
+                col = mt.(extraVars{v});
+                if isnumeric(col) || islogical(col)
+                    numericExtra{end+1} = extraVars{v}; %#ok<AGROW>
+                elseif isempty(labelVar) && (isstring(col) || iscellstr(col) || iscategorical(col))
+                    labelVar = extraVars{v};
                 end
-                
-                % Format as [startTime, duration, value]
-                stimItem.data = markerData(markerIdx, [timeCol, durationCol, valueCol]);
-                
-                % Add labels if we have more than 3 columns
-                if size(markerData, 2) > 3
-                    stimLabels = {'startTime', 'duration', 'value'};
-                    for col = 1:size(markerData, 2)
-                        if col ~= timeCol && col ~= durationCol && col ~= valueCol
-                            stimLabels{end+1} = markerNames{col};
-                        end
+            end
+
+            uniqueMarkers = unique(codes);
+            for m = 1:length(uniqueMarkers)
+                markerIdx = codes == uniqueMarkers(m);
+                stimItem = [];
+
+                % Name from a text label column if present, else the dataset
+                % dictionary, else the bare code.
+                autoName = sprintf('marker%i', uniqueMarkers(m));
+                nameStr = autoName;
+                if ~isempty(labelVar)
+                    lbls = string(mt.(labelVar)(markerIdx));
+                    lbls = lbls(~ismissing(lbls));
+                    if ~isempty(lbls)
+                        nameStr = char(lbls(1));
                     end
+                end
+                if strcmp(nameStr, autoName)
+                    nameStr = dictLabel(dictTbl, uniqueMarkers(m), autoName);
+                end
+                stimItem.name = c2v(nameStr);
+
+                % SNIRF convention: [startTime, duration, value]
+                stimItem.data = [times(markerIdx), durs(markerIdx), codes(markerIdx)];
+                stimLabels = {'startTime', 'duration', 'value'};
+
+                % Append numeric extra columns, preserving their names
+                for v = 1:numel(numericExtra)
+                    stimItem.data = [stimItem.data, ...
+                        double(mt.(numericExtra{v})(markerIdx))];
+                    stimLabels{end+1} = numericExtra{v}; %#ok<AGROW>
+                end
+                if numel(stimLabels) > 3
                     stimItem.dataLabels = stimLabels;
                 end
-                
+
                 if m == 1
                     stim = stimItem;
                 else
@@ -258,16 +323,23 @@ for n = 1:numNIRS
             for m = 1:length(uniqueMarkers)
                 markerIdx = curStruct.markers(:, 2) == uniqueMarkers(m);
                 stimItem = [];
-                stimItem.name = c2v(sprintf('mrk%i', uniqueMarkers(m)));
-                
+                autoName = sprintf('mrk%i', uniqueMarkers(m));
+                stimItem.name = c2v(dictLabel(dictTbl, uniqueMarkers(m), autoName));
+
                 % Standard format: [time, duration, marker value]
                 stimItem.data = curStruct.markers(markerIdx, [1, 3, 2]);
                 
                 % Add dataLabels if more than 3 columns
                 if size(curStruct.markers, 2) > 3
                     stimLabels = {'startTime', 'duration', 'value'};
+                    % Include amplitude data in SNIRF output
+                    stimItem.data = [stimItem.data, curStruct.markers(markerIdx, 4:end)];
                     for col = 4:size(curStruct.markers, 2)
-                        stimLabels{end+1} = sprintf('column%d', col);
+                        if col == 4
+                            stimLabels{end+1} = 'amplitude';
+                        else
+                            stimLabels{end+1} = sprintf('column%d', col);
+                        end
                     end
                     stimItem.dataLabels = stimLabels;
                 end
@@ -384,6 +456,23 @@ pf2_base.external.jsnirfy.savesnirf(snirfData, filepath);
 fprintf('Successfully exported SNIRF file to: %s\n', filepath);
 end
 
+function name = dictLabel(dictTbl, code, fallback)
+    % DICTLABEL Look up a code's label in a normalized dictionary table
+    %   Returns FALLBACK when the dictionary is empty or has no usable label
+    %   for CODE, so callers always get a valid condition name.
+    name = fallback;
+    if isempty(dictTbl) || ~istable(dictTbl) || height(dictTbl) == 0
+        return;
+    end
+    row = dictTbl(dictTbl.Code == code, :);
+    if height(row) > 0
+        lbl = string(row.Label(1));
+        if ~ismissing(lbl) && strlength(lbl) > 0
+            name = char(lbl);
+        end
+    end
+end
+
 function charOut = c2v(str)
     % Ensure consistent string format for HDF5 compatibility
     % This creates a variable-length string that works with Python's h5py
@@ -439,6 +528,25 @@ function metaData = info2meta(nirStruct)
         end
     end
 
+    % Fallback: if MeasurementDate not set yet, try info fields or UnixTime
+    if ~isfield(metaData, 'MeasurementDate')
+        if isfield(info, 'MeasurementDate') && ~isempty(info.MeasurementDate)
+            metaData.MeasurementDate = c2v(info.MeasurementDate);
+        elseif isfield(info, 'date') && ~isempty(info.date)
+            metaData.MeasurementDate = c2v(info.date);
+        elseif isfield(info, 'Date') && ~isempty(info.Date)
+            metaData.MeasurementDate = c2v(info.Date);
+        elseif isfield(info, 'recordingDate') && ~isempty(info.recordingDate)
+            metaData.MeasurementDate = c2v(info.recordingDate);
+        elseif isfield(info, 'UnixTime') && ~isempty(info.UnixTime)
+            ut = info.UnixTime;
+            if ischar(ut) || isstring(ut), ut = str2double(ut); end
+            dt = datetime(ut, 'ConvertFrom', 'posixtime');
+            metaData.MeasurementDate = c2v(datestr(dt, 'yyyy-mm-dd'));
+            metaData.MeasurementTime = c2v(datestr(dt, 'HH:MM:SS'));
+        end
+    end
+
     % Ensure required SubjectID is present
     if isfield(info, 'SubjectID') && ~isempty(info.SubjectID)
         metaData.SubjectID = c2v(info.SubjectID);
@@ -476,6 +584,11 @@ function metaData = info2meta(nirStruct)
     fieldMappings('instancenumber') = 'InstanceNumber';
     fieldMappings('calibrationfile') = 'CalibrationFileName';
     fieldMappings('calibration') = 'CalibrationFileName';
+    fieldMappings('measurementdate') = 'MeasurementDate';
+    fieldMappings('date') = 'MeasurementDate';
+    fieldMappings('recordingdate') = 'MeasurementDate';
+    fieldMappings('measurementtime') = 'MeasurementTime';
+    fieldMappings('recordingtime') = 'MeasurementTime';
     fieldMappings('unixtime') = 'UnixTime';
     fieldMappings('unixtimestamp') = 'UnixTime';
     fieldMappings('lastname') = 'lastName';
@@ -685,10 +798,11 @@ function [probe, measurementList, deviceMetaDataTags, rawMax, strippedChannelsMa
             if(invalidWv(i))
                 warning('This channel has an invalid wavelength')
                 measurement.wavelengthIndex = nan;
+                measurement.wavelengthActual = nan;
             else
                 measurement.wavelengthIndex = wvI(i);
+                measurement.wavelengthActual = wvList(measurement.wavelengthIndex);
             end
-            measurement.wavelengthActual = wvList(measurement.wavelengthIndex);
             measurement.dataUnit = c2v('au');
         end
       
@@ -703,21 +817,60 @@ function [probe, measurementList, deviceMetaDataTags, rawMax, strippedChannelsMa
     % Build probe structure
     probe = [];
 
-    % Handle optode positions
-    if height(probeStruct.DetPos) == height(probeStruct.SrcPos) && ...
+    % Extract 2D/3D positions aligned with SNIRF detectorIndex/sourceIndex
+    % semantics: row k must be the position of detector/source k so that
+    % measurementList references resolve correctly. When DetPos/SrcPos are
+    % optode-indexed (height == TableOpt), compress by DetIdx/SrcIdx value
+    % and pad missing IDs with NaN (devices with non-contiguous numbering,
+    % e.g., merged-probe configs, otherwise produce scrambled positions).
+    if ~isfield(probeStruct, 'DetPos') || ~isfield(probeStruct, 'SrcPos')
+        % Layout-only device (grid montage, no physical optode coordinates):
+        % SNIRF has no place for a schematic grid, so write empty geometry.
+        warning('pf2:asSNIRF:noGeometry', ...
+            ['Device has no optode coordinates (layout-only); writing empty ' ...
+             'source/detector positions to SNIRF.']);
+        probe.detectorPos2D = zeros(0, 2);
+        probe.detectorPos3D = zeros(0, 3);
+        probe.sourcePos2D   = zeros(0, 2);
+        probe.sourcePos3D   = zeros(0, 3);
+    elseif height(probeStruct.DetPos) == height(probeStruct.SrcPos) && ...
             height(probeStruct.TableOpt) == height(probeStruct.DetPos)
-        [~, firstDetIdx] = unique(probeStruct.TableOpt.DetIdx);
-        [~, firstSrcIdx] = unique(probeStruct.TableOpt.SrcIdx);
-    else
-        firstDetIdx = 1:height(probeStruct.DetPos);
-        firstSrcIdx = 1:height(probeStruct.SrcPos);
-    end
+        detIds = probeStruct.TableOpt.DetIdx;
+        srcIds = probeStruct.TableOpt.SrcIdx;
 
-    % Extract 2D and 3D positions
-    probe.detectorPos2D = table2array(probeStruct.DetPos(firstDetIdx, {'x_2d', 'y_2d'}));
-    probe.detectorPos3D = table2array(probeStruct.DetPos(firstDetIdx, {'x', 'y', 'z'}));
-    probe.sourcePos2D = table2array(probeStruct.SrcPos(firstSrcIdx, {'x_2d', 'y_2d'}));
-    probe.sourcePos3D = table2array(probeStruct.SrcPos(firstSrcIdx, {'x', 'y', 'z'}));
+        detAll2D = table2array(probeStruct.DetPos(:, {'x_2d', 'y_2d'}));
+        detAll3D = table2array(probeStruct.DetPos(:, {'x', 'y', 'z'}));
+        srcAll2D = table2array(probeStruct.SrcPos(:, {'x_2d', 'y_2d'}));
+        srcAll3D = table2array(probeStruct.SrcPos(:, {'x', 'y', 'z'}));
+
+        maxDet = max(detIds(detIds > 0 & ~isnan(detIds)));
+        maxSrc = max(srcIds(srcIds > 0 & ~isnan(srcIds)));
+        if isempty(maxDet), maxDet = 0; end
+        if isempty(maxSrc), maxSrc = 0; end
+
+        probe.detectorPos2D = nan(maxDet, 2);
+        probe.detectorPos3D = nan(maxDet, 3);
+        probe.sourcePos2D   = nan(maxSrc, 2);
+        probe.sourcePos3D   = nan(maxSrc, 3);
+
+        for d = unique(detIds(:))'
+            if d <= 0 || isnan(d), continue; end
+            idx = find(detIds == d, 1);
+            probe.detectorPos2D(d, :) = detAll2D(idx, :);
+            probe.detectorPos3D(d, :) = detAll3D(idx, :);
+        end
+        for s = unique(srcIds(:))'
+            if s <= 0 || isnan(s), continue; end
+            idx = find(srcIds == s, 1);
+            probe.sourcePos2D(s, :) = srcAll2D(idx, :);
+            probe.sourcePos3D(s, :) = srcAll3D(idx, :);
+        end
+    else
+        probe.detectorPos2D = table2array(probeStruct.DetPos(:, {'x_2d', 'y_2d'}));
+        probe.detectorPos3D = table2array(probeStruct.DetPos(:, {'x', 'y', 'z'}));
+        probe.sourcePos2D   = table2array(probeStruct.SrcPos(:, {'x_2d', 'y_2d'}));
+        probe.sourcePos3D   = table2array(probeStruct.SrcPos(:, {'x', 'y', 'z'}));
+    end
 
     % Include landmark positions if available
     if isfield(probeStruct, 'landmarkPos3D')
@@ -741,4 +894,20 @@ function [probe, measurementList, deviceMetaDataTags, rawMax, strippedChannelsMa
      
     % Add wavelengths
     probe.wavelengths = wvList(~isnan(wvList));
+end
+
+
+function opts = parseBatchOpts(varargin)
+% Parse batch export name-value parameters
+    p = inputParser;
+    p.addParameter('Dir1', '', @(x) ischar(x) || isstring(x));
+    p.addParameter('Dir2', '', @(x) ischar(x) || isstring(x));
+    p.addParameter('Dir3', '', @(x) ischar(x) || isstring(x));
+    p.addParameter('Dir4', '', @(x) ischar(x) || isstring(x));
+    p.addParameter('Prefix', {}, @iscell);
+    p.addParameter('NormalizeRaw', false, @(x) islogical(x) || isnumeric(x));
+    p.addParameter('StripExtraRawChannels', false, @islogical);
+    p.addParameter('Verbose', true, @islogical);
+    p.parse(varargin{:});
+    opts = p.Results;
 end

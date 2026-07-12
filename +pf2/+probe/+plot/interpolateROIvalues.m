@@ -1,4 +1,4 @@
-function [ imgOut ] = interpolateROIvalues(varargin)
+function [ imgOut ] = interpolateROIvalues(data2plot, fNIR, ROIinfo, minVal, maxVal, bufferMult, titleString, clrBarTitle, opts)
 % INTERPOLATEROIVALUES Create interpolated 2D topographic map of ROI values
 %
 % Generates a smooth, interpolated 2D topographic visualization of fNIRS
@@ -61,31 +61,26 @@ function [ imgOut ] = interpolateROIvalues(varargin)
 % See also: pf2.probe.plot.imageROIvalues, pf2.probe.plot.interpolateValues,
 %           pf2.probe.roi.defineROI, pf2_base.fnirs.buildROI
 
-p = inputParser;
+arguments
+    data2plot
+    fNIR = {}
+    ROIinfo = {}
+    minVal {mustBeNumeric} = []
+    maxVal {mustBeNumeric} = []
+    bufferMult {mustBeNumeric} = 1
+    titleString {mustBeText} = ''
+    clrBarTitle {mustBeText} = ''
+    opts.savePath {mustBeText} = ''
+    opts.saveWidth {mustBeNumeric} = []
+    opts.saveHeight {mustBeNumeric} = []
+    opts.saveDPI {mustBeNumeric} = 150
+end
 
-isStructOrEmpty=@(x) isstruct(x)||isempty(x) ||istable(x);
-isStringOrChar=@(x)isstring(x)||ischar(x);
-
-
-addRequired(p, 'data2plot');
-addOptional(p, 'fNIR', {}, isStructOrEmpty);
-addOptional(p, 'ROIinfo',{}, isStructOrEmpty);
-addOptional(p, 'minVal', [], @isnumeric);
-addOptional(p, 'maxVal', [], @isnumeric);
-addOptional(p, 'bufferMult', 1, @isnumeric);
-addOptional(p, 'titleString', '', isStringOrChar);
-addOptional(p, 'clrBarTitle', '', isStringOrChar);
-
-parse(p, varargin{:});
-
-clrBarTitle = p.Results.clrBarTitle;
-titleString = p.Results.titleString;
-bufferMult = round(p.Results.bufferMult);
-minVal = p.Results.minVal;
-maxVal = p.Results.maxVal;
-fNIR = p.Results.fNIR;
-data2plot = p.Results.data2plot;
-ROIinfo = p.Results.ROIinfo;
+bufferMult = round(bufferMult);
+savePath = opts.savePath;
+saveWidth = opts.saveWidth;
+saveHeight = opts.saveHeight;
+saveDPI = opts.saveDPI;
 
 if(isempty(ROIinfo))
     if(~isempty(fNIR)&&istable(fNIR)&&any(ismember(fNIR.Properties.VariableNames,'DeviceCfg')))%%is struct for ROI info?
@@ -95,11 +90,15 @@ if(isempty(ROIinfo))
         ROIinfo=[];
     end
 else
-    deviceCfg = ROIinfo.DeviceCfg{1};
+    if ismember('DeviceCfg', ROIinfo.Properties.VariableNames)
+        deviceCfg = ROIinfo.DeviceCfg{1};
+    else
+        deviceCfg = '';
+    end
 end
 
 if(isempty(ROIinfo)&&~isempty(fNIR)&&~pf2_base.isnestedfield(fNIR,'ROI.info')&&~isempty(fNIR.info))
-    error('No ROI information in the fNIR struct, unable to plot data');
+    error('pf2:probe:interpolateROIvalues:noROIInfo', 'No ROI information in the fNIR struct, unable to plot data');
 elseif(isempty(ROIinfo))
     ROIinfo=fNIR.ROI.info;
     if(pf2_base.isnestedfield(fNIR,'info.probename'))
@@ -132,7 +131,7 @@ if(isempty(cfgFilePath)||~contains(cfgFilePath,'.cfg'))
     disp('No device specified. Please load device configuration');
     probeInfo=pf2_base.loadDeviceCfg([],true);
     if(~isempty(probeInfo))
-        error('No valid devices selected');
+        error('pf2:probe:interpolateROIvalues:noDevice', 'No valid devices selected');
     end
     
 elseif(~isempty(cfgFilePath)) % If we're not looking at the GUI, doesn't matter
@@ -146,19 +145,19 @@ if(pf2_base.isnestedfield(probeInfo,'Probe'))
     end
     probeInfo=probeInfo.Probe{probeNum};
 else
-   error('Unable to identify probe'); 
+   error('pf2:probe:interpolateROIvalues:noProbe', 'Unable to identify probe');
 end
 
 numROI=size(ROIinfo,1);
 
 if(~isempty(ROIinfo)&&length(data2plot)>numROI)
-    error('Must have a value for all ROIs');
+    error('pf2:probe:interpolateROIvalues:roiCountMismatch', 'Must have a value for all ROIs');
 end
 
 
 
 allCh=[];
-chData2plot=nan(height(probeInfo.TableOpt));
+chData2plot=nan(height(probeInfo.TableOpt), 1);
 
 mrkLbl=cell(size(chData2plot));
 mrkLbl(:)={''};
@@ -167,22 +166,29 @@ ROInames=ROIinfo.Properties.RowNames;
 
 for roiIdx=1:numROI
 
-    if(~strcmp(deviceCfg,ROIinfo.DeviceCfg(roiIdx)))
+    if ismember('DeviceCfg', ROIinfo.Properties.VariableNames) && ...
+            ~strcmp(deviceCfg, ROIinfo.DeviceCfg(roiIdx))
         continue;
     end
 
     curCh=ROIinfo.Optodes{roiIdx};
     
+    if ismember('index', ROIinfo.Properties.VariableNames)
+        dataIdx = ROIinfo.index(roiIdx);
+    else
+        dataIdx = roiIdx;
+    end
+
     for(optIdx=1:length(curCh))
         optNum=probeInfo.TableOpt.OptodeNum(curCh(optIdx));
 
-        chData2plot(optNum)=data2plot(ROIinfo.index(roiIdx));
-        mrkLbl{optNum}=ROInames{ROIinfo.index(roiIdx)};
+        chData2plot(optNum)=data2plot(dataIdx);
+        mrkLbl{optNum}=ROInames{dataIdx};
     end
     
     allCh=[allCh,curCh];
     if(length(unique(allCh))>length(allCh))
-        error('ROIs contain duplicate channels'); 
+        error('pf2:probe:interpolateROIvalues:duplicateChannels', 'ROIs contain duplicate channels');
     end
 end
 
@@ -265,6 +271,8 @@ intArrAlpha(intArrLinear<0)=0;
 
 x2keep=round([inpX(1,min(optXidx)-bufferMult)+1,inpX(1,min(max(optXidx)+bufferMult,length(optXidx)))]);
 y2keep=round([inpY(min(optYidx)-bufferMult,1)+1,inpY(max(optYidx)+bufferMult,1)]);
+x2keep = max(1, min(imgSize, x2keep));
+y2keep = max(1, min(imgSize, y2keep));
 
 optPos2Plot=round([inpX(1,optXidx);inpX(1,optYidx)]);
 
@@ -282,9 +290,11 @@ imgFinal.AlphaDataMapping='scaled';
 
 hold on
 
-plot(optPos2Plot(1,:)/1.01+1,optPos2Plot(2,:)/1.01+1,'O','MarkerSize',25,'LineWidth',3,'color','black', 'MarkerFaceColor', 'k');
+mrkX = optPos2Plot(1,:) - x2keep(1) + 1;
+mrkY = optPos2Plot(2,:) - y2keep(1) + 1;
+plot(mrkX, mrkY, 'O', 'MarkerSize', 25, 'LineWidth', 3, 'color', 'black', 'MarkerFaceColor', 'k');
 for optIdx=1:length(chData2plot)
-    text(optPos2Plot(1,optIdx)/1.01+1,optPos2Plot(2,optIdx)/1.01+1,mrkLbl{optIdx},'FontSize',10,'HorizontalAlignment', 'center','color','white');
+    text(mrkX(optIdx), mrkY(optIdx), mrkLbl{optIdx}, 'FontSize', 10, 'HorizontalAlignment', 'center', 'color', 'white');
 end
 
 ch=colorbar();
@@ -303,6 +313,12 @@ end
 
 if(~isempty(titleString))
     title(titleString);
+end
+
+% Save figure if requested
+if ~isempty(savePath)
+    fig = gcf();
+    pf2_base.plot.saveFigure(fig, savePath, saveWidth, saveHeight, saveDPI);
 end
 
 end

@@ -57,7 +57,7 @@ function [Xcorr, maskCV]=pf2_SMAR(x,N,tauUp,tauLow)
 
 
 if nargin<1
-    error('Not enough Input arguments');
+    error('pf2:smar:notEnoughInputs', 'Not enough Input arguments');
 elseif nargin==1
      N=10;  %Default Window Length
 end
@@ -71,7 +71,7 @@ if(nargin<4)
 end
 
 if(N<1)
-    error('Invalid Window Length');
+    error('pf2:smar:invalidWindowLength', 'Invalid Window Length');
 end
 
 CVx=calcLocalCV(x,N);
@@ -112,11 +112,11 @@ function [CVx] = calcLocalCV(x, N)
 % See also: pf2_SMAR, pf2_SMAR2
 
 if nargin<1
-    error('Not enough Input arguments');
+    error('pf2:smar:notEnoughInputs', 'Not enough Input arguments');
 end
 
 if(N<1)
-    error('Invalid Window Length');
+    error('pf2:smar:invalidWindowLength', 'Invalid Window Length');
 end
 
 l=size(x);

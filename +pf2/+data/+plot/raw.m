@@ -1,121 +1,115 @@
-function [ figHandle ] = raw(varargin)
+function [ figHandle ] = raw(fNIR, varargin)
 % RAW Plot raw light intensity data from fNIRS acquisition
 %
 % Creates time series plots of raw fNIRS intensity data, optionally
 % arranged according to probe geometry. Supports wavelength selection,
-% marker overlay, and visual indication of rejected channels. Useful for
-% quality assessment of raw data before processing.
+% marker overlay, and visual indication of rejected channels.
 %
 % Syntax:
-%   pf2.data.plot.raw(fNIR)
-%   pf2.data.plot.raw(fNIR, channels)
-%   pf2.data.plot.raw(fNIR, channels, showMarkers, wavelengths)
-%   pf2.data.plot.raw(fNIR, channels, showMarkers, wavelengths, ylimit, plotArranged)
-%   figHandle = pf2.data.plot.raw(..., lineProps, rejectedLineProps)
+%   pf2.data.plot.raw(fNIR)                      % All channels
+%   pf2.data.plot.raw(fNIR, channels)            % Specific channels
+%   pf2.data.plot.raw(fNIR, ..., Name, Value)    % With options
 %
 % Inputs:
-%   fNIR              - fNIRS data structure [struct]
-%                       Must contain 'raw' [T x C] and 'time' [T x 1] fields.
-%   channels          - Channels to plot [numeric array | logical | 'all']
-%                       (default: all channels, enables arranged plot)
-%                       Can be channel numbers or logical index.
-%   showMarkers       - Display event markers on plots [logical | numeric | 'all']
-%                       (default: true) If numeric, specifies marker codes to show.
-%   wavelengths       - Wavelengths to include [numeric array | 'all']
-%                       (default: all available wavelengths from probe config)
-%                       Common values: 730, 850 nm.
-%   ylimit            - Y-axis limits for all subplots [1x2 numeric]
-%                       (default: [RawMin, max(data)] from device config)
-%   plotArranged      - Use probe geometry layout for subplots [logical]
-%                       (default: true when all channels plotted)
-%   lineProps         - Line properties for good channels [cell array]
-%                       (default: {'LineWidth', 1})
-%   rejectedLineProps - Line properties for rejected channels [cell array]
-%                       (default: {'--', 'LineWidth', 1})
+%   fNIR      - fNIRS data structure with 'raw' and 'time' fields
+%   channels  - (optional) Channels to plot: numeric, logical, or 'all'
 %
-% Outputs:
-%   figHandle - Handle to the created figure [figure handle]
-%               Only returned when output argument is requested.
+% Options (Name-Value):
+%   'markers'     - true (default), false, or numeric array of codes
+%   'wavelengths' - [] (all), or specific wavelength values [730, 850]
+%   'ylim'        - [] (auto), or [min max]
+%   'arranged'    - [] (auto), true, or false
+%   'interactive' - true (default), false to skip prompts (for batch/headless)
+%   'savePath'    - '' (default), filename to save figure (.png, .pdf, .fig)
+%   'saveWidth'   - [] (default), figure width in pixels
+%   'saveHeight'  - [] (default), figure height in pixels
+%   'saveDPI'     - 150 (default), resolution for raster formats
 %
 % Example:
-%   % Basic raw data plot
-%   data = pf2.import.sampleData.fNIR2000();
-%   pf2.data.plot.raw(data);
-%
-%   % Plot specific channels and wavelengths
-%   pf2.data.plot.raw(data, 1:5, true, 730);
-%
-%   % Custom line styling with markers disabled
-%   pf2.data.plot.raw(data, 'all', false, 'all', [], true, ...
-%       {'LineWidth', 2, 'Color', 'b'});
-%
-% Notes:
-%   - Requires valid device configuration for probe geometry
-%   - Rejected channels (fchMask=0) shown with 'X', marginal (0.5) with '~'
-%   - Data cursor mode enabled for interactive inspection
-%   - Large numbers of markers may prompt for confirmation (slow rendering)
+%   pf2.data.plot.raw(data)                      % Simple
+%   pf2.data.plot.raw(data, 5)                   % Channel 5
+%   pf2.data.plot.raw(data, 1:5)                 % Channels 1-5
+%   pf2.data.plot.raw(data, 'wavelengths', 730)  % Single wavelength
+%   pf2.data.plot.raw(data, 5, 'markers', false) % No markers
 %
 % See also: pf2.data.plot.oxy, pf2.data.plot, pf2.settings.selectDevice
 
-validFnirs = @(x) (iscell(x) || isstruct(x));
-validChannels = @(x) (isnumeric(x) || ischar(x));
-validWavelength = @(x) (isnumeric(x) || ischar(x));
+% Validate fNIR input
+if ~isstruct(fNIR)
+    error('pf2:InvalidInput', 'First argument must be a fNIRS data structure');
+end
 
-p=inputParser;
-addRequired(p, 'fNIR', validFnirs);
-addOptional(p, 'channels', [], validChannels);
-addOptional(p, 'showMarkers', true, @islogical);
-addOptional(p, 'wavelengths', [], validWavelength);
-addOptional(p, 'ylimit', [], @isnumeric);
-addOptional(p, 'plotArranged', false, @islogical);
-addOptional(p, 'lineProps', {'LineWidth', 1}, @iscell);
-addOptional(p, 'rejectedLineProps', {'--', 'LineWidth', 1}, @iscell);
+% Parameter names for detection
+paramNames = {'markers', 'showmarkers', 'wavelengths', 'ylim', 'ylimit', ...
+              'arranged', 'plotarranged', 'lineprops', 'rejectedlineprops', ...
+              'interactive', 'savepath', 'savewidth', 'saveheight', 'savedpi', ...
+              'rejectlevel'};
 
-parse(p, varargin{:});
-fNIR = p.Results.fNIR;
-channels = p.Results.channels;
-showMarkers = p.Results.showMarkers;
+% Extract positional 'channels' argument if present
+channels = [];
+nvStart = 1;
+
+if ~isempty(varargin)
+    firstArg = varargin{1};
+    if isnumeric(firstArg) || islogical(firstArg) || ...
+       (ischar(firstArg) && strcmpi(firstArg, 'all'))
+        channels = firstArg;
+        nvStart = 2;
+    elseif ischar(firstArg) || isstring(firstArg)
+        if ~ismember(lower(char(firstArg)), paramNames)
+            channels = firstArg;
+            nvStart = 2;
+        end
+    end
+end
+
+% Parse name-value pairs
+p = inputParser;
+p.CaseSensitive = false;
+addParameter(p, 'markers', true, @(x) islogical(x) || isnumeric(x));
+addParameter(p, 'showMarkers', [], @(x) islogical(x) || isnumeric(x) || isempty(x));  % Legacy
+addParameter(p, 'wavelengths', [], @(x) isnumeric(x) || ischar(x));
+addParameter(p, 'ylim', [], @isnumeric);
+addParameter(p, 'ylimit', [], @isnumeric);  % Legacy
+addParameter(p, 'arranged', [], @(x) islogical(x) || isempty(x));
+addParameter(p, 'plotArranged', [], @(x) islogical(x) || isempty(x));  % Legacy
+addParameter(p, 'lineProps', {'LineWidth', 1}, @iscell);
+addParameter(p, 'rejectedLineProps', {'--', 'LineWidth', 1}, @iscell);
+addParameter(p, 'interactive', true, @islogical);
+addParameter(p, 'savePath', '', @(x) ischar(x) || isstring(x));
+addParameter(p, 'saveWidth', [], @(x) isempty(x) || isnumeric(x));
+addParameter(p, 'saveHeight', [], @(x) isempty(x) || isnumeric(x));
+addParameter(p, 'saveDPI', 150, @isnumeric);
+addParameter(p, 'rejectLevel', 0, @isnumeric);
+
+parse(p, varargin{nvStart:end});
+
+% Assign parsed values (with legacy fallbacks)
+showMarkers = p.Results.markers;
+if ~isempty(p.Results.showMarkers), showMarkers = p.Results.showMarkers; end
 wavelengths = p.Results.wavelengths;
-ylimit = p.Results.ylimit;
-plotArranged = p.Results.plotArranged;
+ylimit = p.Results.ylim;
+if ~isempty(p.Results.ylimit), ylimit = p.Results.ylimit; end
+plotArranged = p.Results.arranged;
+if ~isempty(p.Results.plotArranged), plotArranged = p.Results.plotArranged; end
 lineProps = p.Results.lineProps;
 rejectedLineProps = p.Results.rejectedLineProps;
+interactive = p.Results.interactive;
+savePath = p.Results.savePath;
+saveWidth = p.Results.saveWidth;
+saveHeight = p.Results.saveHeight;
+saveDPI = p.Results.saveDPI;
 
+rejectLevel = p.Results.rejectLevel;
 
-global PF2
-if(~isfield(PF2,'RejectLevel'))
-    pf2_base.pf2_initialize();
-end
-if(isfield(fNIR,'fchMask'))
-    rejectLevel=PF2.RejectLevel;
-end
-
-if(nargin<8||isempty(rejectedLineProps))
-    rejectedLineProps={'--','LineWidth',1};
-end
-
-if(nargin<7||isempty(lineProps))
-    lineProps={'LineWidth',1};
-end
-
-
-
-if(nargin<6)
-    plotArranged=false;  % plot when channels is all or empty
-end
-
-if(nargin<5)
-   ylimit=[]; % will use max device info to plot
-end
-
-
-if(nargin<3)
-   showMarkers=true;  %will plot all markers 
-end
-
-if(nargin<2||isempty(channels)||(ischar(channels)&&strcmpi(channels,'all')))
-    plotArranged=true; %Enabled when all channels are plot
-    channels=[];
+% Handle default plotArranged (true when all channels)
+if isempty(channels) || (ischar(channels) && strcmpi(channels, 'all'))
+    if isempty(plotArranged)
+        plotArranged = true;  % Enabled when all channels are plotted
+    end
+    channels = [];
+elseif isempty(plotArranged)
+    plotArranged = false;
 end
 
 if(any(logical(channels))&&any(~isnumeric(channels)))
@@ -127,42 +121,8 @@ end
 
 
 
-if(isfield(fNIR,'probeinfo'))
-    probeInfo=fNIR.probeinfo;
-else
-    
-if(pf2_base.isnestedfield(fNIR,'info.probename')&&isfield(fNIR.info,'probename')&&~contains(fNIR.info.probename,'Unknown')) 
-    %try to load the probename cfg file
-    cfgFilePath=sprintf('%s.cfg',fNIR.info.probename);
-else
-    cfgFilePath='';
-end
-
-
-if(isempty(cfgFilePath)||~contains(cfgFilePath,'.cfg'))
-    
-    warning('Missing or invalid configuration file path\n')
-    
-    disp('No device specified. Please load device configuration');
-    probeInfo=pf2_base.loadDeviceCfg([],true);
-    if(~isempty(probeInfo))
-        error('No valid devices selected');
-    end
-    
-elseif(~isempty(cfgFilePath)) % If we're not looking at the GUI, doesn't matter
-    probeInfo=pf2_base.loadDeviceCfg(cfgFilePath,plotArranged);
-end
-
-end
-if(pf2_base.isnestedfield(probeInfo,'Probe'))
-    deviceInfo=probeInfo.Info;
-    if(~isfield(deviceInfo,'numberProbes')||deviceInfo.numberProbes==1)
-        probeNum=1;
-    end
-    probeInfo=probeInfo.Probe{probeNum};
-else
-   error('Unable to identify probe'); 
-end
+% Load probe info using helper
+[probeInfo, deviceInfo] = pf2_base.plot.loadProbeInfo(fNIR, plotArranged);
 
 
 
@@ -191,14 +151,14 @@ if(isempty(wavelengths))
        fprintf(2,'%i ',wavelengths(i)); 
     end
     fprintf('\n');
-    error('No Wavelengths to plot');
+    error('pf2:data:plot:raw:noWavelengths', 'No Wavelengths to plot');
 end
     
     
 if(any(channels>probeInfo.NumOptodes))
-    error('Some channels are higher than probe optode count');
+    error('pf2:data:plot:raw:channelOutOfRange', 'Some channels are higher than probe optode count');
 elseif(any(channels<0))
-    error('Channels can not be negative');
+    error('pf2:data:plot:raw:negativeChannel', 'Channels can not be negative');
 end
 
 
@@ -208,7 +168,7 @@ if(isfield(fNIR,'time'))
     tmax=nanmax(t);
     tmean=nanmean(t)-tmin;
 else
-    error('Must have valid time field');
+    error('pf2:data:plot:raw:noTime', 'Must have valid time field');
 end
 
 idx2plot=ismember(probeInfo.TableCh.OptodeNumber,channels);
@@ -234,9 +194,11 @@ else
     RawMin=0;
 end
 
+sty = pf2_base.plot.PlotStyle.getDefault();
+
 if(~isempty(channels))
     if(nargout>0)
-        figHandle=figure(); 
+        figHandle=figure('Color', sty.FigureColor);
     else
         %figure();
     end
@@ -245,36 +207,11 @@ else
    return; 
 end
 
-if(~isfield(fNIR,'markers')||isempty(fNIR.markers))
-   showMarkers=false; 
-end
-
-if(ischar(showMarkers)&&strcmpi(showMarkers,'all'))
-    showMarkers=true;
-end
-
-if(islogical(showMarkers))
-    if(~showMarkers)
-        showMarkers=[];
-    else
-        [showMarkers,~,showMarkersIdx]=unique(fNIR.markers(:,2));
-    end
-elseif(isnumeric(showMarkers))
-    [uMarkers,~,showMarkersIdxTemp]=unique(fNIR.markers(:,2));
-    showMarkersIdx=nan(size(showMarkersIdxTemp));
-    showMarkersUidx=find(ismember(uMarkers,showMarkers));
-    for i=1:length(showMarkersUidx)
-        showMarkersIdx(showMarkersIdxTemp==(showMarkersUidx(i)))=i;
-    end
-    showMarkers=uMarkers(showMarkersUidx);
-end
-
-if(isfield(fNIR,'markers')&&~isempty(showMarkers))
-    curMarkers=fNIR.markers;
-    if(~isnumeric(curMarkers)&&isfield(curMarkers,'data'))
-        curMarkers=curMarkers.data;
-    end
-end
+% Process markers using helper
+numch2plot = length(channels);
+tooManyMarkers = 1500 / numch2plot;
+[showMarkers, showMarkersIdx, curMarkers, numMarkers] = ...
+    pf2_base.plot.processMarkers(fNIR, showMarkers, tooManyMarkers);
 
 
 
@@ -285,68 +222,40 @@ elseif(length(ylimit)>2||isempty(ylimit))
 end
 
 
-numch2plot=length(channels);
-tooManyLabels=200/numch2plot;
+tooManyLabels = 200 / numch2plot;
 
-tooManyMarkers=1500/numch2plot;
-
-if(~isempty(showMarkers))
-    plotTonsOfMarkers=[];
-    numMarkers=zeros(1,length(showMarkers));
-    for i=1:length(showMarkers)
-        numMarkers(i)=sum(showMarkersIdx==i);
-        if(numMarkers(i)>tooManyMarkers&&isempty(plotTonsOfMarkers))
-            fprintf(2,'Warning: ~ %.0f markers for marker %i\n',tooManyMarkers,i);
-            user_entry = input(sprintf('Enable TonsOfMarkers Mode?\n(Can be VERY slow)\ny/n: '), 's');
-            user_entry=lower(user_entry);
-            switch user_entry
-                case '1'
-                    plotTonsOfMarkers=true;
-                case '0'
-                    plotTonsOfMarkers=false;
-                case 'y'
-                    plotTonsOfMarkers=true;
-                case 'n'
-                    plotTonsOfMarkers=false;
-                case 'yes'
-                    plotTonsOfMarkers=true;
-                case 'no'
-                    plotTonsOfMarkers=false;
-            end
-        end
-    end
-    if(isempty(plotTonsOfMarkers))
-       plotTonsOfMarkers=false; 
-    end
-end
-
-printOnce=false; % flag for multiple printing
-flagOnce=false;
-
-if(isfield(probeInfo,'OptPos'))
-	optLayout=probeInfo.OptPos.subplot_layout_ss;
-elseif(isfield(probeInfo,'OptPos'))
-	optLayout=probeInfo.OptPos.OptPos.subplot_layout;
-else
-   plotArranged=false; 
-end
-
-h=cell(0);
-for(optIdx=1:length(channels))
-    optNum=channels(optIdx);
-    if(plotArranged)
-        if optNum > numel(optLayout) 
-            continue
-        else
-            optPos=optLayout{optNum};
-            optPos([2])=1-optPos([2])-optPos([4]); %flips y vertical axis
-            optPos([3,4])=optPos([3,4]).*[0.65,0.9];
-            optPos([1,2])=optPos([1,2])+0.03;
-            h{optIdx}= axes('Position',optPos,'Box','on');
-        end
-        
+% Handle too many markers prompt (numMarkers already computed by helper)
+plotTonsOfMarkers = false;
+if ~isempty(showMarkers) && any(numMarkers > tooManyMarkers)
+    if interactive
+        user_entry = input('Enable TonsOfMarkers Mode? (Can be VERY slow) y/n: ', 's');
+        plotTonsOfMarkers = ismember(lower(user_entry), {'1', 'y', 'yes'});
     else
-        h{optIdx}=subplot(length(channels),1,optIdx);
+        warning('pf2:TooManyMarkers', 'Too many markers to display (>%d). Use ''interactive'', true to enable.', round(tooManyMarkers));
+    end
+end
+
+printOnce = false;
+flagOnce = false;
+
+if isfield(probeInfo, 'OptPos')
+    optLayout = probeInfo.OptPos.subplot_layout_ss;
+else
+    plotArranged = false;
+end
+
+h = cell(0);
+for optIdx = 1:length(channels)
+    optNum = channels(optIdx);
+    if plotArranged
+        % Use helper for position calculation
+        optPos = pf2_base.plot.getOptodePosition(optLayout, optNum, [0.65, 0.7], [0.03, 0.075]);
+        if isempty(optPos)
+            continue;
+        end
+        h{optIdx} = axes('Position', optPos, 'Box', 'on');
+    else
+        h{optIdx} = subplot(length(channels), 1, optIdx);
     end
     
     gh=gcf();
@@ -364,11 +273,11 @@ for(optIdx=1:length(channels))
     
 
     rawToPlot=fNIR.raw(:,idx2plot);
-    minH=plot([tmin,tmax],[RawMin,RawMin],'k','HandleVisibility','off');
+    minH=plot([tmin,tmax],[RawMin,RawMin],'-','Color',sty.ForegroundColor,'HandleVisibility','off');
     set(minH,'Tag',sprintf('Min Device Intensity'));
     hold on;
     if(~isempty(RawMax))
-        maxH=plot([tmin,tmax],[RawMax,RawMax],'--k','HandleVisibility','off');
+        maxH=plot([tmin,tmax],[RawMax,RawMax],'--','Color',sty.ForegroundColor,'HandleVisibility','off');
         set(maxH,'Tag',sprintf('Max Device Intensity'));
     end
     
@@ -397,17 +306,17 @@ for(optIdx=1:length(channels))
     
     ylim(ylimit);
     if(~isempty(showMarkers))
-        maxH=plot([tmean],ylimit(2),'color',[1,1,1],'HandleVisibility','off');
-        minH=plot([tmean],ylimit(1),'color',[1,1,1],'HandleVisibility','off');
+        maxH=plot([tmean],ylimit(2),'color',sty.FigureColor,'HandleVisibility','off');
+        minH=plot([tmean],ylimit(1),'color',sty.FigureColor,'HandleVisibility','off');
         for i=1:length(showMarkers)
-            
+
             mrkName=sprintf('Mrk%i',showMarkers(i));
             if(numMarkers(i)<tooManyMarkers||plotTonsOfMarkers)
-                yLabelHeight=(1:length(showMarkers))*0.05+0.15;
+                yLabelHeight=min((1:length(showMarkers))*0.05+0.15, 0.95);
                 if(numMarkers(i)<tooManyLabels)
-                	pf2_base.external.vline(curMarkers(showMarkersIdx==i),'k',mrkName,yLabelHeight(i));
+                	pf2_base.external.vline(curMarkers(showMarkersIdx==i),sty.ForegroundColor,mrkName,yLabelHeight(i));
                 else
-                    pf2_base.external.vline(curMarkers(showMarkersIdx==i),'k','',yLabelHeight(i),'lineTags',mrkName);
+                    pf2_base.external.vline(curMarkers(showMarkersIdx==i),sty.ForegroundColor,'',yLabelHeight(i),'lineTags',mrkName);
                     if(~printOnce)
                         fprintf('Marker %i has too many instances to plot labels\n',showMarkers(i));
                         flagOnce=true;
@@ -447,13 +356,25 @@ for(optIdx=1:length(channels))
     
     xlabel(sprintf('Opt %i',optNum));
     ylabel('Intensity');
-    
 
+
+end
+
+% Add figure title from processingInfo if available
+pf2_base.plot.addProcessingInfoTitle(fNIR, gcf());
+
+% Apply theme styling
+sty.applyToFigure(gcf());
+
+% Save figure if requested
+if ~isempty(savePath)
+    fig = gcf();
+    pf2_base.plot.saveFigure(fig, savePath, saveWidth, saveHeight, saveDPI);
 end
 
 end
 
- 
+
 function txt = myupdatefcn(pointDataTip, event_obj)
 
  hAxes=get(pointDataTip,'Parent');
@@ -466,7 +387,8 @@ function txt = myupdatefcn(pointDataTip, event_obj)
      txt={selectedObjectTag};
     elseif(~isempty(selectedObjectTag))
          txt={sprintf('%s\nt=%.2f, y=%.2f',selectedObjectTag,pos(1),pos(2))};
-
+ else
+     txt={''};
  end
  
 for i=1:length(txt)

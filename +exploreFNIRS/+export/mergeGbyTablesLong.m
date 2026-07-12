@@ -117,10 +117,11 @@ for g=1:length(gbyTables)
     if(emptyChannelFlag&&exportFNIR)
         numCh=size(curBarGA.HbO.data,2);
         channelIndexes=1:numCh;
+        channelLabels=cellstr(num2str(channelIndexes(:)));
     elseif(exportFNIR)
-       numCh=length(channelIndexes); 
+       numCh=length(channelIndexes);
     else
-       numCH=0; 
+       numCh=0;
     end
     if(isempty(times))
         numTimes=length(curBarGA.time);
@@ -253,9 +254,10 @@ t2Vars=table2.Properties.VariableNames;
 for i=1:length(t1Vars)
     curVar=t1Vars{i};
     if(~ismember(curVar,t2Vars))
-        if(ischar(curVar))
+        srcCol=table1.(curVar);
+        if(ischar(srcCol) || isstring(srcCol) || iscellstr(srcCol))
             table2.(curVar)=strings(size(table2,1),1);
-        elseif(isnumeric(curVar))
+        else
             table2.(curVar)=nan(size(table2,1),1);
         end
     end
@@ -264,9 +266,10 @@ end
 for i=1:length(t2Vars)
     curVar=t2Vars{i};
     if(~ismember(curVar,t1Vars))
-        if(ischar(curVar))
+        srcCol=table2.(curVar);
+        if(ischar(srcCol) || isstring(srcCol) || iscellstr(srcCol))
             table1.(curVar)=strings(size(table1,1),1);
-        elseif(isnumeric(curVar))
+        else
             table1.(curVar)=nan(size(table1,1),1);
         end
     end

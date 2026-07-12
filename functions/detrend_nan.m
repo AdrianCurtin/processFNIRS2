@@ -75,9 +75,14 @@ y = repmat(NaN, [N m]);
 
 for i = 1:m;
   kp = find(~isnan(x(:,i)));
+  if length(kp) < 2
+    % Cannot fit a trend with fewer than 2 points; return original values
+    y(kp,i) = x(kp,i);
+    continue;
+  end
   a = [(kp-1)/(max(kp)-min(kp)) ones(length(kp), 1)];  %  Build regressor
   y(kp,i) = x(kp,i) - a*(a\x(kp,i));
-  
+
   if(restoreMean)
     y(kp,i)=y(kp,i)+nanmean(x(kp,i));
   end

@@ -40,7 +40,7 @@ function setFixedDPF(dpf_fixed_value)
 % See also: pf2.settings.dpf.setDPFmode, pf2_base.fnirs.bvoxy, processFNIRS2
 
 if(nargin<1||~isnumeric(dpf_fixed_value)||dpf_fixed_value<=0)
-	error('Please provide a valid dpf value');
+	error('pf2:settings:setFixedDPF:invalidValue', 'Please provide a valid dpf value');
 end
 
 processFNIRS2('FixedDPF',dpf_fixed_value,'DPFmode','Fixed');

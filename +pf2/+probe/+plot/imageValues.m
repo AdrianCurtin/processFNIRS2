@@ -1,4 +1,4 @@
-function [ imgOut ] = imageValues(varargin)
+function [ imgOut ] = imageValues(data2plot, fNIR, minVal, maxVal, titleString, clrBarTitle, opts)
 % IMAGEVALUES Display per-channel values as a 2D image heatmap
 %
 % Creates a 2D image visualization where each fNIRS channel position is filled
@@ -29,6 +29,12 @@ function [ imgOut ] = imageValues(varargin)
 %   clrBarTitle - Title for the colorbar (default: '')
 %   'includeSS' - Include short separation channels (default: true)
 %                 Set to false to exclude short separation channels.
+%   'Layout'    - 2D layout to draw (default: 'auto'):
+%                 'schematic' (or 'flat') - clean declared/auto grid montage
+%                     (e.g. a 2x8), tidy for explanatory plots.
+%                 'anatomical' (or 'projected') - affine 3D->2D projection.
+%                 'auto' - schematic when the device DECLARES a montage
+%                     (LayoutRows/Cols or Layout2D_x/y), else anatomical.
 %
 % Outputs:
 %   imgOut - Handle to the image object (optional)
@@ -47,30 +53,26 @@ function [ imgOut ] = imageValues(varargin)
 % See also: pf2.probe.plot.arrangedValues, pf2.probe.plot.interpolateValues,
 %           pf2.probe.plot.imageROIvalues, pf2.data.plot.oxy
 
-p = inputParser;
+arguments
+    data2plot
+    fNIR = {}
+    minVal {mustBeNumeric} = []
+    maxVal {mustBeNumeric} = []
+    titleString {mustBeText} = ''
+    clrBarTitle {mustBeText} = ''
+    opts.includeSS (1,1) logical = true
+    opts.Layout = 'auto'
+    opts.savePath {mustBeText} = ''
+    opts.saveWidth {mustBeNumeric} = []
+    opts.saveHeight {mustBeNumeric} = []
+    opts.saveDPI {mustBeNumeric} = 150
+end
 
-isStructOrEmpty=@(x) isstruct(x)||isempty(x);
-isStringOrChar=@(x)isstring(x)||ischar(x);
-
-addRequired(p, 'data2plot');
-addOptional(p, 'fNIR', {}, isStructOrEmpty);
-addOptional(p, 'minVal', [], @isnumeric);
-addOptional(p, 'maxVal', [], @isnumeric);
-addOptional(p, 'titleString', '', isStringOrChar);
-addOptional(p, 'clrBarTitle', '', isStringOrChar);
-
-addParameter(p, 'includeSS', true, @islogical);
-
-parse(p, varargin{:});
-
-clrBarTitle = p.Results.clrBarTitle;
-titleString = p.Results.titleString;
-minVal = p.Results.minVal;
-maxVal = p.Results.maxVal;
-fNIR = p.Results.fNIR;
-data2plot = p.Results.data2plot;
-
-include_ss=p.Results.includeSS;
+include_ss=opts.includeSS;
+savePath = opts.savePath;
+saveWidth = opts.saveWidth;
+saveHeight = opts.saveHeight;
+saveDPI = opts.saveDPI;
 
 
 if(isempty(maxVal))
@@ -78,73 +80,61 @@ if(isempty(maxVal))
 end
 
 if(isempty(minVal))
-   minVal=nanmin(data2plot); 
-end
-probeInfo=[];
-
-if(isempty(fNIR))
-    global setF
+   minVal=nanmin(data2plot);
 end
 
-if(isempty(fNIR)&&isfield(setF,'device'))
-    
-    cfgFilePath=setF.device.cfg.File;
-    if(~isfield(setF.device.Probe{1},'OptLayout2D'))
-        probeInfo=pf2_base.loadDeviceCfg(cfgFilePath,true);
-        setF.device=probeInfo;
-    else
-       probeInfo=setF.device; 
-    end
-elseif(pf2_base.isnestedfield(fNIR,'info.probename')&&isfield(fNIR.info,'probename')&&~contains(fNIR.info.probename,'Unknown')) 
-    %try to load the probename cfg file
-    cfgFilePath=sprintf('%s.cfg',fNIR.info.probename);
-else
-    cfgFilePath='';
-end
-
-if(isempty(probeInfo))
-    if(isempty(cfgFilePath)||~contains(cfgFilePath,'.cfg'))
-
-        warning('Missing or invalid configuration file path\n')
-
-        disp('No device specified. Please load device configuration');
-        probeInfo=pf2_base.loadDeviceCfg([],true);
-        if(~isempty(probeInfo))
-            error('No valid devices selected');
-        end
-
-    elseif(~isempty(cfgFilePath)) % If we're not looking at the GUI, doesn't matter
-        probeInfo=pf2_base.loadDeviceCfg(cfgFilePath,true);
-    end
-end
-
-if(pf2_base.isnestedfield(probeInfo,'Probe'))
-    deviceInfo=probeInfo.Info;
-    if(~isfield(deviceInfo,'numberProbes')||deviceInfo.numberProbes==1)
-        probeNum=1;
-    end
-    probeInfo=probeInfo.Probe{probeNum};
-else
-   error('Unable to identify probe'); 
-end
+% Load probe info using helper
+probeInfo = pf2_base.plot.loadProbeInfo(fNIR, true);
 
 if(include_ss&&size(probeInfo.OptPos,1)>length(data2plot)&&sum(~probeInfo.TableOpt.IsShortSeparation)==length(data2plot))
    include_ss=false;
    warning('Not enough data for all channels, ignoring short separation channels');
 end
 
+% Resolve which 2D layout to draw: the clean declared/auto "schematic" grid
+% or the affine 3D->2D "anatomical" projection.
+layoutMode = lower(char(opts.Layout));
+if any(strcmp(layoutMode, {'flat'})),       layoutMode = 'schematic';  end
+if any(strcmp(layoutMode, {'projected'})),  layoutMode = 'anatomical'; end
+hasSchem = ismember('subplot_layout_schematic', probeInfo.OptPos.Properties.VariableNames);
+declared = isfield(probeInfo, 'LayoutDeclared') && logical(probeInfo.LayoutDeclared);
+switch layoutMode
+    case 'auto'
+        useSchematic = hasSchem && declared;   % only auto-prefer a real montage
+    case 'schematic'
+        useSchematic = hasSchem;
+        if ~hasSchem
+            warning('pf2:imageValues:noSchematic', ...
+                'No schematic layout for this device; using anatomical projection.');
+        end
+    otherwise % 'anatomical'
+        useSchematic = false;
+end
+
+% rowIdx maps each data value to its OptPos/TableOpt ROW (the layout cells are
+% row-indexed). Indexing by OptodeNum value breaks for devices with
+% non-contiguous channel numbers (e.g. merged probes where OptodeNum spans
+% 5..42 across 34 rows).
 if(include_ss)
     numOptodes=size(probeInfo.TableOpt,1);
-    channelList=probeInfo.TableOpt.OptodeNum;
-    optLayout=probeInfo.OptPos.subplot_layout_ss;
+    rowIdx=(1:numOptodes)';
+    if useSchematic
+        optLayout=probeInfo.OptPos.subplot_layout_schematic_ss;
+    else
+        optLayout=probeInfo.OptPos.subplot_layout_ss;
+    end
 else
     numOptodes=sum(~probeInfo.TableOpt.IsShortSeparation);
-    channelList=probeInfo.TableOpt.OptodeNum(~probeInfo.TableOpt.IsShortSeparation);
-    optLayout=probeInfo.OptPos.subplot_layout;
+    rowIdx=find(~probeInfo.TableOpt.IsShortSeparation);
+    if useSchematic
+        optLayout=probeInfo.OptPos.subplot_layout_schematic;
+    else
+        optLayout=probeInfo.OptPos.subplot_layout;
+    end
 end
 
 if(length(data2plot)~=numOptodes)
-    error('Must have a value for all optodes');
+    error('pf2:probe:imageValues:optodeCountMismatch', 'Must have a value for all optodes');
 end
 % 
 % clf(gcf);
@@ -162,9 +152,9 @@ imgData=nan(imgSize,imgSize);
 
 
 for(optIdx=1:length(data2plot))
-    optNum=channelList(optIdx);
+    optPos=optLayout{rowIdx(optIdx)};
 
-    optPos=optLayout{optNum};
+    if(isempty(optPos)), continue; end   % short-sep / unplaced channel
 
     optPos([2])=1-optPos([2])-optPos([4]); %flips y vertical axis
     
@@ -201,6 +191,12 @@ end
 
 if(~isempty(titleString))
     title(titleString);
+end
+
+% Save figure if requested
+if ~isempty(savePath)
+    fig = gcf();
+    pf2_base.plot.saveFigure(fig, savePath, saveWidth, saveHeight, saveDPI);
 end
 
 end

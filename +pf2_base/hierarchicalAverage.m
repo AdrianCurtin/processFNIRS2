@@ -67,18 +67,18 @@ if(nargin==3)
     elseif(isa(funcAvg, 'function_handle'))
         %works for me
     else
-       error('Must provide valid function name or function handle');
+       error('pf2_base:hierarchicalAverage:invalidFunction', 'Must provide valid function name or function handle');
     end
 end    
 
 if(nargin<1)
-    error('No Input');
+    error('pf2_base:hierarchicalAverage:noInput', 'No Input');
     %arr=[10,10,5,5,2,2]';
     %hierachy(:,1)={'Subject1';'Subject1';'Subject1';'Subject1';'Subject2';'Subject2'};
     %hierachy(:,2)={1;1;2;2;1;1};
     %funcAvg=str2func('nanmean'); 
 elseif(nargin<2)
-    error('Must provide a hierachy');
+    error('pf2_base:hierarchicalAverage:noHierarchy', 'Must provide a hierachy');
 elseif(nargin<3)
     
     funcAvg=str2func('nanmean'); 
@@ -99,7 +99,7 @@ if(size(arr,1)~=numObservations&&size(arr,2)==numObservations)
 end
 
 if(size(arr,1)~=numObservations)
-    error('Hierarchy does not match input data');
+    error('pf2_base:hierarchicalAverage:dimensionMismatch', 'Hierarchy does not match input data');
 end
 
 hierachyArr=nan(size(hierachy));
@@ -118,7 +118,7 @@ for i=1:numLevels
        curLevel=hierachy(:,i);
        [uVals,uCount,uIdx]=unique(curLevel);
    else
-       error('unknown structure');
+       error('pf2_base:hierarchicalAverage:unknownStructure', 'unknown structure');
    end
    if(i==1)
       highestTier=uVals; 

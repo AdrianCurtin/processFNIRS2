@@ -61,6 +61,9 @@ if(~isfield(fNIR,'markers')||size(fNIR.markers,1)<1)
     return;
 end
 
+% Work with markers as a numeric array [time, value, duration, amplitude]
+fNIR.markers=pf2_base.markersToArray(fNIR.markers);
+
 uMatchingMarkers=[];
 
 for i=1:size(markersStart,1)

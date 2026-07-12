@@ -34,7 +34,7 @@ function fNIR=getTakizawaRejection(fNIR,applyMask,strictCriteria)
 	 
      % Updated criteria from 
      %  Takizawa, R., Fukuda, M., Kawasaki, S., Kasai, K., Mimura, M., Pu, S., Noda, T., Niwa, S. ichi, Okazaki, Y., Suda, M., Takei, Y., Aoyama, Y., Narita, K., Mikuni, M., Kameyama, M., Uehara, T., Kinou, M., Koike, S., Ishii-Takahashi, A., Ichikawa, N., Fujiwara, M., Ohta, H., Tomioka, H., Yamagata, B., Yamanaka, K., Nakagome, K., Matsuda, T., Yoshida, S., Kono, S., Yabe, H., Miura, S., Nishimura, Y., Tanii, H., Inoue, K., Yokoyama, C., Takayanagi, Y., Takahashi, K., Nakakita, M., 2014. 
-     %      Neuroimaging-aided differential diagnosis of the depressive state. Neuroimage 85, 498–507. https://doi.org/10.1016/j.neuroimage.2013.05.126
+     %      Neuroimaging-aided differential diagnosis of the depressive state. Neuroimage 85, 498ï¿½507. https://doi.org/10.1016/j.neuroimage.2013.05.126
      
      if(nargin<3)
          strictCriteria=false; % Uses Or instead of And for rejection criteria
@@ -180,7 +180,7 @@ function fNIR=getTakizawaRejection(fNIR,applyMask,strictCriteria)
     %       channels with LF<0.3 and r value of <-0.9 were artifactual
     
     tk.rule2_2014.LF=abs(1-(nanstd(fHbR)./nanstd(fHbO)));  % Threshold per tk2014: LF<0.3
-    tk.rule2_2014.r=corr(fHbO,fHbR,'Rows','pairwise'); %threshold per tk2014: r<-0.9
+    tk.rule2_2014.r=pf2_base.compat.corr(fHbO,fHbR,'Rows','pairwise'); %threshold per tk2014: r<-0.9
     tk.rule2_2014.r=tk.rule2_2014.r(eye(size(tk.rule2_2014.r))==1)';
     
 

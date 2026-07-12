@@ -1,13 +1,78 @@
-function [ ] = asNIR( fNIRstruct, filepath )
-%Takes fNIR struct and writes the basic nir file
-%   Use to construct artificial .nir files for future analysis
+function [ ] = asNIR( fNIRstruct, filepath, varargin )
+% ASNIR Export fNIRS data to fNIR Devices/Biopac .nir format
+%
+% Writes a pf2 fNIRS data structure back out as the fNIR Devices/COBI Studio
+% .nir text format, along with its companion marker (.mrk) and log (.log)
+% files. Useful for constructing artificial .nir files for later analysis or
+% for round-tripping data through tools that expect the native fNIR format.
+% A cell array of structs can be batch-exported to a directory.
+%
+% Reference:
+%   fNIR Devices / COBI Studio .nir text file format.
+%
+% Syntax:
+%   pf2.export.asNIR(fNIRstruct)                 % GUI save dialog
+%   pf2.export.asNIR(fNIRstruct, filepath)       % Write to a specific path
+%   pf2.export.asNIR(allData, 'output/')         % Batch to a directory
+%   pf2.export.asNIR(allData, 'output/', Name, Value, ...)
+%
+% Inputs:
+%   fNIRstruct - fNIRS data structure (.raw, .time, .markers, .info) or a
+%                cell array of such structures for batch export.
+%   filepath   - Output .nir file path, or a directory path for batch export
+%                (optional). If omitted in single mode, a save dialog opens.
+%
+% Name-Value Parameters (batch mode only):
+%   'Dir1'..'Dir4' - Info field names mapped to subdirectory levels
+%   'Prefix'       - Cell array of info field names used to build filenames
+%   'Verbose'      - Print progress messages (default: true)
+%
+% Outputs:
+%   (none) - Writes .nir, .mrk, and .log files to disk.
+%
+% Algorithm:
+%   1. In batch mode, build per-element paths and recurse on each struct.
+%   2. Write the .nir header (start time, codes, gains) then raw samples.
+%   3. Write the companion .mrk marker file from the markers table.
+%   4. Write the companion .log file from .info metadata.
+%
+% Example:
+%   % Export a processed sample dataset to a .nir file
+%   data = pf2.import.sampleData();
+%   pf2.export.asNIR(data, 'sample_out.nir');
+%
+%   % Batch export a cell array to a directory with subdir mapping
+%   pf2.export.asNIR(allData, 'output/', 'Dir1', 'Group', 'Prefix', {'SubjectID'});
+%
+% See also: pf2.export.asSNIRF, pf2.export.export, pf2.import.importNIR
 
 if(nargin<1)
-    error('No fnirs specified!');
+    error('pf2:asNIR:noData', 'No fnirs specified!');
+end
+
+% --- Batch mode: cell array input ---
+if iscell(fNIRstruct)
+    if nargin < 2 || isempty(filepath)
+        error('pf2:export:asNIR:noPath', ...
+            'A directory path is required for batch export.');
+    end
+    opts = parseBatchOpts(varargin{:});
+    paths = pf2_base.buildExportPaths(fNIRstruct, filepath, '.nir', opts);
+    n = numel(fNIRstruct);
+    for i = 1:n
+        if opts.Verbose
+            fprintf('  Exporting %d/%d: %s\n', i, n, paths{i});
+        end
+        pf2.export.asNIR(fNIRstruct{i}, paths{i});
+    end
+    if opts.Verbose
+        fprintf('Batch export complete: %d files written to %s\n', n, filepath);
+    end
+    return;
 end
 
 if nargin<2
-   [filename path]=uiputfile(['*.nir']); 
+   [filename path]=uiputfile(['*.nir']);
     filepath=[path filename];
 end
 
@@ -26,7 +91,7 @@ end
  fid=fopen(filepath,'wt');
 
  if(fid<0)
-    error('Unable to access file for writing!');
+    error('pf2:asNIR:writeFailed', 'Unable to access file for writing!');
  end
 
  fprintf(fid,'fnirUSB.dll log file\n');
@@ -140,7 +205,7 @@ else
     fprintf(fid,'Freq Code:\t	99999999.999999\n');
 end
 
- arr=fNIRstruct.markers;
+ arr=pf2_base.markersToArray(fNIRstruct.markers);
  numLines=size(arr,1);
  numCol=size(arr,2);
  for x=1:numLines
@@ -260,3 +325,16 @@ end
 
 end
 
+
+function opts = parseBatchOpts(varargin)
+% Parse batch export name-value parameters
+    p = inputParser;
+    p.addParameter('Dir1', '', @(x) ischar(x) || isstring(x));
+    p.addParameter('Dir2', '', @(x) ischar(x) || isstring(x));
+    p.addParameter('Dir3', '', @(x) ischar(x) || isstring(x));
+    p.addParameter('Dir4', '', @(x) ischar(x) || isstring(x));
+    p.addParameter('Prefix', {}, @iscell);
+    p.addParameter('Verbose', true, @islogical);
+    p.parse(varargin{:});
+    opts = p.Results;
+end

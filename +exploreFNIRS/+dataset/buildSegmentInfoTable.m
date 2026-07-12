@@ -1,104 +1,190 @@
-function outTable=buildSegmentInfoTable(FNIRS_array)
+function outTable = buildSegmentInfoTable(FNIRS_array)
+% BUILDSEGMENTINFOTABLE Build a summary table from an array of fNIRS data structs
+%
+% Iterates over a cell array of processed fNIRS structs and extracts the
+% .info fields from each into a standardized MATLAB table. Handles type
+% mismatches and missing fields across segments by filling with NaN,
+% empty strings, or NaT as appropriate.
+%
+% Uses a two-pass approach for performance: first discovers the complete
+% field schema across all segments, then pre-allocates the table and fills
+% rows with direct assignment. This avoids O(n*k) ismember calls and
+% dynamic column growth.
+%
+% Syntax:
+%   outTable = exploreFNIRS.dataset.buildSegmentInfoTable(FNIRS_array)
+%
+% Inputs:
+%   FNIRS_array - Cell array of fNIRS data structs, each containing an
+%                 .info sub-struct with metadata fields (e.g., subject ID,
+%                 condition, age). Scalar numeric, string, char, logical,
+%                 categorical, and single-cell table values are extracted.
+%
+% Outputs:
+%   outTable - MATLAB table with one row per segment and columns for each
+%              unique .info field found across all segments. Missing values
+%              are filled with type-appropriate defaults.
+%
+% Example:
+%   data = {seg1, seg2, seg3};  % cell array of fNIRS structs
+%   infoTable = exploreFNIRS.dataset.buildSegmentInfoTable(data);
+%   disp(infoTable);
+%
+% See also: exploreFNIRS.dataset.standardizeROIs, exploreFNIRS
 
-% standardizes all rows and types for provdied array 
-    
-warning off MATLAB:table:RowsAddedExistingVars
-
-if(isempty(FNIRS_array))
-    error('No Data to build exploreFNIRS data table!\n')
-    return;
-else
-    
-    numF=length(FNIRS_array);
-    
-    outTable=table();
-    for i=1:numF
-        fprintf('Row %i of %i\n',i,numF);
-
-       curFNIRseg=FNIRS_array{i};
-       
-       if(~isfield(curFNIRseg,'info'))
-           warning('All fNIRS segments must have a .info section');
-           continue;
-       end
-       curFields=fields(curFNIRseg.info);
-       for j=1:length(curFields)
-           curFieldName=curFields{j};
-
-           curField=curFNIRseg.info.(curFieldName);
-           
-           if(isempty(curField)|| ...
-                   (isnumeric(curField)&&length(curField)==1)||...  %numeric items of 1
-                   ischar(curField)||isstring(curField)||...        %strings or chars
-                   (islogical(curField)&&length(curField)==1)||...   %logical values
-                   (iscategorical(curField)&&length(curField)==1)||... %categorical values
-                   (istable(curField)&&size(curField,1)==1&&size(curField,2)==1)) %singular tables
-               
-              if(istable(curField)&&size(curField,1)==1&&size(curField,2)==1)
-                  curField=curField{1,1};
-              end
-              
-              if(isstring(curField)||ischar(curField))
-                    curField=string(strtrim(curField));
-              end
-              
-               
-              if(ismember(curFieldName,outTable.Properties.VariableNames)&&~isempty(curField))
-                  if(strcmpi(curField,'missing')&&isnumeric(outTable.(curFieldName)(1,1)))
-                      outTable.(curFieldName)(i,1)=nan;
-                  else
-                      outTable.(curFieldName)(i,1)=curField;
-                  end
-              elseif(~isempty(curField))
-                  if(ischar(curField)) % adds columns
-                      outTable.(curFieldName)=strings(size(outTable,1),1);
-                      outTable.(curFieldName)(i,1)=nominal(curField);
-                  elseif(isstring(curField))
-                      outTable.(curFieldName)=strings(size(outTable,1),1);
-                      outTable.(curFieldName)(i,1)=nominal(curField);
-                  elseif(isnumeric(curField))
-                      outTable.(curFieldName)=nan(size(outTable,1),1);
-                      outTable.(curFieldName)(i,1)=curField;
-                  elseif(islogical(curField))
-                      outTable.(curFieldName)=strings(size(outTable,1),1);
-                      outTable.(curFieldName)(i,1)=nominal(string(curField));
-                  elseif(iscategorical(curField))
-                      outTable.(curFieldName)=strings(size(outTable,1),1);
-                      outTable.(curFieldName)(i,1)=string(curField);
-                  end
-                  
-              end
-           end
-       end
-
-       missingFieldsIdx=~ismember(outTable.Properties.VariableNames,curFields);
-
-       if(any(missingFieldsIdx))
-           missingFieldsName=outTable.Properties.VariableNames(missingFieldsIdx);
-           for f=1:length(missingFieldsName)
-               switch(class(outTable.(missingFieldsName{f})))
-                   case 'double'
-                       outTable.(missingFieldsName{f})(i,:)=nan;
-                   case 'string'
-                       outTable.(missingFieldsName{f})(i,:)="";
-                   case 'char'
-                       outTable.(missingFieldsName{f})(i,:)='';
-                   case 'cell'
-                       outTable.(missingFieldsName{f})(i,:)={};
-                   case 'logical'
-                       outTable.(missingFieldsName{f})(i,:)=nan;
-                   case 'duration'
-                       outTable.(missingFieldsName{f})(i,:)=duration(0,0,nan);
-                   case 'datetime'
-                       outTable.(missingFieldsName{f})(i,:)=NaT;
-                   otherwise
-                        error('Unknown type!');
-               end
-              
-           end
-            
-       end
-    end
-    %close(hF);
+if isempty(FNIRS_array)
+    error('exploreFNIRS:dataset:buildSegmentInfoTable:noData', 'No Data to build exploreFNIRS data table!\n')
 end
-    
+
+numF = length(FNIRS_array);
+
+% -----------------------------------------------------------------------
+% Pass 1: Discover schema — collect all unique field names and their types
+% -----------------------------------------------------------------------
+allFieldNames = {};
+fieldTypeMap = struct();  % fieldName -> column type string
+
+for i = 1:numF
+    seg = FNIRS_array{i};
+    if ~isfield(seg, 'info'), continue; end
+
+    fNames = fieldnames(seg.info);
+    for j = 1:length(fNames)
+        fn = fNames{j};
+        if isfield(fieldTypeMap, fn), continue; end  % already registered
+
+        val = seg.info.(fn);
+        colType = classifyForTable(val);
+        if isempty(colType), continue; end  % not a valid info value
+
+        allFieldNames{end+1} = fn; %#ok<AGROW>
+        fieldTypeMap.(fn) = colType;
+    end
+end
+
+nCols = length(allFieldNames);
+
+if nCols == 0
+    outTable = table('Size', [numF, 0], 'VariableTypes', {}, 'VariableNames', {});
+    return;
+end
+
+% -----------------------------------------------------------------------
+% Pre-allocate table with correct column types and defaults
+% -----------------------------------------------------------------------
+colTypes = cell(1, nCols);
+for c = 1:nCols
+    colTypes{c} = fieldTypeMap.(allFieldNames{c});
+end
+
+outTable = table('Size', [numF, nCols], ...
+    'VariableTypes', colTypes, ...
+    'VariableNames', allFieldNames);
+
+% table() with 'Size' initializes: double→0, string→<missing>, etc.
+% Override defaults: double→NaN, string→""
+for c = 1:nCols
+    switch colTypes{c}
+        case 'double'
+            outTable.(allFieldNames{c})(:) = NaN;
+        case 'string'
+            outTable.(allFieldNames{c})(:) = "";
+        case 'datetime'
+            outTable.(allFieldNames{c})(:) = NaT;
+    end
+end
+
+% Build O(1) lookup: field name → column index
+colIdx = containers.Map(allFieldNames, num2cell(1:nCols));
+
+% -----------------------------------------------------------------------
+% Pass 2: Fill rows with direct column assignment
+% -----------------------------------------------------------------------
+for i = 1:numF
+    if mod(i, 500) == 0 || i == numF
+        fprintf('Row %i of %i\n', i, numF);
+    end
+
+    seg = FNIRS_array{i};
+    if ~isfield(seg, 'info'), continue; end
+
+    fNames = fieldnames(seg.info);
+    for j = 1:length(fNames)
+        fn = fNames{j};
+        if ~colIdx.isKey(fn), continue; end
+
+        val = seg.info.(fn);
+        if isempty(val), continue; end
+
+        % Unwrap 1x1 table
+        if istable(val) && size(val,1) == 1 && size(val,2) == 1
+            val = val{1,1};
+        end
+
+        targetType = colTypes{colIdx(fn)};
+
+        % Assign with type coercion
+        switch targetType
+            case 'double'
+                if isnumeric(val) && isscalar(val)
+                    outTable.(fn)(i) = double(val);
+                elseif (isstring(val) || ischar(val)) && strcmpi(val, 'missing')
+                    outTable.(fn)(i) = NaN;
+                end
+            case 'string'
+                if ischar(val) || isstring(val)
+                    outTable.(fn)(i) = string(strtrim(val));
+                elseif islogical(val)
+                    outTable.(fn)(i) = string(val);
+                elseif iscategorical(val)
+                    outTable.(fn)(i) = string(val);
+                elseif isnumeric(val) && isscalar(val)
+                    outTable.(fn)(i) = string(val);
+                end
+            case 'datetime'
+                if isdatetime(val)
+                    outTable.(fn)(i) = val;
+                end
+            case 'duration'
+                if isduration(val)
+                    outTable.(fn)(i) = val;
+                end
+        end
+    end
+end
+
+end
+
+
+% =========================================================================
+% Local helper functions
+% =========================================================================
+
+function colType = classifyForTable(val)
+% CLASSIFYFORTABLE Determine the table column type for an info field value.
+%   Returns '' if the value is not suitable for table storage.
+
+    colType = '';
+
+    % Unwrap 1x1 table
+    if istable(val) && size(val,1) == 1 && size(val,2) == 1
+        val = val{1,1};
+    end
+
+    if isempty(val)
+        return;  % can't determine type from empty
+    elseif ischar(val) || isstring(val)
+        colType = 'string';
+    elseif isnumeric(val) && isscalar(val)
+        colType = 'double';
+    elseif islogical(val) && isscalar(val)
+        colType = 'string';  % stored as string (matches original behavior)
+    elseif iscategorical(val) && isscalar(val)
+        colType = 'string';
+    elseif isdatetime(val) && isscalar(val)
+        colType = 'datetime';
+    elseif isduration(val) && isscalar(val)
+        colType = 'duration';
+    end
+    % Anything else (arrays, structs, cells, etc.) → not stored
+end

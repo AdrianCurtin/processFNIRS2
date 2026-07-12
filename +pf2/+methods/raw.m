@@ -1,4 +1,35 @@
 function [rawMethodsList,isCurrent]=raw(onlyCurrentMethod)
+% RAW List the configured raw (Stage 1) processing methods
+%
+% Reports the available Stage 1 processing methods, which transform raw light
+% intensity into optical density. With no output arguments the method list is
+% printed to the console, with the currently selected method highlighted.
+% With outputs it returns the method names and a flag marking the active one.
+% Initializes the toolbox (pf2_initialize) if the global PF2 state is empty.
+%
+% Syntax:
+%   pf2.methods.raw()
+%   rawMethodsList = pf2.methods.raw()
+%   [rawMethodsList, isCurrent] = pf2.methods.raw()
+%   [rawMethodsList, isCurrent] = pf2.methods.raw(onlyCurrentMethod)
+%
+% Inputs:
+%   onlyCurrentMethod - If true, return only the currently selected method
+%                       name rather than the full list (default: false)
+%
+% Outputs:
+%   rawMethodsList - Cell array of raw method names, or a single name char
+%                    when onlyCurrentMethod is true. Empty when none loaded.
+%   isCurrent      - Logical vector flagging the active method in the list
+%
+% Example:
+%   % Print available raw methods
+%   pf2.methods.raw();
+%
+%   % Get only the currently selected raw method name
+%   current = pf2.methods.raw(true);
+%
+% See also: pf2.methods.oxy, pf2.methods.raw.setMethod, pf2.methods
 
 if(nargin<1)
     onlyCurrentMethod=false;
@@ -36,14 +67,18 @@ if(pf2_base.isnestedfield(PF2,'myRawMethods.cfg.Sections')&&length(PF2.myRawMeth
         return;
     else
         if(onlyCurrentMethod)
-            rawMethodsList=rawMethodsCellStr{isCurrent};
+            if(any(isCurrent))
+                rawMethodsList=rawMethodsCellStr{isCurrent};
+            else
+                rawMethodsList='';   % no current method selected
+            end
         else
             rawMethodsList=rawMethodsCellStr;
         end
     end
 
 else
-    methodListStr=sprintf('No Oxy Processing Methods Loaded\nPlease import or configure methods first\n');
+    methodListStr=sprintf('No Raw Processing Methods Loaded\nPlease import or configure methods first\n');
    
     
     if(nargout==0)

@@ -1,9 +1,9 @@
-function [cleanOD_out] = waveClean(dataIn, level, alpha, convert2OD, showPlot)
+function [cleanOD_out] = waveClean(dataIn, level, alpha, convert2OD, showPlot, wavelet, accelerate)
 % WAVECLEAN Wavelet-based motion artifact removal for fNIRS signals
 %
 % Applies wavelet decomposition with statistical thresholding to remove
-% motion artifacts from fNIRS optical density signals. Uses Daubechies
-% wavelets and p-value based coefficient rejection.
+% motion artifacts from fNIRS optical density signals. Uses configurable
+% wavelet family and p-value based coefficient rejection.
 %
 % Reference:
 %   Molavi, B. & Dumont, G.A. (2012). Wavelet-based motion artifact removal
@@ -14,6 +14,8 @@ function [cleanOD_out] = waveClean(dataIn, level, alpha, convert2OD, showPlot)
 %   cleanOD = waveClean(dataIn, level)
 %   cleanOD = waveClean(dataIn, level, alpha)
 %   cleanOD = waveClean(dataIn, level, alpha, convert2OD, showPlot)
+%   cleanOD = waveClean(dataIn, level, alpha, convert2OD, showPlot, wavelet)
+%   cleanOD = waveClean(dataIn, level, alpha, convert2OD, showPlot, wavelet, accelerate)
 %
 % Inputs:
 %   dataIn     - Input signal matrix [T x C] where T=samples, C=channels
@@ -27,20 +29,27 @@ function [cleanOD_out] = waveClean(dataIn, level, alpha, convert2OD, showPlot)
 %   convert2OD - If true, convert input from raw intensity to OD (default: 0)
 %                Output will be converted back to intensity.
 %   showPlot   - If true, display diagnostic plots (default: false)
+%   wavelet    - Wavelet family (optional, string, default: 'db10')
+%                Supported: 'haar','db2'-'db10','sym4'-'sym10','coif1'-'coif5',
+%                'beylkin','vaidyanathan','battle1','battle3','battle5'
+%   accelerate - Parallel acceleration mode (optional, string, default: 'auto')
+%                'auto'   - use parfor if pool running and nChannels > 8
+%                'parfor' - use parfor if available
+%                'none'   - serial processing
 %
 % Outputs:
 %   cleanOD_out - Cleaned signal matrix [T x C], same size as input
 %                 Motion artifacts are attenuated while preserving signal.
 %
 % Algorithm:
-%   1. Apply forward wavelet transform (Daubechies-10) at specified level
+%   1. Apply forward wavelet transform at specified level
 %   2. Estimate noise standard deviation using MAD of detail coefficients
 %   3. Zero detail coefficients with p-value < alpha (artifact signatures)
 %   4. Reconstruct signal via inverse wavelet transform
 %   5. Average overlapping reconstructions for signals > 2^level samples
 %
 % Notes:
-%   - Requires WaveLab toolbox (automatically initialized via setup_wavelab)
+%   - Uses the built-in pf2_base.wavelet transforms (no external toolbox)
 %   - Beta version - use with caution and validate results
 %   - Signal length must be at least 2^level samples
 %   - Processing time increases with signal length and number of channels
@@ -52,29 +61,25 @@ function [cleanOD_out] = waveClean(dataIn, level, alpha, convert2OD, showPlot)
 %   % More aggressive cleaning with level 6 decomposition
 %   cleanedOD = waveClean(odData, 6, 0.05);
 %
-% See also: pf2_MotionCorrectWavelet, pf2_SMAR, pf2_MotionCorrectTDDR
+%   % Use sym8 wavelet instead of default db10
+%   cleanedOD = waveClean(odData, 6, 0.05, 0, false, 'sym8');
+%
+% See also: pf2_MotionCorrectWavelet, pf2_SMAR, pf2_MotionCorrectTDDR, pf2_base.wavelet.resolveWavelet
 
 
-disp('Wave Clean - Beta 01');
-global WAVELABPATH
-if(isempty(WAVELABPATH))
-    pf2_base.toolboxes.setup_wavelab();
+if(nargin<2) || isempty(level)
+   level=5;
 end
 
-
-if(nargin<2)
-   level=5; 
-end
-
-if(nargin<3)
+if(nargin<3) || isempty(alpha)
     alpha=0.1;
 end
 
-if(nargin<5)
+if(nargin<5) || isempty(showPlot)
     showPlot=false;
 end
 
-if(nargin<4)
+if(nargin<4) || isempty(convert2OD)
     convert2OD=0;
 else
     if(convert2OD)
@@ -82,19 +87,51 @@ else
     end
 end
 
-%waveshrink
-QMF_Filter = MakeONFilter('Daubechies',10);
-mL=9;
+if ~exist('wavelet','var') || isempty(wavelet)
+    wavelet = 'db10';
+end
+if ~exist('accelerate','var') || isempty(accelerate)
+    accelerate = 'auto';
+end
+
+% Resolve wavelet family
+[QMF_Filter, ~, ~] = pf2_base.wavelet.resolveWavelet(wavelet);
+
 cleanOD_out=nan(size(dataIn));
 numCh=size(dataIn,2);
 sigLength=size(dataIn,1);
 
 if(sigLength<2^level)
-   error('Unable to reconstruct signal at Level %i\nSignal has %i samples and must have at least %i',level,sigLength,2^level); 
+   error('pf2:waveClean:signalTooShort', 'Unable to reconstruct signal at Level %i\nSignal has %i samples and must have at least %i',level,sigLength,2^level);
 end
 
-for ch=1:numCh
-    signalOD=dataIn(:,ch);
+% Determine whether to use parfor
+useParfor = false;
+if ~strcmp(accelerate, 'none') && ~showPlot
+    [canUse, poolRunning] = pf2_base.accel.canParfor();
+    if strcmp(accelerate, 'parfor')
+        useParfor = canUse;
+    elseif strcmp(accelerate, 'auto')
+        useParfor = canUse && poolRunning && numCh > 8;
+    end
+end
+
+if useParfor
+    parfor ch=1:numCh
+        cleanOD_out(:,ch) = waveCleanChannel(dataIn(:,ch), level, alpha, convert2OD, QMF_Filter, false);
+    end
+else
+    for ch=1:numCh
+        cleanOD_out(:,ch) = waveCleanChannel(dataIn(:,ch), level, alpha, convert2OD, QMF_Filter, showPlot);
+    end
+end
+
+
+end
+
+
+function cleanCol = waveCleanChannel(signalOD, level, alpha, convert2OD, QMF_Filter, showPlot)
+% Process a single channel - extracted for parfor compatibility
     len=length(signalOD);
     maxPow=floor(log2(len));
     maxSize=2^maxPow;
@@ -135,17 +172,14 @@ for ch=1:numCh
 
     for i=1:length(s)
         sig=s{i};
-        %xh=WaveShrink(sig(1:maxSize), 'SURE',mL,QMF_Filter);
 
         L=level;
 
-        %for L=1:mL
-        dw(L,:)=FWT_PO(sig,L,QMF_Filter);
-        %end
+        dwRow=pf2_base.wavelet.fwtPO(sig,L,QMF_Filter);
+        dwRow=dwRow(:).';   % fwtPO may return a column; keep a row (as the old dw(L,:) layout)
 
-
-        cA{i}=dw(L,1:2^L);
-        cD{i}=dw(L,2^L+1:end);
+        cA{i}=dwRow(1:2^L);
+        cD{i}=dwRow(2^L+1:end);
 
         x=cD{i};
 
@@ -158,15 +192,18 @@ for ch=1:numCh
         end
     end
 
-    sigma=(nanmedian(abs(cDarr))/0.6745);
+    sigma=(median(abs(cDarr),'omitnan')/0.6745);
 
     for i=1:length(s)
 
-        p=(2*(1-normcdf(abs(cD{i})/sigma)));
+        % p = 2*(1-normcdf(|cD|/sigma)) == erfc(|cD|/(sigma*sqrt(2)))
+        % (erfc is base MATLAB; avoids the Statistics Toolbox normcdf)
+        p=erfc(abs(cD{i})/(sigma*sqrt(2)));
         x=cD{i};
         x(p<alpha)=0;
         cD{i}=x;
-        iw(L,:)=IWT_PO([cA{i} cD{i}],L,QMF_Filter);
+        iwRow=pf2_base.wavelet.iwtPO([cA{i} cD{i}],L,QMF_Filter);
+        iwRow=iwRow(:).';   % keep a row (matches the original iw(L,:) layout)
 
         if(showPlot&&i==2)
             figure(1);
@@ -175,16 +212,12 @@ for ch=1:numCh
             title(sprintf('Original Signal %d',mean(sig(1:500))));
             ylim([min(sig(1:500)),max(sig(1:500))]);
             subplot(2,1,2);
-            plot(iw(L,1:maxSize));
-            title(['Reconstructed Signal at level ' sprintf('%i %d',L,mean(iw(L,1:500)))]);
+            plot(iwRow(1:maxSize));
+            title(['Reconstructed Signal at level ' sprintf('%i %d',L,mean(iwRow(1:500)))]);
             ylim([min(sig(1:500)),max(sig(1:500))]);
-            %subplot(3,1,3);
-            %plot(xh(1:maxSize));
-            %title('Denoised');
         end
-        %clear cA cD;
 
-        if(i==1)  %Crops signal by...    
+        if(i==1)  %Crops signal by...
             cutprm1=20; %Removes first 20 points from beginning
             cutprm2=20; %Removes last 100 points from end
         elseif(i==2)
@@ -197,7 +230,7 @@ for ch=1:numCh
 
         ind=[zeros(1,cutprm1),ones(1,maxSize-cutprm1-cutprm2),zeros(1,cutprm2)]==1;
         t1=t{i};
-        combinedSig(i,round(t1(ind)))=iw(L,ind);
+        combinedSig(i,round(t1(ind)))=iwRow(ind);
 
     end
 
@@ -212,21 +245,26 @@ for ch=1:numCh
         plot(combinedSig');
         legend('Original','Filter (pt1)','Filter (pt2');
         ylim([min(signalOD(:)),max(signalOD(:))]);
-        %plot(nanmean(combinedSig));
         hold off;
     end
 
-    cleanOD=nanmean(combinedSig);
+    cleanOD=mean(combinedSig,1,'omitnan');
+
+    % Edge samples not covered by any un-cropped window remain NaN (the first
+    % and last ~cutprm samples, and any interior gap for short signals). Fall
+    % back to the original signal there so the output is always finite —
+    % conservative: leaves the boundary samples uncleaned rather than
+    % fabricating periodization-wrapped values.
+    nanMask=~isfinite(cleanOD);
+    if any(nanMask)
+        cleanOD(nanMask)=signalOD(nanMask).';
+    end
 
     if(convert2OD)
         cleanOD=10.^cleanOD;
     end
-    
-    cleanOD_out(:,ch)=cleanOD;
-end
 
-
-   
+    cleanCol = cleanOD(:);
 end
 
 

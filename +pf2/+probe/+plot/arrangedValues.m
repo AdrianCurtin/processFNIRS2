@@ -1,4 +1,4 @@
-function [ figHandle ] = arrangedValues(varargin)
+function [ figHandle ] = arrangedValues(data2plot, fNIR, minVal, maxVal, titleString, clrBarTitle, opts)
 % ARRANGEDVALUES Display per-channel values in probe-arranged subplot grid
 %
 % Creates a visualization where each fNIRS channel is displayed as a separate
@@ -47,30 +47,27 @@ function [ figHandle ] = arrangedValues(varargin)
 % See also: pf2.probe.plot.imageValues, pf2.probe.plot.interpolateValues,
 %           pf2.data.plot.oxy, pf2_base.pf2_plotArranged
 
-p = inputParser;
+arguments
+    data2plot
+    fNIR = {}
+    minVal {mustBeNumeric} = []
+    maxVal {mustBeNumeric} = []
+    titleString {mustBeText} = ''
+    clrBarTitle {mustBeText} = ''
+    opts.includeSS (1,1) logical = true
+    opts.savePath {mustBeText} = ''
+    opts.saveWidth {mustBeNumeric} = []
+    opts.saveHeight {mustBeNumeric} = []
+    opts.saveDPI {mustBeNumeric} = 150
+end
 
-isStructOrEmpty=@(x) isstruct(x)||isempty(x);
-isStringOrChar=@(x)isstring(x)||ischar(x);
+suptitleString = titleString;
 
-addRequired(p, 'data2plot');
-addOptional(p, 'fNIR', {}, isStructOrEmpty);
-addOptional(p, 'minVal', [], @isnumeric);
-addOptional(p, 'maxVal', [], @isnumeric);
-addOptional(p, 'titleString', '', isStringOrChar);
-addOptional(p, 'clrBarTitle', '', isStringOrChar);
-
-addParameter(p, 'includeSS', true, @islogical);
-
-parse(p, varargin{:});
-
-clrBarTitle = p.Results.clrBarTitle;
-suptitleString = p.Results.titleString;
-minVal = p.Results.minVal;
-maxVal = p.Results.maxVal;
-fNIR = p.Results.fNIR;
-data2plot = p.Results.data2plot;
-
-include_ss= p.Results.includeSS;
+include_ss= opts.includeSS;
+savePath = opts.savePath;
+saveWidth = opts.saveWidth;
+saveHeight = opts.saveHeight;
+saveDPI = opts.saveDPI;
 
 if(isempty(maxVal))
     maxVal=nanmax(data2plot);
@@ -80,37 +77,8 @@ if(isempty(minVal))
    minVal=nanmin(data2plot); 
 end
 
-if(pf2_base.isnestedfield(fNIR,'info.probename')&&isfield(fNIR.info,'probename')&&~contains(fNIR.info.probename,'Unknown')) 
-    %try to load the probename cfg file
-    cfgFilePath=sprintf('%s.cfg',fNIR.info.probename);
-else
-    cfgFilePath='';
-end
-
-
-if(isempty(cfgFilePath)||~contains(cfgFilePath,'.cfg'))
-    
-    warning('Missing or invalid configuration file path\n')
-    
-    disp('No device specified. Please load device configuration');
-    probeInfo=pf2_base.loadDeviceCfg([],true);
-    if(isempty(probeInfo))
-        error('No valid devices selected');
-    end
-    
-elseif(~isempty(cfgFilePath)) % If we're not looking at the GUI, doesn't matter
-    probeInfo=pf2_base.loadDeviceCfg(cfgFilePath,true);
-end
-
-if(pf2_base.isnestedfield(probeInfo,'Probe'))
-    deviceInfo=probeInfo.Info;
-    if(~isfield(deviceInfo,'numberProbes')||deviceInfo.numberProbes==1)
-        probeNum=1;
-    end
-    probeInfo=probeInfo.Probe{probeNum};
-else
-   error('Unable to identify probe'); 
-end
+% Load probe info using helper
+probeInfo = pf2_base.plot.loadProbeInfo(fNIR, true);
 
 
 if(include_ss&&size(probeInfo.OptPos,1)>length(data2plot)&&sum(~probeInfo.TableOpt.IsShortSeparation)==length(data2plot))   include_ss=false;
@@ -129,7 +97,7 @@ end
 
 
 if(length(data2plot)~=numOptodes)
-    error('Must have a value for all optodes');
+    error('pf2:probe:arrangedValues:optodeCountMismatch', 'Must have a value for all optodes');
 end
 
 
@@ -210,6 +178,12 @@ end
 
 if(~isempty(suptitleString))
     suptitle(suptitleString);
+end
+
+% Save figure if requested
+if ~isempty(savePath)
+    fig = gcf();
+    pf2_base.plot.saveFigure(fig, savePath, saveWidth, saveHeight, saveDPI);
 end
 
 end

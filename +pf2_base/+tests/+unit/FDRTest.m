@@ -13,6 +13,8 @@ classdef FDRTest < matlab.unittest.TestCase
     %     - Vector and matrix inputs
     %     - Custom threshold parameters
     %     - Two-step adaptive FDR power improvement
+    %     - Unsorted input handling
+    %     - Matrix input regression (sum vectorization bug)
     %
     %   Example:
     %       results = runtests('pf2_base.tests.unit.FDRTest');
@@ -80,8 +82,6 @@ classdef FDRTest < matlab.unittest.TestCase
             % Q-value calculation correctness
             %
             % Q-values should be >= original p-values (they are adjusted upward).
-            % Note: Q-values may exceed 1 for non-significant tests in this
-            % implementation (capping only occurs for significant tests).
 
             pvals = testCase.sortedPvalues;
             [qvalues, ~, passed] = exploreFNIRS.fx.performFDR(pvals);
@@ -123,9 +123,9 @@ classdef FDRTest < matlab.unittest.TestCase
             % p=0.001 at i=1: threshold = 0.05*1/10 = 0.005 -> passes
             % p=0.01 at i=2: threshold = 0.05*2/10 = 0.01 -> passes (equals)
             % p=0.02 at i=3: threshold = 0.05*3/10 = 0.015 -> fails
-            % So k should be around 2-4 depending on implementation details
-            testCase.verifyGreaterThanOrEqual(k, 1, ...
-                'Expected at least 1 rejection for this test array');
+            % So k should be 2
+            testCase.verifyEqual(k, 2, ...
+                'Expected k=2 for this test array');
         end
 
         function testPerformFDRAllSignificant(testCase)
@@ -161,9 +161,18 @@ classdef FDRTest < matlab.unittest.TestCase
             testCase.verifyEqual(sum(passed), 0, ...
                 'Expected no p-values to pass with all large inputs');
 
-            % Q-values should all be 1 (capped)
-            testCase.verifyEqual(qvalues, ones(size(pvals)), ...
-                'Q-values should all be 1 when no tests pass');
+            % Q-values are valid BH-adjusted p-values: bounded by 1 and never
+            % smaller than the raw p-values. They are NOT all forced to 1 --
+            % standard Benjamini-Hochberg caps at 1 only when m/i * p exceeds
+            % 1, so with all-large p the q-values collapse to the largest p
+            % (here 0.9) via the monotonicity step.
+            testCase.verifyLessThanOrEqual(qvalues, 1, ...
+                'Q-values must be capped at 1');
+            testCase.verifyGreaterThanOrEqual(qvalues, pvals, ...
+                'BH-adjusted q-values must be >= the raw p-values');
+            testCase.verifyEqual(qvalues, max(pvals) * ones(size(pvals)), ...
+                'AbsTol', 1e-12, ...
+                'With all-large p, q-values collapse to the maximum p-value');
         end
 
         function testPerformFDRNaNHandling(testCase)
@@ -178,14 +187,34 @@ classdef FDRTest < matlab.unittest.TestCase
             testCase.verifyEqual(size(qvalues), size(pvals), ...
                 'Output size should match input with NaN values');
 
-            % NaN positions should remain NaN in qvalues or be handled
+            % NaN positions should remain NaN in qvalues
             nanIdx = isnan(pvals);
-            testCase.verifyTrue(all(isnan(qvalues(nanIdx)) | qvalues(nanIdx) == 1), ...
-                'NaN p-values should result in NaN or 1 q-values');
+            testCase.verifyTrue(all(isnan(qvalues(nanIdx))), ...
+                'NaN p-values should result in NaN q-values');
 
             % NaN positions should not pass
             testCase.verifyFalse(any(passed(nanIdx)), ...
                 'NaN p-values should not pass FDR');
+
+            % k should be scalar
+            testCase.verifyTrue(isscalar(k), ...
+                'Critical k must be scalar even with NaN input');
+        end
+
+        function testPerformFDRNaNExcludedFromCount(testCase)
+            % NaN values should be excluded from the test count m
+            %
+            % Having NaN values should not penalize the remaining tests.
+
+            pvals_no_nan = [0.001, 0.01, 0.05];
+            pvals_with_nan = [0.001, NaN, 0.01, NaN, 0.05];
+
+            [~, ~, passed_no_nan] = exploreFNIRS.fx.performFDR(pvals_no_nan, 0.05);
+            [~, ~, passed_with_nan] = exploreFNIRS.fx.performFDR(pvals_with_nan, 0.05);
+
+            % Same number of valid p-values should give same rejections
+            testCase.verifyEqual(sum(passed_no_nan), sum(passed_with_nan), ...
+                'NaN values should not affect rejection count of valid tests');
         end
 
         function testPerformFDRVectorInput(testCase)
@@ -247,6 +276,29 @@ classdef FDRTest < matlab.unittest.TestCase
             % k should be a valid positive scalar
             testCase.verifyGreaterThanOrEqual(k, 1, ...
                 'Critical k should be >= 1');
+            testCase.verifyTrue(isscalar(k), ...
+                'Critical k must be scalar for matrix input');
+        end
+
+        function testPerformFDRUnsortedInput(testCase)
+            % Unsorted input gives same results as sorted
+            %
+            % The BH procedure should produce the same rejections
+            % regardless of input order.
+
+            pvals_sorted = testCase.sortedPvalues;
+            pvals_shuffled = pvals_sorted(randperm(length(pvals_sorted)));
+
+            [~, k_sorted, passed_sorted] = exploreFNIRS.fx.performFDR(pvals_sorted);
+            [~, k_shuffled, passed_shuffled] = exploreFNIRS.fx.performFDR(pvals_shuffled);
+
+            % Same k regardless of order
+            testCase.verifyEqual(k_sorted, k_shuffled, ...
+                'Critical k should be same regardless of input order');
+
+            % Same number of rejections
+            testCase.verifyEqual(sum(passed_sorted), sum(passed_shuffled), ...
+                'Number of rejections should be same regardless of input order');
         end
 
         function testPerformFDRThresholdParameter(testCase)
@@ -275,16 +327,34 @@ classdef FDRTest < matlab.unittest.TestCase
             pvals = testCase.sortedPvalues;
             [qvalues, ~, passed] = exploreFNIRS.fx.performFDR(pvals, 0.05);
 
-            % Passed values should have q-value <= threshold AND p < 0.05
-            % (Based on implementation: passed requires both conditions)
+            % Passed values should have q-value <= threshold
             for i = 1:length(pvals)
                 if passed(i)
                     testCase.verifyLessThanOrEqual(qvalues(i), 0.05, ...
                         'Passed tests should have q-value <= threshold');
-                    testCase.verifyLessThan(pvals(i), 0.05, ...
-                        'Passed tests should have raw p-value < 0.05');
+                    testCase.verifyLessThanOrEqual(pvals(i), 0.05, ...
+                        'Passed tests should have raw p-value <= threshold');
                 end
             end
+        end
+
+        function testPerformFDRMatrixVsVector(testCase)
+            % Matrix input should produce same results as flattened vector
+            %
+            % Regression test: matrix input must produce a scalar k.
+
+            pvals_matrix = [0.001, 0.01, 0.02, 0.03; ...
+                           0.05, 0.06, 0.1, 0.2; ...
+                           0.3, 0.5, 0.8, 0.9];
+            pvals_vector = pvals_matrix(:)';
+
+            [~, k_matrix, passed_matrix] = exploreFNIRS.fx.performFDR(pvals_matrix);
+            [~, k_vector, passed_vector] = exploreFNIRS.fx.performFDR(pvals_vector);
+
+            testCase.verifyEqual(k_matrix, k_vector, ...
+                'k should be the same for matrix and equivalent vector');
+            testCase.verifyEqual(sum(passed_matrix(:)), sum(passed_vector(:)), ...
+                'Number of rejections should match between matrix and vector');
         end
     end
 
@@ -339,9 +409,7 @@ classdef FDRTest < matlab.unittest.TestCase
             testCase.verifyGreaterThanOrEqual(sum(passed_twostep), sum(passed_standard), ...
                 'Two-step FDR should reject >= standard FDR');
 
-            % Both methods should reject at least the obvious cases (p=0.001, 0.005)
-            % Note: This depends on the specific implementation and m value
-            % With 20 tests: p=0.001 at i=1, threshold = 0.05*1/20 = 0.0025 -> passes
+            % Both methods should reject at least the obvious cases
             testCase.verifyGreaterThanOrEqual(sum(passed_twostep), 1, ...
                 'Two-step should reject at least the most significant p-value');
         end
@@ -362,6 +430,10 @@ classdef FDRTest < matlab.unittest.TestCase
             nanIdx = isnan(pvals);
             testCase.verifyFalse(any(passed(nanIdx)), ...
                 'NaN p-values should not pass two-step FDR');
+
+            % k should be scalar
+            testCase.verifyTrue(isscalar(k), ...
+                'Critical k must be scalar even with NaN input');
         end
 
         function testPerformFDRTwostepAllSignificant(testCase)
@@ -376,7 +448,6 @@ classdef FDRTest < matlab.unittest.TestCase
             [~, ~, passed_twostep] = exploreFNIRS.fx.performFDR_twostep(pvals, 0.05);
 
             % When all are significant, both methods should give similar results
-            % Two-step may actually give same or fewer due to its adjustment
             testCase.verifyGreaterThanOrEqual(sum(passed_twostep), sum(passed_standard) - 1, ...
                 'Two-step should have similar rejections to standard when all p-values small');
         end
@@ -419,7 +490,7 @@ classdef FDRTest < matlab.unittest.TestCase
         function testPerformFDRTwostepMatrixInput(testCase)
             % Two-step with matrix input
             %
-            % The function should handle 2D matrix inputs.
+            % The function should handle 2D matrix inputs correctly.
 
             % Create 3x4 matrix of p-values
             pvals_matrix = [0.001, 0.01, 0.02, 0.03; ...
@@ -438,15 +509,35 @@ classdef FDRTest < matlab.unittest.TestCase
             testCase.verifyGreaterThanOrEqual(qvalues, 0, ...
                 'Q-values should be >= 0');
 
-            % Q-values for passed tests should be <= threshold
-            if any(passed(:))
-                testCase.verifyLessThanOrEqual(qvalues(passed), 0.05, ...
-                    'Q-values for passed tests should be <= threshold');
-            end
+            % Q-values for passed tests should be <= 1
+            testCase.verifyLessThanOrEqual(qvalues, 1, ...
+                'Q-values should be <= 1');
 
             % k should be a valid positive scalar
             testCase.verifyGreaterThanOrEqual(k, 1, ...
                 'Critical k should be >= 1');
+            testCase.verifyTrue(isscalar(k), ...
+                'Critical k must be scalar for matrix input');
+        end
+
+        function testPerformFDRTwostepMatrixVsVector(testCase)
+            % Matrix input should give same rejections as equivalent vector
+            %
+            % Regression test for the matrix sum bug where sum() on a matrix
+            % returns column sums instead of a scalar total.
+
+            pvals_matrix = [0.001, 0.01, 0.02, 0.03; ...
+                           0.05, 0.06, 0.1, 0.2; ...
+                           0.3, 0.5, 0.8, 0.9];
+            pvals_vector = pvals_matrix(:)';
+
+            [~, k_matrix, passed_matrix] = exploreFNIRS.fx.performFDR_twostep(pvals_matrix);
+            [~, k_vector, passed_vector] = exploreFNIRS.fx.performFDR_twostep(pvals_vector);
+
+            testCase.verifyEqual(k_matrix, k_vector, ...
+                'k should be the same for matrix and equivalent vector');
+            testCase.verifyEqual(sum(passed_matrix(:)), sum(passed_vector(:)), ...
+                'Number of rejections should match between matrix and vector');
         end
     end
 
@@ -500,6 +591,31 @@ classdef FDRTest < matlab.unittest.TestCase
 
             testCase.verifyEqual(passed_default_2s, passed_explicit_2s, ...
                 'Default threshold should be 0.05 for performFDR_twostep');
+        end
+
+        function testAllNaNInput(testCase)
+            % All NaN input should return gracefully
+
+            pvals = [NaN, NaN, NaN];
+            [qvalues, k, passed] = exploreFNIRS.fx.performFDR(pvals);
+
+            testCase.verifyTrue(all(isnan(qvalues)), ...
+                'All-NaN input should return all-NaN q-values');
+            testCase.verifyEqual(k, 1, ...
+                'All-NaN input should return k=1');
+            testCase.verifyEqual(sum(passed), 0, ...
+                'All-NaN input should have no rejections');
+        end
+
+        function testSinglePvalue(testCase)
+            % Single p-value input
+
+            [qvalues, k, passed] = exploreFNIRS.fx.performFDR(0.01, 0.05);
+
+            testCase.verifyEqual(qvalues, 0.01, ...
+                'Single p-value q should equal p (m/k = 1/1)');
+            testCase.verifyEqual(k, 1, 'k should be 1 for single test');
+            testCase.verifyTrue(passed, 'p=0.01 should pass at threshold 0.05');
         end
     end
 end

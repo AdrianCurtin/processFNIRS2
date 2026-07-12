@@ -42,13 +42,13 @@ function [filename] = loadEx(filename)
 %
 % Example:
 %   % Load session with file dialog
-%   exploreFNIRS.LoadEx();
+%   exploreFNIRS.loadEx();
 %
 %   % Load specific saved experiment
-%   exploreFNIRS.LoadEx('/path/to/myexperiment_exf.mat');
+%   exploreFNIRS.loadEx('/path/to/myexperiment_exf.mat');
 %
 %   % Load and capture the filename for logging
-%   loadedFile = exploreFNIRS.LoadEx();
+%   loadedFile = exploreFNIRS.loadEx();
 %   fprintf('Loaded session from: %s\n', loadedFile);
 %
 % Notes:
@@ -57,7 +57,7 @@ function [filename] = loadEx(filename)
 %   - Compatible with files saved by SaveEx using MATLAB v7.3 format
 %   - After loading, the GUI automatically refreshes to display loaded data
 %
-% See also: exploreFNIRS.SaveEx, exploreFNIRS, exploreFNIRS.BrowseEx
+% See also: exploreFNIRS.saveEx, exploreFNIRS, exploreFNIRS.browseEx
 pathname='';
 
 if(nargin<1)
@@ -76,7 +76,7 @@ tempLoadEx=load(filename,'ExFNIRS');
 
 
 if(~isfield(tempLoadEx,'ExFNIRS')||isempty(tempLoadEx))
-    error('No data found');
+    error('exploreFNIRS:loadEx:noData', 'No data found');
 end
 
 

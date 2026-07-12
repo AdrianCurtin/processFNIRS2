@@ -67,7 +67,7 @@ for i=1:size(x,2)
 	x(nanIdx,i) = interp1(xGoodIdx,x(~isNanArr(:,i),i),nanIdx);
 end
 
-y=filtfilt(b,a,x);
+y=pf2_base.external.filtfilt_classic(b,a,x);
 
 y(isNanArr)=nan;
 

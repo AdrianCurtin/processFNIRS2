@@ -21,9 +21,9 @@ function [outDataOD,outDataRaw]=processStageRaw2OD(method,data,fs,time,rawMask,f
 % Inputs:
 %   method         - Method configuration struct with fields:
 %                    .name - Method display name (string)
-%                    .F    - Cell array of function specifications
-%                    Each F{i} contains: .f (function name), .args (argument
-%                    names), .argvals (argument values), .output (output names)
+%                    .F    - Cell array of PipelineFunction objects
+%                    Legacy structs in .F are auto-converted via
+%                    PipelineFunction.fromStruct().
 %                    If empty, uses PF2.stageRawMethod from global state.
 %   data           - Raw light intensity matrix [T x C_raw]
 %                    T = samples, C_raw = all raw channels (including dark)
@@ -31,7 +31,8 @@ function [outDataOD,outDataRaw]=processStageRaw2OD(method,data,fs,time,rawMask,f
 %   time           - Time vector [T x 1] in seconds
 %   rawMask        - Channel validity mask [1 x C_raw]
 %                    1 = valid channel, 0 = invalid/masked
-%   fMarkers       - Event markers [M x 3] (time, code, duration)
+%   fMarkers       - Event markers, numeric [M x 4] (time, code, duration,
+%                    amplitude); supplied to pipeline functions as an array
 %   fAux           - Auxiliary data struct (physiology, accelerometer, etc.)
 %   channelNumbers - Channel identifier mapping [1 x C_raw]
 %                    Positive values = optode numbers
@@ -65,7 +66,8 @@ function [outDataOD,outDataRaw]=processStageRaw2OD(method,data,fs,time,rawMask,f
 %        'fChannelNumbers'-> channel IDs
 %        'fChannelSD'     -> source-detector distances
 %        'fProbeInfo'     -> probe geometry struct
-%        'fMarkers'       -> event markers
+%        'fMarkers'       -> event markers (numeric [M x 4] array)
+%        'fMarkerTable'   -> event markers (canonical table; optional)
 %        'fAux'           -> auxiliary data
 %        'fAmbient'       -> dark channel data
 %        'fNIRstruct'     -> full fNIRS struct
@@ -95,24 +97,24 @@ function [outDataOD,outDataRaw]=processStageRaw2OD(method,data,fs,time,rawMask,f
 %   [od, raw] = pf2_base.fnirs.processStageRaw2OD(method, data, fs, ...
 %       time, mask, markers, aux, chNums, wavelengths, probe, fData, false);
 %
-% See also: processStageFilterHb, bvoxy, processFNIRS2, pf2_initialize,
-%           pf2_SMAR, pf2_lpf, pf2_MotionCorrectTDDR, pf2_Intensity2OD
+% See also: pf2_base.PipelineFunction, processStageFilterHb, bvoxy,
+%           processFNIRS2, pf2_initialize, pf2_SMAR, pf2_lpf,
+%           pf2_MotionCorrectTDDR, pf2_Intensity2OD
  
  if(nargin<12)
     showGUIerrors=false; 
  end
 
-global PF2
-
 outData=data;
+outDataRaw=data;
 OD_converted=false;
 
 if(isstring(method)||ischar(method))
     % load method from string
 elseif(isempty(method)) % use loaded method
+    global PF2
     if(~isfield(PF2,'stageRawMethod'))
         disp('No current Filters enabled');
-        %outData(:,validChannels)=medfilt1(data(:,validChannels),10);
     else
         method=PF2.stageRawMethod;
     end
@@ -129,157 +131,90 @@ validDarkChannels=((wavelengths==0)&rawMask);
 timeChMask=ones(size(data));
 
 for i=1:length(method.F)
-    Fidx=method.F{i};
-    if(isfield(Fidx,'f'))
-        func=str2func(Fidx(1).f);
-        if(contains(Fidx(1).f,'Intensity2OD'))
-            outDataRaw=outData;
-            OD_converted=true;
-        end
-        x_ind=[];
-        fs_ind=[];
-        time_ind=[];
-        fmask_ind=[];
-        fchInfo_ind=[];
-        fmrk_ind=[];
-        fAux_ind=[];
-        fsd_ind=[];
-        ftimeMask_ind=[];
+    pf=method.F{i};
 
-        if(length(Fidx)>1) %This is a struct array for some reason?
-           %Change it back!
-           args=cell(0,0);
-           passedArgVals=cell(0,0);
-           for j=1:length(Fidx)
-                args{j}=Fidx(j).args;
-                passedArgVals{j}=Fidx(j).argvals;
-           end
+    % Silent fallback: convert legacy structs if they slip through
+    if ~isa(pf, 'pf2_base.PipelineFunction')
+        if isstruct(pf) && isfield(pf, 'f')
+            pf = pf2_base.PipelineFunction.fromStruct(pf);
         else
-            args=Fidx.args;
-            passedArgVals=Fidx.argvals;
-            if(~iscell(args))
-                args={args};
+            continue
+        end
+    end
+
+    if pf.isIntensity2OD
+        outDataRaw=outData;
+        OD_converted=true;
+    end
+
+    if ~OD_converted && pf.requiresOD
+        error('pf2:processStageRaw2OD:notOD', ...
+            ['%s requires optical density input but Intensity2OD has not been applied yet. ' ...
+             'Move Intensity2OD before %s in the processing pipeline.'], ...
+            pf.funcName, pf.funcName);
+    end
+
+    % Build context struct
+    ctx.x = data(:,validChannels);
+    ctx.fs = fs;
+    ctx.fTime = time;
+    ctx.fchMask = rawMask(:,validChannels);
+    ctx.ftimeChMask = timeChMask(:,validChannels);
+    ctx.fChannelNumbers = channelNumbers(validChannels);
+    if isfield(probeInfo,'SD')
+        ctx.fChannelSD = probeInfo.SD(channelNumbers(validChannels));
+    else
+        ctx.fChannelSD = [];
+    end
+    ctx.fProbeInfo = probeInfo;
+    ctx.fMarkers = pf2_base.markersToArray(fMarkers);     % numeric [M x 4]
+    ctx.fMarkerTable = pf2_base.normalizeMarkers(fMarkers); % canonical table
+    ctx.fNIRstruct = fNIR_input;
+    ctx.fAux = fAux;
+    ctx.fAmbient = data(:,validDarkChannels);
+
+    if pf.hasSpecialArg('x')
+        outData=data;
+
+        if(showGUIerrors)
+            try
+                funcOutput = pf.execute(ctx);
+            catch ME
+                outData(:,validChannels)=nan;
+                warning('Error occured in method %s when processing %s\n',method.name,pf.funcName);
+                waitfor(errordlg(sprintf('Error occured in method %s when processing %s\n%s\n',method.name,pf.funcName,ME.message),'Raw Processing Error'));
+                data=outData;
+                continue
             end
-            if(~iscell(passedArgVals))
-                passedArgVals={passedArgVals};
-            end
+        else
+            funcOutput = pf.execute(ctx);
         end
 
-        if(isfield(Fidx,'output'))
-           x_out_ind=[];
-           fmask_out_ind=[];
-           ftimeMask_out_ind=[];
-
-           outputList=Fidx.output;
-
-           if(iscell(outputList)&&iscell(outputList{1}))
-              outputList=outputList{1}; 
-           elseif(~iscell(outputList))
-              outputList={outputList};   
-           end
-           for output_idx=1:length(outputList)
-               if strcmpi(outputList{output_idx},'x')==1 && isempty(x_out_ind)
-                    x_out_ind=output_idx;
-               elseif strcmpi(outputList{output_idx},'fchMask')==1 && isempty(fmask_out_ind)
-                   fmask_out_ind=output_idx;
-               elseif strcmpi(outputList{output_idx},'ftimeChMask')==1 && isempty(ftimeMask_out_ind)
-                   ftimeMask_out_ind=output_idx;
-               end
-           end
-        else %legacy code missing output
-            x_out_ind=1;
-            fmask_out_ind=[];
-            ftimeMask_out_ind=[];
+        if pf.xOutIdx > 0
+            outData(:,validChannels)=funcOutput{pf.xOutIdx};
         end
 
-        for a=1:length(args)
-           if strcmp(args{a},'x')==1
-              x_ind=a;
-              passedArgVals{x_ind}=data(:,validChannels);
-           elseif strcmp(args{a},'fs')==1
-              fs_ind=a; 
-              passedArgVals{fs_ind}=fs;
-           elseif strcmp(args{a},'fTime')==1
-              time_ind=a; 
-              passedArgVals{time_ind}=time;
-           elseif strcmp(args{a},'fchMask')==1
-              fmask_ind=a;
-              passedArgVals{fmask_ind}=rawMask(:,validChannels);
-           elseif strcmp(args{a},'ftimeChMask')==1
-              ftimeMask_ind=a;
-              passedArgVals{ftimeMask_ind}=timeChMask(:,validChannels); % always needs channel info when used in raw
-           elseif strcmp(args{a},'fChannelNumbers')==1
-              fchInfo_ind=a;
-              passedArgVals{fchInfo_ind}=channelNumbers(validChannels);
-           elseif strcmp(args{a},'fChannelSD')==1
-              fsd_ind=a;
-              passedArgVals{fsd_ind}=probeInfo.SD(channelNumbers(validChannels));
-           elseif strcmp(args{a},'fProbeInfo')==1
-              fsd_ind=a;
-              passedArgVals{fsd_ind}=probeInfo;
-           elseif strcmp(args{a},'fMarkers')==1
-              fmrk_ind=a; 
-              passedArgVals{fmrk_ind}=fMarkers;
-           elseif strcmp(args{a},'fNIRstruct')==1
-              fnir_ind=a; 
-              passedArgVals{fnir_ind}=fNIR_input;
-           elseif strcmp(args{a},'fAux')==1
-              fAux_ind=a;
-              passedArgVals{fAux_ind}=fAux;
-           elseif strcmp(args{a},'fAmbient')==1
-              fAmb_ind=a;
-              passedArgVals{fAmb_ind}=data(:,validDarkChannels);
-           end
-        end
-
-        if(~isempty(x_ind))
-            outData=data;
-
-            if(showGUIerrors)
-                try
-                    funcOutput{:}=func(passedArgVals{:});
-                catch ME
-                    outData(:,validChannels)=nan;
-                    warning('Error occured in method %s when processing %s\n',method.name,Fidx(1).f);
-                    waitfor(errordlg(sprintf('Error occured in method %s when processing %s\n%s\n',method.name,Fidx(1).f,ME.message),'Raw Processing Error'));
-                end
+        if pf.maskOutIdx > 0
+            if(size(funcOutput{pf.maskOutIdx},2)<size(rawMask,2))
+                rawMask(:,validChannels)=rawMask(:,validChannels)&funcOutput{pf.maskOutIdx};
             else
-                funcOutput{:}=func(passedArgVals{:});
+                rawMask=rawMask&funcOutput{pf.maskOutIdx};
             end
-            
-            
-            
-            if(~isempty(x_out_ind)) % Assign values to fNIRS Biomarkers and ROIs when available
-                    outData(:,validChannels)=funcOutput{x_out_ind};
-            end
-
-            if(~isempty(fmask_out_ind)) % Or with current fmask
-                if(size(funcOutput{fmask_out_ind},2)<size(rawMask,2))
-                    rawMask(:,validChannels)=rawMask(:,validChannels)&funcOutput{fmask_out_ind};
-                else
-                    rawMask=rawMask&funcOutput{fmask_out_ind};
-                end
-
-                validChannels=validChannels&rawMask;
-                %outData(:,~rawMask)=nan;
-
-            end
-
-            if(~isempty(ftimeMask_out_ind)) % Or with current fmask
-                if(size(funcOutput{ftimeMask_out_ind},2)<size(rawMask,2))
-                    timeChMask(:,validChannels)=timeChMask(:,validChannels)&funcOutput{ftimeMask_out_ind};
-                else
-                    timeChMask=timeChMask&funcOutput{ftimeMask_out_ind};
-                end
-
-            end
-
-            %end
-            data=outData;
-        else
-            outData=data;
-            warning('Unable to identify NIRS input argument\n');
+            validChannels=validChannels&rawMask;
         end
+
+        if pf.timeMaskOutIdx > 0
+            if(size(funcOutput{pf.timeMaskOutIdx},2)<size(rawMask,2))
+                timeChMask(:,validChannels)=timeChMask(:,validChannels)&funcOutput{pf.timeMaskOutIdx};
+            else
+                timeChMask=timeChMask&funcOutput{pf.timeMaskOutIdx};
+            end
+        end
+
+        data=outData;
+    else
+        outData=data;
+        warning('Unable to identify NIRS input argument\n');
     end
 end
 

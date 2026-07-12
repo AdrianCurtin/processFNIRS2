@@ -476,11 +476,10 @@ end
 [~,~,mdlCoef]=fixedEffects(mdl,'DFMethod','satterthwaite');
 
 [~,uNameIdx]=unique(cName);
-
-% UDATE vs. 0 index for unqiue names
-isV0=isV0(uNameIdx);
-
 uNameIdx=sort(uNameIdx);
+
+% Update vs. 0 index to match sorted uNameIdx ordering
+isV0=isV0(uNameIdx);
 for c=1:length(uNameIdx)
     row_idx=uNameIdx(c);
     curRow=cRows(row_idx,:);
@@ -488,23 +487,22 @@ for c=1:length(uNameIdx)
    
    %df2(c)=mdlCoef.DF(c); %overwrite with satterwaite coefs
    
-   mdlCoefAnv=mdlCoef(curRow==1,:);
-   mdlCoefCompare=mdlCoef(curRow==-1,:);
-   if(isempty(mdlCoefCompare))
-        deltaE(c)=sum(mdlCoefAnv.Estimate);
+   % Effect size and SE as weighted combinations of coefficients.
+   % Works for any weights including fractional (Helmert, polynomial, deviation).
+   curRowVec=curRow(:)';
+   deltaE(c)=curRowVec*mdlCoef.Estimate;
+
+   covBeta=mdl.CoefficientCovariance;
+   SD_p(c)=sqrt(curRowVec*covBeta*curRowVec');
+
+   % Glass's delta uses the positive-side-only SE as the reference SD
+   posMask=curRowVec>0;
+   if any(posMask)
+       posWeights=curRowVec.*posMask;
+       SD_anv(c)=sqrt(posWeights*covBeta*posWeights');
    else
-        deltaE(c)=sum(mdlCoefAnv.Estimate)-sum(mdlCoefCompare.Estimate);
+       SD_anv(c)=SD_p(c);
    end
-   
-   SD_anv_temp=mdlCoefAnv.SE;
-   SD_cmp=mdlCoefCompare.SE;
-   
-   SD_p(c)=sqrt(sum((mdlCoefAnv.DF).*(SD_anv_temp.^2))+...
-       sum((mdlCoefCompare.DF).*(SD_cmp.^2)))...
-       /sqrt(sum(mdlCoefAnv.DF)+sum(mdlCoefCompare.DF));
-   SD_anv(c)=sqrt(sum((mdlCoefAnv.DF).*(SD_anv_temp.^2)))...
-       /sqrt(sum(mdlCoefAnv.DF));
-   %SE_p(c)=SD_p(c)/sqrt(mean(mdlCoefAnv.DF));
    HedgesG(c)=deltaE(c)/SD_p(c);
    GlassesDelta(c)=deltaE(c)/SD_anv(c);
    

@@ -42,6 +42,11 @@ function outFNIR=setT0(fnirStruct,t0time)
 %
 % See also: pf2.data.split, pf2.data.getMarkers, pf2.data.resample
 
+arguments
+    fnirStruct (1,1) struct
+    t0time {mustBeA(t0time, ["numeric", "duration", "datetime"])}
+end
+
 outFNIR=fnirStruct;
 
 
@@ -67,10 +72,10 @@ elseif(isdatetime(t0time))
             tDiff=seconds(t0time-fnirStruct.t0);
             
         else
-            error('All datetimes must be the same size as times');
+            error('pf2:setT0:datetimeSizeMismatch', 'All datetimes must be the same size as times');
         end
     else
-        error('t0 cannot be set as a datetime if fnirs struct does not have datetime measures');
+        error('pf2:setT0:noDatetime', 't0 cannot be set as a datetime if fnirs struct does not have datetime measures');
     end
 else
     tDiff=t0time;
@@ -94,11 +99,22 @@ end
 
 
 if(isfield(outFNIR,'markers'))
-   if(isfield(outFNIR.markers,'data'))
+   if(istable(outFNIR.markers))
+      if(~isempty(outFNIR.markers))
+          outFNIR.markers.Time = outFNIR.markers.Time - tDiff;
+      end
+   elseif(isfield(outFNIR.markers,'data'))
        outFNIR.markers.data(:,1)= outFNIR.markers.data(:,1)-tDiff;
    elseif(~isempty(outFNIR.markers))
       outFNIR.markers(:,1)= outFNIR.markers(:,1)-tDiff;
    end
+end
+
+if isfield(outFNIR, 'blocks') && ~isempty(outFNIR.blocks)
+    for bk = 1:length(outFNIR.blocks)
+        outFNIR.blocks(bk).startTime = outFNIR.blocks(bk).startTime - tDiff;
+        outFNIR.blocks(bk).endTime = outFNIR.blocks(bk).endTime - tDiff;
+    end
 end
 
 if(isfield(outFNIR,'raw'))
@@ -119,6 +135,14 @@ if(pf2_base.isnestedfield(outFNIR,'Aux')) && ~isempty(outFNIR.Aux)
         % Only modify numeric arrays with at least 2D where column 1 might be time
         if isnumeric(curField) && ismatrix(curField) && size(curField,1) > 1 && size(curField,2) >= 1
             outFNIR.Aux.(curFieldName)(:,1) = curField(:,1) - tDiff;
+        elseif istable(curField)
+            % Handle flattened Aux tables — shift the time column
+            tblVars = curField.Properties.VariableNames;
+            timeCol = intersect(timeFieldNames, tblVars);
+            if ~isempty(timeCol) && isnumeric(curField.(timeCol{1}))
+                outFNIR.Aux.(curFieldName).(timeCol{1}) = ...
+                    curField.(timeCol{1}) - tDiff;
+            end
         end
     end
 end

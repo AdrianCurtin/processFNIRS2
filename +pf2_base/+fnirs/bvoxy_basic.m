@@ -46,6 +46,15 @@ if(nargin<3)
     wv2=850;
 end
 
-
-
-[HbO, HbR, Total, HbDiff,CBSI,~,~,units,~]=pf2_base.fnirs.bvoxy([Iin1,Iin2],1:length(Iin1),[ones(size(wv1))*wv1,ones(size(wv2))*wv2],1:length(Iin1),DPF,'isOD',false);
+% channels=[1,1]: both raw columns belong to a single optode pair
+% wavelengths=[wv1,wv2]: one wavelength label per raw column
+% distanceSrcDet=1: single channel, 1 cm (arbitrary when using DPF)
+if all(isnan(DPF))
+    % Default: age-based DPF calculation (bvoxy default, age=25)
+    [HbO, HbR, Total, HbDiff,CBSI,~,~,units,~] = pf2_base.fnirs.bvoxy( ...
+        [Iin1,Iin2], [1,1], [wv1,wv2], 1, 'isOD', false);
+else
+    [HbO, HbR, Total, HbDiff,CBSI,~,~,units,~] = pf2_base.fnirs.bvoxy( ...
+        [Iin1,Iin2], [1,1], [wv1,wv2], 1, ...
+        'DiffPathlengthFactor', mean(DPF), 'isOD', false);
+end

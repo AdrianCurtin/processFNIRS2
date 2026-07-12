@@ -1,0 +1,59 @@
+site_name: processFNIRS2
+site_description: A modular MATLAB toolbox for fNIRS data analysis
+site_url: https://adriancurtin.github.io/processFNIRS2/
+repo_url: https://github.com/AdrianCurtin/processFNIRS2
+repo_name: AdrianCurtin/processFNIRS2
+edit_uri: edit/master/docs/
+docs_dir: docs
+site_dir: site
+
+theme:
+  name: material
+  features:
+    - navigation.sections
+    - navigation.top
+    - navigation.tracking
+    - toc.follow
+    - content.code.copy
+    - search.suggest
+    - search.highlight
+  palette:
+    - media: "(prefers-color-scheme: light)"
+      scheme: default
+      primary: indigo
+      toggle:
+        icon: material/weather-night
+        name: Switch to dark mode
+    - media: "(prefers-color-scheme: dark)"
+      scheme: slate
+      primary: indigo
+      toggle:
+        icon: material/weather-sunny
+        name: Switch to light mode
+
+markdown_extensions:
+  - admonition
+  - attr_list
+  - tables
+  - toc:
+      permalink: true
+  - pymdownx.highlight:
+      anchor_linenums: true
+  - pymdownx.superfences:
+      custom_fences:
+        - name: mermaid
+          class: mermaid
+          format: !!python/name:pymdownx.superfences.fence_code_format
+  - pymdownx.inlinehilite
+  - pymdownx.details
+
+nav:
+  - Home: README.md
+  - Reference:
+      - API Reference: API_REFERENCE.md
+      - Processing Pipeline: PROCESSING_PIPELINE.md
+      - Usage Examples: USAGE_EXAMPLES.md
+      - MATLAB CLI: MATLAB_CLI.md
+      - CLI/UX Guide: CLI_UX_GUIDE.md
+      - exploreFNIRS Pipeline: EXPLORERNIRS_PIPELINE.md
+  - Architecture: ARCHITECTURE.md

@@ -37,7 +37,7 @@ if(isnumeric(x))
     end
 
     if(nargin<1)
-       error('No data provided'); 
+       error('pf2_base:fnirs:buildROI:noData', 'No data provided');
     end
 
     if(~isempty(x))
@@ -141,7 +141,7 @@ elseif(isstruct(x)&&strcmpi(fieldToUse,'oxy')&&isfield(x,'HbO')&&~isempty(x.HbO)
 				x_roi=x.(validFields{field_ind})(:,ch_index);
 				roi_out.ROI.(validFields{field_ind})=mergeAndRun(roi_func_handle,x_roi',removeNanChannels,varargin);
             else
-               error('invalid fields'); 
+               error('pf2_base:fnirs:buildROI:invalidFields', 'invalid fields');
             end
         end
         roi_out.ROI.info=table({ch_index},{'oxy'},'RowNames',roi_names,'VariableNames',{'Optodes','Type'});
@@ -152,7 +152,7 @@ elseif(isstruct(x)&&strcmpi(fieldToUse,'oxy')&&isfield(x,'HbO')&&~isempty(x.HbO)
 					x_roi=x.(validFields{field_ind})(:,ch_index{roi_ind});
 					roi_out.ROI.(validFields{field_ind})(:,roi_ind)=mergeAndRun(roi_func_handle,x_roi',removeNanChannels,varargin);
 				else
-                   error('invalid fields'); 
+                   error('pf2_base:fnirs:buildROI:invalidFields', 'invalid fields');
                 end
             end
             if(roi_ind==1)
@@ -177,7 +177,8 @@ function out=mergeAndRun(func_handle,x_roi,removeNanChannels,varg)
         x_roi=x_roi(~nnz_x,:);
         
         if(rm_ch>0)
-            fprintf('Removed %i channels from ROI\n',rm_ch);
+            warning('pf2:buildROI:removedChannels', ...
+                'Removed %i channels from ROI', rm_ch);
         end
         
     end
@@ -189,7 +190,8 @@ function out=mergeAndRun(func_handle,x_roi,removeNanChannels,varg)
     end
 
     if(size(x_roi,1)==1)
-       warning('Only single channel present in ROI, returning just the one channel');
+       warning('pf2:buildROI:singleChannel', ...
+           'Only single channel present in ROI, returning just the one channel');
        out=x_roi; 
        return;
     end

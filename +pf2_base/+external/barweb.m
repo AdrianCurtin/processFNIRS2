@@ -1,553 +1,559 @@
 function handles = barweb(barvalues, errors, varargin)
-% Usage: handles = barweb(barvalues, errors, 'ParameterName', ParameterValue, ...)
+% BARWEB Grouped bar chart with per-bar error bars, points, and violins
 %
-% Required inputs:
-% barvalues - m-by-n-by-o matrix of bar values to be plotted
-% errors - error values (same size as barvalues, or empty)
+% Draws a clustered (grouped) bar chart from a matrix of summary values and
+% overlays per-bar error bars, optional individual data points, optional
+% violin densities, and a legend. It is built directly on MATLAB's native
+% BAR and ERRORBAR primitives. The chart is laid out as M groups (rows of
+% BARVALUES) along the x-axis, each containing N side-by-side bars (columns
+% of BARVALUES).
 %
-% Optional parameters (specified as name-value pairs):
-% 'Width' - Width of bars (default: 1)
-% 'GroupNames' - Cell array of group names (default: {'1', '2', ...})
-% 'Title' - Title of the plot (default: '')
-% 'XLabel' - X-axis label (default: '')
-% 'YLabel' - Y-axis label (default: '')
-% 'ColorMap' - Colormap for bars (default: jet)
-% 'GridStatus' - Grid status ('x', 'y', 'xy', or 'none') (default: 'none')
-% 'Legend' - Cell array of legend entries (default: {})
-% 'ErrorSides' - Number of error bar sides (1 or 2) (default: 2)
-% 'LegendType' - Legend type ('axis' or 'plot') (default: 'plot')
-% 'DataPoints' - Cell array of data points (default: {})
-% 'PlotViolin' - Flag to plot violin (default: false)
-% 'ErrorIsY' - Flag indicating if error is Y value (default: false)
-% 'HideBar' - Flag to hide bars (default: false)
-% 'NegativeToInfinity' - Flag to extend negative bars to bottom (default: false)
-
-% Parse input arguments
-p = inputParser;
-addRequired(p, 'barvalues', @isnumeric);
-addRequired(p, 'errors', @(x) isnumeric(x) || isempty(x));
-addOptional(p, 'Width', 1, @isnumeric);
-addOptional(p, 'GroupNames', {}, @(x) iscell(x) || isempty(x));
-addParameter(p, 'Title', '', @ischar);
-addParameter(p, 'XLabel', '', @ischar);
-addParameter(p, 'YLabel', '', @ischar);
-addParameter(p, 'ColorMap', jet, @(x) isnumeric(x) || ischar(x) || isa(x, 'function_handle'));
-addParameter(p, 'GridStatus', 'none', @ischar);
-addParameter(p, 'Legend', {}, @iscell);
-addParameter(p, 'ErrorSides', 2, @(x) x == 1 || x == 2);
-addParameter(p, 'LegendType', 'plot', @ischar);
-addParameter(p, 'DataPoints', {}, @iscell);
-addParameter(p, 'PlotViolin', false, @islogical);
-addParameter(p, 'ErrorIsY', false, @islogical);
-addParameter(p, 'HideBar', false, @islogical);
-addParameter(p, 'NegativeToInfinity', false, @islogical);
-
-parse(p, barvalues, errors, varargin{:});
-
-% Extract parsed values
-width = p.Results.Width;
-groupnames = p.Results.GroupNames;
-bw_title = p.Results.Title;
-bw_xlabel = p.Results.XLabel;
-bw_ylabel = p.Results.YLabel;
-bw_colormap = p.Results.ColorMap;
-gridstatus = p.Results.GridStatus;
-bw_legend = p.Results.Legend;
-error_sides = p.Results.ErrorSides;
-legend_type = p.Results.LegendType;
-data_points = p.Results.DataPoints;
-plotViolin = p.Results.PlotViolin;
-error_is_y = p.Results.ErrorIsY;
-hideBar = p.Results.HideBar;
-negativeToInfinity = p.Results.NegativeToInfinity;
-
-% barweb is the m-by-n-by-o matrix of barvalues to be plotted.
-% m groups, n bars (per group), o can be 3 points(min, mid/summary, max), or 2points (min, max),
-%     or 1 point for just mid/summary
-% barweb calls the MATLAB bar function and plots m groups of n bars using the width and bw_colormap parameters.
-% If you want all the bars to be the same color, then set bw_colormap equal to the RBG matrix value ie. (bw_colormap = [1 0 0] for all red bars)
-% barweb then calls the MATLAB errorbar function to draw barvalues with error bars of length error.
-% groupnames is an m-length cellstr vector of groupnames (i.e. groupnames = {'group 1'; 'group 2'}).  For no groupnames, enter [] or {}
-% The errors matrix is of the same form of the barvalues matrix, namely m group of n errors.
-% Gridstatus is either 'x','xy', 'y', or 'none' for no grid.
-% No legend will be shown if the legend paramter is not provided
-% 'error_sides = 2' plots +/- std while 'error_sides = 1' plots just + std
-% legend_type = 'axis' produces the legend along the x-axis while legend_type = 'plot' produces the standard legend.  See figure for more details
+% This is an original, clean-room implementation that reproduces the call
+% signature historically used inside exploreFNIRS bar plotting. It does not
+% depend on any external helper.
 %
-% The following default values are used if parameters are left out or skipped by using [].
-% width = 1 (0 < width < 1; widths greater than 1 will produce overlapping bars)
-% groupnames = '1', '2', ... number_of_groups
-% bw_title, bw_xlabel, bw_ylabel = []
-% bw_color_map = jet
-% gridstatus = 'none'
-% bw_legend = []
-% error_sides = 2;
-% legend_type = 'plot';
+% Syntax:
+%   handles = barweb(barvalues, errors)
+%   handles = barweb(barvalues, errors, width, groupnames)
+%   handles = barweb(barvalues, errors, width, groupnames, 'Name', Value, ...)
+%   handles = barweb(barvalues, errors, 'Name', Value, ...)
 %
-% A list of handles are returned so that the user can change the properties of the plot
-% handles.ax: handle to current axis
-% handles.bars: handle to bar plot
-% handles.errors: a vector of handles to the error plots, with each handle corresponding to a column in the error matrix
-% handles.legend: handle to legend
+% Inputs:
+%   barvalues - [M x N] (or [M x N x O]) matrix of bar summary values.
+%               M groups along x, N bars per group. If a single column is
+%               supplied whose length mismatches GroupNames, the data is
+%               assumed transposed and is transposed automatically.
+%   errors    - Error specification, one of:
+%                 []            : no error bars are drawn.
+%                 [M x N]       : symmetric error; bars get +/- error(i,j).
+%                 [M x N x 2]   : page 1 = lower bound, page 2 = upper bound,
+%                                 each interpreted as an ABSOLUTE y value
+%                                 (whisker endpoints), not a delta.
+%                 [M x N x >=3] : box/IQR style. Page 1/2 are lower/upper
+%                                 whisker y values, page 3 is the box lower
+%                                 edge, page 4 (optional) the box upper edge,
+%                                 page 5 (optional) the box midline. Bars are
+%                                 hidden and rectangles are drawn instead.
 %
+% Optional name-value pairs (a leading WIDTH and GROUPNAMES may also be given
+% positionally, in that order, before any name-value pairs):
+%   'Width'       - Bar width, 0 < w <= 1 (default: 1).
+%   'GroupNames'  - Cellstr / string array of M x-axis tick labels
+%                   (default: {'1','2',...}).
+%   'Title'       - Axis title string (default: '').
+%   'XLabel'      - X-axis label string (default: '').
+%   'YLabel'      - Y-axis label string (default: '').
+%   'ColorMap'    - [K x 3] RGB rows used to color the N bar series
+%                   (cycled if K < N). A single [1 x 3] row colors all bars
+%                   the same. Default: lines(N).
+%   'GridStatus'  - 'x', 'y', 'xy', or 'none' (default: 'none').
+%   'Legend'      - Cellstr / string array of N series names. An empty value
+%                   (or LegendType 'hide') suppresses the legend.
+%   'LegendType'  - 'plot' (standard legend), 'axis' (rotated labels under
+%                   each bar), or 'hide' (no legend). Default: 'plot'.
+%   'DataPoints'  - [M x N] cell array; each cell holds the raw observations
+%                   for that bar, scatter-plotted with horizontal jitter.
+%   'PlotViolin'  - Logical; when true (and DataPoints supplied) draws a
+%                   kernel-density violin per bar instead of bars (default: false).
+%   'Axes'        - Target axes handle (default: gca). When supplied, the
+%                   axes hold state is preserved on return.
+%   'ErrorColor'  - [1 x 3] RGB for error bars / edges. Default adapts to the
+%                   axes background (white on dark, black on light).
 %
-% See the MATLAB functions bar and errorbar for more information
+% Outputs:
+%   handles - Struct of graphics handles for post-hoc styling:
+%               .ax        - axes handle
+%               .bars      - [1 x N] array of Bar objects (one per series)
+%               .errors    - [1 x N] array of ErrorBar objects (valid only
+%                            for the series that received error bars)
+%               .legend    - legend handle, or [] when no legend was drawn
+%               .points    - scatter handles for individual data points
+%               .violins   - patch handles for violin densities
+%               .rectangles- rectangle handles for box/IQR rendering
 %
-% Author: Bolu Ajiboye
-% Created: October 18, 2005 (ver 1.0)
-% Updated: Dec 07, 2006 (ver 2.1)
-% Updated: July 21, 2008 (ver 2.3)
+% Algorithm:
+%   1. Parse positional WIDTH/GROUPNAMES then name-value options.
+%   2. Normalize BARVALUES/ERRORS orientation and decode the error pages
+%      into lower/upper whisker values (absolute y) and optional box edges.
+%   3. Draw the grouped bars with BAR, recovering each series' XOffset to
+%      locate true bar centers.
+%   4. Overlay ERRORBAR per series, optional jittered scatter / violins, and
+%      optional box rectangles.
+%   5. Apply labels, legend, grid, and tidy axis limits.
+%
+% Example:
+%   v = [1 2; 3 1; 2 2];          % 3 groups, 2 series
+%   e = 0.2 * ones(3, 2);
+%   figure;
+%   h = barweb(v, e, 1, {'A','B','C'}, 'Legend', {'Pre','Post'}, ...
+%              'YLabel', '\muM', 'ColorMap', lines(2));
+%
+% See also: bar, errorbar, scatter, ksdensity
 
-% Get function arguments
-BottomError=true;
-hideError=false;
-plotFeatureAsPoint=false;
-
-
+% ----------------------------------------------------------------------
+% Input handling
+% ----------------------------------------------------------------------
 if nargin < 1
-	error('Must have at least the first argument:  barweb(barvalues, errors, width, groupnames, bw_title, bw_xlabel, bw_ylabel, bw_colormap, gridstatus, bw_legend, barwebtype)');
-elseif(nargin<2)
-    errors=[];
+    error('pf2:barweb:notEnoughInputs', ...
+        'barweb requires at least BARVALUES.');
+end
+if nargin < 2
+    errors = [];
 end
 
-if(isempty(groupnames))
-    groupnames=1:size(barvalues,1);
-end
-
-if(isempty(data_points))
-    plotData=false;
-else
-    plotData=any(any(~cellfun(@isempty,data_points)));
-end
-
-plotViolin=plotViolin&&plotData;
-useKSD=true;
-
-if(plotData||plotViolin)
-    [jSz,kSz]=size(data_points);
-    for j=1:jSz
-        for k=1:kSz
-            pdata=data_points{j,k};
-            if(~isempty(pdata))
-                pdata=pdata(:);
-                [N_v{j,k},y_bin_v{j,k}]=pf2_base.external.myHistogram(pdata);
-                if(plotViolin&&useKSD)
-                     [f{j,k}, u{j,k}, bb{j,k}]=ksdensity(pdata);
-                     f{j,k}=f{j,k}'/max(f{j,k});
-                     u{j,k}=u{j,k}';
-                end
-            else
-                N_v{j,k}=[];
-                y_bin_v{j,k}=[];
-                s{j,k}=[];
-            end
+% Accept a leading positional WIDTH and GROUPNAMES (classic call form)
+% before the name-value list. WIDTH is numeric scalar; GROUPNAMES is a
+% cell/string array.
+posWidth = [];
+posGroupNames = {};
+if ~isempty(varargin) && isnumeric(varargin{1}) && isscalar(varargin{1})
+    posWidth = varargin{1};
+    varargin(1) = [];
+    if ~isempty(varargin) && (iscell(varargin{1}) || isstring(varargin{1}) ...
+            || isnumeric(varargin{1}) && ~isscalar(varargin{1}))
+        % Next token is the group-names vector (cellstr/string/numeric list)
+        if ~ischar(varargin{1})
+            posGroupNames = varargin{1};
+            varargin(1) = [];
         end
-    end
-
-    if(plotViolin)
-        hideBar=true;
-        plotFeatureAsPoint=true;
-        hideError=true;
+    elseif ~isempty(varargin) && isempty(varargin{1}) && ~ischar(varargin{1})
+        posGroupNames = varargin{1};
+        varargin(1) = [];
     end
 end
 
-change_axis = 0;
+p = inputParser;
+p.FunctionName = 'barweb';
+addParameter(p, 'Width', [], @(x) isempty(x) || (isnumeric(x) && isscalar(x)));
+addParameter(p, 'GroupNames', {}, @(x) iscell(x) || isstring(x) || isnumeric(x) || isempty(x));
+addParameter(p, 'Title', '', @(x) ischar(x) || isstring(x));
+addParameter(p, 'XLabel', '', @(x) ischar(x) || isstring(x));
+addParameter(p, 'YLabel', '', @(x) ischar(x) || isstring(x));
+addParameter(p, 'ColorMap', [], @(x) isnumeric(x) || ischar(x) || isstring(x));
+addParameter(p, 'GridStatus', 'none', @(x) ischar(x) || isstring(x));
+addParameter(p, 'Legend', {}, @(x) iscell(x) || isstring(x) || isempty(x));
+addParameter(p, 'LegendType', 'plot', @(x) ischar(x) || isstring(x));
+addParameter(p, 'DataPoints', {}, @(x) iscell(x) || isempty(x));
+addParameter(p, 'PlotViolin', false, @(x) islogical(x) || isnumeric(x));
+addParameter(p, 'Axes', [], @(x) isempty(x) || isgraphics(x));
+addParameter(p, 'ErrorColor', [], @(x) isempty(x) || (isnumeric(x) && numel(x) == 3));
+parse(p, varargin{:});
 
-if(~negativeToInfinity)
-    ymax = 0;
+R = p.Results;
+
+% Positional overrides take precedence when given.
+if ~isempty(posWidth)
+    width = posWidth;
+elseif ~isempty(R.Width)
+    width = R.Width;
 else
-    ymax = nan;
+    width = 0.8;
 end
-ymin =nan;
 
-if(all(isnan(barvalues)))
-    %barvalues(:)=0;
-    noBarSummaryVal=true;
-    plotFeatureAsPoint=false;
-    hideBar=true;
-    % hide error as well if its not absolute (min max basically)
+if ~isempty(posGroupNames)
+    groupnames = posGroupNames;
 else
-    noBarSummaryVal=false;
+    groupnames = R.GroupNames;
 end
 
-if(isempty(errors))
-    errors=nan(size(barvalues));
-end
+legendNames = cellstrColumn(R.Legend);
+legendType  = lower(char(R.LegendType));
+dataPoints  = R.DataPoints;
+plotViolin  = logical(R.PlotViolin);
+cmap        = resolveColorMap(R.ColorMap);
 
-if size(barvalues,1) ~= size(errors,1) || size(barvalues,2) ~= size(errors,2)
-	error('barvalues and errors matrix must be of same dimension');
+% ----------------------------------------------------------------------
+% Target axes and foreground (edge / error) color
+% ----------------------------------------------------------------------
+ownAxes = isempty(R.Axes);
+if ownAxes
+    ax = gca;
 else
-	if size(barvalues,2) == 1 && size(barvalues,1)~=length(groupnames)&&~isempty(groupnames)
-        warning('Mismatch between groupnames and columns, assuming data is transposed');
-		barvalues = barvalues';
-		errors = errors';
-    end
+    ax = R.Axes;
+end
+priorHold = ishold(ax);
 
-    
-    errorVals=size(errors,3);
-    if(errorVals==1)
-        errorsLower=errors(:,:,1)*BottomError;
-        errorsUpper=errors(:,:,1);
-    elseif(errorVals>1)
-        errorsLower=errors(:,:,1);
-        errorsUpper=errors(:,:,2);
-
-        error_is_y=true;
-
-        hideError=false||hideError;
-    end
-
-    
-
-    if(errorVals>2)
-        barLower=errors(:,:,3);
-        reDrawAsReactangles=true&&~hideBar;
-        hideBar=true;
-    else
-        barLower=zeros(size(barvalues));
-        reDrawAsReactangles=false;
-        hideBar=false||hideBar;
-    end
-
-    if(errorVals>3)
-        barUpper=errors(:,:,4);
-    else
-        barUpper=barvalues;
-    end
-
-    if(errorVals>4)
-        barMids=errors(:,:,5);
-
-        if(~all(barvalues==barMids))
-            plotFeatureAsPoint=true;
+if ~isempty(R.ErrorColor)
+    fgColor = R.ErrorColor(:)';
+else
+    % Honor the active processFNIRS2 plot theme (respects ForceLightMode)
+    % rather than sniffing the axes background, so bar edges, error bars,
+    % and the legend stay consistent with the rest of the toolbox.
+    try
+        fgColor = pf2_base.plot.PlotStyle.getDefault().ForegroundColor;
+    catch
+        axBg = get(ax, 'Color');
+        if isnumeric(axBg) && mean(axBg) < 0.5
+            fgColor = [1 1 1];
         else
-            noBarSummaryVal=true;
+            fgColor = [0 0 0];
         end
+    end
+end
+
+% ----------------------------------------------------------------------
+% Normalize barvalues / groupnames orientation
+% ----------------------------------------------------------------------
+barMeans = barvalues(:, :, 1);
+
+if isempty(groupnames)
+    groupnames = arrayfun(@(k) sprintf('%d', k), 1:size(barMeans, 1), ...
+        'UniformOutput', false);
+else
+    groupnames = cellstrColumn(groupnames);
+end
+
+% Single-column data whose length disagrees with the group labels is almost
+% certainly transposed (a single group of several bars passed as a column).
+if size(barMeans, 2) == 1 && ~isempty(groupnames) ...
+        && size(barMeans, 1) ~= numel(groupnames) ...
+        && size(barMeans, 1) == 1
+    barMeans = barMeans.';
+end
+
+% ----------------------------------------------------------------------
+% Decode the error pages into whisker / box geometry
+% ----------------------------------------------------------------------
+[lowerY, upperY, boxLow, boxHigh, boxMid, drawWhiskers, drawBox] = ...
+    decodeErrors(errors, barMeans);
+
+nGroups = size(barMeans, 1);
+nBars   = size(barMeans, 2);
+
+% ----------------------------------------------------------------------
+% Individual data points / violins
+% ----------------------------------------------------------------------
+hasPoints = ~isempty(dataPoints) && any(~cellfun(@isempty, dataPoints(:)));
+plotViolin = plotViolin && hasPoints;
+hideBars   = drawBox || plotViolin;
+
+handles = struct('ax', ax, 'bars', gobjects(1, nBars), ...
+    'errors', gobjects(1, nBars), 'legend', [], ...
+    'points', gobjects(0), 'violins', gobjects(0), ...
+    'rectangles', gobjects(0));
+
+% ----------------------------------------------------------------------
+% Draw the bars
+% ----------------------------------------------------------------------
+% BAR groups columns side-by-side automatically. A single group of N bars is
+% awkward for BAR (it would treat N as series of 1 group), so pad with a
+% zero second group to keep the clustered layout, then trim the x-limits.
+padded = false;
+plotMeans = barMeans;
+if nGroups == 1 && nBars > 1
+    plotMeans = [barMeans; zeros(1, nBars)];
+    padded = true;
+end
+
+hold(ax, 'on');
+hbars = bar(ax, plotMeans, width, 'EdgeColor', fgColor, 'LineWidth', 1.5);
+handles.bars = hbars;
+
+% Color each series.
+for j = 1:nBars
+    c = cmap(mod(j - 1, size(cmap, 1)) + 1, :);
+    hbars(j).FaceColor = c;
+    if ~isempty(legendNames) && j <= numel(legendNames) && ~isempty(legendNames{j})
+        hbars(j).DisplayName = legendNames{j};
+    end
+end
+
+if hideBars
+    set(hbars, 'Visible', 'off');
+end
+
+% Recover the true x-center of every bar series. XEndPoints holds the
+% per-group bar centers and is reliably populated (unlike XOffset, which can
+% return 0 before the figure has flushed, collapsing every series onto the
+% shared group center). Fall back to XData + XOffset if XEndPoints is absent.
+xCenters = zeros(nGroups, nBars);
+for j = 1:nBars
+    if isprop(hbars(j), 'XEndPoints') && numel(hbars(j).XEndPoints) >= nGroups
+        xe = hbars(j).XEndPoints;
+        xCenters(:, j) = xe(1:nGroups).';
     else
-        barMids=barvalues;
+        xData = hbars(j).XData(1:nGroups);
+        xCenters(:, j) = xData(:) + hbars(j).XOffset;
     end
+end
 
-    if(error_is_y)
-        errorsLower=barvalues-errorsLower;
-        errorsUpper=errorsUpper-barvalues;
-    elseif(hideBar)
-        % if error is not absolute and we're hiding the bar, SEM and SD
-        % mean nothing
-        hideError=true;
+% Approximate per-bar width (for violin / box rectangle footprint).
+if nBars > 1
+    barFootprint = mean(diff(xCenters(1, :)), 'omitnan') * 0.7;
+else
+    barFootprint = 0.7 * width;
+end
+if ~isfinite(barFootprint) || barFootprint <= 0
+    barFootprint = 0.5;
+end
+
+% ----------------------------------------------------------------------
+% Error bars (whiskers)
+% ----------------------------------------------------------------------
+if drawWhiskers
+    for j = 1:nBars
+        x = xCenters(:, j);
+        yc = barMeans(:, j);
+        lo = yc - lowerY(:, j);   % positive distance below
+        hi = upperY(:, j) - yc;   % positive distance above
+        lo(lo < 0) = 0;
+        hi(hi < 0) = 0;
+        valid = ~all(isnan(lo) & isnan(hi));
+        if valid
+            handles.errors(j) = errorbar(ax, x, yc, lo, hi, ...
+                'Color', fgColor, 'LineStyle', 'none', 'LineWidth', 1, ...
+                'HandleVisibility', 'off');
+        end
     end
+end
 
-
-    numgroups = size(barvalues, 1); % number of groups
-
-	if size(barvalues,1) == 1
-
-		barvalues = [barvalues; zeros(1,length(barvalues))];
-		errorsLower = [errorsLower; nan(1,size(barvalues,2))];
-        errorsUpper = [errorsUpper; nan(1,size(barvalues,2))];
-		change_axis = 1;
+% ----------------------------------------------------------------------
+% Box / IQR rectangles (replaces hidden bars)
+% ----------------------------------------------------------------------
+if drawBox
+    rects = gobjects(0);
+    for j = 1:nBars
+        c = cmap(mod(j - 1, size(cmap, 1)) + 1, :);
+        for g = 1:nGroups
+            top = boxHigh(g, j);
+            mid = boxMid(g, j);
+            bot = boxLow(g, j);
+            if any(isnan([top, mid, bot]))
+                continue
+            end
+            x0 = xCenters(g, j) - barFootprint / 2;
+            yLo = min([top, bot]);
+            h = abs(top - bot);
+            if h > 0
+                rh = rectangle(ax, 'Position', [x0, yLo, barFootprint, h], ...
+                    'FaceColor', c, 'EdgeColor', fgColor, 'LineWidth', 1.5);
+                rects(end + 1) = rh; %#ok<AGROW>
+            end
+            % Median line
+            line(ax, [x0, x0 + barFootprint], [mid, mid], ...
+                'Color', fgColor, 'LineWidth', 1.5);
+        end
     end
+    handles.rectangles = rects;
+end
 
-	
-	numbars = size(barvalues, 2); % number of bars in a group
-	if isempty(width)
-		width = 1;
-	end
-	
-	% Plot bars
-    % (even if invisible, we use for the xpoints)
-    if(~negativeToInfinity)
-        handles.bars = bar(barvalues, width,'edgecolor','k', 'linewidth', 2);
+% ----------------------------------------------------------------------
+% Violins and scatter points
+% ----------------------------------------------------------------------
+if hasPoints
+    [pj, pk] = size(dataPoints);
+    pts = gobjects(0);
+    vio = gobjects(0);
+    warnState = warning('off', 'all');
+    cleanupWarn = onCleanup(@() warning(warnState));
+    for g = 1:min(pj, nGroups)
+        for j = 1:min(pk, nBars)
+            d = dataPoints{g, j};
+            if isempty(d)
+                continue
+            end
+            d = d(:);
+            d = d(~isnan(d));
+            if isempty(d)
+                continue
+            end
+            xc = xCenters(g, j);
+            c = cmap(mod(j - 1, size(cmap, 1)) + 1, :);
+
+            if plotViolin && numel(d) > 1
+                [f, u] = ksdensity(d);
+                f = f(:) / max(f) * (barFootprint / 2);
+                u = u(:);
+                vh = fill(ax, [xc + f; flipud(xc - f)], [u; flipud(u)], c, ...
+                    'EdgeColor', fgColor, 'FaceAlpha', 0.5, ...
+                    'HandleVisibility', 'off');
+                vio(end + 1) = vh; %#ok<AGROW>
+            end
+
+            jitter = (rand(numel(d), 1) - 0.5) * barFootprint * 0.6;
+            ph = scatter(ax, xc + jitter, d, 10, 'filled', ...
+                'MarkerFaceColor', c, 'MarkerEdgeColor', fgColor, ...
+                'MarkerFaceAlpha', 0.6, 'HandleVisibility', 'off');
+            pts(end + 1) = ph; %#ok<AGROW>
+        end
+    end
+    handles.points = pts;
+    handles.violins = vio;
+end
+
+% ----------------------------------------------------------------------
+% Legend
+% ----------------------------------------------------------------------
+showLegend = ~isempty(legendNames) && ~strcmp(legendType, 'hide');
+if showLegend && strcmp(legendType, 'plot')
+    nShow = min(numel(legendNames), nBars);
+    if nShow >= 1
+        handles.legend = legend(ax, hbars(1:nShow), legendNames(1:nShow), ...
+            'Location', 'best', 'TextColor', fgColor);
+        legend(ax, 'boxoff');
+        % Match the legend background to the theme so it does not show a dark
+        % fill under ForceLightMode (boxoff only removes the outline).
+        try
+            set(handles.legend, 'Color', ...
+                pf2_base.plot.PlotStyle.getDefault().LegendBgColor);
+        catch
+        end
+    end
+end
+
+% ----------------------------------------------------------------------
+% Labels, ticks, grid, limits
+% ----------------------------------------------------------------------
+set(ax, 'XTick', 1:nGroups, 'XTickLabel', groupnames, ...
+    'Box', 'off', 'TickLength', [0 0], 'LineWidth', 1.5);
+
+if nGroups == 1
+    set(ax, 'XLim', [0.5, 1.5]);
+elseif padded
+    set(ax, 'XLim', [0.5, 1.5]);  % single real group, padded second hidden
+else
+    set(ax, 'XLim', [0.5, nGroups + 0.5]);
+end
+
+if ~isempty(char(R.Title))
+    title(ax, R.Title, 'FontSize', 14);
+end
+if ~isempty(char(R.XLabel))
+    xlabel(ax, R.XLabel, 'FontSize', 14);
+end
+if ~isempty(char(R.YLabel))
+    ylabel(ax, R.YLabel, 'FontSize', 14);
+end
+
+gs = lower(char(R.GridStatus));
+set(ax, 'XGrid', 'off', 'YGrid', 'off');
+if contains(gs, 'x')
+    set(ax, 'XGrid', 'on');
+end
+if contains(gs, 'y')
+    set(ax, 'YGrid', 'on');
+end
+
+% Axis-style legend: rotated labels beneath each bar.
+if showLegend && strcmp(legendType, 'axis')
+    yl = ylim(ax);
+    yBase = yl(1) - 0.03 * (yl(2) - yl(1));
+    for j = 1:min(numel(legendNames), nBars)
+        for g = 1:nGroups
+            text(ax, xCenters(g, j), yBase, legendNames{j}, ...
+                'Rotation', 60, 'FontSize', 11, ...
+                'HorizontalAlignment', 'right', 'Color', fgColor);
+        end
+    end
+    set(ax, 'XAxisLocation', 'top');
+end
+
+% Restore hold state when operating on a caller-supplied axes.
+if ~priorHold
+    hold(ax, 'off');
+end
+
+end
+
+% ======================================================================
+% Local helpers
+% ======================================================================
+
+function out = cellstrColumn(in)
+% Coerce a cellstr / string array / numeric list into a column cellstr.
+if isempty(in)
+    out = {};
+    return
+end
+if isstring(in)
+    out = cellstr(in(:));
+elseif isnumeric(in)
+    out = arrayfun(@(k) sprintf('%g', k), in(:), 'UniformOutput', false);
+elseif iscell(in)
+    out = in(:);
+    for k = 1:numel(out)
+        if isnumeric(out{k})
+            out{k} = sprintf('%g', out{k});
+        elseif isstring(out{k})
+            out{k} = char(out{k});
+        end
+    end
+else
+    out = {char(in)};
+end
+end
+
+function cmap = resolveColorMap(spec)
+% Turn a colormap spec (RGB rows, name string, or empty) into RGB rows.
+if isempty(spec)
+    cmap = lines(8);
+elseif isnumeric(spec)
+    if size(spec, 2) == 3
+        cmap = spec;
     else
-        handles.bars = bar(barvalues, width,'BaseValue', -10,'edgecolor','k', 'linewidth', 2);
+        cmap = lines(8);
     end
-	hold on
-	if ~isempty(bw_colormap)
-		colormap(bw_colormap);
-	else
-		colormap(jet);
-	end
-	if ~isempty(bw_legend) && ~strcmp(legend_type, 'axis')&&strcmp(legend_type,'plot')
-		handles.legend = legend(bw_legend, 'location', 'best', 'FontSize',12,'TextColor',[0,0,0]);
-		legend boxoff;
-	else
-		handles.legend = [];
+else
+    name = char(spec);
+    try
+        cmap = feval(name, 8);
+    catch
+        cmap = lines(8);
     end
-	
-%     if(numgroups==1&&numbars==2)
-%         barvalues=[barvalues;barvalues];
-%     end
+end
+end
 
-    xOffsets=nan([1,numbars]);
-    for i=1:numbars
+function [lowerY, upperY, boxLow, boxHigh, boxMid, drawWhiskers, drawBox] = ...
+        decodeErrors(errors, barMeans)
+% Decode the error pages into absolute whisker y-values and box edges.
+%
+%   1 page  : symmetric +/- error (delta about the bar mean).
+%   2 pages : lower / upper whisker as ABSOLUTE y values.
+%   >=3      : box/IQR rendering; pages 3..5 give box low/high/mid edges.
+[m, n] = size(barMeans);
+lowerY  = nan(m, n);
+upperY  = nan(m, n);
+boxLow  = nan(m, n);
+boxHigh = nan(m, n);
+boxMid  = nan(m, n);
+drawWhiskers = false;
+drawBox = false;
 
-        xOffsets(i)=handles.bars(i).XOffset;   
-        offsetFx=@(x,n)((x-1)/(n-1))-0.5;
-        if(numbars>1&&(all(xOffsets(1:i)==0)))
-            waitfor( handles.bars(i),'XOffset');
-            % Fix for stupid mac running too fast
-            %xOffsets(i)=offsetFx(i,numbars)*0.55;
-            xOffsets(i)=handles.bars(i).XOffset;  
-        end
-    end
+if isempty(errors)
+    return
+end
 
-    barW=mean(diff(xOffsets));
-    if(isnan(barW))
-        barW=0.75;
+nPages = size(errors, 3);
+
+% Align error orientation to barMeans when a transpose occurred upstream.
+if size(errors, 1) ~= m && size(errors, 2) == m && size(errors, 1) == n
+    errors = permute(errors, [2 1 3]);
+end
+
+if nPages == 1
+    e = errors(:, :, 1);
+    lowerY = barMeans - e;
+    upperY = barMeans + e;
+    drawWhiskers = true;
+elseif nPages == 2
+    lowerY = errors(:, :, 1);   % absolute whisker endpoints
+    upperY = errors(:, :, 2);
+    drawWhiskers = true;
+else  % nPages >= 3: box/IQR
+    lowerY = errors(:, :, 1);
+    upperY = errors(:, :, 2);
+    boxLow = errors(:, :, 3);
+    if nPages >= 4
+        boxHigh = errors(:, :, 4);
     else
-        barW=barW*0.75;
+        boxHigh = barMeans;
     end
-    
-	% Plot errors + assign colors
-	for i = 1:numbars 
-        
-
-        xData=handles.bars(i).XData;
-        xOffset=[xOffsets(i)]';
-        
-        x = bsxfun(@plus, xData, xOffset'); 
-
-    
-
-
-        if ~isempty(bw_colormap)
-            newI=rem(i,length(bw_colormap(:,1)));
-            if(newI==0)
-                newI=length(bw_colormap(:,1));
-            end
-            curColor=bw_colormap(newI,:);
-        else
-            curColor=[0,0,0];
-        end
-        
-        if(hideBar&&~reDrawAsReactangles&&~hideError)
-            handles.errors(i) = errorbar(x', barvalues(:,i), errorsLower(:,i), 'Color',curColor, 'linestyle', 'none', 'linewidth', 3); 
-        elseif(~hideError)
-            handles.errors(i) = errorbar(x', barvalues(:,i), errorsLower(:,i),errorsUpper(:,i), 'k', 'linestyle', 'none', 'linewidth', 1); 
-       
-        end
-
-        
-        
-
-        if ~isempty(bw_colormap)
-            handles.bars(i).FaceColor=curColor;
-            if(length(bw_legend)>=i&&~isempty(bw_legend{i}))
-                set(handles.bars(i),'Tag',bw_legend{i});
-            end
-        end
-        if(hideBar)
-            set(handles.bars(i),'Tag',bw_legend{i});
-            set(handles.bars(i),'Visible',false);
-
-            %Replot for non-zero based bars
-            if(reDrawAsReactangles)
-                for ii=1:numgroups
-
-                    h1=abs(barUpper(ii,i)-barMids(ii,i));
-                    h2=abs(barMids(ii,i)-barLower(ii,i));
-
-                    baseY1=min([barUpper(ii,i),barMids(ii,i)]);
-                    baseY2=min([barMids(ii,i),barLower(ii,i)]);
-
-                    if(h1>=0)
-                        handles.rectangles(i,ii,1)=rectangle('position',[x(ii)-barW/2,baseY1, barW, h1]);
-                        if ~isempty(bw_colormap)
-                            handles.rectangles(i,ii,1).FaceColor=curColor; 
-                            handles.rectangles(i,ii,1).LineWidth=2; 
-                        end
-                    end
-                    if(h2>=0)
-                        handles.rectangles(i,ii,2)=rectangle('position',[x(ii)-barW/2,baseY2, barW, h2]);
-                        if ~isempty(bw_colormap)
-                            handles.rectangles(i,ii,2).FaceColor=curColor; 
-                            handles.rectangles(i,ii,2).LineWidth=2; 
-                        end
-                    end
-
-                    if(length(bw_legend)>=i&&~isempty(bw_legend{i}))
-                        set(handles.rectangles(i,ii,1),'Tag',bw_legend{i});
-                        set(handles.rectangles(i,ii,2),'Tag',bw_legend{i});
-                    end
-                end
-            end
-            
-           
-        end
-
-        
-        
-        if(plotData)
-            for ii=1:numgroups
-                if(plotViolin)
-                    % Draw Violin plot with rectangles
-                    if(useKSD)
-                        handles.Violin{ii,i}=fill([f{ii,i}*barW/2+x(ii);flipud(x(ii)-f{ii,i}*barW/2)],[u{ii,i};flipud(u{ii,i})],curColor,'EdgeColor',[0,0,0]);
-                        set(handles.Violin{ii,i},'HandleVisibility','off');
-                    else
-
-                        binVals=(N_v{ii,i})/max((N_v{ii,i}))*barW;
-    
-                        ybin_width=mean(diff(y_bin_v{ii,i}));
-                        xVals=ones(size(y_bin_v{ii,i}))*x(ii);
-    
-                        for b=1:length(xVals)
-    
-                            hBin=rectangle('position',[x(ii)-binVals(b)/2,y_bin_v{ii,i}(b)-ybin_width/2,binVals(b), ybin_width]);
-                            if ~isempty(bw_colormap)
-                                hBin.FaceColor=curColor; 
-                                hBin.LineWidth=0.1; 
-                            end
-                            set(hBin,'HandleVisibility','off');
-                        end
-
-                    end
-
-
-                elseif(~isempty(data_points{ii,i}))
-                    %scatter points within violin plot shape
-
-                    curBarDataPoints=sort(data_points{ii,i}(:));
-                    curBarDataPoints=curBarDataPoints(~isnan(curBarDataPoints));
-                    xVals=ones(size(curBarDataPoints))*x(ii);
-
-                   
-
-                    % Randomize arrangments within each violin bin
-                    [a_count,b_idx]=histc(curBarDataPoints,y_bin_v{ii,i});
-                    b_idx2=b_idx>0;
-                    posIdx=[1;diff(b_idx(b_idx2))>0];
-                    posCount=nan(size(posIdx));
-                    n=0;
-                    lastIdx=1;
-                    for z=1:length(posIdx)
-                        if(posIdx(z)>0)
-                            if(n>0)
-                                posCount(lastIdx:lastIdx+n)=randperm(n+1)-1;
-                            end
-                            n=0;
-                            lastIdx=z;
-                        else
-                            n=n+1;
-                        end
-                        posCount(z)=n;
-                    end
-                    if(posCount(end)>0)
-                        l=length(posIdx)-lastIdx;
-                        posCount(lastIdx:length(posIdx))=randperm(l+1)-1;
-                    end
-                    
-                    %(posCount-(a_count(b_idx(b_idx2))-1)/2)/maxCount
-                    maxCount=max(a_count);
-
-                    xVals(b_idx2)=xVals(b_idx2)+(posCount-(a_count(b_idx(b_idx2))-1)/2)/maxCount*barW*0.8;
-    
-                    curBarDataPoints=[xVals,curBarDataPoints];
-
-                    if(noBarSummaryVal)
-                        scatter(curBarDataPoints(:,1),curBarDataPoints(:,2),2,'o','MarkerEdgeColor',curColor);
-                    else
-                        scatter(curBarDataPoints(:,1),curBarDataPoints(:,2),2,'o','MarkerEdgeColor',[0,0,0]);
-                    end
-                end
-            end
-        end
-        
-
-        if(hideBar)
-             if((~hideError&&~reDrawAsReactangles)||plotFeatureAsPoint)
-
-                 handles.statpoints(i)=scatter(x,barvalues(:,i),16,'d','filled','MarkerFaceColor',[0,0,0]);
-                if ~isempty(bw_colormap)                 
-                     
-                    if(noBarSummaryVal)
-                        %handles.statpoints(i).MarkerSize=8;
-                        handles.statpoints(i).MarkerEdgeColor=curColor; 
-                        handles.statpoints(i).MarkerFaceColor=curColor;  
-                    end
-                    
-                    
-                    if(length(bw_legend)>=i&&~isempty(bw_legend{i}))
-                        set(handles.statpoints(i),'Tag',bw_legend{i});
-                    end
-                end 
-            end
-        end
-
-        if(length(bw_legend)>=i&&~isempty(bw_legend{i})&&~hideError)
-            set(handles.errors(i),'Tag',bw_legend{i});
-        end
-
-        if(~hideError)
-            set(handles.errors(i),'HandleVisibility','off');
-        end
-        
-        nonNanErrors=errors;
-        nonNanErrors(isnan(errors))=0;
-        ymax = nanmax([ymax; barvalues(:,i)+abs(nonNanErrors(:,i))]); 
-        ymin=nanmin([ymin;barvalues(:,i)-abs(nonNanErrors(:,i))]);
-	end
-	
-	if error_sides == 1
-		set(gca,'children', flipud(get(gca,'children')));
-    end
-	
-    if ymin>0||isnan(ymin)
-        ymin=0;
-    end
-    if(ymin~=ymax)
-        if(ymax==ymin||isnan(ymax))
-            ymax=ymin+0.0001;
-            warning('Invalid data');
-        end
-        if(ymin>ymax)
-           temp=ymin;
-           ymin=ymax;
-           ymax=temp;
-        end
-
-        if(ymin==0)
-            yminLim = 0;
-        elseif(ymin<0)
-            yminLim = 1.1*ymin;
-        end
-        ylim([yminLim ymax*1.1]);
-    end
-    
-    if(numbars==1&&change_axis)
-        xlim([0.25 numgroups+0.75]);    
+    if nPages >= 5
+        boxMid = errors(:, :, 5);
     else
-        xlim([0.5 numgroups+0.5]);
+        boxMid = barMeans;
     end
-    
-	if strcmp(legend_type, 'axis')
-		for i = 1:numbars
-			xdata = get(handles.errors(i),'xdata');
-			for j = 1:length(xdata)
-				text(xdata(j),  -0.03*ymax*1.1, bw_legend(i), 'Rotation', 60, 'fontsize', 12, 'HorizontalAlignment', 'right');
-			end
-		end
-		set(gca,'xaxislocation','top');
-	end
-	
-	if ~isempty(bw_title)
-		title(bw_title, 'fontsize',14);
-	end
-	if ~isempty(bw_xlabel)
-		xlabel(bw_xlabel, 'fontsize',14);
-	end
-	if ~isempty(bw_ylabel)
-		ylabel(bw_ylabel, 'fontsize',14);
-	end
-	
-	set(gca, 'xticklabel', groupnames, 'box', 'off', 'ticklength', [0 0], 'fontsize', 12, 'xtick',1:numgroups, 'linewidth', 2,'xgrid','off','ygrid','off');
-	if ~isempty(gridstatus) && any(gridstatus == 'x')
-		set(gca,'xgrid','on');
-	end
-	if ~isempty(gridstatus) && any(gridstatus ==  'y')
-		set(gca,'ygrid','on');
-	end
-	
-	handles.ax = gca;
-	
-	hold off
+    drawWhiskers = true;
+    drawBox = true;
+end
 end

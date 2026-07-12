@@ -1,13 +1,41 @@
 function [ figHandle ] = pf2_plotArranged(varargin)
-% pf2_plotArranged(fNIR,channels,showMarkers,wavelengths,ylimit,plotArranged,lineProps,rejectedLineProps)
-% This function plots and automatically arranges fNIRS data based on
-% the input values. Specify if raw or Oxy (or other) biomarkers
-%   It expects fNIR (the data struct), the channels to plot:
-%       (can be a number or a logical index)
-%      a set of wavelengths (ie: 730 or logical index)
-%   A specific ylimit ( to force all to use the same axes
-%   a boolean to plot the arranged channels
-%  Accepted line properties and for normal and rejected channels
+% PF2_PLOTARRANGED Plot fNIRS channels in device-arranged subplot layout
+%
+% Plots raw fNIRS data with channels arranged spatially according to the
+% device probe layout. Supports multi-probe devices, event markers,
+% wavelength selection, and visual indication of rejected channels.
+%
+% Syntax:
+%   pf2_plotArranged(fNIR)
+%   pf2_plotArranged(fNIR, channels)
+%   pf2_plotArranged(fNIR, channels, showMarkers, signalNames, ylimit, ...
+%       plotArranged, lineProps, rejectedLineProps, baseline, RawData)
+%   figHandle = pf2_plotArranged(...)
+%
+% Inputs:
+%   fNIR              - fNIRS data struct (required)
+%   channels          - Channel indices to plot (default: all)
+%                       Numeric array or logical mask.
+%   showMarkers       - Display event markers (default: true)
+%   signalNames       - Signal/wavelength names to plot (default: all)
+%   ylimit            - Y-axis limits [min max] (default: auto from device)
+%   plotArranged      - Use spatial arrangement (default: false, true if all)
+%   lineProps         - Line properties for good channels (default: {'LineWidth', 1})
+%   rejectedLineProps - Line properties for rejected channels (default: {'--', 'LineWidth', 1})
+%   baseline          - Show baseline indicator (default: false)
+%   RawData           - Plotting raw data flag (default: true)
+%
+% Outputs:
+%   figHandle - Handle(s) to created figure(s)
+%
+% Example:
+%   data = pf2.import.sampleData.fNIR2000();
+%   pf2_base.pf2_plotArranged(data);
+%
+%   % Plot specific channels
+%   pf2_base.pf2_plotArranged(data, [1 3 5]);
+%
+% See also: pf2.data.plot.raw, pf2.data.plot.oxy
 
 validFnirs = @(x) (iscell(x) || isstruct(x));
 validChannels = @(x) (isnumeric(x) || ischar(x));
@@ -162,7 +190,7 @@ end
                 disp('No device specified. Please load device configuration');
                 probeInfo=pf2_base.loadDeviceCfg([],true);
                 if(~isempty(probeInfo))
-                    error('No valid devices selected');
+                    error('pf2_base:pf2_plotArranged:noValidDevices', 'No valid devices selected');
                 end
                 
             elseif(~isempty(cfgFilePath)) % If we're not looking at the GUI, doesn't matter
@@ -177,7 +205,7 @@ end
             end
             probeInfo=probeInfo.Probe{probeNum};
         else
-            error('Unable to identify probe');
+            error('pf2_base:pf2_plotArranged:unidentifiedProbe', 'Unable to identify probe');
         end
         
         
@@ -207,14 +235,14 @@ end
                 fprintf(2,'%i ',wavelengths(i));
             end
             fprintf('\n');
-            error('No Wavelengths to plot');
+            error('pf2_base:pf2_plotArranged:noWavelengths', 'No Wavelengths to plot');
         end
         
         
         if(any(channels>probeInfo.NumOptodes))
-            error('Some channels are higher than probe optode count');
+            error('pf2_base:pf2_plotArranged:channelOutOfRange', 'Some channels are higher than probe optode count');
         elseif(any(channels<0))
-            error('Channels can not be negative');
+            error('pf2_base:pf2_plotArranged:negativeChannel', 'Channels can not be negative');
         end
         
         
@@ -224,7 +252,7 @@ end
             tmax=nanmax(t);
             tmean=nanmean(t)-tmin;
         else
-            error('Must have valid time field');
+            error('pf2_base:pf2_plotArranged:noTimeField', 'Must have valid time field');
         end
         
         idx2plot=ismember(probeInfo.ChannelNumbers,channels);
@@ -268,7 +296,12 @@ end
         if(ischar(showMarkers)&&strcmpi(showMarkers,'all'))
             showMarkers=true;
         end
-        
+
+        % Work with markers as a numeric array [time, value, duration, amplitude]
+        if(isfield(fNIR,'markers')&&~isempty(fNIR.markers))
+            fNIR.markers=pf2_base.markersToArray(fNIR.markers);
+        end
+
         if(islogical(showMarkers))
             if(~showMarkers)
                 showMarkers=[];
@@ -286,10 +319,7 @@ end
         end
         
         if(isfield(fNIR,'markers')&&~isempty(showMarkers))
-            curMarkers=fNIR.markers;
-            if(~isnumeric(curMarkers)&&isfield(curMarkers,'data'))
-                curMarkers=curMarkers.data;
-            end
+            curMarkers=fNIR.markers;   % already a numeric array (converted above)
         end
         
         
@@ -418,7 +448,7 @@ end
                     
                     mrkName=sprintf('Mrk%i',showMarkers(i));
                     if(numMarkers(i)<tooManyMarkers||plotTonsOfMarkers)
-                        yLabelHeight=(1:length(showMarkers))*0.05+0.15;
+                        yLabelHeight=min((1:length(showMarkers))*0.05+0.15, 0.95);
                         if(numMarkers(i)<tooManyLabels)
                             pf2_base.external.vline(curMarkers(showMarkersIdx==i),'k',mrkName,yLabelHeight(i));
                         else

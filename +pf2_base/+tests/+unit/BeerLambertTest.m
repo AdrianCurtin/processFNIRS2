@@ -104,10 +104,11 @@ classdef BeerLambertTest < matlab.unittest.TestCase
         end
 
         function testIntensity2ODZeroHandling(testCase)
-            % Verify zero intensity produces Inf (log10(0) = -Inf)
+            % Verify zero intensity produces NaN
             %
             % Zero or negative intensity values represent invalid measurements.
-            % The function should handle them gracefully.
+            % pf2_Intensity2OD maps any non-finite OD (e.g. -log10(0/mean))
+            % to NaN so downstream code can treat them as missing.
 
             % Create data with zero values
             intensity = [1000; 0; 500; 1000];
@@ -117,9 +118,9 @@ classdef BeerLambertTest < matlab.unittest.TestCase
             od = pf2_Intensity2OD(intensity);
             warning('on', 'all');
 
-            % Zero input should produce Inf (since -log10(0/mean) = Inf)
-            testCase.verifyTrue(isinf(od(2)), ...
-                'Zero intensity should produce Inf in OD');
+            % Zero input should produce NaN (non-finite OD mapped to NaN)
+            testCase.verifyTrue(isnan(od(2)), ...
+                'Zero intensity should produce NaN in OD');
         end
     end
 

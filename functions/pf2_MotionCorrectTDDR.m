@@ -1,54 +1,139 @@
-% function dodTDDR = pf2_MotionCorrectTDDR(dod,sample_rate)
+function [dodTDDR] = pf2_MotionCorrectTDDR(dod, sample_rate, accelerate)
+% PF2_MOTIONCORRECTTDDR Temporal Derivative Distribution Repair for motion artifacts
 %
-% Corrects motion artifacts by computing the temporal derivative of the dod signal, 
-% applying robust regression to reduce magnitude of outlying fluctuations, then 
-% integrating to get the corrected signal.
+% Corrects motion artifacts by computing the temporal derivative of the
+% signal, applying robust regression (Tukey's biweight) to reduce the
+% magnitude of outlying fluctuations, then integrating to recover the
+% corrected signal. High-frequency components (>0.5 Hz) are separated
+% before correction and merged back afterward.
 %
-% This function follows the procedure described in:
-% Fishburn, F. A. et al. (2019). Temporal Derivative Distribution Repair (TDDR): A motion correction method for fNIRS. NeuroImage, 184, 171-179.
+% Channels with partial NaN values are processed piecewise: each contiguous
+% non-NaN segment is corrected independently. Segments shorter than 10
+% samples are left uncorrected (original OD values preserved).
 %
-% INPUTS:
-% dod:         delta_OD
-% SD:          SD structure (removed in this version)
-% sample_rate: the sample rate of the signal
+% Reference:
+%   Fishburn, F. A. et al. (2019). Temporal Derivative Distribution Repair
+%   (TDDR): A motion correction method for fNIRS. NeuroImage, 184, 171-179.
+%   Script by Frank Fishburn (fishburnf@upmc.edu) 10/03/2018.
 %
-% OUTPUTS:
-% dodTDDR:     dod after correction via TDDR
+% Syntax:
+%   dodTDDR = pf2_MotionCorrectTDDR(dod, sample_rate)
+%   dodTDDR = pf2_MotionCorrectTDDR(dod, sample_rate, accelerate)
 %
-% LOG:
-% Script by Frank Fishburn (fishburnf@upmc.edu) 10/03/2018
+% Inputs:
+%   dod         - Optical density signal [T x C double]
+%                 T = time samples, C = channels
+%                 May contain NaN values (handled piecewise).
+%   sample_rate - Sampling rate in Hz (scalar)
+%   accelerate  - Parallel acceleration mode (optional, string, default: 'auto')
+%                 'auto'   - use parfor if pool running and nChannels > 8
+%                 'parfor' - use parfor if available
+%                 'none'   - serial processing
 %
+% Outputs:
+%   dodTDDR - Motion-corrected optical density [T x C double]
+%             Same size as input dod. NaN positions are preserved.
+%
+% Algorithm:
+%   1. Separate low-frequency (<0.5 Hz) and high-frequency components
+%   2. Compute temporal derivative of low-frequency signal
+%   3. Iteratively estimate robust weights via Tukey's biweight function
+%   4. Apply weights to centered derivative
+%   5. Integrate corrected derivative and center result
+%   6. Recombine with high-frequency component
+%
+% Example:
+%   data = pf2.import.sampleData.fNIR2000();
+%   od = pf2_Intensity2OD(data.raw);
+%   corrected = pf2_MotionCorrectTDDR(od, data.fs);
+%
+% See also: pf2_SMAR, pf2_MotionCorrectWavelet, pf2_fnirs_MARA
 
-function [dodTDDR] = pf2_MotionCorrectTDDR(dod,sample_rate)
+if ~exist('accelerate','var') || isempty(accelerate)
+    accelerate = 'auto';
+end
 
-mlAct = ones(size(dod,2),1);
-
-lstAct = find(mlAct==1);
+nChannels = size(dod, 2);
 dodTDDR = dod;
 
-for ii=1:length(lstAct)
-    
-    idx_ch = lstAct(ii);
+minSegment = 10; % Minimum samples for TDDR correction
+
+% Determine whether to use parfor
+useParfor = false;
+if ~strcmp(accelerate, 'none')
+    [canUse, poolRunning] = pf2_base.accel.canParfor();
+    if strcmp(accelerate, 'parfor')
+        useParfor = canUse;
+    elseif strcmp(accelerate, 'auto')
+        useParfor = canUse && poolRunning && nChannels > 8;
+    end
+end
+
+if useParfor
+    parfor ii = 1:nChannels
+        dodTDDR(:, ii) = processChannel(dod(:, ii), sample_rate, minSegment);
+    end
+else
+    for ii = 1:nChannels
+        dodTDDR(:, ii) = processChannel(dod(:, ii), sample_rate, minSegment);
+    end
+end
+
+end
+
+
+function chOut = processChannel(chData, sample_rate, minSegment)
+% PROCESSCHANNEL Apply TDDR to a single channel, handling NaN piecewise.
+
+    chOut = chData;
+
+    % Skip dead channels (all NaN from zero raw intensity)
+    if all(~isfinite(chData))
+        return;
+    end
+
+    nanMask = isnan(chData);
+
+    if ~any(nanMask)
+        % No NaN — process whole channel directly
+        chOut = tddr_core(chData, sample_rate);
+        return;
+    end
+
+    % Piecewise: find contiguous non-NaN segments
+    transitions = diff([true; nanMask; true]);
+    segStarts = find(transitions == -1);
+    segEnds   = find(transitions == 1) - 1;
+
+    for jj = 1:length(segStarts)
+        idx = segStarts(jj):segEnds(jj);
+        if length(idx) >= minSegment
+            chOut(idx) = tddr_core(chData(idx), sample_rate);
+        end
+        % Short segments: left as original OD values (uncorrected but valid)
+    end
+
+end
+
+
+function corrected = tddr_core(signal, sample_rate)
+%TDDR_CORE Apply TDDR to a single contiguous (no-NaN) signal segment.
 
     %% Preprocess: Separate high and low frequencies
     filter_cutoff = .5;
     filter_order = 3;
     Fc = filter_cutoff * 2/sample_rate;
     if Fc<1
-        [fb,fa] = butter(filter_order,Fc);
-        try
-            signal_low = pf2_base.filtfilt_piecewise(fb,fa,dod(:,idx_ch),10);
-        catch 
-            signal_low = pf2_base.external.filtfilt_classic(fb,fa,dod(:,idx_ch));
-        end
+        [fb,fa] = pf2_base.external.butter(filter_order,Fc);
+        signal_low = pf2_base.external.filtfilt_classic(fb,fa,signal);
     else
-        signal_low = dod(:,idx_ch);
+        signal_low = signal;
     end
-    signal_high = dod(:,idx_ch) - signal_low;
+    signal_high = signal - signal_low;
 
     %% Initialize
     tune = 4.685;
-    D = sqrt(eps(class(dod)));
+    D = sqrt(eps(class(signal)));
     mu = inf;
     iter = 0;
 
@@ -96,8 +181,6 @@ for ii=1:length(lstAct)
     signal_low_corrected = signal_low_corrected - mean(signal_low_corrected);
 
     %% Postprocess: Merge back with uncorrected high frequency component
-    dodTDDR(:,idx_ch) = signal_low_corrected + signal_high;
-    
-end
+    corrected = signal_low_corrected + signal_high;
 
 end

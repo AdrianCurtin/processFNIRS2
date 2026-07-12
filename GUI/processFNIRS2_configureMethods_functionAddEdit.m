@@ -55,6 +55,8 @@ function processFNIRS2_configureMethods_functionAddEdit_OpeningFcn(hObject, even
 
 handles.output = hObject;
 
+pf2_base.applyLightTheme(hObject);
+
 global compareMode
 global curFunction
 global outFunc
@@ -682,15 +684,15 @@ function newName=cleanNameForINI(Name)
 			case Numbers
 			case LowerCases
 			case UpperCases
-			case {'À','�?','Â','Ã','Ä','Å'},     Character = 'A';
+			case {'À','�?','Â','Ã','Ä','Å'},     Character = 'A';
 			case 'Æ',                           Character = 'AE';
 			case 'Ç',                           Character = 'C';
 			case {'È','É','Ê','Ë'},             Character = 'E';
-			case {'Ì','�?','Î','�?'},             Character = 'I';
+			case {'Ì','�?','Î','�?'},             Character = 'I';
 			case 'Ñ',                           Character = 'N';
 			case {'Ò','Ó','Ô','Õ','Ö'},         Character = 'O';
 			case {'Ù','Ú','Û','Ü'},             Character = 'U';
-			case '�?',                           Character = 'Y';
+			case '�?',                           Character = 'Y';
 			case '²',                           Character = '2';
 			case '³',                           Character = '3';
 			case '¼',                           Character = '1_4';

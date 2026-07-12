@@ -41,7 +41,8 @@ function x=pf2_unpackMethod(method)
 %   unpacked = pf2_base.pf2_unpackMethod(method);
 %   fprintf('Method has %d processing steps\n', length(unpacked.F));
 %
-% See also: pf2_describeMethod, processStageRaw2OD, processStageFilterHb
+% See also: pf2_base.PipelineFunction, pf2_base.Pipeline,
+%           processStageRaw2OD, processStageFilterHb
     x=method;
     
     if(isempty(method))
@@ -51,9 +52,52 @@ function x=pf2_unpackMethod(method)
        x=x{1}; 
     end
     
-    if(isfield(x,'F'))
-        %return;
+    if isfield(x,'F') && iscell(x.F)
+        % Recover from a much earlier corruption mode: F is a flat cell
+        % {'funcName','val','funcName','val',...} produced by a buggy INI
+        % writer that emitted PipelineFunction objects without struct(...)
+        % wrappers. Split at every 'funcName' marker into per-step structs.
+        if ~isempty(x.F) && all(cellfun(@(c) ~isstruct(c) && ~isa(c,'pf2_base.PipelineFunction'), x.F))
+            funcNameIdx = find(cellfun(@(c) (ischar(c)||isstring(c)) && strcmp(char(c),'funcName'), x.F));
+            if numel(funcNameIdx) >= 1 && mod(numel(x.F),2) == 0
+                breakpoints = [funcNameIdx, numel(x.F)+1];
+                stepStructs = cell(1, numel(funcNameIdx));
+                for s = 1:numel(funcNameIdx)
+                    chunk = x.F(breakpoints(s):breakpoints(s+1)-1);
+                    % MATLAB's struct() distributes cell values across struct
+                    % array elements: struct('a',{'x','y'}) yields a 1x2
+                    % struct, NOT a struct with .a={'x','y'}. We want every
+                    % cell value to be stored as-is. Wrap all cell values in
+                    % {{}} to suppress distribution.
+                    for cc = 2:2:numel(chunk)
+                        if iscell(chunk{cc})
+                            chunk{cc} = {chunk{cc}};
+                        end
+                    end
+                    try
+                        stepStructs{s} = struct(chunk{:});
+                    catch
+                        stepStructs{s} = [];
+                    end
+                end
+                stepStructs = stepStructs(~cellfun(@isempty, stepStructs));
+                if ~isempty(stepStructs)
+                    x.F = stepStructs;
+                end
+            end
+        end
+        % F is now a proper cell array — proceed
+    elseif isfield(x,'F') && isstruct(x.F)
+        % Config loading produced a struct array — convert to cell
+        tmp = cell(1, numel(x.F));
+        for k = 1:numel(x.F)
+            tmp{k} = x.F(k);
+        end
+        x.F = tmp;
     else
+        % F is missing or corrupted (e.g. char from INI serialization)
+        % — fall through to S# field extraction
+        if isfield(x,'F'), x = rmfield(x,'F'); end
         if(iscell(x)&&~isstruct(x))
             t=x;
             x=cell(0);
@@ -65,42 +109,101 @@ function x=pf2_unpackMethod(method)
             end
             x.name=('Unknown Method');
         else
-            x.F=cell(0);
-            x_fields=fields(x);
-
-            numMethods=1;
+            x.F={};
+            x_fields=fieldnames(x);
             for j=1:length(x_fields)
-               if(strcmp(sprintf('S%i',j),x_fields))
-                   x.F{numMethods}=x.(sprintf('S%i',j));
-                   x=rmfield(x,sprintf('S%i',j));
-                   numMethods=numMethods+1;
-               end
+                fieldName=sprintf('S%d',j);
+                if isfield(x,fieldName)
+                    x.F{end+1}=x.(fieldName);
+                    x=rmfield(x,fieldName);
+                end
             end
         end
     end
     
     for idx=1:length(x.F)
         Fidx=x.F{idx};
-        if(length(Fidx)>1) %This is a struct array for some reason?
-           %Change it back!
+
+        % Already a PipelineFunction — leave as-is
+        if isa(Fidx, 'pf2_base.PipelineFunction')
+            continue
+        end
+
+        % Recover from cfg files corrupted by an older INI reader that
+        % truncated values containing '=' (e.g. inside descriptions). The
+        % serialized form starts with `struct(`; try to eval back to a struct.
+        if (ischar(Fidx) || isstring(Fidx)) && startsWith(strtrim(char(Fidx)), 'struct(')
+            try
+                Fidx = eval(char(Fidx));
+                x.F{idx} = Fidx;
+            catch
+                % Leave as-is; downstream check will warn.
+            end
+        end
+
+        % Recovery from cfgs written by an older INI without toStruct
+        % conversion: struct has PipelineFunction property names
+        % ('funcName', 'argNames', ...) rather than the legacy keys
+        % ('f', 'args', ...). Translate BEFORE the struct-array branch
+        % so the unpacker's `.f` lookups succeed.
+        if isstruct(Fidx) && ~isfield(Fidx, 'f') && isfield(Fidx, 'funcName')
+            translated = struct();
+            translated.f = Fidx(1).funcName;
+            if isfield(Fidx, 'argNames'),    translated.args = Fidx(1).argNames;            else, translated.args = {}; end
+            if isfield(Fidx, 'argDefaults')
+                translated.argvals         = Fidx(1).argDefaults;
+                translated.default_argvals = Fidx(1).argDefaults;
+            else
+                translated.argvals         = {};
+                translated.default_argvals = {};
+            end
+            if isfield(Fidx, 'outputNames'), translated.output = Fidx(1).outputNames; else, translated.output = {'x'}; end
+            for fn = {'name','description','validStages','requiresOD','role','style'}
+                if isfield(Fidx, fn{1}), translated.(fn{1}) = Fidx(1).(fn{1}); end
+            end
+            % Coerce numeric requiresOD to logical (constructor expects bool).
+            if isfield(translated, 'requiresOD') && ~islogical(translated.requiresOD)
+                translated.requiresOD = logical(translated.requiresOD);
+            end
+            if isfield(translated, 'name')
+                translated.displayName = translated.name;
+                translated = rmfield(translated, 'name');
+            end
+            Fidx = translated;
+            x.F{idx} = Fidx;
+        end
+
+        if isstruct(Fidx) && length(Fidx) > 1
+           %This is a struct array for some reason — change it back!
            F_noarray.f=Fidx(1).f;
            F_noarray.args=cell(0,0);
            F_noarray.argvals=cell(0,0);
            F_noarray.default_argvals=cell(0,0);
-		   F_noarray.output=cell(0);
            for j=1:length(Fidx)
                 F_noarray.args{j}=Fidx(j).args;
                 F_noarray.argvals{j}=Fidx(j).argvals;
-                F_noarray.default_argvals{j}=Fidx(j).default_argvals;
-				if(isfield(Fidx(j),'output'))
-                    F_noarray.output{j}=Fidx(j).output;
+                if isfield(Fidx, 'default_argvals')
+                    F_noarray.default_argvals{j}=Fidx(j).default_argvals;
                 else
-                    F_noarray.output{j}=Fidx(j).output;
+                    F_noarray.default_argvals{j}=Fidx(j).argvals;
                 end
            end
+           % Output is the same across all struct array elements (artifact of
+           % MATLAB struct() distributing scalar values). Take from first only.
+           if isfield(Fidx, 'output')
+               F_noarray.output = Fidx(1).output;
+           else
+               F_noarray.output = 'x';
+           end
            x.F{idx}=F_noarray;
+           Fidx=x.F{idx};
+        end
+
+        % Convert legacy struct → PipelineFunction at unpack time
+        if isstruct(Fidx) && isfield(Fidx, 'f')
+            x.F{idx} = pf2_base.PipelineFunction.fromStruct(Fidx);
         end
     end
-    
+
 
 end

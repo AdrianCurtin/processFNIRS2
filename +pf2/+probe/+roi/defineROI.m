@@ -12,9 +12,12 @@ function fNIR = defineROI(fNIR,optodeList,ROI_names)
 % Syntax:
 %   fNIR = defineROI(fNIR, optodeList)
 %   fNIR = defineROI(fNIR, optodeList, ROI_names)
+%   allData = defineROI(allData, optodeList, ROI_names)  % cell array input
 %
 % Inputs:
-%   fNIR       - fNIRS data structure to add ROI definitions to
+%   fNIR       - fNIRS data structure, or a cell array of fNIRS structs.
+%                When a cell array is passed, the same ROI definition is
+%                applied to every element and the cell array is returned.
 %   optodeList - Cell array of optode/channel numbers for each ROI
 %                {[1,2,3], [4,5,6]} defines 2 ROIs with 3 channels each.
 %                Can also be [N_roi x N_opt] numeric matrix, but cell array
@@ -24,7 +27,8 @@ function fNIR = defineROI(fNIR,optodeList,ROI_names)
 %                If ROI already exists with same name, it will be overwritten.
 %
 % Outputs:
-%   fNIR - Updated fNIRS structure with ROI.info field containing:
+%   fNIR - Updated fNIRS structure (or cell array) with ROI.info field
+%          containing:
 %          - 'Optodes' column: Cell array of optode numbers for each ROI
 %          - Row names: ROI names for identification
 %
@@ -35,6 +39,10 @@ function fNIR = defineROI(fNIR,optodeList,ROI_names)
 %   processed = pf2.probe.roi.defineROI(processed, ...
 %       {[1,2,3,4,5,6], [7,8,9,10,11,12], [13,14,15,16,17,18]}, ...
 %       {'Left_PFC', 'Center_PFC', 'Right_PFC'});
+%
+%   % Cell array: apply same ROIs to all subjects at once
+%   allData = pf2.probe.roi.defineROI(allData, ...
+%       {[1:6], [7:12], [13:18]}, {'Left', 'Center', 'Right'});
 %
 %   % Add additional ROI to existing definitions
 %   processed = pf2.probe.roi.defineROI(processed, {[1,7,13]}, {'Anterior'});
@@ -52,6 +60,18 @@ function fNIR = defineROI(fNIR,optodeList,ROI_names)
 % See also: pf2_base.fnirs.buildROI, pf2_base.fnirs.ezBuildROI,
 %           pf2.probe.plot.imageROIvalues, pf2.probe.plot.interpolateROIvalues
 
+% Cell array support: apply same ROI definition to every element
+if iscell(fNIR)
+    for ci = 1:numel(fNIR)
+        if nargin < 3
+            fNIR{ci} = pf2.probe.roi.defineROI(fNIR{ci}, optodeList);
+        else
+            fNIR{ci} = pf2.probe.roi.defineROI(fNIR{ci}, optodeList, ROI_names);
+        end
+    end
+    return;
+end
+
 if(nargin<3)
     autoGen_names=true;
 else
@@ -61,7 +81,7 @@ else
 end
 
 if(nargin<2)
-    error('No optode list provided!');
+    error('pf2:probe:defineROI:noOptodeList', 'No optode list provided!');
 end
 
 if(isempty(optodeList))
@@ -83,6 +103,7 @@ if(~iscell(optodeList))
 end
 
 num_ROI=length(optodeList);
+optodeList = optodeList(:);  % ensure column for table row alignment
 
 hasInfo=pf2_base.isnestedfield(fNIR,'ROI.info');
 

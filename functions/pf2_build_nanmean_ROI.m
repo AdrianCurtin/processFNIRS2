@@ -1,4 +1,4 @@
-function roi_out=pf2_build_nanmean_ROI(fNIR)
+function roi_out=pf2_build_nanmean_ROI(fNIR,~)
 % PF2_BUILD_NANMEAN_ROI Build ROI signals using nanmean averaging
 %
 % Constructs Region of Interest (ROI) time series by averaging the specified

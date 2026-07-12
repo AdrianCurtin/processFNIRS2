@@ -35,7 +35,7 @@ function setBaselineStartTime(time_relative_to_start_in_seconds)
 %           pf2.settings.baseline.useGlobalMean, pf2.data.setT0, processFNIRS2
 
 if(nargin<1||~isnumeric(time_relative_to_start_in_seconds)||time_relative_to_start_in_seconds<0)
-	error('Please provide a valid baseline start time');
+	error('pf2:settings:setBaselineStartTime:invalidTime', 'Please provide a valid baseline start time');
 end
 
 processFNIRS2('blStartTime',time_relative_to_start_in_seconds);

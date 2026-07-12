@@ -74,13 +74,18 @@ global PF2
 hObject=1;
 handles=1;
 
+% Self-healing: ensure stats-toolbox fallbacks (nanmean/nansum/...) are on
+% the path whenever the toolbox is absent. Called unconditionally (outside
+% the one-time init block below) so it re-adds the shims even if the path
+% was reset after PF2 was already initialized.
+pf2_base.ensureStatsFallbacks();
 
 if(~isfield(PF2,'defaultRootPath'))
     [pF2_folder,~,~] = fileparts(mfilename('fullpath'));
     PF2.defaultRootPath=pf2_base.pf2_defaultRootPath();
     curdir=cd;
     cd(PF2.defaultRootPath);
-    addpath('base_functions','functions','GUI');
+    addpath(PF2.defaultRootPath,'base_functions','functions','GUI');
     cd(curdir);
 end
 
@@ -90,29 +95,62 @@ PF2.defaultRawMethodsPath=sprintf('%s/pf2_raw_methods_stored_processFNIRS2.cfg',
 if(~isfield(PF2,'myRawMethods')||~isfield(PF2,'baseline'))
 
    disp('Initializing processfNIRS2');
+
+   % Detect first-time install: prefdir cfg files don't exist yet.
+   firstTimeRaw = ~exist(PF2.defaultRawMethodsPath, 'file');
+   firstTimeOxy = ~exist(PF2.defaultOxyMethodsPath, 'file');
+
    PF2.myRawMethods=processFNIRS2_configureMethods('loadMethodsCallback',hObject,handles,[],PF2.defaultRawMethodsPath,true);
-   for i=1:length(PF2.myRawMethods.cfg.Sections)
-      fprintf('Loaded Raw method: %s\n',PF2.myRawMethods.cfg.Sections{i}); 
-   end
-   
    PF2.myOxyMethods=processFNIRS2_configureMethods('loadMethodsCallback',hObject,handles,[],PF2.defaultOxyMethodsPath,true);
-   for i=1:length(PF2.myOxyMethods.cfg.Sections)
-      fprintf('Loaded Oxy method: %s\n',PF2.myOxyMethods.cfg.Sections{i}); 
+
+   % First-time install: apply repo-shipped seed methods so users have
+   % working defaults out of the box. Failures are non-fatal.
+   if firstTimeRaw || firstTimeOxy
+       try
+           seeds = pf2.methods.seeds.list();
+           for k = 1:numel(seeds)
+               s = seeds(k);
+               if strcmp(s.stage,'raw') && ~firstTimeRaw, continue; end
+               if strcmp(s.stage,'oxy') && ~firstTimeOxy, continue; end
+               try
+                   p = feval(['pf2.methods.seeds.' s.stage '.' s.name]);
+                   p.save(s.stage);
+                   fprintf('Seeded %s method: %s\n', s.stage, s.name);
+               catch ME
+                   warning('pf2:initialize:seedFailed', ...
+                       'Could not seed %s method ''%s'': %s', s.stage, s.name, ME.message);
+               end
+           end
+           % Reload to pick up newly-seeded methods
+           if firstTimeRaw
+               PF2.myRawMethods = processFNIRS2_configureMethods( ...
+                   'loadMethodsCallback', hObject, handles, [], PF2.defaultRawMethodsPath, true);
+           end
+           if firstTimeOxy
+               PF2.myOxyMethods = processFNIRS2_configureMethods( ...
+                   'loadMethodsCallback', hObject, handles, [], PF2.defaultOxyMethodsPath, true);
+           end
+       catch ME
+           warning('pf2:initialize:seedingError', ...
+               'First-time seeding error: %s', ME.message);
+       end
    end
    
    PF2.curDPF_fixed=5.93;   %Default differential pathlength for adult human head (van der Zee 1992)
    PF2.dpf_mode='Calc';   %Default age to calculate differential pathlength factor from.
    PF2.curDPF_age=25;   %Default age to calculate differential pathlength factor from.
-   fprintf('Initializing default age for DPF calculation to %.0f\n',PF2.curDPF_age);
    PF2.baseline=[];
    PF2.baseline.startTime=0; %or minimum time
    PF2.RejectLevel=0; % Reject channels when mask ==0
-   
+
    PF2.baseline.useAbsoluteTime=false; %enable to force baseline from absolute time instead of relative time (non-GUI only)
    PF2.baseline.windowStartTime=0; % time from start of viewing window (GUI only)
    PF2.baseline.blLength=10; % time in seconds from start time
-   fprintf('Defaulting to %.1f second baseline from t=%.1f\n',PF2.baseline.blLength,PF2.baseline.startTime);
-   %processFNIRS2_configureMethods() 
+   % Concise one-line notice of the defaults applied on first init (replaces
+   % two separate warning() calls that emitted noisy stack traces).
+   fprintf('Defaults: DPF age=%.0f, baseline=%.1fs from t=%.1fs (change via pf2.settings).\n', ...
+       PF2.curDPF_age, PF2.baseline.blLength, PF2.baseline.startTime);
+   %processFNIRS2_configureMethods()
 end
 
 

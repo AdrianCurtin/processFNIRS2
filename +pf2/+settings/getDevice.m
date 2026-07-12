@@ -52,7 +52,11 @@ if(nargin<1)
         return;
     end
 else
-    if(isstruct(fNIR)&&isfield(fNIR,'probeinfo')&&~isempty(fNIR.probeinfo))
+    if isstruct(fNIR) && isfield(fNIR, 'device') && isa(fNIR.device, 'pf2.Device')
+        probeInfo = fNIR.device.probeInfo;
+        return;
+
+    elseif(isstruct(fNIR)&&isfield(fNIR,'probeinfo')&&~isempty(fNIR.probeinfo))
         probeInfo=fNIR.probeinfo;
         return;
 
@@ -67,7 +71,7 @@ else
             probeInfo=pf2.settings.selectDevice(sprintf('%s.cfg',fNIR));
         end
     else
-       error('No probe information found in data and no config file specified'); 
+       error('pf2:settings:getDevice:noProbeInfo', 'No probe information found in data and no config file specified');
     end
 end
     

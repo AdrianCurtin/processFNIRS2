@@ -1,4 +1,4 @@
-function [markerTimes, tableMrkTimes, matchedPatterns] = getMarkers(varargin)
+function [markerTimes, tableMrkTimes, matchedPatterns] = getMarkers(fNIR, markersStart, markersEnd, opts)
 % GETMARKERS Extract event marker times matching specified codes or patterns
 %
 % Searches fNIRS marker data to find events matching specified marker codes
@@ -12,8 +12,9 @@ function [markerTimes, tableMrkTimes, matchedPatterns] = getMarkers(varargin)
 %   [markerTimes, tableMrkTimes, matchedPatterns] = pf2.data.getMarkers(...)
 %
 % Inputs:
-%   fNIR           - fNIRS data structure with .markers field [M x 3]
-%                    Or marker table/matrix directly
+%   fNIR           - fNIRS data structure with .markers field (canonical
+%                    marker table: .Time .Code .Duration .Amplitude + extras)
+%                    Or a marker table/matrix directly
 %   markerCode     - Single marker code(s) to find:
 %                    - Scalar: Find all markers with this code
 %                    - [50,51] row vector: Find sequence 50 followed by 51
@@ -59,40 +60,28 @@ function [markerTimes, tableMrkTimes, matchedPatterns] = getMarkers(varargin)
 
 
 
-p=inputParser;
+arguments
+    fNIR
+    markersStart {mustBeNumericOrLogical} = []
+    markersEnd {mustBeNumericOrLogical} = []
+    opts.markerPattern = []
+    opts.markerColumn {mustBeNumericOrLogical} = 2
+    opts.markerVariableName {mustBeText} = ''
+    opts.timeColumn {mustBeNumericOrLogical} = 1
+    opts.returnIndices {mustBeNumericOrLogical} = false
+    opts.exactMatch {mustBeNumericOrLogical} = false
+    opts.sortTimes {mustBeNumericOrLogical} = false
+end
 
 validfNIR_Input = @(x) (isstruct(x) && (isfield(x,'raw')||isfield(x,'time')||isfield(x,'info')));
-validfNIR_or_marker_Input = @(x) (istable(x)&&size(x,1)>1)||(isnumeric(x)&&length(x)>1) ||validfNIR_Input(x);
-validScalarNum = @(x) isnumeric(x) && ismatrix(x)||islogical(x);
-validScalarNumOrCell = @(x) (isnumeric(x) && ismatrix(x) || iscell(x));
-isStringOrChar = @(x) isstring(x)||ischar(x);
 
-addRequired(p,'fNIR',validfNIR_or_marker_Input);
-addOptional(p,'markersStart',[],validScalarNum);
-addOptional(p,'markersEnd',[],validScalarNum);
-addParameter(p,'markerPattern',[],validScalarNumOrCell);
-addParameter(p,'markerColumn',2,validScalarNum);
-addParameter(p,'markerVariableName',[],isStringOrChar);
-addParameter(p,'timeColumn',1,validScalarNum);
-addParameter(p,'returnIndicies',false,validScalarNum);
-addParameter(p,'exactMatch',false,validScalarNum);
-addParameter(p,'sortTimes',false,validScalarNum);
-
-
-
-parse(p,varargin{:});
-
-fNIR=p.Results.fNIR;
-markersStart=p.Results.markersStart;
-markersEnd=p.Results.markersEnd;
-
-markerPatternIn=p.Results.markerPattern;
-markerColumn=p.Results.markerColumn;
-markerVariableName=p.Results.markerVariableName;
-timeColumn=p.Results.timeColumn;
-returnIndicies=p.Results.returnIndicies;
-exactMatch=p.Results.exactMatch;
-sortTimes=p.Results.sortTimes;
+markerPatternIn=opts.markerPattern;
+markerColumn=opts.markerColumn;
+markerVariableName=opts.markerVariableName;
+timeColumn=opts.timeColumn;
+returnIndices=opts.returnIndices;
+exactMatch=opts.exactMatch;
+sortTimes=opts.sortTimes;
 
 if(iscell(markersStart))
     markerPatternIn=markersStart;
@@ -101,7 +90,7 @@ end
 
 
 if(timeColumn<=0)
-    returnIndicies=true;
+    returnIndices=true;
 end
 
 isFNIRstruct=validfNIR_Input(fNIR);
@@ -124,6 +113,49 @@ if(~isFNIRstruct)
 elseif(isFNIRstruct&&~isfield(fNIR,'markers')||size(fNIR.markers,1)<1)
     warning('fNIR struct has no marker data')
     markerTimes=[];
+    return;
+end
+
+% --- Fast path: pure OR query (column vector of codes) -------------------
+% A column vector such as [50;51] means "markers with code 50 OR 51".
+% The general regex-based matcher below builds a separate single-code
+% pattern per row and can drop matches for multi-code OR queries, so handle
+% this common case directly with set membership. Returns onset times for any
+% of the requested codes, sorted chronologically. Scalar codes (1x1) and
+% sequence row vectors ([50,51]) fall through to the general matcher.
+isPureOR = ~iscell(markersStart) && isnumeric(markersStart) ...
+    && size(markersStart,1) > 1 && size(markersStart,2) == 1 ...
+    && isempty(markersEnd) && isempty(markerPatternIn) && ~exactMatch;
+if isPureOR
+    mVals = fNIR.markers(:, markerColumn);
+    if istable(mVals); mVals = mVals{:,1}; end
+    codes = unique(markersStart(:));
+    sel = ismember(mVals, codes);
+
+    if ~any(sel)
+        warning('pf2:getMarkers:noMatch', ...
+            'None of the requested marker codes (%s) were found in the data.', ...
+            mat2str(codes(:)'));
+        markerTimes = [];
+        tableMrkTimes = {};
+        matchedPatterns = cell(0);
+        return;
+    end
+
+    if timeColumn <= 0 || returnIndices
+        tVals = find(sel);
+    else
+        tVals = fNIR.markers(sel, timeColumn);
+        if istable(tVals); tVals = tVals{:,1}; end
+    end
+    selCodes = mVals(sel);
+
+    [tVals, ord] = sort(tVals);
+    selCodes = selCodes(ord);
+
+    markerTimes = tVals;                 % Nx1 onset times (start-only semantics)
+    tableMrkTimes = table(tVals, selCodes, 'VariableNames', {'Time','Code'});
+    matchedPatterns = {codes(:)'};
     return;
 end
 
@@ -280,7 +312,7 @@ if(isempty(markerPatternIn))
                matchedPatterns{j,2}=markersEndStr(j,:);
            end
        else
-          error('Marker mismatch\nPlease supply 1 start marker for each end marker or only one start/end marker'); 
+          error('pf2:getMarkers:markerMismatch', 'Marker mismatch\nPlease supply 1 start marker for each end marker or only one start/end marker');
        end
         
     end
@@ -351,7 +383,7 @@ if(isempty(markerTimes))
    return; 
 end
 
-if(returnIndicies)
+if(returnIndices)
    markerTimes=markerTimes(:,[4,5,3,1,2,6]);
 end
 
@@ -387,7 +419,7 @@ function regMrkIdx=uValsToString(uVals)
     regMrkIdx(reg_upper_idx)=uVals(reg_upper_idx)+64;
     regMrkIdx(reg_lower_idx)=uVals(reg_lower_idx)+96;
     if(max(uVals>63))
-        error('Too many unique markers');
+        error('pf2:getMarkers:tooManyMarkers', 'Too many unique markers');
     end
 end
 

@@ -1,4 +1,4 @@
-function [fNIR] = importHitachiMES(file,pathname,channelCheck)
+function [fNIR] = importHitachiMES(file,pathname,channelCheck,varargin)
 % IMPORTHITACHIMES Import fNIRS data from Hitachi ETG-4000 MES files
 %
 % Reads fNIRS data from Hitachi ETG-4000 optical topography systems, which
@@ -31,7 +31,7 @@ function [fNIR] = importHitachiMES(file,pathname,channelCheck)
 %          .raw       - Raw intensity data [T x C double]
 %          .time      - Time vector in seconds [T x 1 double]
 %          .fs        - Sampling frequency in Hz [double]
-%          .markers   - Event markers [M x 3: time, value, index]
+%          .markers   - Event markers [M x 4: time, value, index, amplitude]
 %          .fchMask   - Channel quality mask [1 x C: 1=good, 0=bad]
 %          .info      - Metadata structure containing:
 %                       .MESheader      - Raw header fields
@@ -69,7 +69,15 @@ function [fNIR] = importHitachiMES(file,pathname,channelCheck)
 %
 % See also: pf2.import.importSNIRF, pf2.import.importNIRX, pf2.import.importNIR
 
+pf2_base.ensureStatsFallbacks();  % ensure stats-toolbox fallbacks (nan*) are on the path before use
+
 forceChannelCheck=false;
+channelCheckVersion=pf2_base.channelCheckVersion();
+for vi_=1:2:numel(varargin)
+    if ischar(varargin{vi_}) && strcmpi(varargin{vi_},'ChannelCheckVersion')
+        channelCheckVersion=varargin{vi_+1};
+    end
+end
 
 if(nargin<3) % channel check is on by default with no file
     channelCheck=true;
@@ -89,8 +97,8 @@ if nargin < 1
   filename=[pathname,file];
   fid = fopen([pathname file]);
 
-elseif ~isstr(file)
-  error('Input must be a string representing a filename');
+elseif ~ischar(file) && ~isstring(file)
+  error('pf2:importHitachiMES:badInput', 'Input must be a string representing a filename');
 elseif nargin<2
     fid=fopen(file);
     filename=file;
@@ -109,10 +117,9 @@ end
 [filepath,fileroot,ext]=fileparts(filename);
 
 if fid==-1
-  error('Data file not found or permission denied');
+  error('pf2:importHitachiMES:fileNotFound', 'Data file not found or permission denied');
 end
-
-%fclose(fid);
+fidCleanup = onCleanup(@() fcloseIfOpen(fid));
 
 fNIR=[];
 
@@ -149,7 +156,7 @@ if(isempty(header))
 end
 
 if(isempty(header))
-    error('Unkown delimiter or file type');
+    error('pf2:importHitachiMES:unknownFormat', 'Unknown delimiter or file type');
 end
 
 
@@ -159,7 +166,8 @@ lineNum=lineNum+1;
 header.HeaderInfo=lineF;
 lineF=fgetl(fid);
 startLineNum=lineNum;
-fclose(fid);
+clear fidCleanup;
+fid=-1;
 
 dataLineParts=strsplit(header.HeaderInfo,delimiter);
 
@@ -171,6 +179,10 @@ markCol=find(strcmp(dataLineParts,'Mark'));
 
 fprintf('Importing %s...\n',filename);
 fid=fopen(filename,'r');
+if fid==-1
+  error('pf2:importHitachiMES:reopenFailed', 'Unable to reopen file for data read: %s', filename);
+end
+fidCleanup = onCleanup(@() fcloseIfOpen(fid));
 for i=1:startLineNum
     line=fgetl(fid);  % Figure out the number of columns based on the header
 end
@@ -198,7 +210,8 @@ else
     datetimeCol=[];
 end
 
-fclose(fid);
+clear fidCleanup;
+fid=-1;
 
 
 hMES = data;%importdata(filename,delimiter,startLineNum);
@@ -242,7 +255,7 @@ if(isfield(header,'Wave_nm'))
    fNIR.info.curWv=str2double(strsplit(header.Wave_nm,delimiter)); 
    numWv=length(fNIR.info.curWv);
 else
-   error('Missing number of wavelengths'); 
+   error('pf2:importHitachiMES:missingWavelengths', 'Missing number of wavelengths');
 end
 
 if(isfield(header,'Date'))
@@ -263,6 +276,7 @@ end
 
 
 fNIR.markers=[fNIR.time(mrkIdx),hMES(mrkIdx,markCol),mrkIdx];
+fNIR.markers = pf2_base.normalizeMarkers(fNIR.markers);
 
 fNIR.info.MESheader=header;
 fNIR.info.chWavelengths=chWavelengths;
@@ -305,6 +319,12 @@ switch(numRawChannels)
         fNIR.info.probename='Unkown *MES.CSV file';
 end
 
+% Attach Device object for self-describing data
+try
+    fNIR.device = pf2.Device.load(fNIR);
+catch
+    % Unknown probe — skip device attachment
+end
 
 
 if(~channelCheck)
@@ -324,10 +344,19 @@ end
 
 
 if(channelCheck)
-        if(forceChannelCheck)
-            fNIR=probeCheckGUI(fNIR,filename,forceChannelCheck);
+        if(forceChannelCheck && pf2_base.allowChannelCheckGUI())
+            if channelCheckVersion == 2
+                app = pf2.qc.ChannelCheck(fNIR, 'CalledFromImport', true, 'SkipConfirmation', true);
+                if isvalid(app), fNIR = app.OutputData; delete(app); end
+            else
+                fNIR=probeCheckGUI(fNIR,filename,forceChannelCheck);
+            end
         else
-            fNIR=pf2_base.loadExistingMaskOrCheck(fNIR,filename); 
+            % Non-forced, or the GUI cannot/should not be shown (headless,
+            % under test, or disabled): loadExistingMaskOrCheck loads a saved
+            % mask if present and defaults all-good rather than blocking on the
+            % channel-check GUI.
+            fNIR=pf2_base.loadExistingMaskOrCheck(fNIR,filename,channelCheckVersion);
         end
 else
    if(~isempty(fmask))
@@ -399,4 +428,13 @@ if length(Name2) > 1
 end
 Name2 = matlab.lang.makeValidName(Name2);
 
+end
+
+function fcloseIfOpen(fid)
+    if ~isempty(fid) && isnumeric(fid) && fid > 0
+        try
+            fclose(fid);
+        catch
+        end
+    end
 end

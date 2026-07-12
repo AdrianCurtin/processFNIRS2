@@ -243,7 +243,7 @@ for g=1:numGroups
         curDataH=pf2_base.hierarchicalAverage(curData,curTable(:,dataH),@nanmedian);
         curHAvg=nanmedian(curDataH);
     else
-        error('Unknown parameter');
+        error('exploreFNIRS:plot:barchart_infogroup:unknownParameter', 'Unknown parameter');
         %curHAvg=nanmedian(hierarchicalAverage(curData,curTable(:,dataH),@nanmedian));
     end
     
@@ -292,7 +292,7 @@ for g=1:numGroups
             barChartData(cBarSec,curBarGroup,2)=curHerr*errMultiply;
         elseif(strcmp(errorFeature,'IQR')||strcmp(errorFeature,'IQR-NoOutliers')||strcmp(errorFeature,'Violin'))
             numErrFeatures=5; %min and max) and median
-            gaQuant=quantile(curDataH,3);
+            gaQuant=pf2_base.compat.quantile(curDataH,3);
             iqr=gaQuant(end)-gaQuant(1);
             
             gaPlotMin=min(curDataH);
@@ -355,7 +355,7 @@ elseif(all(all(isnan(barChartData(:,:,1))))&&~plotPoints)
 end
 
 if(exSettings.plot_bar_err&&~strcmp(plotFeature,'Count'))
-    pf2_base.external.barweb(barChartData(:,:,1),barChartData(:,:,2:1+numErrFeatures),'Width',1,'GroupNames',uCurInfoG, 'ColorMap',cIndex,'Legend',gAStrs,'LegendType','hide','DataPoints',barChartDataPoints,'PlotViolin',strcmp(errorFeature,'Violin'));
+    pf2_base.external.barweb(barChartData(:,:,1),barChartData(:,:,2:1+numErrFeatures),'Width',0.8,'GroupNames',uCurInfoG, 'ColorMap',cIndex,'Legend',gAStrs,'LegendType','hide','DataPoints',barChartDataPoints,'PlotViolin',strcmp(errorFeature,'Violin'));
     
     if(strcmp(errorFeature,'SEM')||strcmp(errorFeature,'SD'))&&~plotPoints
         ylimLower=min(min(barChartData(:,:,1)))-max(max(barChartData(:,:,2)));
@@ -399,7 +399,7 @@ if(exSettings.plot_bar_err&&~strcmp(plotFeature,'Count'))
         xlabel_with_space(xLabGby);
     end
 else
-    pf2_base.external.barweb(barChartData(:,:,1),[],'Width',1,'GroupNames',uCurInfoG, 'ColorMap',cIndex,'Legend',gAStrs,'LegendType','hide','DataPoints',barChartDataPoints);
+    pf2_base.external.barweb(barChartData(:,:,1),[],'Width',0.8,'GroupNames',uCurInfoG, 'ColorMap',cIndex,'Legend',gAStrs,'LegendType','hide','DataPoints',barChartDataPoints);
     
     
     if(~plotPoints||strcmp(plotFeature,'Count'))
@@ -424,6 +424,14 @@ if(exSettings.plot_legend_mode==3||(exSettings.plot_legend_mode==2))
         legend(gAStrs(:),'Location', 'Best');
         legend boxoff;
     end
+end
+
+% Apply current PlotStyle (theme-aware, respects ForceLightMode) so axes,
+% legend, and colorbar colors match light/dark preference.
+try
+    sty = pf2_base.plot.PlotStyle.getDefault();
+    sty.applyToFigure(ExFNIRS.figHandles.main);
+catch
 end
 
 

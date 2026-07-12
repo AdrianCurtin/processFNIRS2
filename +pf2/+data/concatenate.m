@@ -47,6 +47,8 @@ function outFNIR = concatenate(fNIR_objs, varargin)
 %
 % See also: pf2.data.concatenateHorizontal, pf2.data.resample, pf2.data.split
 
+pf2_base.ensureStatsFallbacks();  % ensure stats-toolbox fallbacks (nan*) are on the path before use
+
 centerOnT0=true;
 
 if(nargin>1)
@@ -79,7 +81,7 @@ numCh=0;
 
 for i=1:length(fNIR_objs) %use Slowest fNIR file as reference
     if(~isfield(fNIR_objs{i},'HbO'))
-       error('fNIR segment %i has not been processed for Oxy data yet'); 
+       error('pf2:concatenate:notProcessed', 'fNIR segment %i has not been processed for Oxy data yet');
     end
     numCh=numCh+length(fNIR_objs{i}.channels);
     if(minFsIdx~=i||centerOnT0)

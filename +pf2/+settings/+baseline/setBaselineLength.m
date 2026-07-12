@@ -35,7 +35,7 @@ function setBaselineLength(baseline_length_in_seconds)
 %           pf2.settings.baseline.useGlobalMean, processFNIRS2
 
 if(nargin<1||~isnumeric(baseline_length_in_seconds)||baseline_length_in_seconds<0)
-	error('Please provide a valid baseline length');
+	error('pf2:settings:setBaselineLength:invalidLength', 'Please provide a valid baseline length');
 end
 
 processFNIRS2('blLength',baseline_length_in_seconds);

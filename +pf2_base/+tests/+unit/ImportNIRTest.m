@@ -228,9 +228,12 @@ classdef ImportNIRTest < matlab.unittest.TestCase
 
             markers = testCase.Data.markers;
 
-            % Verify markers is numeric
-            testCase.verifyTrue(isnumeric(markers), ...
-                'markers should be numeric');
+            % Verify markers is a table
+            testCase.verifyTrue(istable(markers), ...
+                'markers should be a table');
+
+            % Convert to canonical numeric matrix for positional checks below
+            markers = pf2_base.markersToArray(markers);
 
             % If markers exist, verify they have at least 3 columns
             if ~isempty(markers)

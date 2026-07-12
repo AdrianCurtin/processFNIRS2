@@ -1,4 +1,4 @@
-function [ imgOut,optPos2Plot ] = interpolateValues(varargin)
+function [ imgOut,optPos2Plot ] = interpolateValues(data2plot, fNIR, minVal, maxVal, titleString, clrBarTitle, opts)
 % INTERPOLATEVALUES Create interpolated 2D topographic map of channel values
 %
 % Generates a smooth, interpolated 2D topographic visualization of fNIRS
@@ -66,28 +66,25 @@ function [ imgOut,optPos2Plot ] = interpolateValues(varargin)
 %
 % See also: pf2.probe.plot.interpolateValues3D, pf2.probe.plot.imageValues,
 %           pf2.probe.plot.interpolateROIvalues, pf2.data.plot.oxy
-p = inputParser;
+arguments
+    data2plot
+    fNIR = {}
+    minVal {mustBeNumeric} = []
+    maxVal {mustBeNumeric} = []
+    titleString {mustBeText} = ''
+    clrBarTitle {mustBeText} = ''
+    opts.bufferDistance {mustBeNumeric} = 1
+    opts.savePath {mustBeText} = ''
+    opts.saveWidth {mustBeNumeric} = []
+    opts.saveHeight {mustBeNumeric} = []
+    opts.saveDPI {mustBeNumeric} = 150
+end
 
-isStructOrEmpty=@(x) isstruct(x)||isempty(x);
-isStringOrChar=@(x)isstring(x)||ischar(x);
-
-addRequired(p, 'data2plot');
-addOptional(p, 'fNIR', {}, isStructOrEmpty);
-addOptional(p, 'minVal', [], @isnumeric);
-addOptional(p, 'maxVal', [], @isnumeric);
-addOptional(p, 'titleString', '', isStringOrChar);
-addOptional(p, 'clrBarTitle', '', isStringOrChar);
-addParameter(p, 'bufferDistance', 1, @isnumeric);
-
-parse(p, varargin{:});
-
-clrBarTitle = p.Results.clrBarTitle;
-titleString = p.Results.titleString;
-bufferDistance = round(p.Results.bufferDistance);
-minVal = p.Results.minVal;
-maxVal = p.Results.maxVal;
-fNIR = p.Results.fNIR;
-data2plot = p.Results.data2plot;
+bufferDistance = round(opts.bufferDistance);
+savePath = opts.savePath;
+saveWidth = opts.saveWidth;
+saveHeight = opts.saveHeight;
+saveDPI = opts.saveDPI;
 
 if(isempty(minVal))
     minVal=nanmin(data2plot);
@@ -162,7 +159,7 @@ elseif(isempty(cfgFilePath)||~contains(cfgFilePath,'.cfg'))
     disp('No device specified. Please load device configuration');
     probeInfo=pf2_base.loadDeviceCfg([],true);
     if(~isempty(probeInfo))
-        error('No valid devices selected');
+        error('pf2:probe:interpolateValues:noDevice', 'No valid devices selected');
     end
     
 elseif(~isempty(cfgFilePath)) % If we're not looking at the GUI, doesn't matter
@@ -176,7 +173,7 @@ if(pf2_base.isnestedfield(probeInfo,'Probe'))
     end
     probeInfo=probeInfo.Probe{probeNum};
 else
-    error('Unable to identify probe');
+    error('pf2:probe:interpolateValues:noProbe', 'Unable to identify probe');
 end
 
 include_ss=false;
@@ -192,7 +189,7 @@ end
 
 
 if(length(data2plot)~=numOptodes)
-    error('Must have a value for all optodes');
+    error('pf2:probe:interpolateValues:optodeCountMismatch', 'Must have a value for all optodes');
 end
 
 %clf(gcf)
@@ -562,6 +559,12 @@ end
 
 if(~isempty(titleString))
     title(titleString);
+end
+
+% Save figure if requested
+if ~isempty(savePath)
+    fig = gcf();
+    pf2_base.plot.saveFigure(fig, savePath, saveWidth, saveHeight, saveDPI);
 end
 
 end

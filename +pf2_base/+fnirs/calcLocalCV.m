@@ -38,13 +38,13 @@ function [CVx] = calcLocalCV(x,N)
 % See also: pf2_SMAR, pf2_SMAR2, std, mean
 
 if nargin<1
-    error('Not enough Input arguments');
+    error('pf2_base:fnirs:calcLocalCV:notEnoughInputs', 'Not enough Input arguments');
 elseif nargin==1
      N=500;  %Default Window Length
 end
 
 if(N<1)
-    error('Invalid Window Length');
+    error('pf2_base:fnirs:calcLocalCV:invalidWindowLength', 'Invalid Window Length');
 end
 
 l=size(x);

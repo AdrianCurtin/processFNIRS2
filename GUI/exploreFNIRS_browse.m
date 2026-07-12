@@ -63,6 +63,8 @@ handles.output = hObject;
 % Update handles structure
 guidata(hObject, handles);
 
+pf2_base.applyLightTheme(hObject);
+
 % UIWAIT makes exploreFNIRS_browse wait for user response (see UIRESUME)
 % uiwait(handles.figure1);
 global BrowseFNIRS

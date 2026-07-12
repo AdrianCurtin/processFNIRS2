@@ -1,5 +1,5 @@
 function varargout = processFNIRS2(varargin)
-% PROCESSFNIR2 MATLAB code for faster non-GUI pipeline
+% PROCESSFNIRS2 MATLAB code for faster non-GUI pipeline
 %      2nd generation preprocessing pipleline for fNIRS datasets
 %      Uses device configuration files to allow for more repeatable and 
 %      more flexible situations
@@ -23,20 +23,128 @@ global PF2
 global setF
 %global outputData
 
+% Cell array support: process each element and return cell array of results
+if ~isempty(varargin) && iscell(varargin{1})
+    cellData = varargin{1};
+    extraArgs = varargin(2:end);
+    results = cell(size(cellData));
 
-pf2_base.pf2_initialize() % Loads methods, sets DPF factors, default age, baseline values
-            %Also sets default root path
+    % Determine if parallel processing is appropriate
+    nItems = numel(cellData);
+    useParfor = false;
+    if nItems > 2
+        % Check if user explicitly disabled acceleration
+        accelDisabled = false;
+        for ai = 1:2:length(extraArgs)-1
+            if ischar(extraArgs{ai}) && strcmpi(extraArgs{ai}, 'Accelerate') && ...
+                    ischar(extraArgs{ai+1}) && strcmpi(extraArgs{ai+1}, 'none')
+                accelDisabled = true;
+                break;
+            end
+        end
 
-if(pf2_base.isnestedfield(PF2,'stageRawMethod.name')&&sum(strcmp(PF2.myRawMethods.cfg.Sections,PF2.stageRawMethod.name))==1)
-    defaultRawMethod=PF2.stageRawMethod.name;
-else
-    defaultRawMethod='None';
+        if ~accelDisabled
+            [canUse, poolRunning] = pf2_base.accel.canParfor();
+            useParfor = canUse && poolRunning;
+        end
+    end
+
+    if useParfor
+        % Snapshot global state for workers
+        pf2_base.pf2_initialize();
+        ctx = pf2_base.ProcessingContext.fromGlobals();
+
+        % Check if Context is already in extraArgs
+        hasContext = false;
+        for ai = 1:2:length(extraArgs)-1
+            if ischar(extraArgs{ai}) && strcmpi(extraArgs{ai}, 'Context')
+                hasContext = true;
+                break;
+            end
+        end
+        if ~hasContext
+            extraArgs = [extraArgs, {'Context', ctx}];
+        end
+
+        parfor ci = 1:nItems
+            results{ci} = processFNIRS2(cellData{ci}, extraArgs{:});
+        end
+    else
+        for ci = 1:nItems
+            results{ci} = processFNIRS2(cellData{ci}, extraArgs{:});
+        end
+    end
+
+    if nargout > 0
+        varargout{1} = results;
+    end
+    return;
 end
 
-if(pf2_base.isnestedfield(PF2,'stageOxyMethod.name')&&sum(strcmp(PF2.myOxyMethods.cfg.Sections,PF2.stageOxyMethod.name))==1)
-    defaultOxyMethod=PF2.stageOxyMethod.name;
+% Check if Context is provided before initializing globals
+% This allows Context-based processing to bypass global state entirely
+hasContextArg = false;
+providedContext = [];
+for i = 1:length(varargin)
+    if ischar(varargin{i}) && strcmpi(varargin{i}, 'Context') && i < length(varargin)
+        providedContext = varargin{i+1};
+        hasContextArg = ~isempty(providedContext) && isa(providedContext, 'pf2_base.ProcessingContext');
+        break;
+    end
+end
+
+% Only initialize globals if no Context is provided
+% Context-based processing is isolated from global state for parallel/reproducible use
+if ~hasContextArg
+    pf2_base.pf2_initialize() % Loads methods, sets DPF factors, default age, baseline values
+                %Also sets default root path
+end
+% When a Context is provided, processing is fully isolated: globals PF2/setF
+% are NOT initialized or written. All settings, methods, and the device are
+% threaded as locals from the context (see useContext branch below).
+
+% Set defaults - use Context values if available, otherwise use globals (or hardcoded defaults)
+if hasContextArg
+    % Defaults from Context - no global access needed
+    defaultRawMethod = providedContext.rawMethodName;
+    defaultOxyMethod = providedContext.oxyMethodName;
+    defaultBlLength = providedContext.baselineLength;
+    defaultBlStartTime = providedContext.baselineStartTime;
+    defaultSubjectAge = providedContext.subjectAge;
+    defaultFixedDPF = providedContext.dpfFixedValue;
+    defaultDPFmode = providedContext.dpfMode;
+    defaultRejectLevel = providedContext.rejectLevel;
+    % For method validation, use context's method libraries
+    if ~isempty(providedContext.rawMethodsLib) && isfield(providedContext.rawMethodsLib, 'cfg')
+        rawMethodSections = providedContext.rawMethodsLib.cfg.Sections;
+    else
+        rawMethodSections = {'None'};
+    end
+    if ~isempty(providedContext.oxyMethodsLib) && isfield(providedContext.oxyMethodsLib, 'cfg')
+        oxyMethodSections = providedContext.oxyMethodsLib.cfg.Sections;
+    else
+        oxyMethodSections = {'None'};
+    end
 else
-    defaultOxyMethod='None';
+    % Defaults from globals
+    if pf2_base.isnestedfield(PF2,'stageRawMethod.name') && sum(strcmp(PF2.myRawMethods.cfg.Sections,PF2.stageRawMethod.name))==1
+        defaultRawMethod = PF2.stageRawMethod.name;
+    else
+        defaultRawMethod = 'None';
+    end
+    if pf2_base.isnestedfield(PF2,'stageOxyMethod.name') && sum(strcmp(PF2.myOxyMethods.cfg.Sections,PF2.stageOxyMethod.name))==1
+        defaultOxyMethod = PF2.stageOxyMethod.name;
+    else
+        defaultOxyMethod = 'None';
+    end
+    defaultBlLength = PF2.baseline.blLength;
+    defaultBlStartTime = PF2.baseline.startTime;
+    defaultSubjectAge = PF2.curDPF_age;
+    defaultFixedDPF = PF2.curDPF_fixed;
+    defaultDPFmode = PF2.dpf_mode;
+    defaultRejectLevel = PF2.RejectLevel;
+    rawMethodSections = PF2.myRawMethods.cfg.Sections;
+    oxyMethodSections = PF2.myOxyMethods.cfg.Sections;
 end
 
 p = inputParser;
@@ -44,17 +152,17 @@ p = inputParser;
 validScalarPosNum = @(x) isnumeric(x) && isscalar(x) && (x >= 0);
 validScalarNum = @(x) isnumeric(x) && isscalar(x);
 validDataInput = @(x) ((isnumeric(x) && ismatrix(x))||(isstruct(x)&&(isfield(x,'raw')||isfield(x,'hbo')||isfield(x,'HbO')||isfield(x,'info'))));
-validRawMethod = @(x) ischar(validatestring(x,PF2.myRawMethods.cfg.Sections));
-validOxyMethod = @(x) ischar(validatestring(x,PF2.myOxyMethods.cfg.Sections));
+validRawMethod = @(x) ischar(validatestring(x, rawMethodSections));
+validOxyMethod = @(x) ischar(validatestring(x, oxyMethodSections));
 validDPFmode = @(x) ischar(validatestring(x,{'None','Fixed','Calc'})); % None uses no DPF factor (units mm*mMol), fixed uses one DPF for all wavelenghts,Calc attempts tocalculate wavelength*age dependent changes
 
 
 addOptional(p,'data',[],validDataInput);
 addOptional(p,'Raw_Method',defaultRawMethod,validRawMethod); %Attempt to load specified RawMethod
 addOptional(p,'Oxy_Method',defaultOxyMethod,validOxyMethod); %Attempt to load specified OxyMethod
-addOptional(p,'blLength',PF2.baseline.blLength,validScalarPosNum); %specify realtive baseline relative to blStartTime (in seconds)
-addOptional(p,'blStartTime',PF2.baseline.startTime,validScalarNum); %Specify relative baseline start time (in seconds)
-addParameter(p,'defaultSubjectAge',PF2.curDPF_age,validScalarPosNum); %Use custom default age for DPF calculations rather than whatever was in the GUI
+addOptional(p,'blLength',defaultBlLength,validScalarPosNum); %specify realtive baseline relative to blStartTime (in seconds)
+addOptional(p,'blStartTime',defaultBlStartTime,validScalarNum); %Specify relative baseline start time (in seconds)
+addParameter(p,'defaultSubjectAge',defaultSubjectAge,validScalarPosNum); %Use custom default age for DPF calculations rather than whatever was in the GUI
 addParameter(p,'UseDeviceCFG','',@ischar); %Input for file containing device configuration info
 addParameter(p,'markers',[],@ismatrix); %specify where markers go
 addParameter(p,'OutputLegacyMarkers',false,@islogical); % turn on to output marker array into .markers.data instead of just .markers
@@ -67,15 +175,20 @@ addParameter(p,'ProcessRejectedChannels',false,@islogical); %specifies whether t
 addParameter(p,'ChannelMask',[],@ismatrix); %logical matrix the size of channel array which determines if channel has been rejected, later stored in fChMask
 addParameter(p,'ShowGUI',false,@islogical); % turn true to launch GUI
 addParameter(p,'DirtyBaseline',false,@islogical); % turn to use the entire mean as the baseline period
-addParameter(p,'FixedDPF',PF2.curDPF_fixed,validScalarPosNum); %set default uniwavelength DPF
-addParameter(p,'DPFmode',PF2.dpf_mode,validDPFmode); %set role of DPF in mBLL calculations
-addParameter(p,'RejectLevel',PF2.RejectLevel,@(x) isnumeric(x)&&isscalar(x)&&x<1&&x>=0); %set the level at which a channel is rejected (fChMask)
+addParameter(p,'FixedDPF',defaultFixedDPF,validScalarPosNum); %set default uniwavelength DPF
+addParameter(p,'DPFmode',defaultDPFmode,validDPFmode); %set role of DPF in mBLL calculations
+addParameter(p,'RejectLevel',defaultRejectLevel,@(x) isnumeric(x)&&isscalar(x)&&x<1&&x>=0); %set the level at which a channel is rejected (fChMask)
+addParameter(p,'Context',[],@(x) isempty(x) || isa(x, 'pf2_base.ProcessingContext')); %optional ProcessingContext for isolated processing
 
 
 addParameter(p,'ImportOxyMethods','NA',@ischar);  %Path for Oxy methods cfg file to import
 addParameter(p,'ImportRawMethods','NA',@ischar);  %Path for Raw methods cfg file to import
 
 parse(p,varargin{:});
+
+% Handle ProcessingContext if provided
+ctx = p.Results.Context;
+useContext = ~isempty(ctx);
 
 outputData.ProcessOxy=~p.Results.SkipOxy;
 outputData.ProcessRaw=~p.Results.SkipRaw;
@@ -87,7 +200,14 @@ if(outputData.OutputPreProcessedRaw)
 end
 
 outputData.ProcessRejected=p.Results.ProcessRejectedChannels;
-PF2.OutputLegacyMarkers=p.Results.OutputLegacyMarkers;
+
+% Output-marker format threaded as a local. On the legacy path it is also
+% mirrored into the global for backward compatibility; on the context path
+% globals are left untouched.
+outputLegacyMarkers=p.Results.OutputLegacyMarkers;
+if(~useContext)
+    PF2.OutputLegacyMarkers=outputLegacyMarkers;
+end
 
 
 data=p.Results.data;
@@ -105,40 +225,102 @@ else
     cfgFilePath='';
 end
 
-ShowGUI=p.Results.ShowGUI||isempty(varargin)||(nargout==0&&~isempty(data));
+% Don't show GUI if Context is provided (context implies headless processing)
+ShowGUI=p.Results.ShowGUI||isempty(varargin)||(nargout==0&&~isempty(data)&&isempty(p.Results.Context));
 
-if(isfield(data,'probeinfo')&&~isempty(data.probeinfo))
-    setF.device=data.probeinfo;
-else
+% --- Noop pass-through for empty / non-processable inputs ------------------
+% The pipeline converts raw light intensities (data.raw) into hemoglobin, so a
+% device configuration is only meaningful when there are raw intensities to
+% convert. When an element carries no .raw there is nothing to process and no
+% probe cfg is needed: empty cells, or structs already in biomarker form (e.g.
+% from pf2.import.fromTable or a prior processFNIRS2 run). Return these
+% untouched instead of demanding a device. Exemptions fall through to the normal
+% path: SkipRaw deliberately processes non-raw (oxy-only) data; SkipOD requests
+% raw-stage output and so is only meaningful with raw present (left to error
+% downstream as before rather than silently nooping). NOTE: this fires only when
+% the GUI is suppressed; a bare no-output call processFNIRS2(hbStruct) still
+% routes to the GUI per the ShowGUI rule above (capture an output to noop).
+hasRawIntensity = isstruct(data) && isfield(data,'raw') && ~isempty(data.raw);
 
-    if(isempty(cfgFilePath)||~contains(cfgFilePath,'.cfg'))&&(~ShowGUI&&~isempty(data)) %if nothing, invalid, or no data
+% Config-only invocation (no data, global path): persist the parsed settings to
+% the session globals BEFORE the noop early-return below. Without this, a bare
+% processFNIRS2('blLength',10) call -- and every pf2.settings.* setter that
+% delegates here (baseline, DPF, reject level) -- would have its values silently
+% discarded by that return. The scalar defaults were read from the current
+% globals at parse time, so writing them when unspecified is a no-op; methods are
+% only written when explicitly provided, to avoid a config call clobbering the
+% active stage method as a side effect. Mirrors the global-write block on the
+% normal processing path.
+if(~ShowGUI && ~hasContextArg && isempty(data))
+    PF2.baseline.startTime = p.Results.blStartTime;
+    PF2.baseline.blLength  = p.Results.blLength;
+    PF2.curDPF_fixed       = p.Results.FixedDPF;
+    PF2.curDPF_age         = p.Results.defaultSubjectAge;
+    PF2.dpf_mode           = p.Results.DPFmode;
+    PF2.RejectLevel        = p.Results.RejectLevel;
 
-        warning('Missing or invalid configuration file path\n')
+    if(~any(strcmp('Raw_Method',p.UsingDefaults)) && ...
+            pf2_base.isnestedfield(PF2,sprintf('myRawMethods.cfg.%s',p.Results.Raw_Method)))
+        PF2.stageRawMethod = pf2_base.pf2_unpackMethod(PF2.myRawMethods.cfg.(p.Results.Raw_Method));
+        PF2.stageRawMethod.name = p.Results.Raw_Method;
+    end
+    if(~any(strcmp('Oxy_Method',p.UsingDefaults)) && ...
+            pf2_base.isnestedfield(PF2,sprintf('myOxyMethods.cfg.%s',p.Results.Oxy_Method)))
+        PF2.stageOxyMethod = pf2_base.pf2_unpackMethod(PF2.myOxyMethods.cfg.(p.Results.Oxy_Method));
+        PF2.stageOxyMethod.name = p.Results.Oxy_Method;
+    end
+end
 
-        disp('No device specified. Please load device configuration');
-        pf2_base.loadDeviceCfg();
-        if(~isfield(setF,'device'))
-            error('No valid devices selected');
-        end
+if(~ShowGUI && (isempty(data) || ...
+        (isstruct(data) && ~hasRawIntensity && ~p.Results.SkipRaw && ~p.Results.SkipOD)))
+    if(nargout>0)
+        varargout{1}=data;
+    end
+    return;
+end
 
-    elseif(~isempty(cfgFilePath)) 
+% Device acquisition. On the context path the device is supplied by the
+% context (threaded locally below); the legacy/GUI device-loading logic that
+% reads/writes global setF.device is skipped to keep processing isolated.
+if(~useContext)
+    if(isfield(data,'probeinfo')&&~isempty(data.probeinfo))
+        setF.device=data.probeinfo;
+    else
 
-        if(pf2_base.isnestedfield(setF,'device.cfg.Info.CfgName')&&length(setF)==1) % look to see if they match,...
+        if(isempty(cfgFilePath)||~contains(cfgFilePath,'.cfg'))&&(~ShowGUI&&~isempty(data)) %if nothing, invalid, or no data
 
-            curProbeName=sprintf('%s.cfg',setF.device.cfg.Info.CfgName);
+            warning('Missing or invalid configuration file path\n')
 
-            if(~strcmp(curProbeName,cfgFilePath)&&~skipCFG) %if they do don't bother loading
+            disp('No device specified. Please load device configuration');
+            pf2_base.loadDeviceCfg();
+            if(~isfield(setF,'device'))
+                error('No valid devices selected');
+            end
+
+        elseif(~isempty(cfgFilePath))
+
+            if(pf2_base.isnestedfield(setF,'device.cfg.Info.CfgName')&&length(setF)==1) % look to see if they match,...
+
+                curProbeName=sprintf('%s.cfg',setF.device.cfg.Info.CfgName);
+
+                if(~strcmp(curProbeName,cfgFilePath)&&~skipCFG) %if they do don't bother loading
+                    pf2_base.loadDeviceCfg(cfgFilePath);
+                end
+            else
                 pf2_base.loadDeviceCfg(cfgFilePath);
             end
-        else
-            pf2_base.loadDeviceCfg(cfgFilePath);
         end
-    end
 
+    end
 end
 
 
 if(ShowGUI)
+    if pf2_base.env.isOctave()
+        error('pf2:gui:octaveUnsupported', ...
+            ['Interactive GUIs require MATLAB. Under Octave, use the ' ...
+             'programmatic API, e.g. processed = processFNIRS2(data).']);
+    end
     if(any(strcmp(p.UsingDefaults,'ShowGUI')))
        l=length(varargin);
        if(l==0)
@@ -157,40 +339,141 @@ if(ShowGUI)
     return
 end
 
-PF2.baseline.startTime=p.Results.blStartTime;
-PF2.baseline.blLength=p.Results.blLength;
+% Apply settings - use context if provided, otherwise use parameters/globals
+if useContext
+    % Use context settings (isolated from globals)
+    ctxBaseline.startTime = ctx.baselineStartTime;
+    ctxBaseline.blLength = ctx.baselineLength;
+    ctxDPF_fixed = ctx.dpfFixedValue;
+    ctxDPF_age = ctx.subjectAge;
+    ctxDPF_mode = ctx.dpfMode;
+    ctxRejectLevel = ctx.rejectLevel;
 
-outputData.DirtyBaseline=p.Results.DirtyBaseline||PF2.baseline.blLength==0;
-
-
-PF2.curDPF_fixed=p.Results.FixedDPF;
-PF2.curDPF_age=p.Results.defaultSubjectAge;
-PF2.dpf_mode=p.Results.DPFmode;
-
-rawMethodStr=p.Results.Raw_Method;
-oxyMethodStr=p.Results.Oxy_Method;
-
-if(pf2_base.isnestedfield(PF2,sprintf('myRawMethods.cfg.%s',rawMethodStr)))
-    if(pf2_base.isnestedfield(PF2,'stageRawMethod.name')&&~strcmpi(PF2.stageRawMethod.name,rawMethodStr))
-       fprintf('Setting Raw Method to: %s\n',rawMethodStr); 
+    % Override with explicit parameters if provided
+    if ~any(strcmp(p.UsingDefaults, 'blStartTime'))
+        ctxBaseline.startTime = p.Results.blStartTime;
     end
-    
-    PF2.stageRawMethod=pf2_base.pf2_unpackMethod(PF2.myRawMethods.cfg.(rawMethodStr));
-    PF2.stageRawMethod.name=rawMethodStr;
-else
-    error('Unable to find method named: %s',oxyMethodStr);
-end
-
-
-if(pf2_base.isnestedfield(PF2,sprintf('myOxyMethods.cfg.%s',oxyMethodStr)))
-    if(pf2_base.isnestedfield(PF2,'stageOxyMethod.name')&&~strcmpi(PF2.stageOxyMethod.name,oxyMethodStr))
-       fprintf('Setting Oxy Method to: %s\n',oxyMethodStr); 
+    if ~any(strcmp(p.UsingDefaults, 'blLength'))
+        ctxBaseline.blLength = p.Results.blLength;
     end
-    
-    PF2.stageOxyMethod=pf2_base.pf2_unpackMethod(PF2.myOxyMethods.cfg.(oxyMethodStr));
-    PF2.stageOxyMethod.name=oxyMethodStr;
+    if ~any(strcmp(p.UsingDefaults, 'FixedDPF'))
+        ctxDPF_fixed = p.Results.FixedDPF;
+    end
+    if ~any(strcmp(p.UsingDefaults, 'defaultSubjectAge'))
+        ctxDPF_age = p.Results.defaultSubjectAge;
+    end
+    if ~any(strcmp(p.UsingDefaults, 'DPFmode'))
+        ctxDPF_mode = p.Results.DPFmode;
+    end
+    if ~any(strcmp(p.UsingDefaults, 'RejectLevel'))
+        ctxRejectLevel = p.Results.RejectLevel;
+    end
+
+    % Honor the context's processRejected unless the call site set it
+    % explicitly (an explicit ProcessRejectedChannels argument wins).
+    if any(strcmp(p.UsingDefaults, 'ProcessRejectedChannels'))
+        outputData.ProcessRejected = ctx.processRejected;
+    end
+
+    outputData.DirtyBaseline = ctx.dirtyBaseline || p.Results.DirtyBaseline || ctxBaseline.blLength == 0;
+
+    % Get methods from context
+    if isfield(ctx.rawMethod, 'F') && ~isempty(ctx.rawMethod.F)
+        ctxRawMethod = ctx.rawMethod;
+    else
+        % Fall back to 'None' method - use context's method library
+        if ~isempty(ctx.rawMethodsLib) && isfield(ctx.rawMethodsLib, 'cfg') && isfield(ctx.rawMethodsLib.cfg, 'None')
+            ctxRawMethod = pf2_base.pf2_unpackMethod(ctx.rawMethodsLib.cfg.None);
+        else
+            ctxRawMethod = struct('F', {{}}, 'name', 'None');
+        end
+        ctxRawMethod.name = 'None';
+    end
+
+    if isfield(ctx.oxyMethod, 'F') && ~isempty(ctx.oxyMethod.F)
+        ctxOxyMethod = ctx.oxyMethod;
+    else
+        % Fall back to 'None' method - use context's method library
+        if ~isempty(ctx.oxyMethodsLib) && isfield(ctx.oxyMethodsLib, 'cfg') && isfield(ctx.oxyMethodsLib.cfg, 'None')
+            ctxOxyMethod = pf2_base.pf2_unpackMethod(ctx.oxyMethodsLib.cfg.None);
+        else
+            ctxOxyMethod = struct('F', {{}}, 'name', 'None');
+        end
+        ctxOxyMethod.name = 'None';
+    end
+
+    % Resolve the device as a local (no global write). Prefer the context's
+    % device; if the context carries no usable device, load the cfg locally
+    % WITHOUT touching global setF (loadFromGlobal=false so the cached-device
+    % branch that assigns setF is bypassed and the parsed probeInfo is simply
+    % returned).
+    if isstruct(ctx.device) && isfield(ctx.device, 'Probe') && ~isempty(ctx.device.Probe)
+        procDevice = ctx.device;
+    elseif isfield(data,'probeinfo') && ~isempty(data.probeinfo)
+        procDevice = data.probeinfo;
+    elseif ~isempty(cfgFilePath) && contains(cfgFilePath,'.cfg')
+        procDevice = pf2_base.loadDeviceCfg(cfgFilePath, true, false);
+    else
+        error('pf2:processFNIRS2:noContextDevice', ...
+            ['No device available for context-based processing. Provide a ' ...
+             'device on the ProcessingContext, embed probeinfo, or supply a ' ...
+             'resolvable probename/UseDeviceCFG.']);
+    end
 else
-    error('Unable to find method named: %s',oxyMethodStr);
+    % Original behavior - use globals
+    PF2.baseline.startTime=p.Results.blStartTime;
+    PF2.baseline.blLength=p.Results.blLength;
+    ctxBaseline = PF2.baseline;
+
+    outputData.DirtyBaseline=p.Results.DirtyBaseline||PF2.baseline.blLength==0;
+
+
+    PF2.curDPF_fixed=p.Results.FixedDPF;
+    PF2.curDPF_age=p.Results.defaultSubjectAge;
+    PF2.dpf_mode=p.Results.DPFmode;
+    ctxDPF_fixed = PF2.curDPF_fixed;
+    ctxDPF_age = PF2.curDPF_age;
+    ctxDPF_mode = PF2.dpf_mode;
+    ctxRejectLevel = PF2.RejectLevel;
+
+    rawMethodStr=p.Results.Raw_Method;
+    oxyMethodStr=p.Results.Oxy_Method;
+
+    if(pf2_base.isnestedfield(PF2,sprintf('myRawMethods.cfg.%s',rawMethodStr)))
+        if(pf2_base.isnestedfield(PF2,'stageRawMethod.name')&&~strcmpi(PF2.stageRawMethod.name,rawMethodStr))
+           fprintf('Setting Raw Method to: %s\n',rawMethodStr);
+        end
+
+        PF2.stageRawMethod=pf2_base.pf2_unpackMethod(PF2.myRawMethods.cfg.(rawMethodStr));
+        PF2.stageRawMethod.name=rawMethodStr;
+    else
+        error('Unable to find method named: %s',rawMethodStr);
+    end
+
+
+    if(pf2_base.isnestedfield(PF2,sprintf('myOxyMethods.cfg.%s',oxyMethodStr)))
+        if(pf2_base.isnestedfield(PF2,'stageOxyMethod.name')&&~strcmpi(PF2.stageOxyMethod.name,oxyMethodStr))
+           fprintf('Setting Oxy Method to: %s\n',oxyMethodStr);
+        end
+
+        PF2.stageOxyMethod=pf2_base.pf2_unpackMethod(PF2.myOxyMethods.cfg.(oxyMethodStr));
+        PF2.stageOxyMethod.name=oxyMethodStr;
+    else
+        error('Unable to find method named: %s',oxyMethodStr);
+    end
+
+    ctxRawMethod = PF2.stageRawMethod;
+    ctxOxyMethod = PF2.stageOxyMethod;
+
+    % Legacy path: the device lives in global setF; mirror it locally so the
+    % shared downstream code reads the same threaded variable as the context
+    % path. Device acquisition (above) may not have populated setF.device yet
+    % (e.g. settings-only calls), so guard the access.
+    if isstruct(setF) && isfield(setF, 'device')
+        procDevice = setF.device;
+    else
+        procDevice = struct();
+    end
 end
 
 
@@ -245,7 +528,11 @@ if(isstruct(data)) %treat as fNIR struct
             end
         end
     end
-    
+
+    if(isfield(data,'markers'))
+        data.markers=pf2_base.normalizeMarkers(data.markers);
+    end
+
     
     dataFields=fields(data);  % copy bio marker fields
     for i=1:length(dataFields)
@@ -306,24 +593,31 @@ if(isstruct(data)) %treat as fNIR struct
     end
 end
 
-if(isempty(fData.info.Age))
-    warning('fData.info.Age is empty\nDPF calculations will be performed using an age of %i years old\nPlease assign subject age for accurate chromophore calculations',PF2.curDPF_age);
+if isempty(fData.info.Age) && strcmp(ctxDPF_mode, 'Calc')
+    warning('pf2:processFNIRS2:noAge', ...
+        'fData.info.Age is empty. DPF calculations will use age=%i. Assign subject age for accurate chromophore calculations.', ctxDPF_age);
 end
 
 if(~isempty(p.Results.markers))
     fData.markers=p.Results.markers; %Overwrite markers if specified
 end
 
+% Canonical marker representation: always a table
+fData.markers=pf2_base.normalizeMarkers(fData.markers);
+
 if(isstruct(tempOxyStage))
     fData.stage{4}=tempOxyStage; %Assign stage3 if exists
 end
 
-fData=updateCurrentDevice(fData);
+% Thread the device locally. On the context path (useContext) globals are
+% left untouched; on the legacy path procDevice mirrors setF.device and the
+% globals are updated as before for backward compatibility.
+[fData, procDevice]=updateCurrentDevice(fData, procDevice, useContext);
 
 [numDataRows,numDataCols]=size(fData.stage{1});
 
 probeIdx=1;
-curProbe=setF.device.Probe{probeIdx};
+curProbe=procDevice.Probe{probeIdx};
 numDevCols=size(curProbe.TableCh,1);
 while(numDataCols~=numDevCols)
     if(numDataCols==numDataRows)
@@ -332,10 +626,39 @@ while(numDataCols~=numDevCols)
     else
        fprintf('Data size %i x %i: Expected %i columns in loaded device',numDevCols);
        warning('Channel/Device mismatch, please load new configuration file');
-       pf2_base.loadDeviceCfg();
+       if(useContext)
+           % The data's own geometry is authoritative. The context-supplied
+           % device does not match the data (e.g. a polluted/snapshotted
+           % global device of a different channel count). Re-resolve the
+           % device from the data's own cfg non-interactively and WITHOUT
+           % touching globals (loadFromGlobal=false). Only error if no
+           % matching device can be resolved from the data's cfg at all.
+           if(~isempty(cfgFilePath) && contains(cfgFilePath,'.cfg'))
+               resolvedDevice=pf2_base.loadDeviceCfg(cfgFilePath, true, false);
+               resolvedCols=size(resolvedDevice.Probe{probeIdx}.TableCh,1);
+               if(resolvedCols==numDataCols || numDataCols==numDataRows)
+                   procDevice=resolvedDevice;
+               else
+                   error('pf2:processFNIRS2:contextChannelMismatch', ...
+                       ['Channel/Device mismatch: data has %d columns but ' ...
+                        'neither the supplied ProcessingContext device (%d ' ...
+                        'columns) nor the data cfg ''%s'' (%d columns) match.'], ...
+                       numDataCols, numDevCols, cfgFilePath, resolvedCols);
+               end
+           else
+               error('pf2:processFNIRS2:contextChannelMismatch', ...
+                   ['Channel/Device mismatch with the supplied ' ...
+                    'ProcessingContext device (%d columns vs %d data ' ...
+                    'columns) and no data cfg available to resolve it.'], ...
+                   numDevCols, numDataCols);
+           end
+       else
+           pf2_base.loadDeviceCfg();
+           procDevice=setF.device;
+       end
     end
     [numDataRows,numDataCols]=size(fData.stage{1});
-    curProbe=setF.device.Probe{probeIdx};
+    curProbe=procDevice.Probe{probeIdx};
     numDevCols=size(curProbe.TableCh,1);
 
 end
@@ -357,7 +680,10 @@ if(~isempty(data))
             if(length(fData.fchMask)==length(origNumOptodes))
                 fData.fchMask=fData.fchMask(ismember(origNumOptodes,curProbe.TableOpt.OptodeNum));
             else
-                error('Channel mask does not match number of optodes')
+                warning('pf2:fchMaskMismatch', ...
+                    'Channel mask length (%d) does not match optode count (%d). Resetting to all good.', ...
+                    length(fData.fchMask), numOptodes);
+                fData.fchMask=true(1,numOptodes);
             end
         end
     end
@@ -366,7 +692,7 @@ if(~isempty(data))
     curOptTable=curProbe.TableOpt;
     
     
-    rawMask=ismember(channelNumbers,curProbe.TableOpt.OptodeNum(reshape(fData.fchMask>PF2.RejectLevel|outputData.ProcessRejected,1,numOptodes)));
+    rawMask=ismember(channelNumbers,curProbe.TableOpt.OptodeNum(reshape(fData.fchMask>ctxRejectLevel|outputData.ProcessRejected,1,numOptodes)));
 
    %varargout=processFNIRdata(); 
    
@@ -377,11 +703,11 @@ if(~isempty(data))
 
    if(outputData.ProcessRaw)
         
-        [fData.stage{3},fData.stage{2}]=pf2_base.fnirs.processStageRaw2OD(PF2.stageRawMethod,fData.stage{1},fData.fs,fData.time,rawMask,fMarkers,fAux,channelNumbers,wavelengths,curOptTable,data); % Raw data processing
+        [fData.stage{3},fData.stage{2}]=pf2_base.fnirs.processStageRaw2OD(ctxRawMethod,fData.stage{1},fData.fs,fData.time,rawMask,fMarkers,fAux,channelNumbers,wavelengths,curOptTable,data); % Raw data processing
         if(outputData.ProcessOxy)
-            fData.stage{4}=processStageOD2Hb(fData.stage{3},fData.time,fData.info.Age,outputData.DirtyBaseline,curProbe); % Beer-Lambert conversion
+            fData.stage{4}=pf2_base.fnirs.processStageOD2Hb(fData.stage{3},fData.time,fData.info.Age,outputData.DirtyBaseline,curProbe,ctxBaseline,ctxDPF_mode,ctxDPF_fixed,ctxDPF_age); % Beer-Lambert conversion
         end
-        if(pf2_base.isnestedfield(fData,'ROI.info'))
+        if isfield(fData,'ROI') && isstruct(fData.ROI) && isfield(fData.ROI,'info')
             fData.stage{4}.ROI.info=fData.ROI.info; %Regenerate from info
         end
     else
@@ -390,17 +716,17 @@ if(~isempty(data))
            fData.stage{4}.channels=curProbe.ChannelList;
            warning('No channel information given, assuming all columns indexs correspond with channel numbers');
         end
-        if(pf2_base.isnestedfield(fData,'ROI.info'))
+        if isfield(fData,'ROI') && isstruct(fData.ROI) && isfield(fData.ROI,'info')
             fData.stage{4}.ROI=fData.ROI; % Use All ROI information provided
         end
     end
     if(outputData.ProcessOxy)
-        fData.stage{4}.fchMask=fData.fchMask>PF2.RejectLevel;
+        fData.stage{4}.fchMask=fData.fchMask>ctxRejectLevel;
         fData.stage{4}.Aux=fData.Aux;
         fData.stage{4}.markers=fData.markers;
         fData.stage{4}.time=fData.time;
-        
-        fData.stage{5}=pf2_base.fnirs.processStageFilterHb(PF2.stageOxyMethod,fData.stage{4},fData.fs,curOptTable,outputData.ProcessRejected); % Oxy data processing
+
+        fData.stage{5}=pf2_base.fnirs.processStageFilterHb(ctxOxyMethod,fData.stage{4},fData.fs,curOptTable,outputData.ProcessRejected); % Oxy data processing
     else
         %fData.stage{5}=fData.stage{4};
     end
@@ -448,18 +774,49 @@ if(nargout>0)
        end
        
       if(isfield(fData,'markers')&&~isempty(fData.markers))
-           if(PF2.OutputLegacyMarkers)
+           if(outputLegacyMarkers)
                outfNIR.markers=[];
-               outfNIR.markers.data=fData.markers;
+               outfNIR.markers.data=pf2_base.markersToArray(fData.markers);
            else
-               outfNIR.markers=fData.markers;
+               outfNIR.markers=pf2_base.normalizeMarkers(fData.markers);
            end
        end
        
        if(isfield(fData,'info'))
            outfNIR.info=fData.info;
        end
-       
+
+       % Store processing context for reproducibility and plot enhancement
+       outfNIR.processingInfo = buildProcessingInfo(PF2, setF, ctx);
+
+       % Attach Device object for self-describing output. procDevice is the
+       % locally-threaded device (ctx.device on the context path, setF.device
+       % on the legacy path) so no global read is needed here.
+       deviceSource = [];
+       if isstruct(procDevice) && isfield(procDevice, 'cfg')
+           deviceSource = procDevice;
+       end
+       if ~isempty(deviceSource)
+           outfNIR.device = pf2.Device.fromProbeInfo(deviceSource);
+       end
+
+       % Ensure probe cfg reference is stored for later reloading
+       % Full probeinfo is NOT stored to save memory - loadProbeInfo can reload from cfg
+       deviceSource = [];
+       if isstruct(procDevice) && isfield(procDevice, 'cfg')
+           deviceSource = procDevice;
+       end
+       if ~isempty(deviceSource) && isfield(deviceSource.cfg, 'File')
+           if ~isfield(outfNIR, 'info')
+               outfNIR.info = struct();
+           end
+           if ~isfield(outfNIR.info, 'probename') || isempty(outfNIR.info.probename) || contains(outfNIR.info.probename, 'Unknown')
+               % Extract probename from cfg file path (remove .cfg extension)
+               [~, probename, ~] = fileparts(deviceSource.cfg.File);
+               outfNIR.info.probename = probename;
+           end
+       end
+
        if(exist('outfNIR'))
            
            varargout={outfNIR};
@@ -472,60 +829,16 @@ if(nargout>0)
    
 end
 
-clearVarsOnClose();
+% On the context path globals are never mutated, so the global cleanup is
+% skipped to keep PF2 byte-identical to its pre-call state.
+if(~useContext)
+    clearVarsOnClose();
+end
 
 end
 
 
-function outData=processStageOD2Hb(data,time,subjectAge,DirtyBaseline,curProbe)
- % Beer-Lambert conversion
-
-
-global PF2
-
-if(strcmp(PF2.dpf_mode,'None'))
-    NoPathlength=true;
-else
-    NoPathlength=false;
-end
-
-if(strcmp(PF2.dpf_mode,'Fixed'))
-    fixedDPF=PF2.curDPF_fixed;
-else
-    fixedDPF=0;
-end
-
-if(isempty(subjectAge))
-    subjectAge=PF2.curDPF_age;
-end
-
-if(DirtyBaseline) %use nanmean of entire segment asa baseline
-    baselineSamples=1:length(time);
-else
-    startTime=min(time)+PF2.baseline.startTime;
-    endTime=startTime+PF2.baseline.blLength;
-
-    startSample=find(time>=startTime,1);
-    endSample=find(time>=endTime,1);
-    baselineSamples=startSample:endSample;
-end
-
-
-curTableOpt=curProbe.TableOpt;
-curTableCh=curProbe.TableCh;
-
-data=data(:,curTableCh.isCh);
-curTableCh=curTableCh(curTableCh.isCh,:);
-
-[outData.HbO, outData.HbR, outData.HbTotal, outData.HbDiff,outData.CBSI,outData.channels,~,outData.units,outData.DPF_factor]=...
-    pf2_base.fnirs.bvoxy(data,curTableCh.OptodeNumber,curTableCh.Wavelength,curTableOpt.SD,baselineSamples,subjectAge,[],true,'NoPathlength',NoPathlength,'DiffPathlengthFactor',fixedDPF);
-outData.time=time;
-                                                          %BASELINE
-                                                          %START/END
-%[fNIR.oxy,fNIR.bv_805,fNIR.bv,fNIR.hbo,fNIR.hbr] = bvoxy (1,min(se,60),ss,se,fNIR.fin.raw_730,fNIR.fin.raw_805,fNIR.fin.raw_850);
-
-%outData=data;  
-end
+% processStageOD2Hb moved to pf2_base.fnirs.processStageOD2Hb
 
 
 
@@ -533,112 +846,60 @@ end
 
 % UIWAIT makes processFNIRS2 wait for user response (see UIRESUME)
 % uiwait(handles.figure1);
-function fData=updateCurrentDevice(fData)
+function [fData, device]=updateCurrentDevice(fData, device, isolated)
+% UPDATECURRENTDEVICE Build merged probe tables and resolve timing.
+%
+% Threads the device locally. When ISOLATED is true (a ProcessingContext is
+% in play) the global PF2/setF caches are NOT written, keeping context-based
+% processing free of side effects. On the legacy path (ISOLATED false) the
+% device is sourced from / synced with global setF and the PF2 caches are
+% updated as before for backward compatibility.
 
 global setF
 global PF2
 
-PF2.curChSet=[];
-PF2.curWvSet=[];
-PF2.curSDSet=[];
-PF2.curProbeInd=[];
-
-if(length(setF)>1)
-    setF=setF(1);
+if nargin < 3 || isempty(isolated)
+    isolated = false;
 end
 
-if(length(setF.device.Probe)==1)
-    PF2.mergedProbe=true;
-else
-    PF2.mergedProbe=true;
-    warning('Multiple Probes may not be fully supported');
-end
-
-if(isfield(fData,'probeInfo'))
-    setF.device=probeInfo;
-end
-
-if(PF2.mergedProbe) %All channel numbers are unique for merged probes
-    for i =1:length(setF.device.Probe)
-        curProbe=setF.device.Probe{i};
-        curChTable=curProbe.TableCh;
-        curOptTable=curProbe.TableOpt;
-        curSDTable=curProbe.TableSD;
-        
-        curChTable.ProbeInd(:)=i;
-        curOptTable.ProbeInd(:)=i;
-        curSDTable.ProbeInd(:)=i;
-        
-        if(i==1)
-            PF2.curCh=curChTable;
-            PF2.curOpt=curOptTable;
-            PF2.curSD=curSDTable;
-        else
-            PF2.curCh=[PF2.curCh;curChTable];
-            PF2.curOpt=[PF2.curOpt;curOptTable];
-            PF2.curSD=[PF2.curSD;curSDTable];
-        end
-        
-    end
-    PF2.timeIndex=find(PF2.curCh.isTime);
-    if(isempty(PF2.timeIndex))
-        PF2.timeIndex=0;
-    end
-else
-    error('Not yet implemented for seperate probe data,\nAssumes concatenated datasets with unique channels in the config file'); 
-end
-
-[~,i]=unique(PF2.curCh.OptodeNumber);
-PF2.curChList=PF2.curCh.OptodeNumber(i);
-
-
-if(PF2.mergedProbe) %All channel numbers are unique for merged probes  
-    
-    data=fData.stage{1};
-    
-    if(~isempty(data))
-        if(isfield(fData,'time')&&~isempty(fData.time))
-            fData.fs=1./median(diff(fData.time));
-            fData.sampleTime=1:length(data(:,1));
-        elseif(PF2.timeIndex==0)
-            warning('Time column could not be found, assuming each row is a sample');
-            fData.sampleTime=1:length(data(:,1));
-            fData.time=(fData.sampleTime-1)./setF.device.Info.DefaultSamplingRate;
-            fData.fs=setF.device.Info.DefaultSamplingRate;
-        elseif(setF.device.Info.TimeIsSampleCount==1)
-            fData.sampleTime=data(:,PF2.timeIndex);
-            fData.time=(fData.sampleTime-1)./setF.device.Info.DefaultSamplingRate;
-            fData.fs=setF.device.Info.DefaultSamplingRate;
-        else
-            fData.sampleTime=1:length(data(:,1));
-            fData.time=data(:,PF2.timeIndex);
-            fData.fs=1./median(diff(fData.time));
-        end
-    elseif(isfield(data,'time')&&~isempty(fData.time))  %If time exists
-        fData.sampleTime=1:length(fData.time);
-        fData.fs=1./median(diff(fData.time));
-    elseif(~isempty(fData.stage{4})) %try to calculate from oxy data
-        data=fData.stage{4};
-        if(isfield(fData,'time')&&~isempty(fData.time))
-            fData.fs=1./median(diff(fData.time));
-            fData.sampleTime=1:length(data(:,1));
-        elseif(PF2.timeIndex==0)
-            fData.sampleTime=1:length(data.HbO(:,1));
-            fData.time=(fData.sampleTime-1)./setF.device.Info.DefaultSamplingRate;
-            fData.fs=setF.device.Info.DefaultSamplingRate;
-        elseif(setF.device.Info.TimeIsSampleCount==1)
-            fData.sampleTime=data.HbO(:,PF2.timeIndex);
-            fData.time=(fData.sampleTime-1)./setF.device.Info.DefaultSamplingRate;
-            fData.fs=setF.device.Info.DefaultSamplingRate;
-        else
-            fData.sampleTime=1:length(data.HbO(:,1));
-            fData.time=data.HbO(:,PF2.timeIndex);
-            fData.fs=1./median(diff(fData.time));
-        end
+if ~isolated
+    if(length(setF)>1)
+        setF=setF(1);
     end
 
-else
-   error('Not Yet Implemented for seperate probe data,\nAssumes concatenated datasets with unique channels in the config file'); 
+    if(isfield(fData,'probeInfo'))
+        setF.device=probeInfo;
+    end
+
+    device = setF.device;
+end
+
+% Delegate to shared function (pure: reads device, returns merged tables/time)
+result = pf2_base.gui.updateCurrentDevice(device, fData);
+
+% Write probe caches to globals only on the legacy path.
+if ~isolated
+    PF2.curCh = result.curCh;
+    PF2.curOpt = result.curOpt;
+    PF2.curSD = result.curSD;
+    PF2.curChList = result.curChList;
+    PF2.timeIndex = result.timeIndex;
+    PF2.mergedProbe = result.mergedProbe;
+    PF2.curChSet = [];
+    PF2.curWvSet = [];
+    PF2.curSDSet = [];
+    PF2.curProbeInd = [];
+end
+
+% Write resolved time/fs back to fData
+if ~isempty(result.time)
+    fData.time = result.time;
+end
+if ~isempty(result.sampleTime)
+    fData.sampleTime = result.sampleTime;
+end
+if ~isempty(result.fs)
+    fData.fs = result.fs;
 end
 end
 
@@ -659,5 +920,93 @@ end
 end
 
 
+function info = buildProcessingInfo(PF2, setF, ctx)
+% BUILDPROCESSINGINFO Create processing info struct for output
+%
+% Captures the processing settings used so plots can display them
+% and analyses can be reproduced.
+%
+% When ctx (ProcessingContext) is provided, uses context values instead of
+% PF2/setF globals for isolated processing.
 
+info = struct();
+info.timestamp = datetime('now');
 
+% Use context if provided, otherwise read from globals
+if nargin >= 3 && ~isempty(ctx) && isa(ctx, 'pf2_base.ProcessingContext')
+    % Read from Context - no global access
+    info.dpfMode = ctx.dpfMode;
+    info.dpfValue = ctx.dpfFixedValue;
+    info.subjectAge = ctx.subjectAge;
+    info.baselineStart = ctx.baselineStartTime;
+    info.baselineLength = ctx.baselineLength;
+    info.rejectLevel = ctx.rejectLevel;
+
+    if ~isempty(ctx.rawMethod) && isfield(ctx.rawMethod, 'name')
+        info.rawMethod = ctx.rawMethod.name;
+    elseif ~isempty(ctx.rawMethodName)
+        info.rawMethod = ctx.rawMethodName;
+    end
+    if ~isempty(ctx.oxyMethod) && isfield(ctx.oxyMethod, 'name')
+        info.oxyMethod = ctx.oxyMethod.name;
+    elseif ~isempty(ctx.oxyMethodName)
+        info.oxyMethod = ctx.oxyMethodName;
+    end
+
+    % Device info from context
+    if ~isempty(ctx.device) && isfield(ctx.device, 'Info')
+        if isfield(ctx.device.Info, 'DeviceName')
+            info.deviceName = ctx.device.Info.DeviceName;
+        end
+        if isfield(ctx.device.Info, 'DefaultSamplingRate')
+            info.samplingRate = ctx.device.Info.DefaultSamplingRate;
+        end
+    end
+else
+    % Read from globals (PF2/setF)
+    % DPF settings
+    if isfield(PF2, 'dpf_mode')
+        info.dpfMode = PF2.dpf_mode;
+    end
+    if isfield(PF2, 'curDPF_fixed')
+        info.dpfValue = PF2.curDPF_fixed;
+    end
+    if isfield(PF2, 'curDPF_age')
+        info.subjectAge = PF2.curDPF_age;
+    end
+
+    % Baseline settings
+    if isfield(PF2, 'baseline')
+        if isfield(PF2.baseline, 'startTime')
+            info.baselineStart = PF2.baseline.startTime;
+        end
+        if isfield(PF2.baseline, 'blLength')
+            info.baselineLength = PF2.baseline.blLength;
+        end
+    end
+
+    % Processing methods
+    if isfield(PF2, 'stageRawMethod') && isfield(PF2.stageRawMethod, 'name')
+        info.rawMethod = PF2.stageRawMethod.name;
+    end
+    if isfield(PF2, 'stageOxyMethod') && isfield(PF2.stageOxyMethod, 'name')
+        info.oxyMethod = PF2.stageOxyMethod.name;
+    end
+
+    % Device info
+    if isstruct(setF) && isfield(setF, 'device') && isfield(setF.device, 'Info')
+        if isfield(setF.device.Info, 'DeviceName')
+            info.deviceName = setF.device.Info.DeviceName;
+        end
+        if isfield(setF.device.Info, 'DefaultSamplingRate')
+            info.samplingRate = setF.device.Info.DefaultSamplingRate;
+        end
+    end
+
+    % Quality control
+    if isfield(PF2, 'RejectLevel')
+        info.rejectLevel = PF2.RejectLevel;
+    end
+end
+
+end

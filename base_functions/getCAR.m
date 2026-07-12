@@ -20,7 +20,7 @@ function CARout=getCAR(x,local,medfiltN,mdebug)
     if(debug)
         q1=diff(x);
         for ch=1:numCh
-            medfilt1(q1(:,ch));
+            q1(:,ch)=pf2_base.external.medfilt1(q1(:,ch));
             q1(q1(:,ch)>0.02,ch)=1;
             q1(q1(:,ch)<-0.02,ch)=-1;
         end
@@ -57,7 +57,7 @@ function CARout=getCAR(x,local,medfiltN,mdebug)
         %y=sum(isnan(x),2);
         basicCAR=nanmean(x,2);
         
-        basicCAR=medfilt1(basicCAR,medFiltN);
+        basicCAR=pf2_base.external.medfilt1(basicCAR,medFiltN);
         
         CARx=repmat(basicCAR,1,numCh);
         

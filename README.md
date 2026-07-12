@@ -1,242 +1,362 @@
-# processFNIRS2 v0.9
+# processFNIRS2
 
-## Overview
-processFNIRS2 is a modular MATLAB toolbox designed for processing functional Near-Infrared Spectroscopy (fNIRS) data. The toolbox provides a flexible framework for importing, processing, analyzing, and visualizing fNIRS data from multiple device manufacturers.
+![MATLAB](https://img.shields.io/badge/MATLAB-R2025b-blue.svg)
+![License](https://img.shields.io/badge/license-GPLv3-blue.svg)
+![Version](https://img.shields.io/badge/version-1.0.0-green.svg)
+
+A modular MATLAB toolbox for functional Near-Infrared Spectroscopy (fNIRS) data
+analysis — covering the full workflow from raw device import through signal
+processing, hemoglobin conversion, quality control, visualization, and
+group-level statistics.
+
+processFNIRS2 is organized in two layers: **Layer 1 (`pf2`)** handles
+single-subject import and processing; **Layer 2 (`exploreFNIRS`)** handles
+multi-subject group analysis and statistics. The boundary between them is a
+plain processed-data struct, so you can script the whole pipeline headlessly or
+drive it through the GUI.
+
+## Architecture at a glance
+
+From a device file to group statistics — `import → processFNIRS2 → epoch →
+Experiment`, with `export` available off the processed struct:
+
+![Pipeline overview](docs/assets/diagrams/pipeline-overview.png)
+
+Once data is processed, the analysis approach follows the experimental design.
+`extractBlocks` segments feed the `Experiment` (whose `aggregate` step does
+group-level averaging); `blockAverage` is the single-subject form; GLM betas
+enter via `betasToSegments`:
+
+![Analysis approaches](docs/assets/diagrams/analysis-approaches.png)
+
+For the full set of diagrams (package map, GLM, hyperscanning) see
+[docs/ARCHITECTURE.md](docs/ARCHITECTURE.md).
+
+## Contents
+- [Architecture at a Glance](#architecture-at-a-glance)
+- [Key Features](#key-features)
+- [Requirements](#requirements)
+- [Installation](#installation)
+- [Quick Start](#quick-start)
+- [Core Concepts](#core-concepts)
+- [Common Workflows](#common-workflows)
+- [Documentation](#documentation)
+- [Examples & Tutorials](#examples--tutorials)
+- [Project Structure](#project-structure)
+- [Settings Configuration](#settings-configuration)
+- [Troubleshooting](#troubleshooting)
+- [Contributing](#contributing)
+- [License](#license) · [Citation](#citation) · [Contact](#contact)
 
 ## Key Features
-- **Modular processing pipeline** for both raw intensity data and hemoglobin concentration data
-- **Device-agnostic design** with support for multiple fNIRS systems:
-  - fNIR Devices/Biopac
-  - Hitachi ETG-4000
-  - NIRx systems
-- **Customizable processing methods** that can be configured and saved
-- **Robust visualization tools** including:
-  - Time series plots
-  - Topographic mapping
-  - Interactive data exploration via exploreFNIRS
-- **Channel quality assessment** and artifact rejection capabilities
-- **Region-of-Interest (ROI) analysis** support
-- **Statistical analysis** with LME models integrated in exploreFNIRS
-- **Data export** in various formats including NIR, SNIRF, CSV and MATLAB formats
 
-## Getting Started
+**Import** — fNIR Devices/Biopac (`.nir`), Hitachi ETG-4000, NIRx, Artinis
+OxySoft (`.oxy3`), and SNIRF (auto-reads BIDS `events.tsv`); batch import from a
+directory tree; tidy/long-format tables via `fromTable`; re-import learned
+embeddings.
 
-### Installation
-1. Clone or download this repository
-2. Add the main processFNIRS2 folder and the following subdirectories to your MATLAB path:
+**Process** — configurable three-stage pipeline (raw → optical density →
+hemoglobin); motion correction (TDDR, SMAR, wavelet, spline); FIR/Butterworth
+filtering; age- and wavelength-dependent DPF (Scholkmann 2013). Signal-processing
+and wavelet routines are first-party, so the default pipeline needs no Signal
+Processing or Wavelet Toolbox.
+
+**Quality control** — headless QC pipeline and one-call `snapshot` (Scalp
+Coupling Index, saturation, cardiac, CoV, Takizawa), plus an interactive
+channel-check GUI.
+
+**Analysis** — block/grand averaging, GLM (with `GLMExperiment`), ROI analysis,
+functional connectivity (7 coupling methods), dynamic FC with brain-state
+detection, graph-theoretic metrics, hyperscanning/inter-brain synchrony and
+cross-brain PPI, and LME-based group statistics with FDR correction.
+
+**Visualization** — time series, topographic maps (2D and 3D cortical surface),
+high-quality brain renders, activation movies, Brodmann-parcel projection,
+brain-anchored connectomes, dual-brain synchrony, and diffuse optical
+tomography (DOT) image reconstruction.
+
+**Export & interchange** — NIR, SNIRF, true BIDS-NIRS datasets, CSV/MATLAB
+tables, and self-describing HDF5 tensors for foundation/transformer models.
+
+## Requirements
+- **MATLAB R2025b** recommended.
+- **Statistics and Machine Learning Toolbox** — required for LME-based group
+  statistics in exploreFNIRS.
+- No other toolboxes are required for the default pipeline: filtering, wavelet,
+  Savitzky-Golay, and median-filter routines are implemented first-party (in
+  `+pf2_base/+external` and `+pf2_base/+wavelet`).
+- **Signal Processing Toolbox** — *not* needed for the core processing/filtering
+  pipeline, but still required for **spectral estimation** features: the QC power
+  spectrum (`pf2.qc.powerSpectrum`, uses `pwelch`/`findpeaks`), coherence-based
+  connectivity (`exploreFNIRS.coupling.coherence`/`partialCoherence`, uses
+  `cpsd`/`mscohere`), and the optional equiripple-FIR filter variant (`remez`,
+  the `ft==2` path in `pf2_lpf`). Porting these is tracked in
+  `internal/octave_compatibility.md`.
+
+## Installation
+1. Clone or download this repository.
+2. Add the processFNIRS2 root folder to your MATLAB path:
    ```matlab
    addpath('/path/to/processFNIRS2');
-   addpath('base_functions', 'GUI', 'functions');
    ```
-   Note: Package folders (those with `+` prefix like `+pf2`, `+pf2_base`) are automatically available once the parent folder is on the path.
+   That is all that is required. The package folders (`+pf2`, `+pf2_base`,
+   `+exploreFNIRS`) resolve automatically once the root is on the path, and the
+   loose code folders (`base_functions`, `functions`, `GUI`) are added for you on
+   the first call to `processFNIRS2` (or `pf2`) — no manual `addpath` of
+   subdirectories is needed.
 
-### Quick Start Guide
+Verify the install with a one-line smoke test:
 ```matlab
-% Import data
-mydata = pf2.import.importNIR('myNIRSfile.nir');
-
-% Configure processing methods
-processFNIRS2(); % Opens GUI for method configuration
-% Or select methods programmatically:
-pf2.methods.raw.setMethod('MyRawMethod');
-pf2.methods.oxy.setMethod('MyOxyMethod');
-
-% Process data
-myprocesseddata = processFNIRS2(mydata);
-
-% Visualize data
-pf2.data.plot.oxy(myprocesseddata);
-pf2.data.plot.roi(myprocesseddata);
-
-% Export data
-pf2.export.asNIR(myprocesseddata, 'myexport.nir');
-pf2.export.asSNIRF(myprocesseddata, 'myexport.snirf');
-
-% Explore and analyze data
-exploreFNIRS(myprocesseddata);
+data = pf2.import.sampleData.fNIR2000(); processed = processFNIRS2(data); disp('Done')
 ```
 
-## Processing Pipeline
-
-### Data Import
-Use functions in the `pf2.Import` module to load data from various fNIRS devices:
-- `pf2.import.importNIR`: Import fNIR Devices/Biopac files
-- `pf2.import.importHitachiMES`: Import Hitachi ETG-4000 files
-- `pf2.import.importNIRX`: Import NIRx system files
-- `pf2.import.importSNIRF`: Import SNIRF format files
-- `pf2.import.sampleData`: Load example datasets included with the toolbox
-
-### Data Manipulation
-The toolbox provides various functions for manipulating fNIRS data:
-- `pf2.data.applyChannelMask`: Set bad channels to NaN
-- `pf2.data.getMarkers`: Find specific markers in the data
-- `pf2.data.resample`: Resample or average fNIRS data
-- `pf2.data.setT0`: Shift time to align with experiment start
-- `pf2.data.split`: Split fNIRS segments based on time points
-- `pf2.data.plot`: Visualize fNIRS data (Oxy, Raw, ROI, AuxData)
-- `pf2.Export`: Export data to NIR or SNIRF formats
-
-### Method Configuration
-processFNIRS2 uses a two-stage processing pipeline:
-1. **Raw processing** (Raw → Optical Density)
-   - Configure and select methods using `pf2.methods.Raw`
-   - Common preprocessing includes: motion artifact correction, filtering, CAR, etc.
-
-2. **Oxy processing** (Optical Density → Hemoglobin)
-   - Configure and select methods using `pf2.methods.Oxy`
-   - Processing includes: Beer-Lambert conversion, filtering, ROI analysis, etc.
-
-Methods can be configured through the GUI or programmatically:
+## Quick Start
 ```matlab
-% Open method configuration GUI
-pf2.methods.raw.configureMethods();
-pf2.methods.oxy.configureMethods();
+% Import data (use the bundled sample, or import your own file)
+mydata = pf2.import.sampleData();                 % sample recording with markers
+% mydata = pf2.import.importNIR('myNIRSfile.nir'); % ...or import your own file
 
-% List available methods
-pf2.methods.raw.List();
-pf2.methods.oxy.List();
+% Process to hemoglobin. Assigning an output runs headless (GUI suppressed):
+processed = processFNIRS2(mydata);                % uses the default methods
 
-% Set methods programmatically
-pf2.methods.raw.setMethod('MyRawMethod');
-pf2.methods.oxy.setMethod('MyOxyMethod');
+% To pick specific methods, browse the registered names and select one:
+pf2.methods.raw.list();                           % e.g. 'x2_lpf_smar', 'x5_TDDR'
+pf2.methods.oxy.list();
+pf2.methods.raw.setMethod('x5_TDDR');
+processed = processFNIRS2(mydata);                % process with the chosen method
+
+% Visualize
+pf2.data.plot.oxy(processed);
+pf2.data.plot.roi(processed);
+
+% Export
+pf2.export.asSNIRF(processed, 'myexport.snirf');
+
+% Explore and analyze (group layer / interactive GUI)
+exploreFNIRS(processed);
+```
+> Assigning an output (`processed = processFNIRS2(...)`) suppresses the GUI.
+> Call `processFNIRS2` with **no** output to open the configuration GUI.
+
+### Block average (event-related) in 6 lines
+The happy path from a continuous recording with event markers to an averaged
+event-related waveform:
+```matlab
+data     = pf2.import.sampleData();              % recording WITH markers (code 50)
+proc     = processFNIRS2(data);                   % -> HbO/HbR/...
+blocks   = pf2.data.defineBlocks(proc, 50, 15, 'Embed', false);  % code 50, 15 s duration
+segments = pf2.data.extractBlocks(proc, blocks, 'PreTime', 5, 'PostTime', 15, 'SetT0', true);
+ga       = pf2.data.blockAverage(segments);       % trial average onto a common grid
+plot(ga.time, ga.HbO.Mean(:,1));                  % averaged HbO, channel 1
+```
+> The 3rd `defineBlocks` argument is the block **duration** in seconds, not a
+> window. Always pass explicit `PreTime`/`PostTime` to `extractBlocks` — when
+> omitted it falls back to a small default `Buffer` (2 s each side) rather than
+> the whole recording.
+
+## Core Concepts
+
+**The data struct is the interface.** Import produces a struct; processing adds
+the hemoglobin fields; everything downstream (blocks, plots, Experiment,
+export) reads that same struct. The stable fields:
+
+| After import | After `processFNIRS2` |
+|--------------|-----------------------|
+| `raw` `[T×C]`, `time`, `fs`, `fchMask` | `HbO` `HbR` `HbTotal` `HbDiff` `CBSI` `[T×C]` |
+| `markers` (table), `device`, `info`, `Aux` | `units`, `DPF_factor`, `processingInfo` |
+
+**Three-stage pipeline.** Raw intensity → optical density (`processStageRaw2OD`)
+→ hemoglobin via Beer-Lambert (`bvoxy`) → filtered hemoglobin
+(`processStageFilterHb`). Stage 1 (raw) and Stage 3 (oxy) are configurable
+method chains. See [docs/PROCESSING_PIPELINE.md](docs/PROCESSING_PIPELINE.md).
+
+**Markers are a table.** `data.markers` has variables `Time, Code, Duration,
+Amplitude` (read by name, not position); extra columns you add are preserved
+through processing and splicing. Codes get meaning from the per-dataset marker
+dictionary `data.info.markerDict`, which importers populate from BIDS
+`events.tsv`/COBI logs and which `defineBlocks` reads to auto-label blocks.
+
+## Common Workflows
+
+Each of the snippets below is the short form; the linked reference and runnable
+example go deeper.
+
+### Method configuration & custom pipelines
+Configure the raw/oxy method chains through the GUI or programmatically, or
+build a chain step-by-step with the Pipeline API (value objects — every mutating
+call returns a new copy):
+```matlab
+pf2.methods.raw.setMethod('x5_TDDR');
+pf2.methods.oxy.setMethod('takizawa_easy');
+
+% Build a raw-stage pipeline from scratch
+p = pf2_base.RawPipeline('myPipeline');
+p = p.add('pf2_Intensity2OD');                 % required first step
+p = p.add('pf2_MotionCorrectTDDR');
+p = p.add('pf2_lpf', 'freq_cut', 0.08);
+out = p.run(data);                             % standard processFNIRS2 output
+p.save('raw');                                 % register as a named method
+```
+Reference: [docs/PROCESSING_PIPELINE.md](docs/PROCESSING_PIPELINE.md) ·
+Examples: `examples/scripts/example_pipeline_basics.m`,
+`examples/scripts/example_pipeline_custom_function.m`.
+
+### Reproducible & parallel processing (Context)
+A `ProcessingContext` bypasses global state, so settings stay isolated — ideal
+for testing, `parfor`, and reproducibility:
+```matlab
+parfor i = 1:numSubjects
+    ctx = pf2_base.ProcessingContext.fromGlobals();
+    ctx.subjectAge = ages(i);
+    ctx.setRawMethod('x5_TDDR');
+    ctx.setOxyMethod('takizawa_easy');
+    results{i} = processFNIRS2(data{i}, 'Context', ctx);
+end
 ```
 
-### Data Processing
-Process data using the selected methods:
+### Visualization & export
 ```matlab
-% Process both raw and oxy stages
-myprocesseddata = processFNIRS2(mydata);
+pf2.data.plot.oxy(processed);                              % time series
+pf2.probe.plot.topo(processed, 'HbO', 'View', '3d');       % 3D cortical surface
+pf2.probe.plot.topo(processed, 'HbO', 'savePath', 'topo.png');  % headless save
 
-% Process specific stages only
-myrawprocessed = pf2.process.processRaw(mydata);
-myoxyprocessed = pf2.process.processOxy(myrawprocessed);
+pf2.export.asSNIRF(processed, 'out.snirf');
+pf2.export.asBIDS(allData, 'bids_out/', 'Task', 'rest');   % BIDS-NIRS dataset
+pf2.export.asTensor(processed, 'rec.h5', 'Features', {'HbO','HbR'});  % ML tensor
 ```
+> For headless 3D renders, prefer the `'savePath'` option over
+> `figure('Visible','off') + saveas` — it reliably writes a correct
+> white-background image. Reference: [docs/API_REFERENCE.md](docs/API_REFERENCE.md).
 
-### Visualization and Export
-Visualize and export your processed data:
+### GLM analysis
+Keep continuous recordings intact and fit HRF-convolved regressors. The
+`GLMExperiment` class wraps processing + GLM + group analysis into one object:
 ```matlab
-% Visualize different aspects of the data
-pf2.data.plot.oxy(myprocesseddata);      % Plot oxygenation data
-pf2.data.plot.raw(myprocesseddata);      % Plot raw intensity data
-pf2.data.plot.roi(myprocesseddata);      % Plot region of interest data
-pf2.data.plot.auxData(myprocesseddata);  % Plot auxiliary data
-
-% Export data to different formats
-pf2.export.asNIR(myprocesseddata, 'myexport.nir');
-pf2.export.asSNIRF(myprocesseddata, 'myexport.snirf');
+[subjects, blockDefs] = pf2.import.sampleData.experiment('blocks');
+gx = exploreFNIRS.core.GLMExperiment(subjects, blockDefs);
+gx.glm.conditions = {'Easy', 'Hard'};
+gx.fit();
+gx.groupby({'Condition'}); gx.aggregate();
+gx.plotBar('Biomarker', 'HbO', 'ShowIndividual', true);
 ```
+Examples: `examples/scripts/example_glm_analysis.m` (and `_advanced`,
+`_connectivity`).
 
-### Advanced Analysis with exploreFNIRS
-For group-level data exploration and statistical analysis, use the exploreFNIRS module:
+### Group analysis & statistics (exploreFNIRS)
+Load a cell array of processed subjects into the scriptable `Experiment` class
+(or the GUI) for group plots, connectivity, hyperscanning, and LME statistics:
 ```matlab
-% Load multiple processed subjects into a cell array
-allData = {subject1, subject2, subject3, ...};
-
-% Launch exploreFNIRS GUI
-exploreFNIRS(allData);
-
-% With configuration options
-exploreFNIRS(allData, 'timeShiftTo0', true, 'blStart', 0, 'blEnd', 5, ...
-             'blockStart', 5, 'blockEnd', 65, 'barSegmentLength', 60);
+ex = exploreFNIRS.core.Experiment(allData);
+ex.groupby({'Group', 'Condition'});
+ex.aggregate();
+ex.plotTemporal('Biomarkers', {'HbO','HbR'});      % group-averaged timeseries
+[fig, stats] = ex.plotLME('Biomarkers', {'HbO'});  % LME + F-stat bars
 ```
+> `Experiment` computes task/baseline statistics over **epoched segments**, not
+> continuous recordings — extract blocks first, and keep `settings.baseline`
+> within each segment's time range.
 
-exploreFNIRS features:
-- Group-level analysis with hierarchical averaging
-- Linear mixed-effects modeling with Satterthwaite degrees of freedom
-- Visualization: temporal plots, bar charts, scatter plots, topographic maps
-- FDR correction: `exploreFNIRS.fx.performFDR()`
-- Data export: `exploreFNIRS.export.mergeGbyTablesWide()` / `mergeGbyTablesLong()`
+Reference: [docs/EXPLORERNIRS_PIPELINE.md](docs/EXPLORERNIRS_PIPELINE.md) and
+[ExploreFNIRS_README.md](ExploreFNIRS_README.md) · Examples:
+`example_experiment_cli.m`, `example_connectivity.m`, `example_hyperscanning.m`.
 
-See [ExploreFNIRS_README.md](ExploreFNIRS_README.md) for detailed documentation.
-
-## Settings Configuration
-Adjust common settings using the Settings module:
+### Quality control
 ```matlab
-% Baseline settings
-pf2.settings.baseline.setBaselineStartTime(0);
-pf2.settings.baseline.setBaselineLength(5);
-
-% DPF (Differential Path Length) settings
-pf2.settings.dpf.setDPFmode('Calc'); % 'None', 'Fixed', or 'Calc'
-pf2.settings.dpf.setFixedDPF(5.93);
-
-% Device selection
-pf2.settings.selectDevice('fNIR_Devices_fNIR1200_16ch.cfg');
+report = pf2.qc.snapshot(data, 'SaveDir', 'qc_out');   % one-call headless summary
+report = pf2.qc.pipeline.assess(data);                  % saturation/sci/cardiac/cov/takizawa
+data   = pf2.qc.pipeline.apply(data, report);           % AND results into data.fchMask
 ```
+Example: `examples/scripts/example_qc_pipeline.m`.
 
-## File Structure
-- `processFNIRS2.m`: Main function for processing fNIRS data
-- `pf2.m`: Convenience wrapper for processFNIRS2
-- `exploreFNIRS.m`: Group-level analysis GUI
-- `+pf2/`: User-facing API (Import, Export, Data, Methods, Settings, Probe)
-- `+pf2_base/`: Internal infrastructure and utilities
-- `+exploreFNIRS/`: Group analysis functions (plot, export, fx, dataset)
-- `base_functions/`: Utility functions (legacy)
-- `GUI/`: User interface components (legacy, GUIDE-based)
-- `functions/`: Signal processing algorithms (filters, motion correction, etc.)
-- `devices/`: Device configuration files (.cfg)
-- `sampledata/`: Example datasets
-
-## Overall Structure
-processFNIRS2 is laid out in the following manner:
-- **Data**: Functions to manipulate individual fNIRS segments
-  - ApplyChannelMask: Set bad channels to nan
-  - GetMarkers: Find timepoints of markers in a regex style
-  - Resample: Resample or average fNIRS data
-  - SetT0: Shift fNIRS time to match start of experiment
-  - Split: Split fNIRS segment based on different input times
-  - **Plot**: Functions to visualize fNIRS data
-    - AuxData: Plot auxiliary data channels
-    - Oxy: Plot oxygenation data
-    - ROI: Plot Region of Interest data
-    - Raw: Plot raw intensity data
-  - **Export**: Functions to export fNIRS data
-    - asNIR: Export to NIR file format
-    - asSNIRF: Export to SNIRF file format
-- **GUI**: Shortcut for accessing the GUI
-- **Help**: Access to help documentation
-- **Import**: Functions to import fNIRS files
-  - importHitachiMES: Import Hitachi Probes
-  - importNIRX: Import NIRx files
-  - importNIR: Import fNIR Devices/Biopac files
-  - importSNIRF: Import SNIRF format files
-  - sampleData: Load sample data included with the toolbox
-- **Methods**: Functions to change and modify processing methods
-  - Oxy: Oxy conversion pipeline methods
-  - Raw: Raw domain pipeline methods
-- **Process**: Process fNIR segment data
-  - processOxy: Run the Oxy Pipeline only
-  - processRaw: Run the Raw Pipeline only
-- **Settings**: Change settings related to processing
-  - Baseline: Change baseline time settings
-  - DPF: Change mode of Differential Path Length
-  - selectDevice: Reload device settings for FNIRS probe
-
-## Troubleshooting Tips
-- When importing data for the first time, verify that the probe configuration is correct
-- If you get errors about DPF factors, check the settings using `pf2.settings.DPF`
-- For visualization issues, try running with default methods first
-- If having trouble loading the software, check the MATLAB preference directory (`prefdir`) and delete any related settings files
-- Remember that GUI settings are for visualization only and don't affect your data
-
-## Preferences and Configuration
-Settings, loaded functions, and methods are stored in the MATLAB preference directory.
-Access this location using the MATLAB command: `prefdir`
+### Metadata import
+```matlab
+allData = pf2.data.importInfo(allData, 'demographics.csv', 'SubjectID');  % per subject
+blocks  = pf2.data.importBlockInfo(blocks, 'behavior.csv', 'MarkerCode', 49); % per block
+```
+Example: `examples/scripts/example_import_blocks.m`.
 
 ## Documentation
-For detailed function documentation, use MATLAB's `help` command:
-```matlab
-help processFNIRS2
-help pf2.methods.Raw
-help pf2.import.importNIR
+Full reference documentation lives in the [`docs/`](docs/) directory — see
+[`docs/README.md`](docs/README.md) for the index:
+
+| Guide | Content |
+|-------|---------|
+| [API Reference](docs/API_REFERENCE.md) | Package/function reference and device support |
+| [Processing Pipeline](docs/PROCESSING_PIPELINE.md) | Three-stage pipeline, methods, configuration |
+| [Usage Examples](docs/USAGE_EXAMPLES.md) | Worked single-subject, multi-device, and batch workflows |
+| [MATLAB CLI](docs/MATLAB_CLI.md) | Headless execution and automation patterns |
+| [CLI/UX Guide](docs/CLI_UX_GUIDE.md) | CLI conventions and progressive-disclosure API |
+| [exploreFNIRS Pipeline](docs/EXPLORERNIRS_PIPELINE.md) | Group-analysis layer reference |
+| [Architecture](docs/ARCHITECTURE.md) | Data flow, package map, and where new code belongs |
+
+For per-function help in MATLAB, use `help` (e.g. `help processFNIRS2`,
+`help pf2.import.importNIR`).
+
+### Driving pf2 from an AI agent (MCP)
+processFNIRS2 can be operated by an MCP client (Claude Code/Desktop, VS Code)
+through the official [MATLAB MCP Server](https://github.com/matlab/matlab-mcp-server).
+See [`mcp/README.md`](mcp/README.md) for install/config and a session tool card.
+
+## Examples & Tutorials
+Runnable, copy-pasteable scripts live in [`examples/scripts/`](examples/scripts)
+— see [`examples/scripts/README.md`](examples/scripts/README.md) for the full
+index. Start with:
+
+1. `tutorial_end_to_end.m` — import → process → blocks → Experiment → stats/export.
+2. `tutorial_batch_workflow.m` — multi-subject directory import, metadata, batch.
+3. Topic examples — pipelines, GLM, QC, connectivity, hyperscanning, DOT, visualization.
+
+## Project Structure
+```
+processFNIRS2.m      Main processing entry point
+pf2.m                Convenience wrapper (self-heals the path)
+exploreFNIRS.m       Group-level analysis GUI
++pf2/                User-facing API (import, export, data, methods, settings, probe, qc)
++pf2_base/           Internal infrastructure, algorithms, and tests
++exploreFNIRS/       Group analysis (core, connectivity, coupling, hyperscanning, stats, graph, plot, export)
+functions/           Signal-processing algorithm implementations (TDDR, SMAR, wavelet, ...)
+devices/             Device configuration files (.cfg)
+sampledata/          Example datasets
+examples/scripts/    Runnable tutorials and examples
+docs/                Reference documentation
+base_functions/, GUI/  Legacy (GUIDE-based) code — kept for compatibility
 ```
 
+## Settings Configuration
+```matlab
+pf2.settings.baseline.setBaselineStartTime(0);
+pf2.settings.baseline.setBaselineLength(5);
+pf2.settings.dpf.setDPFmode('Calc');                 % 'None', 'Fixed', or 'Calc'
+pf2.settings.selectDevice('fNIR_Devices_fNIR1200_16ch.cfg');
+```
+Settings, loaded functions, and methods persist in the MATLAB preference
+directory (find it with `prefdir`).
+
+## Troubleshooting
+- When importing for the first time, verify the probe configuration is correct.
+- If you get DPF-factor errors, check `pf2.settings.dpf`.
+- For visualization issues, try the default methods first.
+- If the toolbox won't load, check `prefdir` and delete any stale settings files.
+- GUI plotting settings affect visualization only — they don't change your data.
+
+## Contributing
+Contributions are welcome — see [CONTRIBUTING.md](CONTRIBUTING.md) for
+development setup, running the tests, and coding conventions, and
+[docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) for how the toolbox fits together.
+
 ## License
-processFNIRS2 is free for academic and non-commercial use, but some included code may have other licenses.
+processFNIRS2 is licensed under the GNU General Public License, Version 3
+(GPLv3); see [LICENSE](LICENSE). Bundled third-party components and their
+licenses are documented in [THIRD_PARTY_LICENSES.md](THIRD_PARTY_LICENSES.md).
 
 ## Citation
-If you use processFNIRS2 in your research, please cite:
-[Citation information to be added]
+If you use processFNIRS2 in your research, please cite the software
+(machine-readable metadata is in [CITATION.cff](CITATION.cff)):
+
+> Curtin, A., & Ayaz, H. (2026). *processFNIRS2* (version 1.0.0)
+> [Computer software]. https://github.com/AdrianCurtin/processFNIRS2
+
+A companion publication and archival DOI will be added here when available.
 
 ## Contact
 For questions or support, contact Dr. Adrian Curtin at adrian.b.curtin@drexel.edu

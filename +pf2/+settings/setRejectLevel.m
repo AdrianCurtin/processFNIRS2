@@ -55,7 +55,7 @@ if(nargin<1)
 end
 
 if(~isnumeric(rejectionLevel)||rejectionLevel<0||rejectionLevel>=1)
-	error('Please provide a valid rejection level, must be >=0 and <1');
+	error('pf2:settings:setRejectLevel:invalidLevel', 'Please provide a valid rejection level, must be >=0 and <1');
 end
 
 processFNIRS2('RejectLevel',rejectionLevel);

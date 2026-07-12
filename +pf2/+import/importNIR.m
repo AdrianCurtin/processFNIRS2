@@ -1,4 +1,4 @@
-function [fNIR] = importNIR(nir_filename, mrk_filename, channelCheck)
+function [fNIR] = importNIR(nir_filename, mrk_filename, channelCheck, varargin)
 % IMPORTNIR Import fNIRS data from fNIR Devices/Biopac .nir files
 %
 % Imports raw fNIRS data from COBI Studio software (.nir files) used with
@@ -32,7 +32,7 @@ function [fNIR] = importNIR(nir_filename, mrk_filename, channelCheck)
 %                   .time [T x 1] - Time vector in seconds
 %                   .fs - Sampling frequency in Hz
 %                   .fchMask [1 x C] - Channel validity mask (1=good, 0=bad)
-%                   .markers [M x 3] - Event markers (time, code, duration)
+%                   .markers [M x 4] - Event markers (time, code, duration, amplitude)
 %                   .info - Metadata structure:
 %                       .header - File header information
 %                       .mrkheaders - Marker file headers
@@ -69,6 +69,8 @@ function [fNIR] = importNIR(nir_filename, mrk_filename, channelCheck)
 %   3/29/2019 - Cell array marker support, strsplit parsing
 %   2/1/2019 - Output as fNIR struct, continuous baseline
 
+pf2_base.ensureStatsFallbacks();  % ensure stats-toolbox fallbacks (nan*) are on the path before use
+
 fNIR=[]; % placeholder initializations
 data=[]; 
 markers=[];
@@ -77,6 +79,12 @@ fchMask=[];
 autoLoadMrk=true;
 
 forceChannelCheck=false; % if channelcheck is enabled manually, then honor, otherwise load only first time
+channelCheckVersion=pf2_base.channelCheckVersion();
+for vi_=1:2:numel(varargin)
+    if ischar(varargin{vi_}) && strcmpi(varargin{vi_},'ChannelCheckVersion')
+        channelCheckVersion=varargin{vi_+1};
+    end
+end
 
 if nargin < 1 % No Arguments - Open fNIRS and mrk file
 	[nir_filename, pathname] = uigetfile({'*.nir';'*.*'},'Open fNIRS nir_filename');
@@ -147,7 +155,7 @@ if(isstring(nir_filename))
 end
 
 if ~ischar(nir_filename)
-	error('Input must be a string representing a filename');
+	error('pf2:importNIR:badInput', 'Input must be a string representing a filename');
 end
 
 if(~isempty(nir_filename))
@@ -155,7 +163,7 @@ if(~isempty(nir_filename))
 end
 
 if fid==-1
-	error('Data nir_filename not found or permission denied');
+	error('pf2:importNIR:fileNotFound', 'Data nir_filename not found or permission denied');
 end
 
 
@@ -446,6 +454,7 @@ if(isfield(markers,'data'))
 else
     fNIR.markers=[];
 end
+fNIR.markers = pf2_base.normalizeMarkers(fNIR.markers);
 
 fNIR.info=[];
 
@@ -481,6 +490,18 @@ end
 
 if(~isempty(log_info))
     fNIR.info.log_info=log_info;
+    % Fold the COBI Marker Dictionary into the canonical marker dictionary
+    if(isstruct(log_info)&&isfield(log_info,'MarkerDict')&&~isempty(log_info.MarkerDict))
+        try
+            fNIR.info.markerDict=pf2_base.normalizeMarkerDict(log_info.MarkerDict);
+        catch normErr
+            % Leave markerDict unset if the COBI table can't be normalized,
+            % but warn so the cause is visible (the column layout is parsed
+            % from the .nir log header and may be unexpected).
+            warning('pf2:importNIR:markerDictFailed', ...
+                'Could not normalize COBI MarkerDict: %s', normErr.message);
+        end
+    end
 end
     
 %clear count;
@@ -490,47 +511,35 @@ end
 numRawChannels=size(data,2)-1;
 
 if(hasDataSource)
-    dataSource = fNIR.info.header.DataSource;
+    [cfgName, modelToken, probeStyle] = resolveProbeFromDataSource(fNIR.info.header.DataSource);
+    fprintf('Loading configuration for: Model %s %s\n', modelToken, probeStyle);
 
-    dataSourceParts = strsplit(dataSource,', ');
-
-    imagerModel = dataSourceParts{2}; % ex Model 2000S Imager, Model 1200W Imager
-
-    probeStyle = dataSourceParts{end-1}; % ex HD split
-
-    numOptodes = sscanf(dataSourceParts{end},'%i optodes'); %ex: 4 18
-
-    fprintf('Loading configuration for: %s %s\n',imagerModel,probeStyle);
-
-    switch(probeStyle)
-        case 'Split'
-            fNIR.info.probename='fNIR_Devices_fNIR1000_Split_2x2ch';
-            fNIR.raw=fNIR.raw(:,1:13);
-        case 'Linear'
-            error('This probe is unsupported');
-            fNIR.info.probename='fNIR_Devices_fNIR1000_Linear';
-            fNIR.raw=fNIR.raw(:,1:13);
-        case 'HD' % 2x8 +2
-            fNIR.info.probename='fNIR_Devices_fNIR2000_18ch';
-            fNIR.raw=fNIR.raw(:,1:55);
-        case 'HDS' % 2x8 +2
-            fNIR.info.probename='fNIR_Devices_fNIR2000_18ch';
-            fNIR.raw=fNIR.raw(:,1:55);
-        case 'SD' % 2x2 +1
-            error('This probe is unsupported');
-            fNIR.info.probename='fNIR_Devices_fNIR1000_Split_2x2ch';
-            fNIR.raw=fNIR.raw(:,1:(20*3+1));
-        case 'LD' % 1x4 +2
-            error('This probe is unsupported');
-            fNIR.info.probename='fNIR_Devices_fNIR1000';
-            fNIR.raw=fNIR.raw(:,1:(6*3+1));
-        otherwise
-             warning('Unidentified Probe\n');
-            fNIR.info.probename='Unknown .nir file';
+    if(~isempty(cfgName))
+        fNIR.info.probename = cfgName;
+        % Trim trailing columns based on the cfg's expected raw width.
+        % Trailing columns may be unused detector slots reported by the imager.
+        try
+            dev = pf2.Device.load(cfgName);
+            expectedCols = length(dev.wavelengths());
+            if(size(fNIR.raw,2) >= expectedCols)
+                fNIR.raw = fNIR.raw(:, 1:expectedCols);
+            else
+                warning('pf2:import:rawWidthMismatch', ...
+                    'Probe %s expects %d raw columns; data has %d. Skipping trim.', ...
+                    cfgName, expectedCols, size(fNIR.raw,2));
+            end
+        catch ME
+            warning('pf2:import:probeLoadFailed', ...
+                'Failed to load probe %s: %s', cfgName, ME.message);
+        end
+    else
+        warning('pf2:import:unidentifiedProbe', ...
+            'Unidentified probe (model "%s", style "%s")', modelToken, probeStyle);
+        fNIR.info.probename = 'Unknown .nir file';
     end
 
 else
-       
+
     switch(numRawChannels)
         case 12
             fNIR.info.probename='fNIR_Devices_fNIR1000_Linear';
@@ -545,6 +554,13 @@ else
 
 end
 
+% Attach Device object for self-describing data
+try
+    fNIR.device = pf2.Device.load(fNIR);
+catch
+    % Unknown probe — skip device attachment
+end
+
 
 %clear linecount line times count;
 
@@ -555,7 +571,10 @@ if(~channelCheck)
     try
         fmask=load(ch_mask_file,'fmask');
         fmask=fmask.fmask;
-        fprintf('\n%i Channels marked bad\n',sum(fmask<1));
+        nBad=sum(fmask<1);
+        if(nBad>0)
+            fprintf('%i channel(s) marked bad in saved rejection mask\n',nBad);
+        end
     catch
         fprintf('\nNo channel rejection present\n');
         fmask=[];
@@ -565,14 +584,38 @@ else
 end
 
 if(channelCheck)
-    if(forceChannelCheck)
-        fNIR=probeCheckGUI(fNIR,nir_filename,forceChannelCheck);
+    if(forceChannelCheck && pf2_base.allowChannelCheckGUI())
+        if channelCheckVersion == 2
+            app = pf2.qc.ChannelCheck(fNIR, 'CalledFromImport', true, 'SkipConfirmation', true);
+            if isvalid(app), fNIR = app.OutputData; delete(app); end
+        else
+            fNIR=probeCheckGUI(fNIR,nir_filename,forceChannelCheck);
+        end
     else
-        fNIR=pf2_base.loadExistingMaskOrCheck(fNIR,nir_filename); 
+        % Non-forced, or the GUI cannot/should not be shown (headless, under
+        % test, or disabled): load a saved mask if present; otherwise
+        % loadExistingMaskOrCheck defaults all-good instead of blocking on the
+        % channel-check window.
+        fNIR=pf2_base.loadExistingMaskOrCheck(fNIR,nir_filename,channelCheckVersion);
     end
 else
    if(~isempty(fmask))
-       fNIR.fchMask=fmask; 
+       fNIR.fchMask=fmask;
+   elseif isempty(fNIR.fchMask)
+       % No saved mask and channel check skipped — default to all good.
+       % Use device nChannels (not raw column count which includes wavelengths).
+       if isfield(fNIR, 'device') && ~isempty(fNIR.device)
+           fNIR.fchMask=ones(1,fNIR.device.nChannels);
+       else
+           % Fallback: guess from probename config
+           try
+               dev = pf2.Device.load(fNIR);
+               fNIR.fchMask=ones(1,dev.nChannels);
+           catch
+               warning('pf2:import:unknownChannelCount', ...
+                   'Cannot determine channel count for default fchMask. Set manually.');
+           end
+       end
    end
 end
 
@@ -580,6 +623,96 @@ end
 
 function loadExistingOrOpen()
 
+end
+
+function [cfgName, modelToken, probeStyle] = resolveProbeFromDataSource(dataSource)
+% RESOLVEPROBEFROMDATASOURCE Map a COBI Studio "Data Source" string to a probe cfg.
+%
+% Parses comma-separated DataSource lines from COBI Studio. Tolerates
+% formatting differences across COBI versions by:
+%   - extracting model digits via regex anywhere in the string,
+%   - scanning all parts for a known probe-style keyword (HD/HDS/Split/Linear/LD/SD),
+%   - falling back to the second-to-last part (older versions) if no match.
+%
+% Examples handled:
+%   'Device 1, Model 3000C Imager, Port 1, HD, 18 optodes'   (newer)
+%   'Device 1, Model 2000S Imager, Port 1, HDS, 18 optodes'  (newer)
+%   'Device 1, Model 1200W Imager, Port 1, HD, 16 optodes'   (newer)
+%   'Device 1, Model 1000 Imager, Port 1, LD, 6 optodes'     (newer)
+%   'Model 1000, HD'                                         (older / minimal)
+%
+% Returns:
+%   cfgName    - Probe config name (without .cfg), or '' if unrecognized.
+%   modelToken - Imager model token (e.g. '3000C', '2000S', '1200W', '1000').
+%   probeStyle - Probe style token (e.g. 'HD', 'HDS', 'Split', 'Linear', 'LD').
+
+    cfgName = '';
+    modelToken = '';
+    probeStyle = '';
+
+    if(~ischar(dataSource) && ~isstring(dataSource))
+        return;
+    end
+    parts = strtrim(strsplit(char(dataSource), ','));
+
+    % Extract model token: "Model NNNN[X]" anywhere in the string.
+    % "Imager" suffix is optional (older COBI versions may omit it).
+    modelMatch = regexp(strjoin(parts, ', '), ...
+        'Model\s+(\d+)([A-Za-z]*)', 'tokens', 'once');
+    if(isempty(modelMatch))
+        return;
+    end
+    modelDigits = modelMatch{1};
+    modelToken = [modelDigits modelMatch{2}];
+
+    % Find probe style by scanning parts for a known keyword.
+    % This is more robust than position-based parsing across COBI versions.
+    knownStyles = {'HDS','HD','Split','Linear','LD','SD'};
+    for i = 1:numel(parts)
+        token = regexp(parts{i}, '^[A-Za-z]+$', 'match', 'once');
+        if(isempty(token)); continue; end
+        idx = find(strcmpi(knownStyles, token), 1);
+        if(~isempty(idx))
+            probeStyle = knownStyles{idx};
+            break;
+        end
+    end
+
+    % Fallback: take second-to-last comma part (matches legacy parser).
+    if(isempty(probeStyle) && numel(parts) >= 2)
+        probeStyle = strtrim(parts{end-1});
+    end
+
+    cfgName = lookupProbeCfg(modelDigits, probeStyle);
+end
+
+function cfgName = lookupProbeCfg(modelDigits, probeStyle)
+% LOOKUPPROBECFG Map (model digits, probe style) to a device cfg name.
+%
+% 3000-series imagers use the dedicated fNIR3000 cfg. Earlier-generation
+% imagers (1000/1200/2000) share the probeStyle-based mapping that
+% historically dispatched on style alone.
+
+    cfgName = '';
+
+    if(strcmp(modelDigits, '3000'))
+        switch(probeStyle)
+            case {'HD','HDS'}
+                cfgName = 'fNIR_Devices_fNIR3000';
+        end
+        return;
+    end
+
+    switch(probeStyle)
+        case {'HD','HDS'}      % 2x8 + 2 short-sep
+            cfgName = 'fNIR_Devices_fNIR2000_18ch';
+        case 'Split'           % 2x2
+            cfgName = 'fNIR_Devices_fNIR1000_Split_2x2ch';
+        case 'Linear'          % 1x4 linear
+            cfgName = 'fNIR_Devices_fNIR1000_Linear';
+        case 'LD'              % Square patch, detector at center, 4 corner sources
+            cfgName = 'fNIR_Devices_fNIR1000_LD';
+    end
 end
 
 function markers=importMrk(mrk_filename,startCode,mrkSourceID)
@@ -753,7 +886,8 @@ function loginfo=importCOBIlog(log_filename)
     loginfo=[];
 
     if (logfid==-1&&~isempty(log_filename))
-        warning('COBI log file not found, loading without log file');
+        % Companion COBI log is optional; absence is the common case
+        % (e.g. sample data), so proceed silently rather than warn.
         return;
     elseif(logfid==-1)
         %no file provided so just return

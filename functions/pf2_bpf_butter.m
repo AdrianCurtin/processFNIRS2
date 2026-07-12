@@ -36,7 +36,7 @@ function [ dataf ] = pf2_bpf_butter( data,filtOrder,fs,lowF,highF,restoreMean,Na
 %   - Uses second-order sections (SOS) for numerical stability
 %   - Data length must be at least 6*filtOrder samples
 %   - Common bands: 0.008-0.1 Hz (hemodynamic), 0.008-0.5 Hz (with cardiac)
-%   - Falls back to MATLAB R2018a filtfilt if current version fails
+%   - Falls back to the in-house zero-phase filter (filtfilt_classic)
 %
 % Example:
 %   % Standard hemodynamic band-pass (0.008-0.1 Hz)
@@ -63,25 +63,25 @@ end
 [M,N]=size(data);
 
 %-----------------------------------------------------------------
-% Band-pass Filter design
+% Band-pass Filter design (ZPK -> SOS for numerical stability)
 %-----------------------------------------------------------------
 half_fs = fs/2;    %half of sampling freq. equal to pi
 
-[A,B,C,D] = butter(filtOrder,[lowF highF]/half_fs);
+[z,p,k] = pf2_base.external.butter(filtOrder,[lowF highF]/half_fs);
 minLen=filtOrder*6;
 
 if size(data,1)<=minLen
     warning('Data length (%i) must be at least 3 * filter order',size(data,1));
     dataf=nan(size(data));
 else
-    sos = ss2sos(A,B,C,D);
+    sos = pf2_base.external.zp2sos(z,p,k);
 
 	switch(NaN_mode)
 		case 'Interpolate'
 			try
 				dataf=pf2_base.filtfilt_interp(sos,1,data);
 			catch
-				dataf=pf2_base.external.filtfilt_classic(sos,1,data); % Use matlab 2018a filtfilt if current version fails due to nans
+				dataf=pf2_base.external.filtfilt_classic(sos,1,data); % Fall back to in-house zero-phase filter if the NaN-aware path errors
 			end
 			if(restoreMean)
 			   dataf=dataf+nanmean(data,1);
@@ -90,14 +90,10 @@ else
 			try
 				dataf=pf2_base.filtfilt_piecewise(sos,1,data,minLen,restoreMean);
 			catch
-				dataf=pf2_base.external.filtfilt_classic(sos,1,data); % Use matlab 2018a filtfilt if current version fails due to nans
+				dataf=pf2_base.external.filtfilt_classic(sos,1,data); % Fall back to in-house zero-phase filter if the NaN-aware path errors
 			end
 		case 'Leave'
-			try
-				dataf=filtfilt(sos,1,data);
-			catch
-				dataf=pf2_base.external.filtfilt_classic(sos,1,data); % Use matlab 2018a filtfilt if current version fails due to nans
-			end
+			dataf=pf2_base.external.filtfilt_classic(sos,1,data);
 
 			if(restoreMean)
 			   dataf=dataf+nanmean(data,1);
@@ -109,18 +105,4 @@ else
     end
 end
 
-end
-
-function dataf=nantolerant_filtfilt(b,a,data)
-    datamask=isnan(data)|isinf(data);
-
-    data(datamask)=nanmedian(data(:));
-    for i=1:size(data,2)
-       data(datamask(:,i),i)=nanmedian(data(:,i));
-    end
-    data(isnan(data))=0;
-
-    dataf=filtfilt(b,a,data);
-
-    dataf(datamask)=nan;
 end

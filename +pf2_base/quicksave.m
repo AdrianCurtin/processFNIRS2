@@ -534,7 +534,7 @@ function b = class2tag(cls)
         %   b = uint8(201);
 
 		otherwise
-			error('Unknown class');
+			error('pf2_base:quicksave:unknownClass', 'Unknown class');
     end
 end
 
