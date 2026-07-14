@@ -30,7 +30,7 @@ function setMethod(raw_method, ctx)
 %
 %   % Typical workflow
 %   pf2.methods.raw.list();              % View available methods
-%   pf2.methods.raw.setMethod('x5_TDDR'); % Select TDDR method
+%   pf2.methods.raw.setMethod('OD_TDDR'); % Select TDDR method
 %   data = processFNIRS2(rawData);       % Process with selected method
 %
 % See also: pf2.methods.raw.list, pf2.methods.raw.describeMethod,

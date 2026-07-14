@@ -54,7 +54,7 @@ processFNIRS2();
 ## Workflow 3: Programmatic Method Selection
 ```matlab
 % Set methods (browse names with pf2.methods.raw.list() / pf2.methods.oxy.list())
-pf2.methods.raw.setMethod('x5_TDDR');
+pf2.methods.raw.setMethod('OD_TDDR');
 pf2.methods.oxy.setMethod('takizawa_easy');
 
 % Configure parameters
@@ -316,7 +316,7 @@ segments = pf2.data.extractBlocks(data, blocks);
 % pf2.ProcessingContext is usable straight from construction (no fromGlobals
 % bootstrap) and accepts processFNIRS2-style Name-Value settings.
 ctx = pf2.ProcessingContext('DPFmode', 'Calc', 'SubjectAge', 30, ...
-    'RawMethod', 'x5_TDDR', 'OxyMethod', 'takizawa_easy');
+    'RawMethod', 'OD_TDDR', 'OxyMethod', 'takizawa_easy');
 
 % Process without modifying global state (either form works)
 result = ctx.process(data);                       % context as receiver

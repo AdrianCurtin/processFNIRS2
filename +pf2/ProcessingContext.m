@@ -19,7 +19,7 @@ classdef ProcessingContext < pf2_base.ProcessingContext
     %   ctx = pf2.ProcessingContext(Name, Value, ...)
     %
     % Inputs (Name-Value pairs; all optional):
-    %   'RawMethod'    - Name of a raw-stage method (e.g. 'x5_TDDR')
+    %   'RawMethod'    - Name of a raw-stage method (e.g. 'OD_TDDR')
     %   'OxyMethod'    - Name of an oxy-stage method (e.g. 'takizawa_easy')
     %   'DPFmode'      - 'None' | 'Fixed' | 'Calc'
     %   'FixedDPF'     - Fixed DPF value (used when DPFmode is 'Fixed')
@@ -36,7 +36,7 @@ classdef ProcessingContext < pf2_base.ProcessingContext
     %
     % Examples:
     %   % Configure once, in one call, without touching globals
-    %   ctx = pf2.ProcessingContext('RawMethod','x5_TDDR', ...
+    %   ctx = pf2.ProcessingContext('RawMethod','OD_TDDR', ...
     %       'DPFmode','Calc', 'SubjectAge',25, 'blLength',10);
     %   out = processFNIRS2(data, 'Context', ctx);
     %   % ...or let the context be the receiver:

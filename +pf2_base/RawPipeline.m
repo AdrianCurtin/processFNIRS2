@@ -104,7 +104,7 @@ classdef RawPipeline < pf2_base.Pipeline
         function p = fromMethod(methodName)
         % FROMMETHOD Build a RawPipeline from an existing named method.
         %
-        %   p = pf2_base.RawPipeline.fromMethod('x5_TDDR')
+        %   p = pf2_base.RawPipeline.fromMethod('OD_TDDR')
 
             base = pf2_base.Pipeline.fromMethod(methodName, 'raw');
             p = pf2_base.RawPipeline(base.name);

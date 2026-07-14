@@ -97,7 +97,7 @@ classdef PipelineEditorWorkflowTest < matlab.unittest.TestCase
 
             sections = PF2.myRawMethods.cfg.Sections;
             tc.verifyTrue(any(strcmp(sections, 'OD_TDDR')));
-            tc.verifyTrue(any(strcmp(sections, 'OD_TDDR_lpf')));
+            tc.verifyTrue(any(strcmp(sections, 'OD_SMAR')));
             sectionsOxy = PF2.myOxyMethods.cfg.Sections;
             tc.verifyTrue(any(strcmp(sectionsOxy, 'LPF')));
             tc.verifyTrue(any(strcmp(sectionsOxy, 'LPF_ROI')));

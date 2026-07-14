@@ -7,8 +7,8 @@ abstract: >-
   signal processing, hemoglobin conversion, quality control, and group-level
   statistics.
 type: software
-version: 1.0.0
-date-released: "2026-02-11"
+version: 1.0.1
+date-released: "2026-07-14"
 license: GPL-3.0-or-later
 repository-code: "https://github.com/AdrianCurtin/processFNIRS2"
 url: "https://github.com/AdrianCurtin/processFNIRS2"

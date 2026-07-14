@@ -26,7 +26,7 @@ function p = OD_TDDR()
 %   p = pf2.methods.seeds.raw.OD_TDDR();
 %   p.save();
 %
-% See also: pf2.methods.seeds.raw.OD_TDDR_lpf, pf2.methods.resetDefaults,
+% See also: pf2.methods.seeds.raw.OD_SMAR, pf2.methods.resetDefaults,
 %           pf2_base.RawPipeline, pf2_MotionCorrectTDDR
 
 p = pf2_base.RawPipeline('OD_TDDR', ...

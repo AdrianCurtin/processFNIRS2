@@ -71,21 +71,10 @@ fprintf('  Saved: %s\n', outFile);
 % --- Golden 2: TDDR raw, no oxy ---
 fprintf('Generating: fNIR2000_TDDR_None...\n');
 
-% Check if x5_TDDR method exists
-global PF2
-rawMethods = PF2.myRawMethods.cfg.Sections;
-if ismember('x5_TDDR', rawMethods)
-    pf2.methods.raw.setMethod('x5_TDDR');
-    rawMethodName = 'x5_TDDR';
-else
-    % Create a temporary TDDR method
-    pf2.methods.raw.create('golden_TDDR', ...
-        {struct('f', 'pf2_MotionCorrectTDDR', 'args', {{'x', 'fs'}}, ...
-                'argvals', {{'x', 'fs'}}, 'output', 'x')}, ...
-        'Replace', true);
-    pf2.methods.raw.setMethod('golden_TDDR');
-    rawMethodName = 'golden_TDDR';
-end
+% Use the registered OD_TDDR raw method (portable: the golden stores a real
+% method name so GoldenFileTest can reproduce it without a temp method).
+rawMethodName = 'OD_TDDR';
+pf2.methods.raw.setMethod(rawMethodName);
 pf2.methods.oxy.setMethod('None');
 processed = processFNIRS2(data);
 
@@ -100,11 +89,6 @@ golden.matlabVersion = version();
 outFile = fullfile(pipelineDir, 'fNIR2000_TDDR_None.mat');
 save(outFile, '-struct', 'golden');
 fprintf('  Saved: %s\n', outFile);
-
-% Clean up temp method if created
-if strcmp(rawMethodName, 'golden_TDDR')
-    pf2.methods.raw.delete('golden_TDDR');
-end
 
 % --- Golden 3: TDDR function in isolation ---
 fprintf('Generating: pf2_TDDR_fNIR2000...\n');

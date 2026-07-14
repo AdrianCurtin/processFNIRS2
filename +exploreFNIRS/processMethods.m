@@ -15,7 +15,7 @@ function processMethods(rawMethodStr,oxyMethodStr)
 %   oxyMethodStr - Name of the oxy processing method
 %
 % Example:
-%   exploreFNIRS.processMethods('x5_TDDR', 'takizawa_easy');
+%   exploreFNIRS.processMethods('OD_TDDR', 'takizawa_easy');
 %   exploreFNIRS.processMethods([], 'None');  % oxy-only reprocessing
 %
 % See also: processFNIRS2, pf2.methods.raw.list, pf2.methods.oxy.list,

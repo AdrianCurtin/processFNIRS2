@@ -2,7 +2,7 @@
 
 ![MATLAB](https://img.shields.io/badge/MATLAB-R2025b-blue.svg)
 ![License](https://img.shields.io/badge/license-GPLv3-blue.svg)
-![Version](https://img.shields.io/badge/version-1.0.0-green.svg)
+![Version](https://img.shields.io/badge/version-1.0.1-green.svg)
 
 A modular MATLAB toolbox for functional Near-Infrared Spectroscopy (fNIRS) data
 analysis — covering the full workflow from raw device import through signal
@@ -120,9 +120,9 @@ mydata = pf2.import.sampleData();                 % sample recording with marker
 processed = processFNIRS2(mydata);                % uses the default methods
 
 % To pick specific methods, browse the registered names and select one:
-pf2.methods.raw.list();                           % e.g. 'x2_lpf_smar', 'x5_TDDR'
+pf2.methods.raw.list();                           % e.g. 'x2_lpf_smar', 'OD_TDDR'
 pf2.methods.oxy.list();
-pf2.methods.raw.setMethod('x5_TDDR');
+pf2.methods.raw.setMethod('OD_TDDR');
 processed = processFNIRS2(mydata);                % process with the chosen method
 
 % Visualize
@@ -186,7 +186,7 @@ Configure the raw/oxy method chains through the GUI or programmatically, or
 build a chain step-by-step with the Pipeline API (value objects — every mutating
 call returns a new copy):
 ```matlab
-pf2.methods.raw.setMethod('x5_TDDR');
+pf2.methods.raw.setMethod('OD_TDDR');
 pf2.methods.oxy.setMethod('takizawa_easy');
 
 % Build a raw-stage pipeline from scratch
@@ -202,14 +202,13 @@ Examples: `examples/scripts/example_pipeline_basics.m`,
 `examples/scripts/example_pipeline_custom_function.m`.
 
 ### Reproducible & parallel processing (Context)
-A `ProcessingContext` bypasses global state, so settings stay isolated — ideal
-for testing, `parfor`, and reproducibility:
+A `pf2.ProcessingContext` bypasses global state, so settings stay isolated —
+ideal for testing, `parfor`, and reproducibility:
 ```matlab
+base = pf2.ProcessingContext('RawMethod', 'OD_TDDR', 'OxyMethod', 'takizawa_easy');
 parfor i = 1:numSubjects
-    ctx = pf2_base.ProcessingContext.fromGlobals();
+    ctx = base.copy();              % independent context per worker
     ctx.subjectAge = ages(i);
-    ctx.setRawMethod('x5_TDDR');
-    ctx.setOxyMethod('takizawa_easy');
     results{i} = processFNIRS2(data{i}, 'Context', ctx);
 end
 ```
@@ -353,7 +352,7 @@ licenses are documented in [THIRD_PARTY_LICENSES.md](THIRD_PARTY_LICENSES.md).
 If you use processFNIRS2 in your research, please cite the software
 (machine-readable metadata is in [CITATION.cff](CITATION.cff)):
 
-> Curtin, A., & Ayaz, H. (2026). *processFNIRS2* (version 1.0.0)
+> Curtin, A., & Ayaz, H. (2026). *processFNIRS2* (version 1.0.1)
 > [Computer software]. https://github.com/AdrianCurtin/processFNIRS2
 
 A companion publication and archival DOI will be added here when available.

@@ -18,16 +18,20 @@ function results = runAllTests()
 %                   .Duration - Test execution time in seconds
 %
 %   Description:
-%       This function discovers and runs all tests in the pf2_base.tests.unit and
-%       pf2_base.tests.integration packages. Tests are executed with verbose output
-%       (Verbosity level 3) showing detailed progress information.
+%       This function runs the 'full' lane from pf2_base.tests.buildSuite: every
+%       headless-safe TestCase under pf2_base.tests, including the root
+%       testExperiment class, excluding only the UI lane. Tests execute with
+%       verbose output (Verbosity level 3).
 %
-%       The function prints a summary showing total tests, passed count,
-%       and failed count. If any tests fail, their names are listed.
+%       The function REPORTS results (total/passed/failed/incomplete, with the
+%       names of any failed or incomplete tests) but does not itself signal
+%       failure to the shell. To gate CI so the process exits non-zero on any
+%       failure OR incomplete test, use pf2_base.tests.runCI instead.
 %
-%   Test Organization:
+%   Test Organization (see pf2_base.tests.buildSuite for the authoritative map):
 %       pf2_base.tests.unit        - Unit tests for individual functions
 %       pf2_base.tests.integration - Integration tests for multi-component workflows
+%       pf2_base.tests.testExperiment - Experiment class tests (root of the package)
 %
 %   Example:
 %       % Run all tests and examine results
@@ -44,8 +48,8 @@ function results = runAllTests()
 %           disp(failedResults(i).Details);
 %       end
 %
-%   See also: pf2_base.tests.runQuickTests, matlab.unittest.TestSuite,
-%             matlab.unittest.TestRunner
+%   See also: pf2_base.tests.buildSuite, pf2_base.tests.runCI,
+%             pf2_base.tests.runQuickTests, matlab.unittest.TestSuite
 
 %   Author: processFNIRS2 Development Team
 %   Version: 8.1
@@ -60,24 +64,22 @@ function results = runAllTests()
     fprintf('Running at: %s\n', datestr(now));
     fprintf('MATLAB Version: %s\n\n', version);
 
-    % Build test suites from packages
-    fprintf('Discovering tests...\n');
-
-    unitSuite = TestSuite.fromPackage('pf2_base.tests.unit', 'IncludingSubpackages', true);
-    integrationSuite = TestSuite.fromPackage('pf2_base.tests.integration', 'IncludingSubpackages', true);
-
-    % Combine suites
-    suite = [unitSuite, integrationSuite];
+    % Build the authoritative headless suite (unit + integration + the root
+    % testExperiment class, excluding the UI lane). Discovery lives in one
+    % place, pf2_base.tests.buildSuite, so this runner cannot silently drift
+    % out of sync with what the test tree actually contains.
+    fprintf('Discovering tests (lane: full)...\n');
+    suite = pf2_base.tests.buildSuite('full');
 
     if isempty(suite)
-        fprintf('No tests found in pf2_base.tests.unit or pf2_base.tests.integration packages.\n');
+        fprintf('No tests discovered under pf2_base.tests.\n');
         fprintf('Ensure test classes inherit from matlab.unittest.TestCase.\n');
         results = matlab.unittest.TestResult.empty;
         return;
     end
 
-    fprintf('Found %d unit tests, %d integration tests\n', ...
-        numel(unitSuite), numel(integrationSuite));
+    nClasses = numel(unique(regexprep(string({suite.Name}), '/.*$', '')));
+    fprintf('Found %d tests across %d classes\n', numel(suite), nClasses);
     fprintf('\n');
 
     % Configure runner with verbose output
@@ -122,5 +124,10 @@ function results = runAllTests()
     else
         fprintf('Some tests FAILED or were INCOMPLETE.\n');
     end
+
+    % Other lanes are run separately (they need a display or a fresh process):
+    fprintf('\nOther lanes: pf2_base.tests.runCI(''ui''), runCI(''clean''), runCI(''quick'').\n');
+    fprintf('To gate CI on the result (non-zero exit on any failure/incomplete):\n');
+    fprintf('  matlab -batch "pf2_base.tests.runCI(''full'')"\n');
     fprintf('=== Test Run Complete ===\n');
 end
