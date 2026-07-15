@@ -311,7 +311,7 @@ processFNIRS2.m      Main processing entry point
 pf2.m                Convenience wrapper (self-heals the path)
 exploreFNIRS.m       Group-level analysis GUI
 +pf2/                User-facing API (import, export, data, methods, settings, probe, qc)
-+pf2_base/           Internal infrastructure, algorithms, and tests
++pf2_base/           Advanced APIs plus internal infrastructure, algorithms, and tests
 +exploreFNIRS/       Group analysis (core, connectivity, coupling, hyperscanning, stats, graph, plot, export)
 functions/           Signal-processing algorithm implementations (TDDR, SMAR, wavelet, ...)
 devices/             Device configuration files (.cfg)

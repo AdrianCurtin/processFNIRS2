@@ -2,7 +2,7 @@
 
 ## Contents
 - [+pf2 — User-Facing Interface](#pf2-user-facing-interface) — import, export, data, methods, probe, QC, settings
-- [+pf2_base — Internal Infrastructure](#pf2_base-internal-infrastructure) — pipelines, core processing, signal/wavelet
+- [+pf2_base — Advanced and Internal Infrastructure](#pf2_base-advanced-and-internal-infrastructure) — pipelines, core processing, signal/wavelet
 - [+exploreFNIRS — Analysis & Visualization](#explorefnirs-analysis-and-visualization-gui) — Experiment class, stats, connectivity, hyperscanning, graph, report
 - [Signal Processing Functions (`/functions/`)](#signal-processing-functions-functions)
 - [Supported Devices (`/devices/`)](#supported-devices-devices)
@@ -211,9 +211,13 @@ Auto-attached as `data.device` by all import functions and `processFNIRS2`.
 
 ---
 
-## +pf2_base (Internal Infrastructure)
+## +pf2_base (Advanced and Internal Infrastructure)
 
-Core processing and utility functions used internally.
+`pf2_base` contains both supported expert/low-level interfaces and
+implementation machinery. Advanced users may deliberately use documented
+pipeline and scientific operations; callbacks, codecs, compatibility plumbing,
+and incidental helpers are not thereby public contracts. The advanced API is
+an explicit allowlist, not every callable symbol in the package.
 
 ### Pipeline Classes
 | Class | Purpose |

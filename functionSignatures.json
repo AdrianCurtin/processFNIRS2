@@ -9,7 +9,7 @@
       {"name":"rawMethod", "kind":"ordered", "type":["char"], "purpose":"Named raw-stage method"},
       {"name":"oxyMethod", "kind":"ordered", "type":["char"], "purpose":"Named oxy-stage method"},
       {"name":"ShowGUI", "kind":"namevalue", "type":["logical","scalar"], "purpose":"Force the GUI even when an output is captured"},
-      {"name":"Context", "kind":"namevalue", "type":["pf2_base.ProcessingContext"], "purpose":"Isolated processing context (bypasses PF2/setF globals)"},
+      {"name":"Context", "kind":"namevalue", "type":["pf2.ProcessingContext"], "purpose":"Isolated processing context (bypasses PF2/setF globals)"},
       {"name":"SkipRaw", "kind":"namevalue", "type":["logical","scalar"], "purpose":"Skip the raw stage (oxy-only input)"},
       {"name":"SkipOD", "kind":"namevalue", "type":["logical","scalar"], "purpose":"Return optical-density output from the raw stage"}
     ]

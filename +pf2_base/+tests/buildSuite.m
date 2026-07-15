@@ -20,6 +20,11 @@ function suite = buildSuite(lane)
 %                        run in a fresh MATLAB process (matlab -batch) so a
 %                        clean-process replay is genuinely clean. This lane is
 %                        a subset of 'full'; it also runs inside 'full'.
+%              'identity' - canonical encoding, domain-separated hashing,
+%                        source-manifest fingerprinting, and fail-closed
+%                        identity verification contracts. This lane is a
+%                        subset of 'full' and is intended for the supported-
+%                        release/platform CI matrix.
 %              'all'   - full + ui (everything discoverable).
 %
 %   Outputs:
@@ -66,6 +71,15 @@ function suite = buildSuite(lane)
         "pf2_base.tests.unit.PublicProcessingContextTest", ...
         "pf2_base.tests.integration.ProcessingContextIntegrationTest" ];
 
+    % Durable semantic-identity contract. Keep this explicit so the sparse
+    % cross-release/platform matrix does not need to run the entire suite.
+    identityClasses = [ ...
+        "pf2_base.tests.unit.IdentityCanonicalEncodingTest", ...
+        "pf2_base.tests.unit.IdentityNamedHashTest", ...
+        "pf2_base.tests.unit.IdentityTransportRoundtripTest", ...
+        "pf2_base.tests.unit.InputIdentityPreflightTest", ...
+        "pf2_base.tests.unit.SourceFingerprintTest" ];
+
     % --- Authoritative discovery ----------------------------------------
     full = TestSuite.fromPackage('pf2_base.tests', 'IncludingSubpackages', true);
 
@@ -78,11 +92,13 @@ function suite = buildSuite(lane)
     parents = regexprep(string({full.Name}), '/.*$', '');
     isUI    = ismember(parents, uiClasses);
     isClean = ismember(parents, cleanClasses);
+    isIdentity = ismember(parents, identityClasses);
 
     % Warn if a registry entry never matched a discovered test: a rename or a
     % typo would otherwise silently shrink a lane.
     warnMissing(uiClasses, parents, 'ui');
     warnMissing(cleanClasses, parents, 'clean');
+    warnMissing(identityClasses, parents, 'identity');
 
     switch lane
         case {"full", "headless"}
@@ -91,11 +107,14 @@ function suite = buildSuite(lane)
             suite = full(isUI);
         case {"clean", "clean-process", "cleanprocess"}
             suite = full(isClean);
+        case "identity"
+            suite = full(isIdentity);
         case "all"
             suite = full;
         otherwise
             error('pf2:tests:buildSuite:unknownLane', ...
-                'Unknown lane "%s". Use one of: full | ui | clean | all.', lane);
+                ['Unknown lane "%s". Use one of: full | ui | clean | ', ...
+                 'identity | all.'], lane);
     end
 end
 

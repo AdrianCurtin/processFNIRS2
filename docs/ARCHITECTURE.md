@@ -196,7 +196,13 @@ flowchart TB
 | `+export` | `asNIR`, `asSNIRF`, `asBIDS`, `asTensor`, `export`. |
 | `+settings`, `+GUI` | Processing settings and GUI glue. `Device.m` (top level) is the device value class. |
 
-### `+pf2_base/` — internal infrastructure & algorithms
+### `+pf2_base/` — advanced and internal infrastructure & algorithms
+
+This package serves two roles: documented low-level interfaces for advanced
+users, and implementation machinery used by the primary `pf2` workflow. Those
+roles are distinguished by the API catalog and documentation tier; package
+membership alone is not a support promise.
+
 Top-level: `ProcessingContext`, the pipeline classes (`Pipeline`,
 `RawPipeline`, `OxyPipeline`, `PipelineFunction`), `pf2_initialize`,
 `loadDeviceCfg`, `normalizeMarkers`/`normalizeAux`, `hierarchicalAverage`.

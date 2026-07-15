@@ -322,11 +322,6 @@ ctx = pf2.ProcessingContext('DPFmode', 'Calc', 'SubjectAge', 30, ...
 result = ctx.process(data);                       % context as receiver
 % result = processFNIRS2(data, 'Context', ctx);   % equivalent keyword form
 
-% Save for reproducibility (-struct needs a variable, not an inline call)
-settings = ctx.toStruct();
-save('analysis_settings.mat', '-struct', 'settings');
-% Rebuild a usable context later: ctx = pf2.ProcessingContext.fromRecipe(load('analysis_settings.mat'));
-
 % Parallel processing with different ages. Configure ONCE, then take an
 % independent copy() per worker -- a plain ctx = base would alias one handle,
 % and fromGlobals() on a worker sees empty globals.

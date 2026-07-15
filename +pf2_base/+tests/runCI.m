@@ -19,9 +19,9 @@ function results = runCI(lane)
 %
 %   Inputs:
 %       lane - (char/string, optional) 'full' (default) | 'ui' | 'clean' |
-%              'all' | 'quick'. The first four map to pf2_base.tests.buildSuite
-%              lanes; 'quick' runs the lightweight script validation lane
-%              (pf2_base.tests.runQuickTests).
+%              'identity' | 'all' | 'quick'. All except 'quick' map to
+%              pf2_base.tests.buildSuite lanes; 'quick' runs the lightweight
+%              script validation lane (pf2_base.tests.runQuickTests).
 %
 %   Outputs:
 %       results - matlab.unittest.TestResult array for the lane (empty for the

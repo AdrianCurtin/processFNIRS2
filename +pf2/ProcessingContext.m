@@ -42,12 +42,6 @@ classdef ProcessingContext < pf2_base.ProcessingContext
     %   % ...or let the context be the receiver:
     %   out = ctx.process(data);
     %
-    %   % Save an analysis "recipe" and reload it in a fresh session
-    %   recipe = ctx.toStruct();
-    %   save('study_protocol.mat', '-struct', 'recipe');
-    %   s   = load('study_protocol.mat');
-    %   ctx = pf2.ProcessingContext.fromRecipe(s);     % fully usable again
-    %
     %   % Parallel, one independent context per worker (note copy(), not '='):
     %   parfor i = 1:numel(allData)
     %       c = ctx.copy();
@@ -156,23 +150,4 @@ classdef ProcessingContext < pf2_base.ProcessingContext
         end
     end
 
-    methods (Static)
-        function obj = fromRecipe(s)
-            % FROMRECIPE Rebuild a usable context from a saved settings struct
-            %
-            % Delegates deserialization to the inherited (base) fromStruct --
-            % the single source of truth for which fields round-trip, and which
-            % also reloads the method libraries -- then returns the settings as
-            % a public pf2.ProcessingContext.
-            %
-            % Syntax:
-            %   ctx = pf2.ProcessingContext.fromRecipe(s)
-
-            base = pf2_base.ProcessingContext.fromStruct(s);
-            obj = pf2.ProcessingContext();
-            for p = properties(base)'
-                obj.(p{1}) = base.(p{1});
-            end
-        end
-    end
 end
