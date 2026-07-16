@@ -111,10 +111,10 @@ classdef PipelineEditorWorkflowTest < matlab.unittest.TestCase
 
         %% A4 every seed factory returns a runnable Pipeline
         function testA4SeedsAreRunnable(tc)
-            seeds = pf2.methods.seeds.list();
+            seeds = pf2_base.methods.seeds.list();
             for k = 1:numel(seeds)
                 s = seeds(k);
-                fact = ['pf2.methods.seeds.' s.stage '.' s.name];
+                fact = ['pf2_base.methods.seeds.' s.stage '.' s.name];
                 p = feval(fact);
                 tc.verifyTrue(isa(p, 'pf2_base.Pipeline'));
                 tc.verifyEqual(p.numSteps(), p.numSteps()); % sanity
@@ -126,7 +126,7 @@ classdef PipelineEditorWorkflowTest < matlab.unittest.TestCase
 
         %% A5 PipelineModel round-trip with a runnable pipeline at the end
         function testA5ModelRoundTripAndRun(tc)
-            p0 = pf2.methods.seeds.raw.OD_TDDR();
+            p0 = pf2_base.methods.seeds.raw.OD_TDDR();
             m  = pf2_base.PipelineModel(p0);
             % Mutate via the model: add LPF, tweak its cutoff
             m.addStep('pf2_lpf', 'freq_cut', 0.05);

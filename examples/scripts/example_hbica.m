@@ -29,7 +29,7 @@
 fprintf('=== Step 1: Prepare paired data ===\n');
 
 [subjects, blockDefs] = pf2.import.sampleData.experiment('blocks');
-[rawMethod, oxyMethod] = pf2.import.sampleData.addDemoPipelines();
+[rawMethod, oxyMethod] = pf2_base.examples.addDemoPipelines();
 
 % Assign dyad metadata (2 dyads, 4 subjects)
 dyadIDs = {'D1', 'D1', 'D2', 'D2'};

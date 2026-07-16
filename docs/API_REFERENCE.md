@@ -106,8 +106,9 @@ Each subpackage contains:
 - `removeFunction.m` - Remove a function from a method chain
 - `exportMethod.m` - Export method for sharing
 
-**+pf2/+methods (shared):**
-- `validateFunction.m` - Validate function compatibility with processing stages
+> Method-authoring internals — function validation, the default-method seed
+> factories, and the add/edit-function GUI helpers — live under
+> `+pf2_base/+methods` (see below), not in the primary `pf2.methods` API.
 
 ### +pf2/+process - Processing Pipeline
 | Function | Purpose |
@@ -231,6 +232,15 @@ an explicit allowlist, not every callable symbol in the package.
 **PipelineFunction** resolves all argument lookups at construction time using uint8 enum types, so `execute(ctx)` runs with zero string comparison overhead. Supports `fromStruct(s)` / `toStruct()` for legacy method round-tripping, `detect(funcName)` for auto-discovering signatures, and `fromString(callStr)` for parsing MATLAB call syntax.
 
 **Pipeline** is a value class — all mutating methods return a new copy. `toMethod()` converts to the legacy method struct consumed by `processStageRaw2OD` and `processStageFilterHb`. `fromMethod(name, stage)` reconstructs a Pipeline from an existing named method.
+
+### +pf2_base/+methods — Method Extension & Seeds
+Advanced method-authoring tools and the shipped default-method seed factories.
+| Function | Purpose |
+|----------|---------|
+| `validateFunction.m` | Validate a processing-function configuration (function existence, argument consistency, output-variable name) before adding it to a method chain |
+| `+seeds/list.m` | Enumerate the seed factories for a stage (`raw`/`oxy`) |
+| `+seeds/+raw/*`, `+seeds/+oxy/*` | Zero-argument factories that build the shipped default methods (e.g. `OD_TDDR`, `LPF`); used by `pf2_initialize` and `pf2.methods.resetDefaults` |
+| `+functions/add.m` / `+functions/edit.m` | Launch the GUI to define / edit processing-function metadata |
 
 ### Core Initialization
 | Function | Purpose |

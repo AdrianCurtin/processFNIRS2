@@ -530,15 +530,18 @@ rawProcessed = pf2.process.processRaw(data)    % Stage 1 only
 oxyProcessed = pf2.process.processOxy(data)    % Stage 3 only
 ```
 
-### 5.11 GUI Configuration (`pf2.gui.*`)
+### 5.11 GUI Configuration
 
 ```matlab
-pf2.gui()                               % Launch main GUI
-pf2.gui.configureRawMethods()           % Raw method editor
-pf2.gui.configureOxyMethods()           % Oxy method editor
-pf2.gui.functions()                     % Function library
-pf2.gui.functions.add()                 % Add function
-pf2.gui.functions.edit()                % Edit function
+pf2.gui()                                    % Launch the main processing GUI
+
+% Method editors (also under 5.8 Method Management)
+pf2.methods.raw.configureMethods()           % Raw (Stage 1) method editor
+pf2.methods.oxy.configureMethods()           % Oxy (Stage 3) method editor
+
+% Advanced: define/edit a processing function's metadata (pf2_base extension API)
+pf2_base.methods.functions.add()             % Define a new processing function
+pf2_base.methods.functions.edit('pf2_lpf')   % Edit an existing function's definition
 ```
 
 ---
@@ -774,7 +777,6 @@ pf2.methods.oxy.editFunction
 pf2.methods.oxy.removeFunction
 pf2.methods.oxy.exportMethod
 pf2.methods.oxy.importMethod
-pf2.methods.validateFunction
 pf2.methods.describeCurrentMethods
 
 pf2.settings.selectDevice
@@ -789,12 +791,6 @@ pf2.settings.dpf.setFixedDPF
 pf2.process.process
 pf2.process.processRaw
 pf2.process.processOxy
-
-pf2.gui.configureRawMethods
-pf2.gui.configureOxyMethods
-pf2.gui.functions
-pf2.gui.functions.add
-pf2.gui.functions.edit
 ```
 
 ### Layer 2 (exploreFNIRS)

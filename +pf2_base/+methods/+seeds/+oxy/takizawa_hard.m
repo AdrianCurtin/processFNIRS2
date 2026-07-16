@@ -15,7 +15,7 @@ function p = takizawa_hard()
 % AND.
 %
 % Syntax:
-%   p = pf2.methods.seeds.oxy.takizawa_hard()
+%   p = pf2_base.methods.seeds.oxy.takizawa_hard()
 %
 % Inputs:
 %   None
@@ -25,7 +25,7 @@ function p = takizawa_hard()
 %
 % Example:
 %   % Build and register the takizawa_hard oxy method
-%   p = pf2.methods.seeds.oxy.takizawa_hard();
+%   p = pf2_base.methods.seeds.oxy.takizawa_hard();
 %   p.save();
 %
 % References:
@@ -35,7 +35,7 @@ function p = takizawa_hard()
 %   spectroscopy study. Schizophrenia Research, 99(1-3), 250-262.
 %   DOI: 10.1016/j.schres.2007.10.025
 %
-% See also: pf2.methods.seeds.oxy.takizawa_easy, pf2.methods.seeds.oxy.LPF,
+% See also: pf2_base.methods.seeds.oxy.takizawa_easy, pf2_base.methods.seeds.oxy.LPF,
 %           pf2.methods.resetDefaults, pf2_TakizawaRejection, pf2_base.OxyPipeline
 
 p = pf2_base.OxyPipeline('takizawa_hard', ...

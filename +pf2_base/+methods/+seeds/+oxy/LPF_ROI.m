@@ -8,7 +8,7 @@ function p = LPF_ROI()
 % methods. Returns a pipeline object you can save() to register or run().
 %
 % Syntax:
-%   p = pf2.methods.seeds.oxy.LPF_ROI()
+%   p = pf2_base.methods.seeds.oxy.LPF_ROI()
 %
 % Inputs:
 %   None
@@ -18,10 +18,10 @@ function p = LPF_ROI()
 %
 % Example:
 %   % Build and register the default LPF_ROI oxy method
-%   p = pf2.methods.seeds.oxy.LPF_ROI();
+%   p = pf2_base.methods.seeds.oxy.LPF_ROI();
 %   p.save();
 %
-% See also: pf2.methods.seeds.oxy.LPF, pf2.methods.resetDefaults,
+% See also: pf2_base.methods.seeds.oxy.LPF, pf2.methods.resetDefaults,
 %           pf2_base.OxyPipeline
 
 p = pf2_base.OxyPipeline('LPF_ROI', ...

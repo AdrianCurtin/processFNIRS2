@@ -2,9 +2,9 @@ function info = list(stage)
 % LIST Enumerate available seed methods for the given stage.
 %
 % Syntax:
-%   info = pf2.methods.seeds.list()        % both stages
-%   info = pf2.methods.seeds.list('raw')   % raw stage only
-%   info = pf2.methods.seeds.list('oxy')   % oxy stage only
+%   info = pf2_base.methods.seeds.list()        % both stages
+%   info = pf2_base.methods.seeds.list('raw')   % raw stage only
+%   info = pf2_base.methods.seeds.list('oxy')   % oxy stage only
 %
 % Inputs:
 %   stage - (optional) 'raw' | 'oxy' (default: '' = both)
@@ -15,14 +15,14 @@ function info = list(stage)
 %       .stage - 'raw' | 'oxy'
 %       .file  - absolute path to the seed factory function
 %
-% Discovery: each seed package (+pf2/+methods/+seeds/+raw and .../+oxy)
+% Discovery: each seed package (+pf2_base/+methods/+seeds/+raw and .../+oxy)
 % contributes one entry per .m file found there. The .m file must be a
 % zero-argument function returning a Pipeline / RawPipeline / OxyPipeline.
 %
 % Example:
-%   info = pf2.methods.seeds.list('raw');
+%   info = pf2_base.methods.seeds.list('raw');
 %   for k = 1:numel(info)
-%       p = feval(['pf2.methods.seeds.raw.' info(k).name]);
+%       p = feval(['pf2_base.methods.seeds.raw.' info(k).name]);
 %       disp(p);
 %   end
 %

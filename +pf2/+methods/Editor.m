@@ -870,10 +870,10 @@ classdef Editor < matlab.apps.AppBase
                 'DefaultOption', 1, 'CancelOption', 2);
             if ~strcmp(sel, 'Install'), return; end
             try
-                seeds = pf2.methods.seeds.list(app.Stage);
+                seeds = pf2_base.methods.seeds.list(app.Stage);
                 for k = 1:numel(seeds)
                     s = seeds(k);
-                    factory = ['pf2.methods.seeds.' s.stage '.' s.name];
+                    factory = ['pf2_base.methods.seeds.' s.stage '.' s.name];
                     p = feval(factory);
                     p.save(s.stage, 'Replace', true);
                 end

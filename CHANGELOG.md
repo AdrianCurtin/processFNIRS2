@@ -5,7 +5,7 @@
 ### New Features
 
 **Processing Methods:**
-- New default oxy (Stage 3) methods, seeded via `pf2.methods.seeds.oxy.*`: `HPF` (0.01 Hz high-pass), `BPF` (0.01–0.1 Hz Butterworth band-pass), and `takizawa_easy` / `takizawa_hard` (Takizawa automatic channel rejection, lenient / strict criteria — Takizawa et al. 2008)
+- New default oxy (Stage 3) methods, seeded via `pf2_base.methods.seeds.oxy.*`: `HPF` (0.01 Hz high-pass), `BPF` (0.01–0.1 Hz Butterworth band-pass), and `takizawa_easy` / `takizawa_hard` (Takizawa automatic channel rejection, lenient / strict criteria — Takizawa et al. 2008)
 - Refreshed the processing-method reference tables to match the live registry
 
 **Toolbox-Free Signal Processing (`+pf2_base/+external/`):**

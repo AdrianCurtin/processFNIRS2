@@ -9,7 +9,7 @@ function p = BPF()
 % to register or run() directly.
 %
 % Syntax:
-%   p = pf2.methods.seeds.oxy.BPF()
+%   p = pf2_base.methods.seeds.oxy.BPF()
 %
 % Inputs:
 %   None
@@ -18,10 +18,10 @@ function p = BPF()
 %   p - pf2_base.OxyPipeline named 'BPF', ready for save() or run()
 %
 % Example:
-%   p = pf2.methods.seeds.oxy.BPF();
+%   p = pf2_base.methods.seeds.oxy.BPF();
 %   p.save();
 %
-% See also: pf2.methods.seeds.oxy.LPF, pf2.methods.seeds.oxy.HPF,
+% See also: pf2_base.methods.seeds.oxy.LPF, pf2_base.methods.seeds.oxy.HPF,
 %           pf2.methods.resetDefaults, pf2_base.OxyPipeline
 
 p = pf2_base.OxyPipeline('BPF', ...

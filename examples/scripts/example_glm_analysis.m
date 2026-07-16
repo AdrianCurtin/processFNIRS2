@@ -48,7 +48,7 @@ fprintf('  %d subjects, %d blocks each\n', length(subjects), length(blockDefs{1}
 fprintf('  Recording duration: %.0fs\n', max(subjects{1}.time) - min(subjects{1}.time));
 
 % Register demo pipelines
-[rawMethod, oxyMethod] = pf2.import.sampleData.addDemoPipelines();
+[rawMethod, oxyMethod] = pf2_base.examples.addDemoPipelines();
 
 %% Step 2: Create and configure GLMExperiment
 %

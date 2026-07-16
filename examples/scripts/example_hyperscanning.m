@@ -28,7 +28,7 @@
 fprintf('=== Step 0: Generate paired data, define ROIs, process ===\n');
 
 [subjects, blockDefs] = pf2.import.sampleData.experiment('blocks');
-[rawMethod, oxyMethod] = pf2.import.sampleData.addDemoPipelines();
+[rawMethod, oxyMethod] = pf2_base.examples.addDemoPipelines();
 
 % Assign dyad metadata
 dyadIDs = {'D1', 'D1', 'D2', 'D2'};

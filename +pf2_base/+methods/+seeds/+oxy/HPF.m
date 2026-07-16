@@ -8,7 +8,7 @@ function p = HPF()
 % run() directly.
 %
 % Syntax:
-%   p = pf2.methods.seeds.oxy.HPF()
+%   p = pf2_base.methods.seeds.oxy.HPF()
 %
 % Inputs:
 %   None
@@ -17,10 +17,10 @@ function p = HPF()
 %   p - pf2_base.OxyPipeline named 'HPF', ready for save() or run()
 %
 % Example:
-%   p = pf2.methods.seeds.oxy.HPF();
+%   p = pf2_base.methods.seeds.oxy.HPF();
 %   p.save();
 %
-% See also: pf2.methods.seeds.oxy.LPF, pf2.methods.seeds.oxy.BPF,
+% See also: pf2_base.methods.seeds.oxy.LPF, pf2_base.methods.seeds.oxy.BPF,
 %           pf2.methods.resetDefaults, pf2_base.OxyPipeline
 
 p = pf2_base.OxyPipeline('HPF', ...

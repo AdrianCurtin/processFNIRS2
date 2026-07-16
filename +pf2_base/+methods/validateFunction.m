@@ -6,8 +6,8 @@ function validateFunction(funcName, args, argvals, varargin)
 % consistency, and output variable names.
 %
 % Syntax:
-%   pf2.methods.validateFunction(funcName, args, argvals)
-%   pf2.methods.validateFunction(funcName, args, argvals, 'Output', outputVar)
+%   pf2_base.methods.validateFunction(funcName, args, argvals)
+%   pf2_base.methods.validateFunction(funcName, args, argvals, 'Output', outputVar)
 %
 % Inputs:
 %   funcName - Name of the MATLAB function (e.g., 'pf2_TDDR')
@@ -19,15 +19,15 @@ function validateFunction(funcName, args, argvals, varargin)
 %
 % Example:
 %   % Validate a valid function
-%   pf2.methods.validateFunction('pf2_TDDR', {'x','fs'}, {'x','fs'});
+%   pf2_base.methods.validateFunction('pf2_TDDR', {'x','fs'}, {'x','fs'});
 %
 %   % Validate with output specification
-%   pf2.methods.validateFunction('pf2_TakizawaRejection', ...
+%   pf2_base.methods.validateFunction('pf2_TakizawaRejection', ...
 %       {'x','fchMask','threshold'}, {'x','fchMask',0.75}, ...
 %       'Output', 'fchMask');
 %
 %   % This will error - function does not exist
-%   pf2.methods.validateFunction('nonexistent_func', {'x'}, {'x'});
+%   pf2_base.methods.validateFunction('nonexistent_func', {'x'}, {'x'});
 %
 % See also: pf2.methods.raw.addFunction, pf2.methods.oxy.addFunction,
 %           pf2.methods.raw.editFunction, pf2.methods.oxy.editFunction

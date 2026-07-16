@@ -9,7 +9,7 @@ function p = OD_SMAR()
 % pipeline object you can save() to register or run() directly.
 %
 % Syntax:
-%   p = pf2.methods.seeds.raw.OD_SMAR()
+%   p = pf2_base.methods.seeds.raw.OD_SMAR()
 %
 % Inputs:
 %   None
@@ -18,10 +18,10 @@ function p = OD_SMAR()
 %   p - pf2_base.RawPipeline named 'OD_SMAR', ready for save() or run()
 %
 % Example:
-%   p = pf2.methods.seeds.raw.OD_SMAR();
+%   p = pf2_base.methods.seeds.raw.OD_SMAR();
 %   p.save();
 %
-% See also: pf2.methods.seeds.raw.OD_TDDR, pf2.methods.resetDefaults,
+% See also: pf2_base.methods.seeds.raw.OD_TDDR, pf2.methods.resetDefaults,
 %           pf2_base.RawPipeline, pf2_SMAR
 
 p = pf2_base.RawPipeline('OD_SMAR', ...
