@@ -117,7 +117,7 @@ classdef CharacterizationTest < matlab.unittest.TestCase
               'f2000_calc_bl_5_15'       'fNIR2000' 'None'         'None'  'Calc'    5.93   25   5     15     false
               'f2000_calc_lpf'           'fNIR2000' 'None'         'LPF'   'Calc'    5.93   25   0     10     false
               'f2000_tddr_calc'          'fNIR2000' 'OD_TDDR'      'None'  'Calc'    5.93   25   0     10     false
-              'f2000_tddr_lpf_fixed'     'fNIR2000' 'OD_TDDR_lpf'  'LPF'   'Fixed'   5.50   25   0     10     false
+              'f2000_tddr_lpf_fixed'     'fNIR2000' 'OD_TDDR'      'LPF'   'Fixed'   5.50   25   0     10     false
               'f1200_none_default'       'fNIR1200' 'None'         'None'  'None'    5.93   25   0     10     false
               'f1200_calc_default'       'fNIR1200' 'None'         'None'  'Calc'    5.93   25   0     10     false
               'f1200_fixed_bl_2_8'       'fNIR1200' 'None'         'None'  'Fixed'   6.00   25   2      8     false

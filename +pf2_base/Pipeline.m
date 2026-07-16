@@ -523,7 +523,7 @@ classdef Pipeline
         function p = fromMethod(methodName, stage)
         % FROMMETHOD Build a Pipeline from an existing named method.
         %
-        %   p = pf2_base.Pipeline.fromMethod('x5_TDDR', 'raw')
+        %   p = pf2_base.Pipeline.fromMethod('OD_TDDR', 'raw')
         %   p = pf2_base.Pipeline.fromMethod('takizawa_easy_lpf', 'oxy')
         %
         % Requires PF2 to be initialized.

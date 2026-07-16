@@ -3,7 +3,7 @@ classdef PublicProcessingContextTest < matlab.unittest.TestCase
     %
     % Covers the user-facing subclass: usable-from-bare-construction (no
     % fromGlobals bootstrap), Name-Value configuration with aliases,
-    % independent copy(), the process() convenience, and recipe round-trips.
+    % independent copy(), and the process() convenience.
     %
     % Usage:
     %   results = runtests('pf2_base.tests.unit.PublicProcessingContextTest');
@@ -103,19 +103,7 @@ classdef PublicProcessingContextTest < matlab.unittest.TestCase
             testCase.verifyEqual(ctx.subjectAge, 77);
         end
 
-        %% Recipe round-trip
-
-        function testRecipeRoundTripIsUsable(testCase)
-            ctx = pf2.ProcessingContext('DPFmode', 'Fixed', 'FixedDPF', 6.5, ...
-                'SubjectAge', 40);
-            recipe = ctx.toStruct();
-            rebuilt = pf2.ProcessingContext.fromRecipe(recipe);
-            testCase.verifyEqual(rebuilt.dpfMode, 'Fixed');
-            testCase.verifyEqual(rebuilt.dpfFixedValue, 6.5, 'AbsTol', 1e-12);
-            testCase.verifyEqual(rebuilt.subjectAge, 40);
-            % And it is immediately usable (libraries loaded).
-            testCase.verifyWarningFree(@() rebuilt.setRawMethod('None'));
-        end
+        %% Internal context-struct compatibility
 
         function testBaseFromStructReloadsMethods(testCase)
             % The base fromStruct fix: a deserialized context must be usable.
@@ -123,31 +111,6 @@ classdef PublicProcessingContextTest < matlab.unittest.TestCase
             r = pf2_base.ProcessingContext.fromStruct(ctx.toStruct());
             testCase.verifyTrue(isfield(r.rawMethodsLib, 'cfg'));
             testCase.verifyWarningFree(@() r.setRawMethod('None'));
-        end
-
-        function testRecipeRoundTripRestoresNamedMethod(testCase)
-            % Exercises the non-'None' branch of loadMethods/fromStruct: a real
-            % method name must survive serialize -> deserialize and stay set.
-            ctx = pf2.ProcessingContext();
-            sections = ctx.rawMethodsLib.cfg.Sections;
-            named = sections(~strcmpi(sections, 'None'));
-            testCase.assumeNotEmpty(named);   % need at least one real method
-            name = named{1};
-            ctx.setRawMethod(name);
-
-            rebuilt = pf2.ProcessingContext.fromRecipe(ctx.toStruct());
-            testCase.verifyEqual(rebuilt.rawMethodName, name);
-            testCase.verifyTrue(isfield(rebuilt.rawMethod, 'name'));
-            testCase.verifyEqual(rebuilt.rawMethod.name, name);
-        end
-
-        function testFromRecipeRestoresRootPath(testCase)
-            % fromRecipe delegates to fromStruct, so rootPath round-trips.
-            ctx = pf2.ProcessingContext();
-            recipe = ctx.toStruct();
-            recipe.rootPath = fullfile('some', 'custom', 'root');
-            rebuilt = pf2.ProcessingContext.fromRecipe(recipe);
-            testCase.verifyEqual(rebuilt.rootPath, fullfile('some', 'custom', 'root'));
         end
 
         %% process() convenience

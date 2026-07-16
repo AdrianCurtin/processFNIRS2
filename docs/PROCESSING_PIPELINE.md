@@ -101,65 +101,44 @@ Output fNIRS struct with all stages
 ## Available Processing Methods
 
 ### Raw Processing Methods
-Methods for Stage 1 processing (Raw → Optical Density):
+Methods for Stage 1 processing (Raw → Optical Density). Each `OD_` method first
+converts raw intensity to optical density, then applies the named motion
+correction. Run `pf2.methods.raw.list()` for the authoritative live set.
 
-| Method | Description |
-|--------|-------------|
-| `None` | No processing |
-| `x1_lpf` | Low-pass filter only |
-| `x1_lpf_mask` | Low-pass filter with masking |
-| `x2_lpf_smar` | Low-pass filter + SMAR |
-| `x2_lpf_smar_permissive` | LPF + SMAR (permissive settings) |
-| `x2_lpf_smar_short` | LPF + SMAR (short window) |
-| `x3_bpf` | Band-pass filter |
-| `x3_bpf_008_1` | BPF (0.008-1 Hz) |
-| `x3_bpf_008_1_mask` | BPF (0.008-1 Hz) with masking |
-| `x4_bpf_smar` | Band-pass filter + SMAR |
-| `x5_TDDR` | Temporal Derivative Distribution Repair |
-| `x5_TDDR_mask` | TDDR with masking |
-| `x5_TDDR_mask_smar` | TDDR + masking + SMAR |
-| `x6_TDDR_lpf` | TDDR + low-pass filter |
-| `x6_TDDR_lpf_mask` | TDDR + LPF + masking |
-| `x6_lpf_MARA` | LPF + Movement Artifact Reduction |
-| `x6_lpf_SMAR_SR` | LPF + SMAR (spline reconstruction) |
-| `x6_lpf_TDDR` | LPF + TDDR |
-| `x6_medfilt_TDDR` | Median filter + TDDR |
-| `x7_kbWF` | Kalman-Butterworth Wiener filter |
-| `x7_kbWF_lpf` | kbWF + low-pass filter |
-| `x8_lpf_mask_subAmb` | LPF + masking + ambient subtraction |
-| `x8_mask_subAmb_tddr` | Masking + ambient subtraction + TDDR |
-| `x8_mask_subAmb_wave` | Masking + ambient subtraction + wavelet |
-| `x8_mask_subAmb_wave_bpf` | Masking + ambient + wavelet + BPF |
-| `x8_mask_subAmb_wave_detrend` | Masking + ambient + wavelet + detrend |
-| `x8_mask_subAmb_wave_lpf` | Masking + ambient + wavelet + LPF |
-| `x9_bpf_mask_subAmb` | BPF + masking + ambient subtraction |
-| `x9_lpf_mask_subAmb_detrend` | LPF + masking + ambient + detrend |
+| Method | Pipeline |
+|--------|----------|
+| `None` | Optical-density conversion only (no motion/filter step) |
+| `OD_TDDR` | Log→OD, then TDDR motion correction |
+| `OD_SMAR` | Log→OD, then SMAR sliding-window motion artifact rejection |
+
+`OD_TDDR` and `OD_SMAR` are the shipped raw seeds (restored by
+`pf2.methods.resetDefaults`). Band-pass filtering is applied at the oxy stage
+via the `BPF` method (below). To build other raw chains — e.g. spline or
+wavelet motion correction, or a raw-stage band-pass — use the Pipeline API;
+the underlying functions (`pf2_MotionCorrectSpline`, `pf2_MotionCorrectSplineSG`,
+`pf2_MotionCorrectWavelet`, `pf2_sSMART`, `pf2_bpf_butter`) ship with the toolbox:
+
+```matlab
+raw = pf2_base.RawPipeline('OD_Spline_BPF');
+raw = raw.add('pf2_Intensity2OD');
+raw = raw.add('pf2_MotionCorrectSpline');
+raw = raw.add('pf2_bpf_butter');
+raw.save('raw');   % register as a named raw method
+```
 
 ### Oxy Processing Methods
-Methods for Stage 3 processing (Hemoglobin post-processing):
+Methods for Stage 3 processing (hemoglobin post-processing). Run
+`pf2.methods.oxy.list()` for the authoritative live set.
 
-| Method | Description |
-|--------|-------------|
+| Method | Pipeline |
+|--------|----------|
 | `None` | No processing |
-| `bpf_butter` | Butterworth band-pass filter |
-| `bpf_fir` | FIR band-pass filter |
-| `car` | Common Average Reference |
-| `hpf` | High-pass filter |
-| `lpf_car` | Low-pass filter + CAR |
-| `medfilt` | Median filter |
-| `medfilt_car` | Median filter + CAR |
-| `takizawa_easy` | Takizawa rejection (easy threshold) |
-| `takizawa_easy_car` | Takizawa easy + CAR |
-| `takizawa_easy_car_pca` | Takizawa easy + CAR + PCA |
-| `takizawa_easy_lpf` | Takizawa easy + low-pass filter |
-| `takizawa_easy_lpf_detrend` | Takizawa easy + LPF + detrend |
-| `takizawa_easy_pca` | Takizawa easy + PCA |
-| `takizawa_hard` | Takizawa rejection (hard threshold) |
-| `takizawa_hard_car` | Takizawa hard + CAR |
-| `takizawa_hard_car_pca` | Takizawa hard + CAR + PCA |
-| `takizawa_hard_lpf` | Takizawa hard + low-pass filter |
-| `takizawa_hard_lpf_detrend` | Takizawa hard + LPF + detrend |
-| `takizawa_hard_pca` | Takizawa hard + PCA |
+| `LPF` | Low-pass filter (0.1 Hz) |
+| `HPF` | High-pass filter (0.01 Hz, drift removal) |
+| `BPF` | Butterworth band-pass filter (0.01–0.1 Hz) |
+| `LPF_ROI` | Low-pass filter + ROI averaging |
+| `takizawa_easy` | Takizawa automatic channel rejection (lenient criteria) |
+| `takizawa_hard` | Takizawa automatic channel rejection (strict criteria) |
 
 ---
 
@@ -202,7 +181,7 @@ raw = raw.add('pf2_lpf', 'freq_cut', 0.2);
 m = raw.toMethod();
 
 % Reconstruct from existing named method
-raw = pf2_base.RawPipeline.fromMethod('x5_TDDR');
+raw = pf2_base.RawPipeline.fromMethod('OD_TDDR');
 ```
 
 ### Eager Conversion at Unpack Time
@@ -259,12 +238,12 @@ Based on real research usage:
 
 **For motion-prone data (head movement):**
 ```matlab
-% Raw stage: Motion correction + filtering
-pf2.methods.raw.setMethod('x2_lpf_smar');        % LPF + SMAR
+% Raw stage: motion correction
+pf2.methods.raw.setMethod('OD_TDDR');            % TDDR motion correction
 % or
-pf2.methods.raw.setMethod('x5_TDDR');            % TDDR alone
-% or
-pf2.methods.raw.setMethod('x6_lpf_TDDR');        % LPF + TDDR
+pf2.methods.raw.setMethod('OD_SMAR');            % SMAR sliding-window rejection
+% Add band-pass filtering at the oxy stage:
+pf2.methods.oxy.setMethod('BPF');                % 0.01-0.1 Hz Butterworth
 
 % Spline interpolation — good for isolated, large artifacts
 % Can combine with wavelet for hybrid correction (spline first, then wavelet)
@@ -277,9 +256,10 @@ pf2_MotionCorrectSplineSG(dod, fs);
 
 **For cleaner data (minimal motion):**
 ```matlab
-% Raw stage: Filtering only
-pf2.methods.raw.setMethod('x1_lpf');             % Low-pass only
-pf2.methods.raw.setMethod('x3_bpf');             % Band-pass (0.008-0.1 Hz)
+% Raw stage: light correction (or 'None' for OD conversion only)
+pf2.methods.raw.setMethod('OD_TDDR');            % TDDR motion correction
+% Do band-pass / low-pass filtering at the oxy stage instead:
+pf2.methods.oxy.setMethod('BPF');                % Band-pass (0.01-0.1 Hz)
 ```
 
 **For oxy stage (post-hemoglobin):**
@@ -288,10 +268,10 @@ pf2.methods.raw.setMethod('x3_bpf');             % Band-pass (0.008-0.1 Hz)
 pf2.methods.oxy.setMethod('takizawa_easy');      % Lenient thresholds
 
 % Aggressive artifact rejection
-pf2.methods.oxy.setMethod('takizawa_hard_lpf_detrend');  % Strict + detrend
+pf2.methods.oxy.setMethod('takizawa_hard');      % Strict thresholds
 
-% Spatial filtering
-pf2.methods.oxy.setMethod('medfilt_car');        % Median + CAR
+% Band-pass filtering
+pf2.methods.oxy.setMethod('BPF');                % 0.01-0.1 Hz Butterworth
 ```
 
 ## Common Processing Parameters
@@ -324,7 +304,7 @@ When using `fitGLM` with drift regressors and AR-IRLS, explicit bandpass filteri
 
 Recommended GLM pipeline:
 ```matlab
-pf2.methods.raw.setMethod('x5_TDDR_mask');  % Motion correction on OD
+pf2.methods.raw.setMethod('OD_TDDR');       % Motion correction on OD
 pf2.methods.oxy.setMethod('None');           % No bandpass — GLM handles it
 
 % Design matrix includes drift regressors
@@ -346,7 +326,7 @@ connResults = ex.connectivity('Method', 'wcoherence');
 
 ### When Bandpass Filtering IS Appropriate
 
-Use bandpass filtering (`bpf_butter`, 0.008–0.1 Hz) for:
+Use bandpass filtering (`BPF`, 0.01–0.1 Hz) for:
 
 - **Block averaging** without GLM (epoch-based approach)
 - **Trial-by-trial amplitude extraction** (peak/mean in a time window)
@@ -354,7 +334,7 @@ Use bandpass filtering (`bpf_butter`, 0.008–0.1 Hz) for:
 - **Visualization** of hemodynamic response shape
 
 ```matlab
-pf2.methods.oxy.setMethod('bpf_butter');  % 0.008-0.1 Hz Butterworth
+pf2.methods.oxy.setMethod('BPF');         % 0.01-0.1 Hz Butterworth
 ```
 
 Short block-extracted segments (e.g., 30s) naturally limit low-frequency drift contribution, so bandpass is less critical for block-wise correlation analyses.
@@ -488,7 +468,7 @@ path safe for `parfor` and byte-for-byte reproducible.
 ```matlab
 % Configure in one call — usable immediately, no fromGlobals() bootstrap
 ctx = pf2.ProcessingContext('DPFmode', 'Calc', 'SubjectAge', 30, ...
-    'RawMethod', 'x5_TDDR');
+    'RawMethod', 'OD_TDDR');
 result = ctx.process(data);                       % globals left untouched
 % equivalently: result = processFNIRS2(data, 'Context', ctx);
 

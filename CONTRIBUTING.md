@@ -37,9 +37,22 @@ where practical — prefer the `pf2_base.external.*` equivalents (`butter`, `fir
 ## Running the tests
 
 ```matlab
-pf2_base.tests.runAllTests()     % full suite
+pf2_base.tests.runAllTests()     % report the full headless lane
 pf2_base.tests.runQuickTests()   % fast subset for iterating
 ```
+
+To gate a run so it exits non-zero on any failed **or** incomplete test (what CI
+should use), run the lane through `runCI` from `-batch`:
+
+```bash
+matlab -batch "pf2_base.tests.runCI('full')"    # main headless gate
+matlab -batch "pf2_base.tests.runCI('ui')"      # display-dependent tests
+matlab -batch "pf2_base.tests.runCI('clean')"   # global-isolation, fresh process
+```
+
+`pf2_base.tests.buildSuite` is the single source of truth for which tests exist;
+`runAllTests` and `runCI` both build from it, so adding a test class anywhere
+under `+pf2_base/+tests` makes it part of the gated run automatically.
 
 Add or update tests in `+pf2_base/+tests` for any behavior you change. New
 features should ship with coverage; bug fixes should add a regression test.

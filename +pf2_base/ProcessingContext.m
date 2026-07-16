@@ -130,7 +130,7 @@ classdef ProcessingContext < matlab.mixin.Copyable
             % SETRAWMETHOD Set the raw processing method by name
             %
             % Syntax:
-            %   ctx.setRawMethod('x5_TDDR')
+            %   ctx.setRawMethod('OD_TDDR')
             %
             % The method must exist in rawMethodsLib.
 

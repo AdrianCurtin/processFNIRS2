@@ -64,7 +64,7 @@ fprintf('  Duration:  %.1f seconds\n', max(raw.time) - min(raw.time));
 %    defaultSubjectAge - age in years (for DPF calculation)
 %    blLength        - baseline length in seconds
 %    blStartTime     - baseline start (seconds from recording start)
-%    Raw_Method      - name of raw-stage processing method (e.g. 'x5_TDDR')
+%    Raw_Method      - name of raw-stage processing method (e.g. 'OD_TDDR')
 %    Oxy_Method      - name of oxy-stage processing method (e.g. 'lpf_car')
 
 fprintf('\n=== Part 2: Process ===\n');

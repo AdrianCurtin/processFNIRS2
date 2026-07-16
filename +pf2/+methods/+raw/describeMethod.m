@@ -35,7 +35,7 @@ function [descrip,functions]=describeMethod(rawMethod, ctx)
 %   pf2.methods.raw.describeMethod('x2_lpf_smar');
 %
 %   % Get method details as variables for programmatic use
-%   [desc, funcs] = pf2.methods.raw.describeMethod('x5_TDDR');
+%   [desc, funcs] = pf2.methods.raw.describeMethod('OD_TDDR');
 %   fprintf('Method has %d processing functions\n', length(funcs));
 %
 %   % Describe method by index

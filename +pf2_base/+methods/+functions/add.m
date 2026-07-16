@@ -7,8 +7,8 @@ function varargout=add(varargin)
 % processFNIRS2_configureMethods_functionAddEdit.
 %
 % Syntax:
-%   pf2.GUI.functions.add()
-%   out = pf2.GUI.functions.add()
+%   pf2_base.methods.functions.add()
+%   out = pf2_base.methods.functions.add()
 %
 % Inputs:
 %   varargin - Reserved; the underlying add/edit GUI is invoked with no
@@ -20,9 +20,9 @@ function varargout=add(varargin)
 %
 % Example:
 %   % Open the GUI to define a new processing function
-%   pf2.GUI.functions.add();
+%   pf2_base.methods.functions.add();
 %
-% See also: pf2.GUI.functions.edit, pf2.GUI.functions,
+% See also: pf2_base.methods.functions.edit,
 %           processFNIRS2_configureMethods_functionAddEdit
 
 if(nargout>0)

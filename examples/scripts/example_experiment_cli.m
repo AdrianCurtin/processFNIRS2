@@ -86,7 +86,7 @@ ex.settings.useBaseline = true;
 % Set processing methods - data is reprocessed on first aggregate() call,
 % then cached. Changing the method triggers reprocessing on next aggregate().
 % Use pf2.methods.raw.list() / pf2.methods.oxy.list() to see available names.
-[rawM, oxyM] = pf2.import.sampleData.addDemoPipelines();
+[rawM, oxyM] = pf2_base.examples.addDemoPipelines();
 ex.settings.rawMethod = rawM;
 ex.settings.oxyMethod = oxyM;
 

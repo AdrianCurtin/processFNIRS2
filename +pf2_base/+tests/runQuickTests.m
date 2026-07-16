@@ -1,12 +1,20 @@
-function runQuickTests()
+function ok = runQuickTests()
 %RUNQUICKTESTS Run quick validation scripts for processFNIRS2
 %
-%   pf2_base.tests.runQuickTests() executes lightweight validation scripts that
-%   verify core functionality without the full unit testing framework.
+%   ok = pf2_base.tests.runQuickTests() executes lightweight validation scripts
+%   that verify core functionality without the full unit testing framework.
 %   These scripts are designed for rapid sanity checks during development.
 %
 %   Syntax:
+%       ok = pf2_base.tests.runQuickTests()
 %       pf2_base.tests.runQuickTests()
+%
+%   Outputs:
+%       ok - logical; true only if every quick test passed. When called with
+%            NO output captured, a failure instead raises an error so that
+%            `matlab -batch "pf2_base.tests.runQuickTests()"` exits non-zero
+%            and CI can gate on it. Capture ok to inspect the status without
+%            throwing.
 %
 %   Description:
 %       This function runs a series of quick validation scripts located in
@@ -107,7 +115,9 @@ function runQuickTests()
     totalDuration = sum(cellfun(@(r) r.duration, results));
     fprintf('Total duration: %.2f seconds\n', totalDuration);
 
-    if failCount == 0
+    ok = (failCount == 0);
+
+    if ok
         fprintf('All %d tests passed.\n', passCount);
     else
         fprintf('Results: %d passed, %d failed\n', passCount, failCount);
@@ -122,5 +132,14 @@ function runQuickTests()
 
         fprintf('\nRun individual tests for more details:\n');
         fprintf('  pf2_base.tests.quick.testName()\n');
+
+        % Fail loudly when the caller did not capture the status, so a bare
+        % `matlab -batch "pf2_base.tests.runQuickTests()"` exits non-zero
+        % rather than reporting success with the failures merely printed.
+        if nargout == 0
+            error('pf2:tests:runQuickTests:failures', ...
+                '%d of %d quick validation tests failed. See the list above.', ...
+                failCount, numTests);
+        end
     end
 end

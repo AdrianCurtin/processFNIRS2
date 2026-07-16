@@ -12,6 +12,8 @@ sampledata/sampleNIR_CH.mat
 !CONTRIBUTING.md
 !docs/*.md
 !examples/scripts/README.md
+!mcp/*.md
+!tests/golden/README.md
 internal/
 site/
 tests/benchmarks/data/

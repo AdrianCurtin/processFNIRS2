@@ -7,8 +7,8 @@ function varargout=edit(varargin)
 % are forwarded to processFNIRS2_configureMethods_functionAddEdit.
 %
 % Syntax:
-%   pf2.GUI.functions.edit(funcName)
-%   out = pf2.GUI.functions.edit(funcName, ...)
+%   pf2_base.methods.functions.edit(funcName)
+%   out = pf2_base.methods.functions.edit(funcName, ...)
 %
 % Inputs:
 %   funcName - Name of the processing function to edit (e.g. 'pf2_lpf')
@@ -20,13 +20,13 @@ function varargout=edit(varargin)
 %
 % Example:
 %   % Edit the definition of the low-pass filter function
-%   pf2.GUI.functions.edit('pf2_lpf');
+%   pf2_base.methods.functions.edit('pf2_lpf');
 %
-% See also: pf2.GUI.functions.add, pf2.GUI.functions,
+% See also: pf2_base.methods.functions.add,
 %           processFNIRS2_configureMethods_functionAddEdit
 
 if(nargin<1)
-	error('pf2:GUI:functions:edit:noFunctionName', 'Please provide function name to edit');
+	error('pf2:methods:functions:edit:noFunctionName', 'Please provide function name to edit');
 end
 
 if(nargout>0)

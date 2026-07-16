@@ -17,9 +17,9 @@ function [rawName, oxyName, oxyNamePCA] = addDemoPipelines()
 %   2. pf2_build_pca_ROI    - Build ROI signals via PCA 1st component (if ROIs defined)
 %
 % Syntax:
-%   pf2.import.sampleData.addDemoPipelines()
-%   [rawName, oxyName] = pf2.import.sampleData.addDemoPipelines()
-%   [rawName, oxyName, oxyNamePCA] = pf2.import.sampleData.addDemoPipelines()
+%   pf2_base.examples.addDemoPipelines()
+%   [rawName, oxyName] = pf2_base.examples.addDemoPipelines()
+%   [rawName, oxyName, oxyNamePCA] = pf2_base.examples.addDemoPipelines()
 %
 % Outputs:
 %   rawName    - Name of the raw method ('demo_TDDR')
@@ -27,7 +27,7 @@ function [rawName, oxyName, oxyNamePCA] = addDemoPipelines()
 %   oxyNamePCA - Name of the PCA oxy method ('demo_lpf_pca')
 %
 % Example:
-%   [rawM, oxyM] = pf2.import.sampleData.addDemoPipelines();
+%   [rawM, oxyM] = pf2_base.examples.addDemoPipelines();
 %   ex.settings.rawMethod = rawM;
 %   ex.settings.oxyMethod = oxyM;
 %   ex.aggregate();

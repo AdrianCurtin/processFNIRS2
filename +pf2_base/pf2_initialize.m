@@ -107,13 +107,13 @@ if(~isfield(PF2,'myRawMethods')||~isfield(PF2,'baseline'))
    % working defaults out of the box. Failures are non-fatal.
    if firstTimeRaw || firstTimeOxy
        try
-           seeds = pf2.methods.seeds.list();
+           seeds = pf2_base.methods.seeds.list();
            for k = 1:numel(seeds)
                s = seeds(k);
                if strcmp(s.stage,'raw') && ~firstTimeRaw, continue; end
                if strcmp(s.stage,'oxy') && ~firstTimeOxy, continue; end
                try
-                   p = feval(['pf2.methods.seeds.' s.stage '.' s.name]);
+                   p = feval(['pf2_base.methods.seeds.' s.stage '.' s.name]);
                    p.save(s.stage);
                    fprintf('Seeded %s method: %s\n', s.stage, s.name);
                catch ME

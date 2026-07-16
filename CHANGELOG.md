@@ -4,6 +4,10 @@
 
 ### New Features
 
+**Processing Methods:**
+- New default oxy (Stage 3) methods, seeded via `pf2_base.methods.seeds.oxy.*`: `HPF` (0.01 Hz high-pass), `BPF` (0.01–0.1 Hz Butterworth band-pass), and `takizawa_easy` / `takizawa_hard` (Takizawa automatic channel rejection, lenient / strict criteria — Takizawa et al. 2008)
+- Refreshed the processing-method reference tables to match the live registry
+
 **Toolbox-Free Signal Processing (`+pf2_base/+external/`):**
 - First-party implementations of `butter`, `fir1`, `sgolay`, `sgolayfilt`, `medfilt1`, `zp2sos`, and the window functions (`hamming`, `hann`, `hanning`, `genCosWin`), so filtering and motion correction no longer require the MATLAB Signal Processing Toolbox
 - Filtering and motion-correction functions (`bpf`/`hpf`/`lpf`, `pf2_bpf_*`, `pf2_hpf`/`pf2_lpf`, `pf2_bandstop`, `pf2_MotionCorrectTDDR`, `pf2_MotionCorrectSplineSG`) route through the external math and `filtfilt_classic`/`filtfilt_piecewise`/`filtfilt_interp`

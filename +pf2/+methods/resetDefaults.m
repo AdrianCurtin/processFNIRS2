@@ -12,7 +12,7 @@ function resetDefaults(varargin)
 %   2. Deletes the prefdir cfg file(s) for the requested stage(s).
 %   3. Clears cached globals so pf2_initialize re-seeds on next call.
 %   4. Calls pf2_initialize(), which now applies all repo seeds via
-%      the factory functions in +pf2/+methods/+seeds/+raw and +oxy.
+%      the factory functions in +pf2_base/+methods/+seeds/+raw and +oxy.
 %
 % Use this when the stored methods cfg has become corrupted, or after
 % upgrading pf2 and wanting the latest shipped defaults.
@@ -24,7 +24,7 @@ function resetDefaults(varargin)
 %   % Reset only the raw stage without a confirmation prompt
 %   pf2.methods.resetDefaults('Stage', 'raw', 'Confirm', false);
 %
-% See also: pf2.methods.seeds.list
+% See also: pf2_base.methods.seeds.list
 
 ip = inputParser;
 ip.addParameter('Stage',   'both', @(x) ismember(lower(char(x)), {'raw','oxy','both'}));
@@ -76,12 +76,12 @@ end
 pf2_base.pf2_initialize();
 
 % Now apply the seeds.
-seeds = pf2.methods.seeds.list();
+seeds = pf2_base.methods.seeds.list();
 for k = 1:numel(seeds)
     s = seeds(k);
     if strcmp(stage, 'raw') && ~strcmp(s.stage, 'raw'), continue; end
     if strcmp(stage, 'oxy') && ~strcmp(s.stage, 'oxy'), continue; end
-    factory = ['pf2.methods.seeds.' s.stage '.' s.name];
+    factory = ['pf2_base.methods.seeds.' s.stage '.' s.name];
     try
         p = feval(factory);
         p.save(s.stage, 'Replace', true);

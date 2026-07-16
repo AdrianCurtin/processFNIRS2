@@ -56,7 +56,7 @@ function varargout=processRaw(varargin)
 %
 %   % Compare different raw methods before committing to oxy processing
 %   result1 = pf2.process.processRaw(data, 'x2_lpf_smar');
-%   result2 = pf2.process.processRaw(data, 'x5_TDDR');
+%   result2 = pf2.process.processRaw(data, 'OD_TDDR');
 %
 % Notes:
 %   - This function sets 'SkipOxy' to true internally

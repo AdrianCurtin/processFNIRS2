@@ -8,7 +8,7 @@ function p = LPF()
 % directly.
 %
 % Syntax:
-%   p = pf2.methods.seeds.oxy.LPF()
+%   p = pf2_base.methods.seeds.oxy.LPF()
 %
 % Inputs:
 %   None
@@ -18,10 +18,10 @@ function p = LPF()
 %
 % Example:
 %   % Build and register the default LPF oxy method
-%   p = pf2.methods.seeds.oxy.LPF();
+%   p = pf2_base.methods.seeds.oxy.LPF();
 %   p.save();
 %
-% See also: pf2.methods.seeds.oxy.LPF_ROI, pf2.methods.resetDefaults,
+% See also: pf2_base.methods.seeds.oxy.LPF_ROI, pf2.methods.resetDefaults,
 %           pf2_base.OxyPipeline
 
 p = pf2_base.OxyPipeline('LPF', ...
