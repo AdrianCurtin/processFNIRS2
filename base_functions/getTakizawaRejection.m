@@ -151,7 +151,7 @@ function fNIR=getTakizawaRejection(fNIR,applyMask,strictCriteria)
 
     fsHz=L2; %frequency at 1 hz
     point1hz=find(freqvec>0.1,1); %should be approximately L/(10*fs)
-    onehz=find(freqvec>1);  % Should be approximately L/fs
+    onehz=find(freqvec>1,1);  % first bin above 1 Hz (scalar); Should be approximately L/fs
 
     if(isempty(onehz))
         onehz=length(freqvec);

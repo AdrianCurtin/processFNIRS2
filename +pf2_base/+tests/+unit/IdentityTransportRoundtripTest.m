@@ -57,8 +57,7 @@ classdef IdentityTransportRoundtripTest < matlab.unittest.TestCase
         end
 
         function testPermittedNonFiniteValuesRoundTripCanonically(testCase)
-            negativeZero = typecast(bitshift(uint64(1), 63), 'double');
-            value = [NaN, Inf, -Inf, negativeZero];
+            value = [NaN, Inf, -Inf];
 
             testCase.verifyError(@() ...
                 pf2_base.identity.encodeJsonTransport(value), ...
@@ -71,6 +70,24 @@ classdef IdentityTransportRoundtripTest < matlab.unittest.TestCase
                     'AllowNonFinite', true), ...
                 pf2_base.identity.canonicalBytes(value, ...
                     'AllowNonFinite', true));
+        end
+
+        function testSignedZeroRoundTripsThroughJsonAsPositiveZero(testCase)
+            % Negative zero is finite, so it must round-trip through the
+            % default JSON transport with no AllowNonFinite escape and
+            % normalize to +0, mirroring canonicalBytes' signed-zero
+            % contract. This is deliberately separate from the non-finite
+            % path above, where -0 was previously (and misleadingly) bundled
+            % in with NaN/Inf despite being finite.
+            negativeZero = typecast(bitshift(uint64(1), 63), 'double');
+            testCase.assertEqual(negativeZero, 0);
+
+            json = pf2_base.identity.encodeJsonTransport(negativeZero);
+            decoded = pf2_base.identity.decodeJsonTransport(json);
+
+            testCase.verifyEqual( ...
+                pf2_base.identity.canonicalBytes(decoded), ...
+                pf2_base.identity.canonicalBytes(0.0));
         end
 
         function testMatAndJsonRoundTripToSameRecipeHash(testCase)
