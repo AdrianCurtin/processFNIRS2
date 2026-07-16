@@ -103,21 +103,28 @@ Output fNIRS struct with all stages
 ### Raw Processing Methods
 Methods for Stage 1 processing (Raw → Optical Density). Each `OD_` method first
 converts raw intensity to optical density, then applies the named motion
-correction and/or filtering. Run `pf2.methods.raw.list()` for the authoritative
-live set (a few internal test/demo methods are omitted here).
+correction. Run `pf2.methods.raw.list()` for the authoritative live set.
 
 | Method | Pipeline |
 |--------|----------|
 | `None` | Optical-density conversion only (no motion/filter step) |
-| `OD_TDDR` | TDDR motion correction |
-| `OD_TDDR_BPF` | TDDR motion correction + band-pass filter |
-| `OD_SMAR` | SMAR sliding-window motion artifact rejection |
-| `OD_Spline` | Spline-interpolation motion correction |
-| `OD_Spline_BPF` | Spline motion correction + band-pass filter |
-| `OD_SplineSG_BPF` | Spline + Savitzky-Golay motion correction + band-pass filter |
-| `OD_Spline_Wavelet` | Spline + wavelet motion correction |
-| `OD_Wavelet_BPF` | Wavelet motion correction + band-pass filter |
-| `OD_sSMART` | sSMART motion correction |
+| `OD_TDDR` | Log→OD, then TDDR motion correction |
+| `OD_SMAR` | Log→OD, then SMAR sliding-window motion artifact rejection |
+
+`OD_TDDR` and `OD_SMAR` are the shipped raw seeds (restored by
+`pf2.methods.resetDefaults`). Band-pass filtering is applied at the oxy stage
+via the `BPF` method (below). To build other raw chains — e.g. spline or
+wavelet motion correction, or a raw-stage band-pass — use the Pipeline API;
+the underlying functions (`pf2_MotionCorrectSpline`, `pf2_MotionCorrectSplineSG`,
+`pf2_MotionCorrectWavelet`, `pf2_sSMART`, `pf2_bpf_butter`) ship with the toolbox:
+
+```matlab
+raw = pf2_base.RawPipeline('OD_Spline_BPF');
+raw = raw.add('pf2_Intensity2OD');
+raw = raw.add('pf2_MotionCorrectSpline');
+raw = raw.add('pf2_bpf_butter');
+raw.save('raw');   % register as a named raw method
+```
 
 ### Oxy Processing Methods
 Methods for Stage 3 processing (hemoglobin post-processing). Run
@@ -231,12 +238,12 @@ Based on real research usage:
 
 **For motion-prone data (head movement):**
 ```matlab
-% Raw stage: Motion correction + filtering
-pf2.methods.raw.setMethod('OD_TDDR_BPF');        % TDDR + band-pass filter
-% or
-pf2.methods.raw.setMethod('OD_TDDR');            % TDDR alone
+% Raw stage: motion correction
+pf2.methods.raw.setMethod('OD_TDDR');            % TDDR motion correction
 % or
 pf2.methods.raw.setMethod('OD_SMAR');            % SMAR sliding-window rejection
+% Add band-pass filtering at the oxy stage:
+pf2.methods.oxy.setMethod('BPF');                % 0.01-0.1 Hz Butterworth
 
 % Spline interpolation — good for isolated, large artifacts
 % Can combine with wavelet for hybrid correction (spline first, then wavelet)
@@ -250,7 +257,7 @@ pf2_MotionCorrectSplineSG(dod, fs);
 **For cleaner data (minimal motion):**
 ```matlab
 % Raw stage: light correction (or 'None' for OD conversion only)
-pf2.methods.raw.setMethod('OD_Spline');          % Spline motion correction
+pf2.methods.raw.setMethod('OD_TDDR');            % TDDR motion correction
 % Do band-pass / low-pass filtering at the oxy stage instead:
 pf2.methods.oxy.setMethod('BPF');                % Band-pass (0.01-0.1 Hz)
 ```

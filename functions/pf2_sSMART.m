@@ -6,9 +6,19 @@ function [x_recon, maskCV, MA_idx] = pf2_sSMART(x, fs, chNum, tauArtifact, tauCl
 % Optionally corrects DC baseline shifts caused by optode displacement
 % during artifacts before interpolating.
 %
-% Reference:
-%   Ayaz, H. et al. (2010). Sliding-window motion artifact rejection for
-%   Functional Near-Infrared Spectroscopy. Conf Proc IEEE Eng Med Biol Soc.
+% References:
+%   sSMART method:
+%     Curtin, A., & Ayaz, H. (2019). sSMART: statistical Sliding Motion
+%     Artifact Reconstruction Technique for functional Near-Infrared
+%     Spectroscopy. AHFE 2019 International Conference on Neuroergonomics
+%     and Cognitive Engineering, July 24-28, 2019, Washington, D.C., USA.
+%     Advances in Neuroergonomics and Cognitive Engineering, Springer.
+%   SMAR sliding-window detection stage (adapted; see pf2_SMAR2):
+%     Ayaz, H., Izzetoglu, M., Shewokis, P. A., & Onaral, B. (2010).
+%     Sliding-window motion artifact rejection for Functional Near-Infrared
+%     Spectroscopy. 2010 Annual International Conference of the IEEE
+%     Engineering in Medicine and Biology, 6567-6570.
+%     DOI: 10.1109/IEMBS.2010.5627113
 %
 % Syntax:
 %   x_recon = pf2_sSMART(x, fs)
@@ -87,12 +97,25 @@ function [x_recon, maskCV, MA_idx] = pf2_sSMART(x, fs, chNum, tauArtifact, tauCl
 %   [corrected, mask, idx] = pf2_sSMART(odData, 10, [], 4, 2, 10, 5, 'spline', true);
 %
 % Notes:
-%   - The SMAR2 detection stage is based on Ayaz et al. (2010). The
-%     interpolation-based reconstruction and DC-shift correction stages are
-%     original to processFNIRS2 and are not part of the published algorithm.
+%   - The sSMART method (statistical CV thresholding plus interpolated
+%     reconstruction) is described in Curtin & Ayaz (2019). The
+%     sliding-window detection it builds on derives from the SMAR algorithm
+%     of Ayaz et al. (2010) (see pf2_SMAR2).
 %   - Interpolation fills gaps smoothly but cannot recover true underlying
 %     neural signal. Short gaps (< few seconds) are typically acceptable;
 %     long gaps should be treated with caution in downstream analysis.
+%   - DC-offset adjustment (ShiftCorrect, off by default): motion can
+%     permanently displace an optode, leaving a step-like shift in the
+%     baseline across the artifact. When enabled, each gap's pre/post
+%     baseline difference (mean over a 1 s window on each side) is removed
+%     from every sample after the gap, so the post-artifact signal realigns
+%     to the pre-artifact baseline. The correction is CUMULATIVE across gaps
+%     and applied INDEPENDENTLY per channel, so offsets accumulate over a
+%     recording and channels can drift relative to one another. It targets
+%     step-like displacement shifts only; if a gap straddles a genuine slow
+%     hemodynamic change, that real signal is removed along with the shift.
+%     Leave it off unless clear baseline jumps from optode displacement are
+%     visible, and inspect the reconstructed output before trusting it.
 %
 % See also: pf2_SMAR2, pf2_SMAR, pf2_MotionCorrectTDDR, interp1
 

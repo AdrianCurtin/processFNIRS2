@@ -42,7 +42,8 @@ pf2.data.plot(processed);
 ```matlab
 % Load → Configure → Process → Visualize → Export
 data = pf2.import.importNIR('subject01.nir');
-pf2.methods.raw.setMethod('OD_TDDR_BPF');     % Motion correction + filtering
+pf2.methods.raw.setMethod('OD_TDDR');         % Motion correction (raw stage)
+pf2.methods.oxy.setMethod('BPF');             % Band-pass filter (oxy stage)
 processed = processFNIRS2(data);
 pf2.data.plot.oxy(processed);                  % Time series plot
 pf2.export.asSNIRF(processed, 'subject01_processed.snirf');
@@ -193,7 +194,7 @@ data = pf2.import.importNIR('myfile.nir');  % No guessing
 |------------------|------------------|----------|
 | `pf2.data.plot(data)` | `pf2.data.plot.oxy(data)` | Parent auto-detects: has HbO? → Oxy plot, else → Raw plot |
 | `pf2.methods()` | `pf2.methods.raw()` | Parent lists ALL methods; child lists only raw methods |
-| `pf2.methods.raw.setMethod()` | `pf2.methods.raw.setMethod('OD_TDDR_BPF')` | No-arg prompts interactively; with-arg sets directly |
+| `pf2.methods.raw.setMethod()` | `pf2.methods.raw.setMethod('OD_TDDR')` | No-arg prompts interactively; with-arg sets directly |
 
 ### Tab-Completion is Your Friend
 
@@ -455,7 +456,7 @@ pf2.methods.raw.list()                  % Same as raw()
 pf2.methods.oxy.list()                  % Same as oxy()
 
 % Set active method
-pf2.methods.raw.setMethod('OD_TDDR_BPF')    % By name
+pf2.methods.raw.setMethod('OD_TDDR')         % By name
 pf2.methods.raw.setMethod(3)                 % By index
 pf2.methods.raw.setMethod()                  % Interactive
 
@@ -464,7 +465,7 @@ pf2.methods.oxy.setMethod(2)
 pf2.methods.oxy.setMethod()
 
 % Method information
-pf2.methods.raw.describeMethod('OD_TDDR_BPF')
+pf2.methods.raw.describeMethod('OD_TDDR')
 pf2.methods.oxy.describeMethod('takizawa_easy')
 pf2.methods.describeCurrentMethods()
 
@@ -483,9 +484,11 @@ pf2.methods.oxy.importMethods(filepath)
 |------------|-------------|-------------|
 | `None` | Optical-density conversion only | Already clean, minimal motion |
 | `OD_TDDR` | TDDR motion correction | Spike / motion artifacts |
-| `OD_TDDR_BPF` | TDDR motion correction + band-pass filter | Motion + isolate hemodynamic band |
 | `OD_SMAR` | SMAR sliding-window motion artifact rejection | Coefficient-of-variation spikes |
-| `OD_Spline` | Spline-interpolation motion correction | Baseline shifts / slow drift |
+
+> Band-pass filtering is applied at the oxy stage via the `BPF` method. For
+> spline/wavelet raw chains, build a `pf2_base.RawPipeline` (see
+> PROCESSING_PIPELINE.md); the underlying functions ship with the toolbox.
 
 | Oxy Method | Description | When to Use |
 |------------|-------------|-------------|
@@ -884,7 +887,7 @@ For users transitioning from the GUI to command-line:
 
 **In the GUI, you would:**
 1. Click File → Open and select a .nir file
-2. In the Method dropdown, select "OD_TDDR_BPF"
+2. In the Method dropdown, select "OD_TDDR"
 3. Set baseline to 10 seconds
 4. Click "Process"
 5. View the time series plot
@@ -894,7 +897,7 @@ For users transitioning from the GUI to command-line:
 ```matlab
 % Steps 1-2: Import and configure
 data = pf2.import.importNIR('/path/to/file.nir');
-pf2.methods.raw.setMethod('OD_TDDR_BPF');
+pf2.methods.raw.setMethod('OD_TDDR');
 
 % Step 3: Set baseline
 pf2.settings.baseline.setBaselineLength(10);

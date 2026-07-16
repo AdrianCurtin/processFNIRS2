@@ -120,7 +120,7 @@ mydata = pf2.import.sampleData();                 % sample recording with marker
 processed = processFNIRS2(mydata);                % uses the default methods
 
 % To pick specific methods, browse the registered names and select one:
-pf2.methods.raw.list();                           % e.g. 'x2_lpf_smar', 'OD_TDDR'
+pf2.methods.raw.list();                           % e.g. 'OD_TDDR', 'OD_SMAR'
 pf2.methods.oxy.list();
 pf2.methods.raw.setMethod('OD_TDDR');
 processed = processFNIRS2(mydata);                % process with the chosen method
