@@ -256,6 +256,14 @@ for i=1:size(files,1)
             device.Probe{p}.TableCh.SourceIndex(:)=probeInfo.SD.MeasList(:,1);
             device.Probe{p}.TableCh.DetectorIndex(:)=probeInfo.SD.MeasList(:,2);
 
+            % Flag real-channel columns (the OD->Hb stage selects data(:,isCh)).
+            % NIRX raw carries no time/marker columns, so every measurement is a
+            % channel; dark columns are those with no valid wavelength.
+            validCh=~isnan(device.Probe{p}.TableCh.OptodeNumber);
+            device.Probe{p}.TableCh.isDark=(isnan(device.Probe{p}.TableCh.Wavelength) ...
+                | device.Probe{p}.TableCh.Wavelength==0) & validCh;
+            device.Probe{p}.TableCh.isCh=validCh(:);
+
             device.Probe{p}.SrcPos=table();
             device.Probe{p}.SrcPos.x_2d=device.Probe{p}.SrcPosX(:);
             device.Probe{p}.SrcPos.y_2d=device.Probe{p}.SrcPosY(:);
@@ -334,6 +342,12 @@ for i=1:size(files,1)
             device.Probe{p}.ChannelList= 1:numCh;
             device.Probe{p}.Wavelength=probeInfo.SD.Lambda(device.Probe{p}.wvI);
             device.Info.NumberChannels=device.Info.NumberChannels+numCh;
+
+            % Assemble the canonical per-channel optode table from the geometry
+            % computed above so processFNIRS2 / pf2.Device can resolve this
+            % probe (device resolution, MNI positions, SD distances) without a
+            % .cfg. Mirrors the TableOpt that pf2_base.loadDeviceCfg emits.
+            device.Probe{p}.TableOpt=pf2_base.buildOptodeTable(device.Probe{p});
 
 
 
