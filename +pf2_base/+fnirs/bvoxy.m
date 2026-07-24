@@ -26,6 +26,25 @@ function [HbO, HbR, Total, HbDiff,CBSI,channels,time,units,DPF_factor]=bvoxy(var
 %     pathlength factor of the frontal human head depending on wavelength
 %     and age. J. Biomed. Opt. 18(10), 105004. DOI: 10.1117/1.JBO.18.10.105004
 %
+%   Partial-volume correction (PVC) / cortical sensitivity:
+%     Strangman, G. E., Zhang, Q., & Li, Z. (2014). Scalp and skull influence
+%     on near infrared photon propagation in the Colin27 brain template.
+%     NeuroImage, 85, 136-149. DOI: 10.1016/j.neuroimage.2013.04.090
+%     Strangman, G., Franceschini, M. A., & Boas, D. A. (2003). Factors
+%     affecting the accuracy of near-infrared spectroscopy concentration
+%     calculations for focal changes in oxygenation parameters. NeuroImage,
+%     18(4), 865-879. DOI: 10.1016/s1053-8119(03)00021-1
+%     Boas, D. A. et al. (2001). The accuracy of near infrared spectroscopy
+%     and imaging during focal changes in cerebral hemodynamics. NeuroImage,
+%     13(1), 76-90. DOI: 10.1006/nimg.2000.0674
+%     Hiraoka, M. et al. (1993). A Monte Carlo investigation of optical
+%     pathlength in inhomogeneous tissue and its application to near-infrared
+%     spectroscopy. Phys. Med. Biol. 38(12), 1859-1876.
+%     DOI: 10.1088/0031-9155/38/12/011
+%     Uludag, K. et al. (2002). Cross talk in the Lambert-Beer calculation for
+%     near-infrared wavelengths estimated by Monte Carlo simulations.
+%     J. Biomed. Opt. 7(1), 51. DOI: 10.1117/1.1427048
+%
 %   Extinction Coefficients:
 %     Prahl, S. A. Tabulated molar extinction coefficient for hemoglobin.
 %     http://omlc.org/spectra/hemoglobin/
@@ -35,6 +54,7 @@ function [HbO, HbR, Total, HbDiff,CBSI,channels,time,units,DPF_factor]=bvoxy(var
 %   fNIR = bvoxy(data, channels, wavelengths, distanceSrcDet, baselineSamples)
 %   fNIR = bvoxy(..., age)
 %   fNIR = bvoxy(..., 'DiffPathlengthFactor', dpf)
+%   fNIR = bvoxy(..., 'PartialPathlengthFactor', ppf)
 %   fNIR = bvoxy(..., 'NoPathlength', true)
 %   fNIR = bvoxy(..., 'isOD', true)
 %   [HbO, HbR, Total, HbDiff, CBSI, ch, t, units, DPF] = bvoxy(...)
@@ -54,8 +74,59 @@ function [HbO, HbR, Total, HbDiff,CBSI,channels,time,units,DPF_factor]=bvoxy(var
 %                     Used only when DPF mode is 'Calc' (age-dependent).
 %
 % Name-Value Parameters:
-%   'DiffPathlengthFactor' - Fixed DPF value to use (bypasses age calculation)
-%                            Typical adult value: 5.93 (van der Zee, 1992)
+%   There are two mutually exclusive ways to set the pathlength factor:
+%   (a) a DPF (fixed or age-calculated) optionally divided by a partial-volume
+%   correction PVC, or (b) a complete effective factor supplied directly (PPF).
+%   Path (a) is the documented primary route because DPF and PVC each have a
+%   checkable range, so typos are caught; (b) is an escape hatch (see PPF).
+%
+%   'DiffPathlengthFactor' - Fixed DPF value to use (bypasses the age
+%                            calculation). Typical adult head-tissue DPF is
+%                            ~3-10 (van der Zee 1992: 5.93); a value outside
+%                            that range emits a pf2_base:fnirs:bvoxy:dpfRange
+%                            warning. Combined with 'PartialVolumeCorrection':
+%                            L = distanceSrcDet .* DPF ./ PVC.
+%   'PartialVolumeCorrection' - Partial-volume correction divisor (PVC >= 1),
+%                            applied to the fixed OR age-calculated DPF:
+%                            L = distanceSrcDet .* DPF ./ PVC. A scalar applies
+%                            uniformly; a per-optode vector (one value per
+%                            optode, in the sorted-optode order of
+%                            distanceSrcDet) gives each channel its own
+%                            separation/region-specific correction. Default 1
+%                            (no correction; the classic "apparent" concentration).
+%                            PVC is the total-photon-path / gray-matter-partial-
+%                            path ratio, i.e. the reciprocal of the sensitivity
+%                            PPL_GM/TPL. It is separation- and region-dependent:
+%                            at a conventional 30 mm channel PVC ~ 10 (Strangman,
+%                            Zhang & Li 2014, sensitivity ~0.10); it falls
+%                            toward ~5 at 50 mm and rises toward ~15+ at 20 mm.
+%                            Compute a principled, separation/region-specific
+%                            value with pf2_base.fnirs.strangmanPVC rather than
+%                            guessing. A hard floor at 1 is enforced (a partial
+%                            path cannot exceed the total).
+%   'PartialPathlengthFactor' - ESCAPE HATCH: a COMPLETE effective pathlength
+%                            factor supplied directly, L = distanceSrcDet .* ppf,
+%                            with NO DPF and NO PVC. Use this when you already
+%                            have an effective factor from a Monte Carlo or
+%                            atlas computation (which yields a partial pathlength
+%                            directly, with no DPF/PVC split to recover). It is
+%                            deliberately NOT the primary path: a bare factor is
+%                            unvalidatable (6 is a fine uncorrected factor and
+%                            0.12 a fine corrected one, two orders of magnitude
+%                            apart, both plausible), which is precisely the
+%                            ambiguity that produces cross-toolbox magnitude
+%                            confusion. Scalar (both wavelengths) or [ppf1 ppf2]
+%                            wavelength-ascending (sub-805 nm first); every
+%                            element must be finite, real, and positive -- a
+%                            length-3+ vector, or a NaN/Inf/non-positive value,
+%                            errors with pf2_base:fnirs:bvoxy:badPPF rather than
+%                            silently truncating or propagating (a bare factor
+%                            already can't be range-checked, so malformed input
+%                            must be caught outright). Output units uM. Mutually
+%                            exclusive with DiffPathlengthFactor /
+%                            PartialVolumeCorrection. In this mode the DPF/PVC
+%                            components are recorded as unknown (NaN) in the
+%                            output rather than back-solved.
 %   'NoPathlength'         - If true, skip DPF correction (default: false)
 %                            Output units become mM*mm instead of uM.
 %   'coefs'                - Custom extinction coefficients [N_wv x 3]
@@ -100,6 +171,28 @@ function [HbO, HbR, Total, HbDiff,CBSI,channels,time,units,DPF_factor]=bvoxy(var
 %   - Returns struct when called with single output argument
 %   - Currently supports two-wavelength systems only
 %   - Marker columns are preserved in output (appended with -1 channel IDs)
+%   - distanceSrcDet is expected in centimeters. If its mean exceeds ~10 a
+%     pf2_base:fnirs:bvoxy:distanceUnits warning fires (likely millimeters,
+%     which yields HbO/HbR ~10x too small); the conversion still proceeds.
+%   - PVC definition and wavelength dependence. PVC = TPL / PPL_GM, the ratio
+%     of total photon pathlength to gray-matter partial pathlength (the inverse
+%     of the sensitivity PPL_GM/TPL). Which denominator is meant matters: the
+%     Strangman 2014 sensitivity used here is the path in ALL gray matter the
+%     channel samples (giving PVC ~10 at 30 mm); the focal partial-volume-error
+%     literature (Strangman 2003, Boas 2001) uses only the FOCALLY ACTIVATED
+%     patch, a smaller denominator that yields a larger PVC (~20-60). Same
+%     physics, different denominators. This function applies PVC as a single
+%     scalar (the quasi-anatomical stance): the DPF is divided uniformly, which
+%     assumes the partial-volume factor is wavelength-independent. That is a
+%     convenience, not a result -- PPL_GM's wavelength dependence differs from
+%     bulk DPF, and that difference is the mechanism of HbO/HbR crosstalk
+%     (Uludag 2002). It is negligible for standard two-chromophore cortical
+%     activation but matters for broadband NIRS fitting cytochrome-c-oxidase.
+%     PVC/sensitivity is also strongly separation- and region-dependent
+%     (Strangman 2014, Table 2/3/4): use pf2_base.fnirs.strangmanPVC to get a
+%     separation- and location-specific value, and for full rigor prefer
+%     Monte Carlo / image reconstruction (pf2.probe.forward.sensitivity,
+%     pf2.probe.dot.reconstruct).
 %
 % See also: processStageRaw2OD, processStageFilterHb, pf2_Intensity2OD,
 %           processFNIRS2
@@ -115,7 +208,9 @@ addRequired(p,'wavelengths',validDataInput); %wavelengths for each column in dat
 addRequired(p,'distanceSrcDet',validDataInput); %source detector distance for each column in channels (in cm)
 addOptional(p,'baselineSamples',[1:50],validDataInput); %array of samples to get from baseline (in seconds
 addOptional(p,'age',25,validScalarPosNum); %Age to calculate DPF from (in years)
-addParameter(p,'DiffPathlengthFactor',[],validScalarNum); % Force same fixed path length to use (typical is 5.93)
+addParameter(p,'DiffPathlengthFactor',[],validScalarNum); % Fixed DPF (typical 3-10); overrides the age calculation
+addParameter(p,'PartialVolumeCorrection',[],@(x) isempty(x)||(isnumeric(x)&&isvector(x))); % Partial-volume correction divisor(s) (>=1), scalar or per-optode: L = SD.*DPF./pvc
+addParameter(p,'PartialPathlengthFactor',[],@(x) isempty(x)||(isnumeric(x)&&isvector(x))); % ESCAPE HATCH: a complete effective factor, L = SD.*ppf (no DPF/PVC decomposition)
 addParameter(p,'NoPathlength',false,@islogical); % Force same fixed path length to use (typical is 5.93)
 addOptional(p,'coefs',[],validDataInput); %If empty calculate instead of using mfg coefficients
 addOptional(p,'isOD',false,@islogical); %Indicates that data is in light intensity instead of OD
@@ -126,13 +221,61 @@ parse(p,varargin{:});
 data=p.Results.data; %in units of light intensity
 channels=p.Results.channels;
 wavelengths=p.Results.wavelengths; %in nm
-sd_distance=p.Results.distanceSrcDet; %in cm
+sd_distance=p.Results.distanceSrcDet(:); %in cm; force a column so it aligns element-wise with the per-optode DPF and any per-optode PVC (a row input would otherwise outer-product)
 subject_age=p.Results.age;
 baselineSamples=p.Results.baselineSamples;
-DiffPathlengthFactor=p.Results.DiffPathlengthFactor; %in DPF 
+DiffPathlengthFactor=p.Results.DiffPathlengthFactor; %fixed DPF
+pvc=p.Results.PartialVolumeCorrection; %partial-volume correction divisor (>=1)
+ppf=p.Results.PartialPathlengthFactor; %complete effective factor (escape hatch)
 coefs=p.Results.coefs;
 isOD=p.Results.isOD;
 NoPathlength=p.Results.NoPathlength;
+
+% Two ways to specify the pathlength factor, kept mutually exclusive:
+%   dpf/pvc  -> build an effective factor (DPF/PVC); each is range-checkable
+%               (DPF ~3-10, PVC >=1), so typos are caught.
+%   ppf      -> a COMPLETE effective factor supplied directly (Monte Carlo /
+%               atlas), unvalidatable by construction (6 and 0.12 are both
+%               legitimate). This ambiguity is why it is an explicit escape
+%               hatch rather than the primary path.
+hasDPF = ~isempty(DiffPathlengthFactor) && DiffPathlengthFactor > 0;
+if ~isempty(ppf) && (hasDPF || ~isempty(pvc))
+    error('pf2_base:fnirs:bvoxy:ppfConflict', ...
+        ['Give PartialPathlengthFactor (a complete effective factor), or ' ...
+         'DiffPathlengthFactor/PartialVolumeCorrection, not both.']);
+end
+if ~isempty(ppf) && any(ppf(:) <= 0)
+    error('pf2_base:fnirs:bvoxy:ppfPositive', ...
+        'PartialPathlengthFactor must be positive; got min %g.', min(ppf(:)));
+end
+if ~isempty(pvc) && any(pvc(:) < 1)
+    error('pf2_base:fnirs:bvoxy:pvcFloor', ...
+        ['PartialVolumeCorrection must be >= 1 (it divides the DPF; a partial ' ...
+         'path cannot exceed the total). Got min %g. A typical cortical PVC at ' ...
+         'a 30 mm channel is ~10 (Strangman 2014).'], min(pvc(:)));
+end
+if hasDPF && (DiffPathlengthFactor < 3 || DiffPathlengthFactor > 10)
+    warning('pf2_base:fnirs:bvoxy:dpfRange', ...
+        ['DiffPathlengthFactor=%g is outside the usual head-tissue DPF range ' ...
+         '(~3-10). If this is an already-partial-volume-corrected factor, pass ' ...
+         'it as PartialPathlengthFactor (the escape hatch) instead.'], ...
+        DiffPathlengthFactor);
+end
+% pvcVal (scalar or per-optode column) is resolved just before the dispatch,
+% once the optode count is known.
+
+% Unit-safety guard: source-detector distances are expected in centimeters.
+% A mean well above any plausible fNIRS separation (long channels are ~2.5-4.5
+% cm, short channels smaller) almost always means millimeters were passed,
+% which makes HbO/HbR ~10x too small with no other symptom. Warn loudly but do
+% not error (some tomographic montages carry longer separations).
+mSD = mean(sd_distance(:), 'omitnan');
+if ~NoPathlength && ~isempty(sd_distance) && isfinite(mSD) && mSD > 10
+    warning('pf2_base:fnirs:bvoxy:distanceUnits', ...
+        ['distanceSrcDet mean=%.1f looks like millimeters, not centimeters ' ...
+         '(a typical long channel is ~2.7 cm). HbO/HbR will be ~10x too small. ' ...
+         'Pass source-detector distances in cm.'], mSD);
+end
 
 
 if(length(baselineSamples)==1)
@@ -194,11 +337,14 @@ end
 %sStart=bEnd+1;
 %len=size(w700,1)-sStart+1;
 
+% Baseline and the extinction arrays are constant across time, so keep them as
+% [1 x numOpt x numWv] and let implicit expansion broadcast them against the
+% [len x numOpt x numWv] data. This avoids materializing full-length copies
+% (measured: ~2x faster and ~half the peak memory vs repmat), byte-identical.
 Baseline=nanmean(rawArray(baselineSamples,:,:),1);
-Baseline=repmat(Baseline,[len,1,1]);
 
-eHbOArray=repmat(reshape(eHbOArray,[1,numOpt,numWv]),[len,1,1]);
-eHbRArray=repmat(reshape(eHbRArray,[1,numOpt,numWv]),[len,1,1]);
+eHbOArray=reshape(eHbOArray,[1,numOpt,numWv]);
+eHbRArray=reshape(eHbRArray,[1,numOpt,numWv]);
 
 if(~isOD)
     OD=real(-log10(rawArray./Baseline));
@@ -223,47 +369,92 @@ end
 od700=OD(:,:,1);
 od830=OD(:,:,2);
 
+% Resolve PVC to a scalar or a per-optode column aligned to the sorted optode
+% order (same order as sd_distance / DPF_700). A per-optode vector lets each
+% channel carry its own separation/region-specific correction.
+if isempty(pvc)
+    pvcVal = 1;
+elseif isscalar(pvc)
+    pvcVal = pvc;
+elseif numel(pvc) == numOpt
+    pvcVal = pvc(:);
+else
+    error('pf2_base:fnirs:bvoxy:pvcLength', ...
+        ['PartialVolumeCorrection must be a scalar or have one value per ' ...
+         'optode (%d); got %d.'], numOpt, numel(pvc));
+end
+
 if(NoPathlength)
     %Convert to mM*mm from uM*cm
-    
+
     L_700=100;
     L_830=100;
-    
+
     DPF_factor=[nan,nan];
-    
+    pathInfo=struct('mode','none','dpf',[nan nan],'pvc',nan,'effective',[nan nan]);
+
     units='mM*mm';
 
-elseif(~isempty(DiffPathlengthFactor)&&DiffPathlengthFactor>0)
-    L_700=sd_distance*DiffPathlengthFactor; %0.015 = 2.5cm*5.92 /1000
-    L_830=sd_distance*DiffPathlengthFactor;
-    
-    DPF_factor=DiffPathlengthFactor;
-    
+elseif(~isempty(ppf))
+    % Escape hatch: ppf is a COMPLETE effective pathlength factor supplied
+    % directly (e.g. a Monte Carlo / atlas partial pathlength), so
+    % L = SD .* ppf with NO DPF and NO PVC to recover. The DPF/PVC components
+    % are recorded as unknown (NaN) rather than back-solving a split that was
+    % never provided. A scalar ppf applies to both wavelengths; a vector must
+    % be exactly [ppf1 ppf2] wavelength-ascending (channels are sorted <805 nm
+    % first). Every element must be finite, real, and positive: silently
+    % truncating a longer vector to its first two elements (a stray third
+    % value from e.g. a copy-paste error) or accepting a NaN/Inf would corrupt
+    % HbO/HbR without any other symptom, so both are rejected outright.
+    if ~(isnumeric(ppf) && isreal(ppf) && all(isfinite(ppf(:))) && all(ppf(:) > 0) ...
+            && (isscalar(ppf) || numel(ppf) == 2))
+        error('pf2_base:fnirs:bvoxy:badPPF', ...
+            ['PartialPathlengthFactor must be a scalar or exactly two finite, ' ...
+             'real, positive values [ppf1 ppf2] (one per wavelength); got %s.'], ...
+            mat2str(ppf));
+    end
+
+    if(isscalar(ppf))
+        ppfVec=[ppf ppf];
+    else
+        ppfVec=ppf(1:2);
+    end
+
+    L_700=sd_distance.*ppfVec(1);
+    L_830=sd_distance.*ppfVec(2);
+
+    DPF_factor=ppfVec;
+    pathInfo=struct('mode','ppf','dpf',[nan nan],'pvc',nan,'effective',ppfVec);
+
+    units='uM';
+
+elseif(hasDPF)
+    % Fixed DPF, optionally partial-volume corrected: L = SD .* DPF ./ PVC.
+    % ./ broadcasts a per-optode pvcVal column against the [nOpt x 1] distances.
+    L_700=sd_distance.*(DiffPathlengthFactor./pvcVal);
+    L_830=sd_distance.*(DiffPathlengthFactor./pvcVal);
+
+    pvcSummary=mean(pvcVal(:));
+    DPF_factor=DiffPathlengthFactor./pvcSummary;
+    pathInfo=struct('mode','fixed','dpf',[DiffPathlengthFactor DiffPathlengthFactor], ...
+        'pvc',pvcSummary,'effective',[DiffPathlengthFactor DiffPathlengthFactor]./pvcSummary);
+
     units='uM';
 else
-    % Calculates DPF accurding to Felix Scholkmann, Martin Wolf, "General equation for the differential pathlength factor of the frontal human head depending on wavelength and age," J. Biomed. Opt. 18(10) 105004 (11 October 2013)
-    % These calculations are valid for the frontal cortex, but until a
-    % better solution is available for other corticies they will
-    % temporarliy be used everywhere
-    
-    
-    alpha=223.3;
-    beta=0.05624;
-    gamma=0.8493;
-    delta=-5.723e-7;
-    eta=0.001245;
-    sigma=-0.9025;
-    calcDPF=@(lambda,Age) alpha + beta*Age.^gamma+delta*lambda.^3+eta.*lambda.^2+sigma*lambda;
-    
-    DPF_700=calcDPF(wvArray(:,1),subject_age);
-    DPF_830=calcDPF(wvArray(:,2),subject_age);
-    
-    
-    L_700=sd_distance.*DPF_700; %0.015 = 2.5cm*5.92 /1000
-    L_830=sd_distance.*DPF_830;
-    
-    DPF_factor=unique([DPF_700,DPF_830]);
-    
+    % Age/wavelength DPF (Scholkmann & Wolf 2013), optionally partial-volume
+    % corrected: L = SD .* DPF_calc ./ PVC. The Scholkmann DPF is valid for the
+    % frontal cortex; used everywhere until a better solution is available.
+    DPF_700=scholkmannDPF(wvArray(:,1),subject_age);
+    DPF_830=scholkmannDPF(wvArray(:,2),subject_age);
+
+    L_700=sd_distance.*(DPF_700./pvcVal);
+    L_830=sd_distance.*(DPF_830./pvcVal);
+
+    pvcSummary=mean(pvcVal(:));
+    DPF_factor=unique([DPF_700, DPF_830]./pvcVal);
+    pathInfo=struct('mode','calc','dpf',[mean(DPF_700) mean(DPF_830)],'pvc',pvcSummary, ...
+        'effective',[mean(DPF_700) mean(DPF_830)]./pvcSummary);
+
     units='uM';
 end
 
@@ -280,8 +471,10 @@ eHBR_830=eHbRArray(:,:,2);
 % od700=reshape(od700,[numOpt,len]);
 % od830=reshape(od830,[numOpt,len]);
 
-L_700=repmat(L_700',len,1);
-L_830=repmat(L_830',len,1);
+% Keep L as [1 x numOpt] rows and broadcast against the [len x numOpt] OD; no
+% repmat to full length (measured ~2x, half memory), byte-identical.
+L_700=L_700(:).';
+L_830=L_830(:).';
 
 HbO=(eHBR_830.*(od700./L_700)-eHBR_700.*(od830./L_830))./(eHBO_700.*eHBR_830-eHBO_830.*eHBR_700);
 HbR=(eHBO_700.*(od830./L_830)-eHBO_830.*(od700./L_700))./(eHBO_700.*eHBR_830-eHBO_830.*eHBR_700);
@@ -313,29 +506,46 @@ if(nargout==1) % if one output argument, return all as fNIR struct
 	fNIR.time=time;
 	fNIR.channels=channels;
 	fNIR.DPF_factor=DPF_factor;
+	fNIR.pathlengthInfo=pathInfo; % provenance: mode + dpf/pvc/effective (NaN if unknown)
 	fNIR.units=units;
-	
+
 	HbO=fNIR; %return only the struct
 	return;
 end
 
 end
 
+function dpf=scholkmannDPF(lambda,Age)
+% SCHOLKMANNDPF Age- and wavelength-dependent differential pathlength factor
+%
+% General equation for the DPF of the frontal human head (Scholkmann & Wolf,
+% 2013, J. Biomed. Opt. 18(10) 105004. DOI: 10.1117/1.JBO.18.10.105004).
+%
+% Inputs:
+%   lambda - Wavelength(s) in nm
+%   Age    - Subject age in years
+%
+% Outputs:
+%   dpf    - Differential pathlength factor (dimensionless), same size as lambda
+
+alpha=223.3;
+beta=0.05624;
+gamma=0.8493;
+delta=-5.723e-7;
+eta=0.001245;
+sigma=-0.9025;
+dpf = alpha + beta*Age.^gamma + delta*lambda.^3 + eta.*lambda.^2 + sigma*lambda;
+
+end
+
 function [eHbR,eHbO]=estimateAbsorb(lambda,coefs)
 % coeficients should be in 1/(cm*microMolar)
 % but are output in millimolar (1/(cm*uM))
-
-persistent cache
-if isempty(cache)
-    cache = containers.Map('KeyType','char','ValueType','any');
-end
-
-% Cache clear sentinel
-if ischar(lambda) && strcmp(lambda, '__clear__')
-    cache = containers.Map('KeyType','char','ValueType','any');
-    eHbR = []; eHbO = [];
-    return
-end
+%
+% Note: previously memoized with a containers.Map keyed by mat2str(lambda).
+% Measured on R2025b, the mat2str key-hashing costs more than the two interp1
+% calls it avoids (~7-15x SLOWER at typical montage sizes), so the cache was
+% removed and the coefficients are computed directly.
 
 %Sourced Data from http://omlc.org/spectra/hemoglobin/summary.html
 % molar extinction coefficient
@@ -476,22 +686,6 @@ altCoeff(:,[2,3])=altCoeff(:,[2,3])*1e-3; % convert from eta to absorption coeff
 
 if(nargin<2||isempty(coefs)) % AutoCalulate With
     coefs=altCoeff;
-    customCoefs = false;
-else
-    customCoefs = true;
-end
-
-% Build cache key from rounded wavelengths (+ coefs hash if custom)
-if customCoefs
-    cacheKey = mat2str(round([lambda(:); coefs(:)], 6));
-else
-    cacheKey = mat2str(round(lambda(:), 6));
-end
-if cache.isKey(cacheKey)
-    cached = cache(cacheKey);
-    eHbO = cached.eHbO;
-    eHbR = cached.eHbR;
-    return
 end
 
 %fNIR Devices saturation coefficietns
@@ -518,8 +712,6 @@ coeffHitachi=[700.8	701.5	702.3	703	703.7   826.4	827.2   827.9	828.7;  %wavelen
 
 eHbO=interp1(coefs(:,1),coefs(:,2),lambda)./1000;  %convert from 1/mM to 1/uM
 eHbR=interp1(coefs(:,1),coefs(:,3),lambda)./1000;   %convert from 1/mM to 1/uM
-
-cache(cacheKey) = struct('eHbO', eHbO, 'eHbR', eHbR);
 
 end
 

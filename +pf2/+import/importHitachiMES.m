@@ -19,7 +19,7 @@ function [fNIR] = importHitachiMES(file,pathname,channelCheck,varargin)
 %
 % Inputs:
 %   file         - Filename or full path to MES file [char | string]
-%                  If omitted, a file selection dialog opens.
+%                  If omitted or empty, a file selection dialog opens.
 %                  Files typically contain 'MES' in the filename.
 %   pathname     - Directory path if file is just a filename (default: pwd)
 %                  Ignored if file contains full path.
@@ -92,10 +92,14 @@ if(nargin<2||isempty(pathname))
     pathname=cd;
 end
 
-if nargin < 1
+if nargin < 1 || isempty(file)
   [file, pathname] = uigetfile({'*MES*.*';'*.*'},'Open Hitachi MES file');
-  filename=[pathname,file];
-  fid = fopen([pathname file]);
+  if isequal(file,0)   % selection cancelled
+      fNIR = [];
+      return;
+  end
+  filename=fullfile(pathname,file);
+  fid = fopen(filename);
 
 elseif ~ischar(file) && ~isstring(file)
   error('pf2:importHitachiMES:badInput', 'Input must be a string representing a filename');
@@ -108,7 +112,9 @@ else
      fid=fopen(filename);
     else
         
-        filename=[pathname,file];
+        % Join with a real separator (fullfile), not bracket concatenation,
+        % so 'sub.csv' + '/data/subj' does not become '/data/subjsub.csv'.
+        filename=fullfile(pathname,file);
         fid=fopen(filename);
     end
 end

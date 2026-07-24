@@ -68,6 +68,20 @@ function fNIR=getTakizawaRejection(fNIR,applyMask,strictCriteria)
      % Best practice is to use original data processed in this style, but
      % using the mean-calculated pathlength is a close approximation for wavelength
      % dependant DPF adaptations and is accurate for fixed DPF styles
+     %
+     % NB: DPF_factor is the *effective* pathlength factor actually applied in the
+     % conversion (DPF, or DPF/PVC when partial-volume correction is enabled).
+     % Because PVC inflates HbO by the same factor it divides out of DPF_factor,
+     % this HbO*DPF_factor reconstruction is invariant to PVC (verified: identical
+     % rejection). Do NOT substitute a nominal DPF here — that would re-introduce
+     % the PVC scaling and make the QC over-reject on PVC-corrected data.
+     %
+     % KNOWN LIMITATION (not yet corrected): the hard-coded *3 assumes a 3 cm
+     % source-detector distance rather than the device's actual per-channel
+     % geometry, so uM-processed data reconstructed here is thresholded ~1.45x
+     % more aggressively than data processed natively in mM*mm. A geometry-aware
+     % reconstruction would need re-validation against Takizawa's mM*mm
+     % calibration before changing established rejection behavior.
      switch(fNIR.units)
          case 'uM'
              fHbO=fNIR.HbO*mean(fNIR.DPF_factor)*3/100; %pretends the data came from a 3cm detector

@@ -186,24 +186,19 @@ end
 globalStd = std(signal, 'omitnan');
 halfWin = floor(nMotion / 2);
 
-for i = 1:T
-    lo = max(1, i - halfWin);
-    hi = min(T, i + halfWin);
-    window = signal(lo:hi);
+% Vectorized moving-window criteria (replaces the per-sample loop). The loop
+% used a centered window signal(max(1,i-halfWin):min(T,i+halfWin)), i.e. a
+% window of length 2*halfWin+1 that SHRINKS at the edges (clamped, not filled).
+% movstd/movmax/movmin with default 'Endpoints','shrink' reproduce exactly
+% that: winStd == std(window,'omitnan') and ampChange == max-min over the same
+% window. movmax/movmin are exact; movstd matches per-window std to floating
+% point. ~O(T) vs the O(T*nMotion) loop.
+k = 2 * halfWin + 1;
+winStd    = movstd(signal, k, 0, 1, 'omitnan');
+ampChange = movmax(signal, k, 1, 'omitnan') - movmin(signal, k, 1, 'omitnan');
 
-    % Moving std criterion
-    winStd = std(window, 'omitnan');
-    if winStd > STDEVthresh * globalStd
-        artifactMask(i) = true;
-        continue;
-    end
-
-    % Amplitude change criterion
-    ampChange = max(window, [], 'omitnan') - min(window, [], 'omitnan');
-    if ampChange > AMPthresh
-        artifactMask(i) = true;
-    end
-end
+artifactMask = (winStd > STDEVthresh * globalStd) | (ampChange > AMPthresh);
+artifactMask = artifactMask(:);
 
 end
 

@@ -66,6 +66,10 @@ handles.output = hObject;
 % Update handles structure
 guidata(hObject, handles);
 
+% Force a separate, floating window (avoid R2026+ desktop auto-docking into
+% the main MATLAB window).
+set(hObject, 'WindowStyle', 'normal');
+
 pf2_base.applyLightTheme(hObject);
 
 global pf2ChannelCheck

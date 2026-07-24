@@ -266,7 +266,7 @@ classdef ChannelCheck < matlab.apps.AppBase
 
         function createComponents(app)
             % Figure
-            app.UIFigure = uifigure('Visible', 'off');
+            app.UIFigure = uifigure('Visible', 'off', 'WindowStyle', 'normal');
             app.UIFigure.Position = [100, 100, 1400, 900];
             app.UIFigure.Name = 'Channel Check';
             app.UIFigure.CloseRequestFcn = @(~,~) closeApp(app, true);

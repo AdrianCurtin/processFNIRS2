@@ -82,6 +82,27 @@ compliance with their terms.
 > applicable GPL terms explicit; the upstream license (GPLv2-or-later) was
 > confirmed against the official FastICA distribution.
 
+## 5. Colin27 Average Brain (derived surface assets)
+
+| Field | Value |
+|-------|-------|
+| **Component** | Colin27 stereotaxic average brain model. processFNIRS2 bundles two **derived** triangular surface meshes generated from it: a scalp/head surface and an intracranial (cortex) surface, both in MNI millimetre space. |
+| **Author / Origin** | D. Louis Collins, McConnell Brain Imaging Centre, Montreal Neurological Institute, McGill University. Packaged by Andrew Janke. Original single-subject average described in Holmes et al. (1998), *J Comput Assist Tomogr* 22(2):324–333, DOI: 10.1097/00004728-199803000-00032. |
+| **Version** | Colin27 linear (`colin27_t1_tal_lin`) release; © 1993–2009. |
+| **Upstream URL** | https://github.com/aces/mni-models_colin27-lin |
+| **License** | Permissive MIT/BSD-style: "Permission to use, copy, modify, and distribute this software and its documentation for any purpose and without fee is hereby granted, provided that the above copyright notice appear in all copies. The authors and McGill University make no representations about the suitability of this software for any purpose. It is provided 'as is' without express or implied warranty." GPL-compatible. |
+| **Path in this repo** | `assets/colin27_scalp.mat`, `assets/colin27_brain.mat` |
+| **Bundled license text** | Copyright/permission notice reproduced in this table (per the license's "copyright notice appear in all copies" requirement). |
+| **How it is used** | Anatomical head rendering in `pf2.probe.plot.showHead3D` (scalp + cortex surfaces in MNI space), loaded via `pf2_base.getAsset`. |
+
+> **Note (derivation):** the shipped `.mat` files are not the upstream files.
+> The scalp mesh was produced by marching-cubes of `colin27_t1_tal_lin_headmask.mnc`,
+> the cortex mesh by marching-cubes of `colin27_t1_tal_lin_mask.mnc`; both were
+> smoothed and decimated. Surfaces are placed in the standard MNI 1 mm
+> stereotaxic frame using the volumes' world affine; the colin27-lin →
+> ICBM152-2009a nonlinear residual (sub-centimetre) is not applied. Modification
+> and redistribution are expressly permitted by the license above.
+
 ---
 
 ## Formerly-bundled components replaced by original implementations

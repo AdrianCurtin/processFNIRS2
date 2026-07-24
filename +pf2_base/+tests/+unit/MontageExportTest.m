@@ -46,8 +46,8 @@ classdef MontageExportTest < matlab.unittest.TestCase
         function testBrodmannOff(testCase)
             tbl = pf2.probe.montage(testCase.data, 'Brodmann', false);
             testCase.verifyFalse(ismember('BA', tbl.Properties.VariableNames));
-            % Channel, Source, Detector, X/Y/Z_mni, SD_mm, ShortSep
-            testCase.verifyEqual(width(tbl), 8);
+            % Channel, ChannelLabel, Source, Detector, X/Y/Z_mni, SD_mm, ShortSep
+            testCase.verifyEqual(width(tbl), 9);
         end
 
         function testSourceDetectorColumns(testCase)

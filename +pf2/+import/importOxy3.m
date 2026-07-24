@@ -35,7 +35,7 @@ function [fNIR] = importOxy3(file, channelCheck, varargin)
 %
 % Inputs:
 %   file         - Filename or full path to a .oxy3 file [char | string]
-%                  If omitted, a file selection dialog opens.
+%                  If omitted or empty, a file selection dialog opens.
 %   channelCheck - Run channel quality check GUI after import (default: true)
 %                  Set false to skip interactive quality assessment.
 %   varargin     - Name-value options:
@@ -519,6 +519,14 @@ function [srcPos, detPos, label] = localGeometry(nCh, templatePath, templateID, 
 % placeholder layout. The placeholder leaves Z (3D) at zero so the device
 % reports no real MNI geometry (hasMNI stays false).
 srcPos = []; detPos = []; label = 'placeholder';
+% A template was explicitly requested but the (often relative) path does not
+% resolve: warn rather than silently dropping to placeholder geometry, so a
+% user who asked for real optode coordinates is not handed synthetic ones.
+if ~isempty(templatePath) && ~isfile(templatePath)
+    warning('pf2:importOxy3:templateNotFound', ...
+        ['OptodeTemplate ''%s'' not found (check the path is absolute or on ' ...
+         'the current folder); using placeholder geometry.'], char(templatePath));
+end
 if ~isempty(templatePath) && isfile(templatePath) && ~isnan(templateID)
     try
         [srcPos, detPos] = localParseTemplate(templatePath, templateID, nCh, xml);

@@ -26,9 +26,15 @@ classdef ProcessingContext < matlab.mixin.Copyable
     %
     % Properties:
     %   DPF Settings:
-    %     dpfMode       - 'None', 'Fixed', or 'Calc' (default: 'Calc')
+    %     dpfMode       - 'None', 'Fixed', 'Calc', or 'PPF' (default: 'Calc')
     %     dpfFixedValue - Fixed DPF value (default: 5.93)
     %     subjectAge    - Age for DPF calculation (default: 25)
+    %     pvc           - Partial-volume correction divisor (>=1) applied to the
+    %                     Fixed/Calc DPF: L = SD.*DPF./pvc. Get a principled
+    %                     value from pf2_base.fnirs.strangmanPVC. (default: [] ->1)
+    %     ppf           - Complete effective pathlength factor (escape hatch)
+    %                     used when dpfMode is 'PPF': L = SD.*ppf, no DPF/PVC.
+    %                     Scalar or per-wavelength [ppf1 ppf2]. (default: [])
     %
     %   Baseline Settings:
     %     baselineStartTime - Baseline start in seconds (default: 0)
@@ -81,9 +87,20 @@ classdef ProcessingContext < matlab.mixin.Copyable
 
     properties
         % DPF (Differential Pathlength Factor) settings
-        dpfMode (1,:) char {mustBeMember(dpfMode, {'None', 'Fixed', 'Calc'})} = 'Calc'
+        dpfMode (1,:) char {mustBeMember(dpfMode, {'None', 'Fixed', 'Calc', 'PPF'})} = 'Calc'
         dpfFixedValue (1,1) double {mustBePositive} = 5.93
         subjectAge (1,1) double {mustBePositive} = 25
+
+        % Partial-volume correction applied to the fixed or age-calculated DPF:
+        % L = SD.*DPF./pvc. Empty means 1 (no correction). A scalar or per-optode
+        % numeric vector (each >=1), or the string 'auto' for a per-channel value
+        % derived from each channel's separation (Strangman 2014). Left untyped
+        % so 'auto' and numeric forms are both accepted.
+        pvc = []
+
+        % Complete effective pathlength factor (escape hatch), used when
+        % dpfMode == 'PPF': L = SD.*ppf, with no DPF/PVC. Scalar or [ppf1 ppf2].
+        ppf (1,:) double = []
 
         % Baseline settings
         baselineStartTime (1,1) double = 0
@@ -225,6 +242,8 @@ classdef ProcessingContext < matlab.mixin.Copyable
             s.created = char(datetime('now', 'Format', 'yyyy-MM-dd''T''HH:mm:ss'));
             s.dpfMode = obj.dpfMode;
             s.dpfFixedValue = obj.dpfFixedValue;
+            s.pvc = obj.pvc;
+            s.ppf = obj.ppf;
             s.subjectAge = obj.subjectAge;
             s.baselineStartTime = obj.baselineStartTime;
             s.baselineLength = obj.baselineLength;
@@ -286,6 +305,12 @@ classdef ProcessingContext < matlab.mixin.Copyable
             end
             if isfield(PF2, 'curDPF_age')
                 obj.subjectAge = PF2.curDPF_age;
+            end
+            if isfield(PF2, 'pvc')
+                obj.pvc = PF2.pvc;
+            end
+            if isfield(PF2, 'ppf')
+                obj.ppf = PF2.ppf;
             end
 
             % Baseline settings
@@ -358,6 +383,8 @@ classdef ProcessingContext < matlab.mixin.Copyable
 
             if isfield(s, 'dpfMode'), obj.dpfMode = s.dpfMode; end
             if isfield(s, 'dpfFixedValue'), obj.dpfFixedValue = s.dpfFixedValue; end
+            if isfield(s, 'pvc'), obj.pvc = s.pvc; end
+            if isfield(s, 'ppf'), obj.ppf = s.ppf; end
             if isfield(s, 'subjectAge'), obj.subjectAge = s.subjectAge; end
             if isfield(s, 'baselineStartTime'), obj.baselineStartTime = s.baselineStartTime; end
             if isfield(s, 'baselineLength'), obj.baselineLength = s.baselineLength; end

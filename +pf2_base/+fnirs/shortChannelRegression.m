@@ -25,9 +25,21 @@ function fNIR = shortChannelRegression(fNIR, varargin)
 %          IsShortSeparation flags.
 %
 % Name-Value Parameters:
+%   'Space'      - Signal space in which to regress (default: 'Hb')
+%                  'Hb' - Regress the hemoglobin fields (.HbO/.HbR/...) AFTER
+%                         Beer-Lambert conversion (the historical behavior).
+%                  'OD' - Regress optical density BEFORE Beer-Lambert, per
+%                         wavelength (Brigadoi & Cooper 2015), so the conversion
+%                         does not amplify systemic residuals. Requires the
+%                         struct to carry raw-column OD as .OD with .odChannels
+%                         and .odWavelengths (delegates to
+%                         pf2_base.fnirs.shortChannelRegressionOD). In the
+%                         processFNIRS2 pipeline, prefer the 'ODShortRegression'
+%                         option, which wires OD-space SSR in automatically.
 %   'Method'     - Regression method (default: 'nearest')
 %                  'nearest' - Use closest short channel for each long channel
 %                  'pca'     - Use first N principal components of short channels
+%                              (Hb space only)
 %                  'all'     - Use all short channels as simultaneous regressors
 %   'Biomarkers' - Cell array of fields to correct (default: {'HbO','HbR'})
 %   'NumPCs'     - Number of PCs for 'pca' method (default: 1)
@@ -82,13 +94,48 @@ function fNIR = shortChannelRegression(fNIR, varargin)
 
 % --- Parse inputs ---
 p = inputParser;
+p.KeepUnmatched = true;   % pass through extra options to the OD delegate
 p.addRequired('fNIR', @isstruct);
+p.addParameter('Space', 'Hb', @(x) ischar(x) && ismember(lower(x), {'hb', 'od'}));
 p.addParameter('Method', 'nearest', @(x) ismember(x, {'nearest', 'pca', 'all'}));
 p.addParameter('Biomarkers', {'HbO', 'HbR'}, @iscell);
 p.addParameter('NumPCs', 1, @(x) isnumeric(x) && isscalar(x) && x >= 1);
 p.addParameter('ShortSepMax', [], @(x) isempty(x) || (isnumeric(x) && isscalar(x)));
 p.addParameter('CenterRegressors', false, @(x) isscalar(x) && (islogical(x) || ismember(x, [0 1])));
 p.parse(fNIR, varargin{:});
+
+% --- OD-space delegation (regress before Beer-Lambert) ---
+if strcmpi(p.Results.Space, 'OD')
+    if ~isfield(fNIR, 'OD') || ~isfield(fNIR, 'odChannels') || ~isfield(fNIR, 'odWavelengths')
+        error('pf2:ssr:odFieldsRequired', ...
+            ['Space=''OD'' requires the struct to carry raw-column optical ' ...
+             'density as .OD with .odChannels and .odWavelengths. In the ' ...
+             'processFNIRS2 pipeline use the ''ODShortRegression'' option instead.']);
+    end
+    if isfield(fNIR, 'device') && ~isempty(fNIR.device)
+        probeArg = fNIR.device;
+    else
+        probeArg = getProbeInfo(fNIR);
+    end
+    odOpts = [{'Method', p.Results.Method, ...
+               'ShortSepMax', p.Results.ShortSepMax, ...
+               'CenterRegressors', p.Results.CenterRegressors}, ...
+              namedValuePairs(p.Unmatched)];
+    fNIR.OD = pf2_base.fnirs.shortChannelRegressionOD(fNIR.OD, ...
+        fNIR.odChannels, fNIR.odWavelengths, probeArg, odOpts{:});
+    fNIR.ssrInfo.space = 'OD';
+    fNIR.ssrInfo.method = p.Results.Method;
+    return;
+end
+
+% KeepUnmatched is enabled only to forward extra options to the OD delegate
+% above; in the Hb-space path any unmatched name is a typo, so reject it here
+% (restoring the usual inputParser strictness for the common path).
+if ~isempty(fieldnames(p.Unmatched))
+    unknown = fieldnames(p.Unmatched);
+    error('pf2:ssr:unknownParameter', ...
+        'Unknown parameter(s): %s.', strjoin(unknown, ', '));
+end
 
 method = p.Results.Method;
 biomarkers = p.Results.Biomarkers;
@@ -205,6 +252,21 @@ end
 end
 
 %%_Subfunctions_________________________________________________________
+
+function pairs = namedValuePairs(s)
+% NAMEDVALUEPAIRS Flatten a struct of unmatched options into a {name,val,...} cell
+
+pairs = {};
+if ~isstruct(s)
+    return;
+end
+fn = fieldnames(s);
+for i = 1:numel(fn)
+    pairs{end+1} = fn{i};      %#ok<AGROW>
+    pairs{end+1} = s.(fn{i});  %#ok<AGROW>
+end
+
+end
 
 function y = regressOut(y, X, centerReg)
 % REGRESSOUT Remove signal explained by regressors from target

@@ -251,6 +251,65 @@ classdef Device
             tf = obj.probeInfo.Probe{1}.TableOpt.IsShortSeparation(:)';
         end
 
+        function [pos, labels] = sourcePositions(obj)
+        % SOURCEPOSITIONS Source optode MNI coordinates [nSrc x 3]
+        %
+        % Positions are returned as stored (MNI for MNI-registered montages),
+        % mirroring mniPositions(); no coordinate transform is applied. Returns
+        % empty [] if per-optode source/detector 3D positions are unavailable.
+        % Optional second output returns the source labels [nSrc x 1] string.
+            [pos, labels] = obj.sdTypePositions('Src');
+        end
+
+        function [pos, labels] = detectorPositions(obj)
+        % DETECTORPOSITIONS Detector optode MNI coordinates [nDet x 3]
+        %
+        % See sourcePositions() for the coordinate-frame caveat. Returns empty
+        % [] if positions are unavailable; optional second output is the
+        % detector labels [nDet x 1] string.
+            [pos, labels] = obj.sdTypePositions('Det');
+        end
+
+        function tf = hasSDPositions(obj)
+        % HASSDPOSITIONS True if per-optode source/detector 3D positions exist
+            tf = ~isempty(obj.sdTypePositions('Src')) || ...
+                 ~isempty(obj.sdTypePositions('Det'));
+        end
+
+    end
+
+    methods (Access = private)
+
+        function [pos, labels] = sdTypePositions(obj, which)
+        % SDTYPEPOSITIONS Positions/labels of one optode type from TableSD
+        %
+        % Inputs:
+        %   which - 'Src' selects sources; any other value selects detectors.
+        % Outputs:
+        %   pos    - [n x 3] Pos3D for the selected type ([] if unavailable).
+        %   labels - [n x 1] string labels ([] when pos is []).
+            pos = []; labels = strings(0, 1);
+            probe = obj.probeInfo.Probe{1};
+            if ~isfield(probe, 'TableSD'), return; end
+            tbl = probe.TableSD;
+            if ~istable(tbl) || ~all(ismember({'Pos3D_x', 'Pos3D_y', 'Pos3D_z', 'Type'}, ...
+                    tbl.Properties.VariableNames))
+                return;
+            end
+            isSrc = (tbl.Type == 'Src');
+            if strcmpi(which, 'Src'), sel = isSrc; else, sel = ~isSrc; end
+            p = [tbl.Pos3D_x(sel), tbl.Pos3D_y(sel), tbl.Pos3D_z(sel)];
+            if isempty(p) || all(p(:) == 0) || all(isnan(p(:)))
+                return;
+            end
+            pos = p;
+            if ismember('Label', tbl.Properties.VariableNames)
+                labels = string(tbl.Label(sel));
+            else
+                labels = strings(size(p, 1), 1);
+            end
+        end
+
     end
 
     methods (Static)
