@@ -214,6 +214,7 @@
 - **ClusterPermutationTest.m** — Adjacency computation, cluster finding, null distribution
 - **GroupStatsIndependenceTest.m** — group GLM subject-level aggregation, mixed-montage channel-label alignment, nuisance-regressor exclusion
 - **HyperscanningNullTest.m** — positive-metric null handling in `computeGroup`, per-element permutation denominator, `computeDyad` fs-mismatch rejection and timestamp alignment
+- **BuildOptodeTableTest.m** — `buildOptodeTable` schema contract: expected columns, OptodeNum sorting, source/detector recovery (NaN when unmatched), geometry-column omission, short-separation derivation
 
 ### GUI Refactoring
 - `updateCurrentDevice` consolidated: GUI and headless paths now delegate to shared `pf2_base.gui.updateCurrentDevice`
@@ -269,6 +270,10 @@
 **Motion correction & GUI:**
 - Fixed `pf2_MotionCorrectTDDR` returning an all-NaN channel for a constant / zero-variance segment — a zero robust spread made the Tukey biweight compute `0/0 = NaN` and poison the output; such segments now keep unit weights (there is nothing to repair)
 - Fixed `processFNIRS2_GUI` returning empty captured output — the output function guarded on `isfield(PF2,'data')`, but processed data lives at `PF2.GUIPF2.data` (`PF2.data` is never set), so `out = processFNIRS2_GUI(...)` silently dropped the processed stages
+
+**Import & device geometry:**
+- Fixed `pf2.import.importNIRX` marking dark (no-wavelength) columns as valid measurement channels — `TableCh.isCh` now excludes `isDark` columns, matching the toolbox-wide convention (`importOxy3`, `loadDeviceCfg`), so dark columns are no longer fed into OD→Hb conversion, SCI, or DOT channel geometry
+- Fixed `pf2_base.buildOptodeTable` returning `TableOpt` in input `ChannelList` order — it now sorts by `OptodeNum` to match `loadDeviceCfg`'s canonical schema, keeping per-channel geometry (SD, positions) aligned by channel number for downstream Beer-Lambert conversion; the source/detector lookup is also vectorized (was O(nCh²))
 
 **Export:**
 - Fixed `glmToTable` collapsing sessions for repeated-subject cohorts — session was reconstructed from a subject-only map, so two recordings for one participant in different sessions both exported under the last session; each recording's own session is now preserved

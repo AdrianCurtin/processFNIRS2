@@ -27,10 +27,11 @@ function TableOpt = buildOptodeTable(probe)
 %                                   source/detector index of each channel
 %
 % Outputs:
-%   TableOpt - nCh-row table with columns OptodeNum, SrcIdx, DetIdx,
-%              Pos2D_x/y/z (when 2D coords are present), Pos3D_x/y/z (when 3D
-%              coords are present), SD, IsShortSeparation. Position/SD columns
-%              are simply omitted when the source geometry is unavailable.
+%   TableOpt - nCh-row table (sorted by OptodeNum, matching loadDeviceCfg)
+%              with columns OptodeNum, SrcIdx, DetIdx, Pos2D_x/y/z (when 2D
+%              coords are present), Pos3D_x/y/z (when 3D coords are present),
+%              SD, IsShortSeparation. Position/SD columns are simply omitted
+%              when the source geometry is unavailable.
 %
 % Example:
 %   % Complete an in-memory NIRX probe so processFNIRS2 can resolve it
@@ -54,18 +55,16 @@ function TableOpt = buildOptodeTable(probe)
     TableOpt = table();
     TableOpt.OptodeNum = chList;
 
-    % Source / detector index per channel (first raw measurement of each channel)
+    % Source / detector index per channel. All wavelength rows of a channel
+    % share the same source/detector, so a single ismember lookup (first match
+    % per channel) is equivalent to scanning and avoids the O(nCh^2) find loop.
     src = nan(nCh, 1); det = nan(nCh, 1);
     if isfield(probe, 'TableCh') && istable(probe.TableCh) ...
             && all(ismember({'OptodeNumber','SourceIndex','DetectorIndex'}, ...
                             probe.TableCh.Properties.VariableNames))
-        for c = 1:nCh
-            idx = find(probe.TableCh.OptodeNumber == chList(c), 1);
-            if ~isempty(idx)
-                src(c) = probe.TableCh.SourceIndex(idx);
-                det(c) = probe.TableCh.DetectorIndex(idx);
-            end
-        end
+        [found, loc] = ismember(chList, probe.TableCh.OptodeNumber);
+        src(found) = probe.TableCh.SourceIndex(loc(found));
+        det(found) = probe.TableCh.DetectorIndex(loc(found));
     end
     TableOpt.SrcIdx = src;
     TableOpt.DetIdx = det;
@@ -95,5 +94,11 @@ function TableOpt = buildOptodeTable(probe)
     elseif ismember('SD', TableOpt.Properties.VariableNames)
         TableOpt.IsShortSeparation = TableOpt.SD < 2;
     end
+
+    % Canonical schema is sorted by OptodeNum (matches pf2_base.loadDeviceCfg),
+    % so downstream code that aligns per-channel vectors by channel number
+    % (e.g. Beer-Lambert SD/geometry lookup) sees a consistent order regardless
+    % of the input ChannelList order.
+    TableOpt = sortrows(TableOpt, 'OptodeNum');
 
 end

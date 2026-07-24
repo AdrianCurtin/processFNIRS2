@@ -271,11 +271,14 @@ for i=1:size(files,1)
 
             % Flag real-channel columns (the OD->Hb stage selects data(:,isCh)).
             % NIRX raw carries no time/marker columns, so every measurement is a
-            % channel; dark columns are those with no valid wavelength.
+            % channel; dark columns are those with no valid wavelength. Match the
+            % toolbox-wide convention (importOxy3, loadDeviceCfg): isCh EXCLUDES
+            % dark columns, so downstream consumers (processStageOD2Hb, qc.sci,
+            % dot.channelGeometry) never treat a dark column as a measurement.
             validCh=~isnan(device.Probe{p}.TableCh.OptodeNumber);
             device.Probe{p}.TableCh.isDark=(isnan(device.Probe{p}.TableCh.Wavelength) ...
                 | device.Probe{p}.TableCh.Wavelength==0) & validCh;
-            device.Probe{p}.TableCh.isCh=validCh(:);
+            device.Probe{p}.TableCh.isCh=validCh(:) & ~device.Probe{p}.TableCh.isDark(:);
 
             device.Probe{p}.SrcPos=table();
             device.Probe{p}.SrcPos.x_2d=device.Probe{p}.SrcPosX(:);
