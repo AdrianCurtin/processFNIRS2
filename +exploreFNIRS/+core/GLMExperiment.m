@@ -508,11 +508,22 @@ classdef GLMExperiment < exploreFNIRS.core.Experiment
         %   T = gx.betaTable('IncludeStats', true)
         %
         % Builds a table with one row per subject x condition x channel,
-        % containing beta weights and optionally t-stats/p-values.
+        % containing beta weights and optionally t-stats/p-values. A
+        % channel_label column ('S#_D#' or 'Ch#') is included by default
+        % after the Channel column when device information is available.
         %
         % Name-Value Parameters:
         %   Channels     - Channel indices (default: all)
         %   IncludeStats - Include tstat/pval columns (default: false)
+        %
+        % Notes:
+        %   - When gx.glm.conditions is empty, the exported Condition set is
+        %     auto-detected from the design matrix's regressor names,
+        %     EXCLUDING anything that looks like a nuisance/drift/aux
+        %     confound term (constant, intercept, drift/dct/legendre/poly,
+        %     short-separation, aux_*, motion, accel, cardiac, hr/heart,
+        %     resp, global/gsr) as well as any name declared in
+        %     gx.glm.auxNuisance. See groupStats for the same rule.
 
             if ~obj.isFitted
                 error('exploreFNIRS:core:GLMExperiment:betaTable', ...
@@ -533,9 +544,13 @@ classdef GLMExperiment < exploreFNIRS.core.Experiment
                 r1 = obj.subjectResults{1};
                 bio1 = obj.glm.biomarkers{1};
                 allNames = r1.results.(bio1).regressorNames;
-                conds = detectStimulusRegressors(allNames);
+                conds = detectStimulusRegressors(allNames, obj.glm.auxNuisance);
             end
 
+            % betaTable is per-recording, so resolve channel labels from EACH
+            % subject's own device inside the loop (below) -- mixed montages
+            % across subjects would otherwise be mislabeled with the first
+            % subject's labels.
             rows = {};
             for s = 1:length(obj.subjectResults)
                 sr = obj.subjectResults{s};
@@ -543,10 +558,25 @@ classdef GLMExperiment < exploreFNIRS.core.Experiment
                 bio1 = obj.glm.biomarkers{1};
                 nCh = size(sr.results.(bio1).beta, 2);
 
+                chanLabelsAll = [];
+                try
+                    chanLabelsAll = pf2.probe.channelLabels(d);
+                catch
+                    chanLabelsAll = [];
+                end
+
                 if isempty(channels)
                     chList = 1:nCh;
                 else
-                    chList = channels;
+                    % Clip requested channels to the montage size so an
+                    % out-of-range 'Channels' argument does not index past the
+                    % beta matrix (matches blockAvgToTable's defensive handling).
+                    chList = channels(channels >= 1 & channels <= nCh);
+                    if numel(chList) < numel(channels)
+                        warning('exploreFNIRS:GLMExperiment:betaTableChannelClip', ...
+                            'Dropped %d out-of-range channel index/indices (montage has %d channels).', ...
+                            numel(channels) - numel(chList), nCh);
+                    end
                 end
 
                 for c = 1:length(conds)
@@ -576,6 +606,13 @@ classdef GLMExperiment < exploreFNIRS.core.Experiment
                         row.Condition = string(condName);
                         row.Channel = ch;
 
+                        % Channel label ('S#_D#' or 'Ch#')
+                        if ~isempty(chanLabelsAll) && ch <= numel(chanLabelsAll)
+                            row.channel_label = chanLabelsAll(ch);
+                        else
+                            row.channel_label = string(sprintf('Ch%d', ch));
+                        end
+
                         % Beta per biomarker
                         for b = 1:length(obj.glm.biomarkers)
                             bio = obj.glm.biomarkers{b};
@@ -597,6 +634,341 @@ classdef GLMExperiment < exploreFNIRS.core.Experiment
             end
 
             T = struct2table([rows{:}]);
+        end
+
+
+        function stats = groupStats(obj, varargin)
+        % GROUPSTATS One-sample group t-test on first-level betas vs zero
+        %
+        % Tests whether the mean beta across subjects is significantly
+        % different from zero on a per-channel, per-condition basis. This is
+        % the standard second-level summary for a single-group design (one
+        % beta per subject per channel) and matches the "summary statistics"
+        % approach used in Homer3 and AnalyzIR. It is simpler and more
+        % interpretable than routing through statsFitLME for the
+        % single-group one-condition case.
+        %
+        % For designs with multiple groups or covariates, prefer the LME
+        % path (gx.statsFitLME or gx.plotLME) which accounts for random
+        % subject effects.
+        %
+        % Syntax:
+        %   stats = gx.groupStats()
+        %   stats = gx.groupStats('Correction', 'fdr')
+        %   stats = gx.groupStats('Contrast', 'ConditionA')
+        %   stats = gx.groupStats('Contrast', {'CondA', 'CondB'})
+        %
+        % Inputs:
+        %   (none required; all arguments are name-value pairs)
+        %
+        % Name-Value Parameters:
+        %   'Correction' - Multiple-comparison correction method applied
+        %                  across channels within each condition:
+        %                  'fdr'        - Benjamini-Hochberg FDR (default)
+        %                  'bonferroni' - Bonferroni correction
+        %                  'none'       - No correction
+        %   'Contrast'   - Condition name (char/string) or two-element cell
+        %                  {'CondA','CondB'} for a simple subtraction contrast
+        %                  beta = beta_CondA - beta_CondB (default: all
+        %                  conditions from betaTable are tested independently).
+        %   'Biomarker'  - Biomarker to test: 'HbO' (default) or 'HbR' or
+        %                  any biomarker in gx.glm.biomarkers.
+        %
+        % Outputs:
+        %   stats - Table with one row per (condition, channel). Columns:
+        %     condition       - Condition name [string]
+        %     channel         - Channel index into the union channel_label
+        %                       axis (see Notes on channel alignment) [double]
+        %     channel_label   - 'S#_D#' or 'Ch#' label [string]
+        %     n_subjects      - Number of SUBJECTS contributing a valid beta
+        %                       (repeated recordings of one subject are
+        %                       averaged first -- see Notes) [double]
+        %     mean_beta       - Mean first-level beta across subjects [double]
+        %     se_beta         - Standard error of the mean beta [double]
+        %     tstat           - One-sample t-statistic (H0: mean_beta = 0) [double]
+        %     df              - Degrees of freedom (n_subjects - 1) [double]
+        %     pval            - Two-sided uncorrected p-value [double]
+        %     pval_corrected  - p-value after 'Correction' across channels
+        %                       within each condition [double]
+        %
+        % Algorithm:
+        %   1. Resolve subject identity per recording from .info (SubjectID,
+        %      then participant_id, then subject, then Subject) and group
+        %      recordings that share an identity (e.g. repeated BIDS
+        %      runs/sessions of one participant).
+        %   2. Align channels across recordings by channel_label (union axis,
+        %      NaN-padded where a recording lacks a given channel) so
+        %      differing channel counts/montages do not crash the test.
+        %   3. Extract first-level betas for each condition/channel and,
+        %      within each subject, average across that subject's recordings
+        %      (omitnan) to get ONE beta per subject per channel.
+        %   4. For each (condition, channel), run a one-sample t-test vs 0
+        %      across subjects via pf2_base.compat.ttest.
+        %   5. Apply multiple-comparison correction across channels within
+        %      each condition using exploreFNIRS.fx.performFDR (BH) or
+        %      Bonferroni.
+        %
+        % Example:
+        %   [subjects, blockDefs] = pf2.import.sampleData.experiment('blocks');
+        %   gx = exploreFNIRS.core.GLMExperiment(subjects, blockDefs);
+        %   gx.fit();
+        %   stats = gx.groupStats('Correction', 'fdr');
+        %   disp(stats(stats.pval_corrected < 0.05, :))   % significant channels
+        %
+        %   % Subtraction contrast between two conditions
+        %   stats = gx.groupStats('Contrast', {'TaskA', 'TaskB'});
+        %
+        % Notes:
+        %   - Requires fit() to have been called first.
+        %   - SUBJECT AGGREGATION (behavior change): n_subjects and df now
+        %     count unique SUBJECTS, not recordings. If gx.subjects contains
+        %     multiple recordings for the same participant (repeated
+        %     runs/sessions), their betas are averaged into one value per
+        %     subject before the t-test -- previously each recording was
+        %     treated as an independent subject, inflating n_subjects/dof and
+        %     overstating significance. Subject identity is resolved from
+        %     .info.SubjectID, falling back to .info.participant_id,
+        %     .info.subject, then .info.Subject. If identity cannot be
+        %     resolved for any recording, groupStats warns
+        %     (pf2:GLMExperiment:noSubjectID) and falls back to the legacy
+        %     per-recording behavior.
+        %   - CHANNEL ALIGNMENT: subjects/recordings with different channel
+        %     counts (e.g. per-subject bad-channel rejection or mixed
+        %     montages) are aligned by channel_label rather than assumed to
+        %     share one channel INDEX axis; a subject missing a given
+        %     channel contributes NaN there instead of causing a dimension
+        %     error. When montages differ, a
+        %     exploreFNIRS:GLMExperiment:groupStats:mixedMontage warning
+        %     is issued.
+        %   - CONDITION AUTO-DETECTION: when 'Contrast' is not given and
+        %     gx.glm.conditions is empty, tested conditions are auto-detected
+        %     from the design matrix's regressor names, EXCLUDING anything
+        %     that looks like a nuisance/drift/aux confound term (constant,
+        %     intercept, drift/dct/legendre/poly, short-separation, aux_*,
+        %     motion, accel, cardiac, hr/heart, resp, global/gsr) as well as
+        %     any name declared in gx.glm.auxNuisance. Custom nuisance
+        %     regressors therefore never appear as spurious "conditions".
+        %   - When a subject has no beta for a given condition/channel (NaN
+        %     or missing regressor), that subject is excluded from the test
+        %     for that entry. n_subjects reflects the count after exclusion.
+        %   - For the Contrast two-condition form, the correction still runs
+        %     across channels (within the single contrast condition row).
+        %   - The LME path (statsFitLME / plotLME) remains the recommended
+        %     route when between-subject factors or covariates are present.
+        %
+        % See also: exploreFNIRS.core.GLMExperiment.betaTable,
+        %           exploreFNIRS.core.GLMExperiment.statsFitLME,
+        %           pf2_base.compat.ttest,
+        %           exploreFNIRS.fx.performFDR
+
+            if ~obj.isFitted
+                error('exploreFNIRS:core:GLMExperiment:groupStats', ...
+                    'Call fit() before groupStats()');
+            end
+
+            ip = inputParser;
+            addParameter(ip, 'Correction', 'fdr', @(x) ischar(x) || (isstring(x) && isscalar(x)));
+            addParameter(ip, 'Contrast',   [],    @(x) ischar(x) || isstring(x) || iscell(x));
+            addParameter(ip, 'Biomarker',  'HbO', @(x) ischar(x) || (isstring(x) && isscalar(x)));
+            parse(ip, varargin{:});
+
+            correction = lower(char(ip.Results.Correction));
+            contrast   = ip.Results.Contrast;
+            biomarker  = char(ip.Results.Biomarker);
+
+            if ~ismember(correction, {'fdr', 'bonferroni', 'none'})
+                error('exploreFNIRS:core:GLMExperiment:groupStats', ...
+                    'Correction must be ''fdr'', ''bonferroni'', or ''none''.');
+            end
+            if ~ismember(biomarker, obj.glm.biomarkers)
+                error('exploreFNIRS:core:GLMExperiment:groupStats', ...
+                    'Biomarker ''%s'' was not fitted. Available: %s.', ...
+                    biomarker, strjoin(obj.glm.biomarkers, ', '));
+            end
+
+            % --- Resolve conditions to test ---
+            allConds = obj.glm.conditions;
+            if isempty(allConds) && ~isempty(obj.subjectResults)
+                r1 = obj.subjectResults{1};
+                allNames = r1.results.(biomarker).regressorNames;
+                allConds = detectStimulusRegressors(allNames, obj.glm.auxNuisance);
+            end
+
+            isContrast = false;
+            if ~isempty(contrast)
+                if iscell(contrast) && numel(contrast) == 2
+                    isContrast = true;
+                    condA = char(contrast{1});
+                    condB = char(contrast{2});
+                    condNames = {sprintf('%s - %s', condA, condB)};
+                else
+                    condNames = {char(contrast)};
+                end
+            else
+                condNames = allConds;
+            end
+
+            % --- Resolve subject identity (aggregate repeated recordings) ---
+            % Multiple recordings of the same participant (e.g. repeated BIDS
+            % runs/sessions) must be averaged into ONE row per SUBJECT before
+            % the across-subjects one-sample t-test, otherwise n_subjects/dof
+            % are inflated by the number of recordings. Identity is resolved
+            % per-recording from .info, trying (in order) SubjectID,
+            % participant_id, subject, Subject. If identity cannot be
+            % determined for one or more recordings, fall back to treating
+            % each recording as an independent subject (legacy behavior) and
+            % warn.
+            [subjMap, nSubjects, subjFellBack] = resolveSubjectGrouping(obj.subjects);
+            if subjFellBack
+                warning('pf2:GLMExperiment:noSubjectID', ...
+                    ['Could not determine subject identity from .info ' ...
+                     '(checked SubjectID, participant_id, subject, Subject) ' ...
+                     'for one or more recordings; groupStats is falling back ' ...
+                     'to treating each RECORDING as an independent subject. ' ...
+                     'n_subjects/dof will be inflated if any recordings are ' ...
+                     'repeated runs/sessions of the same participant.']);
+            end
+
+            % --- Resolve channel labels and align channels by LABEL ---
+            % Recordings may come from different montages/rejection masks
+            % with different channel counts. Align on channel_label (union of
+            % all labels seen, in first-seen order) and NaN-pad recordings
+            % missing a given channel, rather than assuming a shared channel
+            % INDEX -- which previously crashed with a dimension mismatch
+            % whenever channel counts differed across subjects.
+            bio1 = obj.glm.biomarkers{1};
+            [masterLabels, chanIdxPerRecording, mixedMontage] = ...
+                alignChannelLabelsAcrossRecordings(obj.subjects, obj.subjectResults, ...
+                biomarker, bio1);
+            nCh = numel(masterLabels);
+
+            if mixedMontage
+                warning('exploreFNIRS:GLMExperiment:groupStats:mixedMontage', ...
+                    ['Subjects/recordings have different channel counts or ' ...
+                     'channel labels; channels are aligned by channel_label ' ...
+                     '(NaN-padded where a channel is absent for a given ' ...
+                     'subject/recording). Verify that channels sharing a ' ...
+                     'label are anatomically comparable across montages.']);
+            end
+
+            nRecordings = numel(obj.subjectResults);
+
+            % --- Collect per-recording betas per (condition, channel), then
+            %     aggregate recordings -> one row per SUBJECT ---
+            rows = {};
+            for ci = 1:numel(condNames)
+                condName = condNames{ci};
+
+                recBeta = nan(nRecordings, nCh);
+                for s = 1:nRecordings
+                    sr = obj.subjectResults{s};
+                    if ~isfield(sr.results, biomarker)
+                        continue;
+                    end
+                    betas = sr.results.(biomarker).beta;
+
+                    if isContrast
+                        idxA = find(strcmp(sr.regressorNames, condA), 1);
+                        idxB = find(strcmp(sr.regressorNames, condB), 1);
+                        if isempty(idxA) || isempty(idxB)
+                            continue;
+                        end
+                        rowVals = betas(idxA, :) - betas(idxB, :);
+                    else
+                        regIdx = find(strcmp(sr.regressorNames, condName), 1);
+                        if isempty(regIdx)
+                            continue;
+                        end
+                        rowVals = betas(regIdx, :);
+                    end
+
+                    recIdx = chanIdxPerRecording{s};
+                    nUse = min(numel(rowVals), numel(recIdx));
+                    recBeta(s, recIdx(1:nUse)) = rowVals(1:nUse);
+                end
+
+                % Average repeated recordings of the same subject (identified
+                % via subjMap) BEFORE the group t-test; omitnan so a channel
+                % missing in one run doesn't wipe out a value present in
+                % another run of the same subject.
+                betaMat = nan(nSubjects, nCh);
+                for u = 1:nSubjects
+                    recRows = recBeta(subjMap == u, :);
+                    if size(recRows, 1) == 1
+                        betaMat(u, :) = recRows;
+                    else
+                        betaMat(u, :) = mean(recRows, 1, 'omitnan');
+                    end
+                end
+
+                % --- Per-channel one-sample t-test (across SUBJECTS) ---
+                meanB = nan(1, nCh);
+                seB   = nan(1, nCh);
+                tst   = nan(1, nCh);
+                dfVec = nan(1, nCh);
+                pv    = nan(1, nCh);
+                nVec  = zeros(1, nCh);
+
+                for ch = 1:nCh
+                    b = betaMat(:, ch);
+                    b = b(~isnan(b));
+                    n = numel(b);
+                    nVec(ch) = n;
+                    if n < 2
+                        continue;
+                    end
+                    [~, p, ~, st] = pf2_base.compat.ttest(b);
+                    meanB(ch) = mean(b);
+                    seB(ch)   = std(b) / sqrt(n);
+                    tst(ch)   = st.tstat;
+                    dfVec(ch) = st.df;
+                    pv(ch)    = p;
+                end
+
+                % --- Multiple-comparison correction across channels ---
+                switch correction
+                    case 'fdr'
+                        validMask = ~isnan(pv);
+                        pvCorr = nan(1, nCh);
+                        if any(validMask)
+                            qv = exploreFNIRS.fx.performFDR(pv(validMask));
+                            pvCorr(validMask) = qv;
+                        end
+                    case 'bonferroni'
+                        % min(NaN,1)=1 would turn untested (NaN) channels into a
+                        % fabricated p=1, so correct only the valid entries and
+                        % leave untested ones NaN (matching the 'fdr' branch).
+                        validMask = ~isnan(pv);
+                        m = sum(validMask);
+                        pvCorr = nan(1, nCh);
+                        pvCorr(validMask) = min(pv(validMask) * m, 1);
+                    otherwise
+                        pvCorr = pv;
+                end
+
+                % --- Build output rows ---
+                for ch = 1:nCh
+                    r = struct();
+                    r.condition      = string(condName);
+                    r.channel        = ch;
+                    r.channel_label  = masterLabels(ch);
+                    r.n_subjects     = nVec(ch);
+                    r.mean_beta      = meanB(ch);
+                    r.se_beta        = seB(ch);
+                    r.tstat          = tst(ch);
+                    r.df             = dfVec(ch);
+                    r.pval           = pv(ch);
+                    r.pval_corrected = pvCorr(ch);
+                    rows{end+1} = r; %#ok<AGROW>
+                end
+            end
+
+            if isempty(rows)
+                error('exploreFNIRS:core:GLMExperiment:groupStats', ...
+                    'No conditions were found to test. Check fit() results and condition names.');
+            end
+
+            stats = struct2table([rows{:}]);
         end
 
 
@@ -1319,14 +1691,53 @@ function seg = aggregateBlockInfo(seg, blocks, groupField)
 end
 
 
-function stimRegs = detectStimulusRegressors(regressorNames)
-% DETECTSTIMULUSREGRESSORS Identify stimulus regressors by excluding nuisance
+function stimRegs = detectStimulusRegressors(regressorNames, extraExclude)
+% DETECTSTIMULUSREGRESSORS Identify task/condition regressors by excluding
+% nuisance, drift, and auxiliary confound terms.
+%
+% A regressor is auto-detected as a task CONDITION only when its name does
+% NOT match the nuisance pattern below and is not one of the names in
+% extraExclude (normally gx.glm.auxNuisance -- the Aux signals declared as
+% nuisance regressors). This keeps custom nuisance regressors (respiration,
+% cardiac, motion, short-separation, aux confounds) from appearing as
+% experimental conditions in betaTable()/groupStats() output.
+%
+% Nuisance pattern (case-insensitive), matched anywhere in the name unless
+% anchored with ^/$:
+%   constant, intercept          - GLM baseline/offset term
+%   drift, dct, legendre, poly   - drift/basis regressors
+%   short, ss, shortsep          - short-separation channel regressors
+%   aux_, nuisance               - generic aux/nuisance confound prefix
+%   motion, accel                - motion regressors
+%   cardiac, hr, heart           - cardiac/heart-rate regressors
+%   resp                         - respiration regressors
+%   global, gsr                  - global-signal/EDA regressors
+% plus the '_deriv'/'_disp' HRF-basis suffixes.
+
+    if nargin < 2 || isempty(extraExclude)
+        extraExclude = {};
+    end
 
     nuisancePatterns = {
         '^constant$'
-        '^drift_'
-        '^dct_'
-        '^short_ch'
+        '^intercept$'
+        'drift'
+        'dct'
+        'legendre'
+        'poly'
+        '^short'
+        '(^|_)ss($|_)'
+        'shortsep'
+        '^aux_'
+        'nuisance'
+        'motion'
+        'accel'
+        'cardiac'
+        '(^|_)hr($|_)'
+        'heart'
+        'resp'
+        'global'
+        'gsr'
         '_deriv$'
         '_disp$'
     };
@@ -1334,10 +1745,168 @@ function stimRegs = detectStimulusRegressors(regressorNames)
     isNuisance = false(size(regressorNames));
     for k = 1:length(nuisancePatterns)
         isNuisance = isNuisance | ~cellfun(@isempty, ...
-            regexp(regressorNames, nuisancePatterns{k}));
+            regexpi(regressorNames, nuisancePatterns{k}));
+    end
+
+    % Explicitly declared nuisance names (e.g. gx.glm.auxNuisance signal
+    % names) are excluded too, matched as an exact name or as the "aux_<name>"
+    % prefix used by collectAuxNuisance for design-matrix column names.
+    for k = 1:numel(extraExclude)
+        nm = extraExclude{k};
+        if isempty(nm), continue; end
+        isNuisance = isNuisance | strcmpi(regressorNames, nm) | ...
+            ~cellfun(@isempty, regexpi(regressorNames, ...
+            ['^aux_' regexptranslate('escape', char(nm)) '(_|$)']));
     end
 
     stimRegs = regressorNames(~isNuisance);
+end
+
+
+function [subjMap, nSubjects, fellBack] = resolveSubjectGrouping(subjects)
+% RESOLVESUBJECTGROUPING Map each recording to a unique-subject index
+%
+% Resolves subject identity per recording from .info, trying (in order)
+% SubjectID, participant_id, subject, Subject. Recordings sharing the same
+% resolved identity (e.g. repeated BIDS runs/sessions of one participant)
+% map to the same subject index. If identity cannot be resolved for ANY
+% recording, falls back to one group per recording (fellBack = true) so the
+% caller can warn and preserve the legacy per-recording behavior.
+%
+% Inputs:
+%   subjects - {1 x S} cell array of continuous fNIRS structs
+%
+% Outputs:
+%   subjMap   - [S x 1] index into 1:nSubjects for each recording
+%   nSubjects - Number of unique subjects (or S if fellBack)
+%   fellBack  - true if subject identity could not be resolved for one or
+%               more recordings
+
+    nRec = numel(subjects);
+    ids = strings(nRec, 1);
+    ok = true(nRec, 1);
+    for s = 1:nRec
+        info = struct();
+        if isfield(subjects{s}, 'info')
+            info = subjects{s}.info;
+        end
+        id = resolveSubjectID(info);
+        if strlength(id) == 0
+            ok(s) = false;
+        else
+            ids(s) = id;
+        end
+    end
+
+    fellBack = ~all(ok);
+    if fellBack
+        % One group per recording -- preserves prior per-recording behavior.
+        subjMap = (1:nRec)';
+        nSubjects = nRec;
+        return;
+    end
+
+    [~, ~, subjMap] = unique(ids, 'stable');
+    nSubjects = max(subjMap);
+end
+
+
+function id = resolveSubjectID(info)
+% RESOLVESUBJECTID Best-effort subject identifier from an .info struct
+%
+% Tries, in order: SubjectID, participant_id, subject, Subject. Returns ""
+% if none of these fields are present (or all are empty).
+
+    id = "";
+    candidateFields = {'SubjectID', 'participant_id', 'subject', 'Subject'};
+    for k = 1:numel(candidateFields)
+        fn = candidateFields{k};
+        if isfield(info, fn) && ~isempty(info.(fn))
+            id = string(info.(fn));
+            return;
+        end
+    end
+end
+
+
+function [masterLabels, chanIdxPerRecording, mixedMontage] = ...
+        alignChannelLabelsAcrossRecordings(subjects, subjectResults, biomarker, fallbackBio)
+% ALIGNCHANNELLABELSACROSSRECORDINGS Union channel-label axis across recordings
+%
+% Builds a master channel_label axis across all recordings (union of every
+% recording's labels, in first-seen order) and, for each recording, an index
+% vector mapping its own channel positions onto that master axis. This
+% replaces the previous assumption that all subjects share one channel INDEX
+% axis, which crashed with a dimension mismatch whenever channel counts
+% differed across recordings (e.g. per-subject bad-channel rejection or
+% mixed montages). Recordings missing a given labeled channel are simply
+% absent from that column (left NaN by the caller).
+%
+% Inputs:
+%   subjects       - {1 x S} cell array of continuous fNIRS structs (source
+%                    of pf2.probe.channelLabels)
+%   subjectResults - {1 x S} per-subject GLM result structs (source of the
+%                    fitted channel COUNT for `biomarker`)
+%   biomarker      - Requested biomarker name (e.g. 'HbO')
+%   fallbackBio    - Biomarker to fall back to if `biomarker` is missing for
+%                    a given recording (obj.glm.biomarkers{1})
+%
+% Outputs:
+%   masterLabels         - [nCh x 1] string array, the union channel-label axis
+%   chanIdxPerRecording  - {1 x S} cell array; chanIdxPerRecording{s} is a
+%                          [1 x nChS] vector mapping recording s's own
+%                          channel positions onto masterLabels
+%   mixedMontage         - true if any recording's channel count or label
+%                          set differs from the others
+
+    nRec = numel(subjectResults);
+    recLabels = cell(nRec, 1);
+    masterLabels = strings(0, 1);
+
+    for s = 1:nRec
+        sr = subjectResults{s};
+        if isfield(sr.results, biomarker)
+            nChS = size(sr.results.(biomarker).beta, 2);
+        elseif isfield(sr.results, fallbackBio)
+            nChS = size(sr.results.(fallbackBio).beta, 2);
+        else
+            recLabels{s} = strings(0, 1);
+            continue;
+        end
+
+        lbls = [];
+        if s <= numel(subjects)
+            try
+                lbls = pf2.probe.channelLabels(subjects{s});
+            catch
+                lbls = [];
+            end
+        end
+        if isempty(lbls) || numel(lbls) < nChS
+            lbls = arrayfun(@(c) string(sprintf('Ch%d', c)), 1:nChS);
+        else
+            lbls = string(lbls(1:nChS));
+        end
+        recLabels{s} = lbls(:);
+
+        masterLabels = [masterLabels; setdiff(lbls(:), masterLabels, 'stable')]; %#ok<AGROW>
+    end
+
+    nCh = numel(masterLabels);
+    chanIdxPerRecording = cell(1, nRec);
+    mixedMontage = false;
+    for s = 1:nRec
+        lbls = recLabels{s};
+        if isempty(lbls)
+            chanIdxPerRecording{s} = [];
+            continue;
+        end
+        [tf, idx] = ismember(lbls, masterLabels);
+        chanIdxPerRecording{s} = idx(:)';
+        if ~all(tf) || numel(lbls) ~= nCh || ~isequal(lbls(:), masterLabels(:))
+            mixedMontage = true;
+        end
+    end
 end
 
 

@@ -48,9 +48,33 @@ function result = computeGroup(data, pairs, varargin)
 %     .N         - Number of independent groups contributing each element
 %     .nValid    - Per-cell count of non-NaN values (group-mean level)
 %     .tstat     - One-sample t-statistic vs 0 (group-mean level). NaN where
-%                  fewer than 3 groups contribute (df < 2 is not interpretable).
+%                  fewer than 3 groups contribute (df < 2 is not interpretable),
+%                  AND for strictly non-negative coupling measures with no
+%                  per-dyad surrogate/null baseline available (see .nullTest).
 %     .pvalue    - P-value from one-sample t-test (group-mean level). NaN where
-%                  fewer than 3 groups contribute (see .tstat).
+%                  fewer than 3 groups contribute or a surrogate null is
+%                  required but unavailable (see .tstat, .nullTest).
+%     .nullTest  - How the vs-zero significance test was obtained:
+%                  'zero'      - classic one-sample t-test against 0. Valid
+%                                for signed measures (pearson/spearman/xcorr
+%                                Fisher-z; granger/partialcorr/mutualinfo/
+%                                transferentropy/hbica raw values), where 0
+%                                is the correct null-hypothesis value.
+%                  'surrogate' - per-dyad surrogate/null baselines were found
+%                                attached to the dyad results and the test was
+%                                run on (observed - baseline), which IS validly
+%                                centered at 0 under the null.
+%                  'skipped'   - the coupling measure (plv, imagcoherence,
+%                                wpli, wcoherence, coherence) is strictly
+%                                non-negative with a finite-sample null that is
+%                                NOT centered at 0 (e.g. independent-noise PLV
+%                                is reliably > 0), and no per-dyad surrogate
+%                                baseline was available, so the vs-zero test
+%                                was skipped (tstat/pvalue are NaN). A
+%                                pf2:computeGroup:surrogateNullRequired warning
+%                                is emitted; use
+%                                exploreFNIRS.hyperscanning.permutationTest or
+%                                exploreFNIRS.coupling.surrogateTest instead.
 %     .dyads     - Cell array of individual sub-dyad results
 %     .dyadIDs   - Cell array of sub-dyad ID strings
 %     .groupIDs  - Cell array of parent group ID strings (one per pairs entry)
@@ -116,6 +140,20 @@ function result = computeGroup(data, pairs, varargin)
         end
     end
     useFisherZ = ismember(methodName, {'pearson', 'spearman', 'xcorr'});
+
+    % Coupling measures whose magnitude is strictly non-negative and has no
+    % meaningful signed "zero" null: their finite-sample null distribution
+    % under independence (no true coupling) is NOT centered at zero (e.g. the
+    % mean PLV of two independent noise series over a narrow band is reliably
+    % > 0 -- 30 independent-noise dyads gave mean PLV = 0.192, t = 13.95,
+    % p = 2.15e-14 against a t-test-vs-0). A classic one-sample t-test of
+    % these RAW values against 0 is therefore invalid and yields spurious
+    % "significant" group results. Contrast the correlation-family measures
+    % (pearson/spearman/xcorr) above, whose Fisher-z is legitimately centered
+    % at 0 under independence, and Granger/mutual-info/etc., which the task
+    % of fixing this bug did not extend to. See the .nullTest output field.
+    strictlyPositiveNoZeroNull = {'plv', 'imagcoherence', 'wpli', 'wcoherence', 'coherence'};
+    isPositiveNoZeroNullMetric = ismember(methodName, strictlyPositiveNoZeroNull);
 
     % -----------------------------------------------------------------------
     % Expand each group into pairwise sub-dyads
@@ -320,6 +358,8 @@ function result = computeGroup(data, pairs, varargin)
 
     nVals = sum(~isnan(groupMeanStackR), nGroupDim);
 
+    nullTest = 'zero';  % overridden below for positive-metric branches
+
     if useFisherZ
         % groupMeanStackZ holds within-group Fisher-z means; run group
         % statistics in z-space (approximately Gaussian), then back-transform.
@@ -330,13 +370,63 @@ function result = computeGroup(data, pairs, varargin)
         % Back-transform SD/SEM to original scale (delta method approximation)
         sdVals  = zSD  .* (1 - meanVals.^2);
         semVals = zSEM .* (1 - meanVals.^2);
-        % T-test in z-space (where distribution is approximately normal)
+        % T-test in z-space (where distribution is approximately normal).
+        % Valid vs-zero test: Fisher-z of an independent-sample correlation
+        % IS centered at 0 under the null.
         tstat = zMean ./ max(zSEM, eps);
     else
         meanVals = mean(groupMeanStackR, nGroupDim, 'omitnan');
         sdVals   = std(groupMeanStackR, 0, nGroupDim, 'omitnan');
         semVals  = sdVals ./ sqrt(max(nVals, 1));
-        tstat = meanVals ./ max(semVals, eps);
+
+        if isPositiveNoZeroNullMetric
+            % See the "strictlyPositiveNoZeroNull" note above: a vs-0 t-test
+            % on raw PLV/|imag coherence|/wPLI/wavelet-coherence/coherence
+            % values is invalid. Only proceed if a per-dyad surrogate/null
+            % baseline is attached to the dyad results (inspected below); the
+            % PAIRED test of (observed - baseline) against 0 is then valid.
+            [hasNull, baselineDyadResults] = extractSurrogateBaseline(dyadResults);
+            if hasNull
+                [allSubDyadBaseline, ~, ~, ~] = ...
+                    exploreFNIRS.connectivity.alignMatrices(baselineDyadResults, align);
+                groupMeanBaselineStack = nan([spatialShape, nValidGroups]);
+                for gi = 1:nValidGroups
+                    g = uniqueValidGroups(gi);
+                    memberMask = (validGroupIdxs == g);
+                    gIdx  = [repmat({':'}, 1, length(spatialShape)), {gi}];
+                    sdIdx = [repmat({':'}, 1, length(spatialShape)), {memberMask}];
+                    subBase = allSubDyadBaseline(sdIdx{:});
+                    groupMeanBaselineStack(gIdx{:}) = mean(subBase, nDim, 'omitnan');
+                end
+                diffStack = groupMeanStackR - groupMeanBaselineStack;
+                diffMean  = mean(diffStack, nGroupDim, 'omitnan');
+                diffSD    = std(diffStack, 0, nGroupDim, 'omitnan');
+                diffSEM   = diffSD ./ sqrt(max(nVals, 1));
+                tstat = diffMean ./ max(diffSEM, eps);
+                nullTest = 'surrogate';
+            else
+                tstat = nan(size(meanVals));
+                nullTest = 'skipped';
+                warning('pf2:computeGroup:surrogateNullRequired', ...
+                    ['Method "%s" is a strictly non-negative coupling measure ' ...
+                     'whose finite-sample null under independence is NOT ' ...
+                     'centered at zero (e.g. mean PLV for independent noise ' ...
+                     'is reliably > 0), so a one-sample t-test against zero ' ...
+                     'produces spurious significance. No per-dyad surrogate/' ...
+                     'null baseline was found on the computeDyad results, so ' ...
+                     'the vs-zero significance test has been skipped ' ...
+                     '(tstat/pvalue are NaN for this metric). Use ' ...
+                     'exploreFNIRS.hyperscanning.permutationTest (dyad-shuffle ' ...
+                     'null) or exploreFNIRS.coupling.surrogateTest (within-dyad ' ...
+                     'circular-shift/phase-randomization null) to obtain a ' ...
+                     'valid significance test for "%s".'], methodName, methodName);
+            end
+        else
+            % Valid vs-zero test: e.g. Granger F, partial correlation, mutual
+            % information, transfer entropy -- signed or otherwise appropriately
+            % centered at 0 (or handled by their own within-method p-values).
+            tstat = meanVals ./ max(semVals, eps);
+        end
     end
 
     df = max(nVals - 1, 1);
@@ -370,6 +460,7 @@ function result = computeGroup(data, pairs, varargin)
     result.nValid  = squeeze(nVals);   % group-level count (matches N; documented)
     result.tstat   = squeeze(tstat);
     result.pvalue  = squeeze(pvalue);
+    result.nullTest = nullTest;
     result.dyads   = dyadResults;
     result.dyadIDs = dyadIDs;
 
@@ -406,5 +497,76 @@ function result = computeGroup(data, pairs, varargin)
     if nGroupsForInference < 3
         fprintf(['  NOTE: Only %d independent groups for inference. ', ...
             'Statistics are exploratory only.\n'], nGroupsForInference);
+    end
+    if strcmp(nullTest, 'skipped')
+        fprintf(['  NOTE: vs-zero significance test skipped for "%s" ' ...
+            '(see pf2:computeGroup:surrogateNullRequired warning above).\n'], ...
+            methodName);
+    end
+end
+
+
+function [available, baselineDyadResults] = extractSurrogateBaseline(dyadResults)
+% EXTRACTSURROGATEBASELINE Look for a per-dyad surrogate/null baseline
+%
+% Inspects each valid sub-dyad's computeDyad result for an attached
+% surrogate/null baseline (same shape as .values), so that strictly
+% non-negative coupling measures (PLV, |imaginary coherence|, wPLI,
+% wavelet coherence, coherence) can be tested against that baseline instead
+% of an invalid vs-zero t-test. Recognized fields (checked per sub-dyad, in
+% order): a top-level 'surrogateBaseline' or 'nullMean' field, or a nested
+% 'surrogate.nullMean' struct field -- the shapes computeDyad or
+% exploreFNIRS.coupling.surrogateTest results would carry if/when a
+% per-dyad null is attached. As of this version, exploreFNIRS.hyperscanning.
+% computeDyad does NOT attach any such baseline (its .pvalues field is NaN
+% for these methods and defers significance to
+% exploreFNIRS.hyperscanning.permutationTest or
+% exploreFNIRS.coupling.surrogateTest instead), so `available` will be
+% false in current usage; this helper exists so a future per-dyad
+% surrogate baseline is picked up automatically without further changes
+% here.
+%
+% Inputs:
+%   dyadResults - Cell array of valid computeDyad result structs
+%
+% Outputs:
+%   available            - True only if EVERY sub-dyad carries a
+%                           recognized baseline matching the shape of its
+%                           own .values
+%   baselineDyadResults  - Copy of dyadResults with .values replaced by the
+%                           extracted baseline (suitable for
+%                           exploreFNIRS.connectivity.alignMatrices); {}
+%                           when available is false
+
+    available = false;
+    baselineDyadResults = {};
+    n = numel(dyadResults);
+    if n == 0
+        return;
+    end
+
+    baseline = cell(n, 1);
+    for s = 1:n
+        r = dyadResults{s};
+        found = [];
+        if isfield(r, 'surrogateBaseline') && isequal(size(r.surrogateBaseline), size(r.values))
+            found = r.surrogateBaseline;
+        elseif isfield(r, 'nullMean') && isequal(size(r.nullMean), size(r.values))
+            found = r.nullMean;
+        elseif isfield(r, 'surrogate') && isstruct(r.surrogate) && ...
+                isfield(r.surrogate, 'nullMean') && ...
+                isequal(size(r.surrogate.nullMean), size(r.values))
+            found = r.surrogate.nullMean;
+        end
+        if isempty(found)
+            return;  % at least one sub-dyad lacks baseline info -> unavailable
+        end
+        baseline{s} = found;
+    end
+
+    available = true;
+    baselineDyadResults = dyadResults;
+    for s = 1:n
+        baselineDyadResults{s}.values = baseline{s};
     end
 end

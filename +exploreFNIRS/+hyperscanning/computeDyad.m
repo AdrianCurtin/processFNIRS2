@@ -4,6 +4,17 @@ function result = computeDyad(dataA, dataB, varargin)
 % Computes inter-brain synchrony between two fNIRS datasets by calculating
 % coupling between corresponding (or all) channel/ROI pairs across subjects.
 %
+% TIME ALIGNMENT: the two recordings must share a sampling rate to within a
+% small relative tolerance (0.1%); a coarser mismatch raises
+% pf2:computeDyad:fsMismatch. The overlapping time window is then aligned by
+% linear interpolation of BOTH signals onto a single shared time grid, rather
+% than assuming sample k of A and sample k of B occur simultaneously and
+% simply trimming both to the shorter sample count. Index-based trimming
+% silently turns clock offset/drift between two independently-clocked
+% acquisition computers into spurious phase lag (inflating/deflating
+% PLV/coherence/wPLI) or an apparent Granger-causality direction that has
+% nothing to do with the subjects' actual coupling.
+%
 % Syntax:
 %   result = exploreFNIRS.hyperscanning.computeDyad(dataA, dataB)
 %   result = exploreFNIRS.hyperscanning.computeDyad(dataA, dataB, ...
@@ -17,7 +28,11 @@ function result = computeDyad(dataA, dataB, varargin)
 % Name-Value Parameters:
 %   Method          - Coupling method: 'pearson' (default), 'spearman', 'xcorr',
 %                     'coherence', 'wcoherence', 'granger', 'transferentropy',
-%                     'partialcorr', 'mutualinfo'
+%                     'partialcorr', 'mutualinfo', 'plv', 'imagcoherence', 'wpli'
+%                     Note: 'imagcoherence' and 'wpli' are insensitive to zero-lag
+%                     volume-conduction / shared-signal confounds and are the
+%                     recommended methods for fNIRS hyperscanning. 'plv' measures
+%                     total phase synchrony but does not suppress zero-lag confounds.
 %   Biomarker       - 'HbO' (default), 'HbR', 'HbTotal', 'HbDiff', 'CBSI'
 %   ChannelPairing  - How to pair channels/ROIs across subjects:
 %                     'same' (default) - same index (Ca=Cb)
@@ -38,7 +53,12 @@ function result = computeDyad(dataA, dataB, varargin)
 % Outputs:
 %   result - Struct with fields:
 %     .values     - [N x 1] coupling values for 'same', [Na x Nb] for 'all'
-%     .pvalues    - Same size as .values, p-values
+%     .pvalues    - Same size as .values, p-values. NaN for the phase methods
+%                   ('plv','imagcoherence','wpli') and 'wcoherence', which defer
+%                   significance to a permutation/surrogate test - use
+%                   exploreFNIRS.hyperscanning.permutationTest (inter-brain) or
+%                   exploreFNIRS.coupling.surrogateTest (within-subject) rather
+%                   than filtering on these NaN p-values.
 %     .channelsA  - Channel/ROI indices for subject A
 %     .channelsB  - Channel/ROI indices for subject B
 %     .labels     - Cell array of labels (ROI names when UseROI=true)
@@ -144,9 +164,24 @@ function result = computeDyad(dataA, dataB, varargin)
     fsA = dataA.fs;
     fsB = dataB.fs;
 
-    if abs(fsA - fsB) > 0.01
-        error('exploreFNIRS:hyperscanning:computeDyad', ...
-            'Sampling rates differ (%.2f vs %.2f Hz). Resample data to matching rates before computing dyad coupling.', fsA, fsB);
+    % Reject sampling-rate mismatches beyond a small relative tolerance.
+    % Trimming both recordings to a common SAMPLE COUNT (the previous
+    % behavior) implicitly assumes sample k of A and sample k of B occur at
+    % the same instant; even a fraction-of-a-Hz fs mismatch accumulates into
+    % many samples of drift over a multi-minute recording, which then shows
+    % up as spurious phase lag or Granger direction rather than genuine
+    % inter-brain coupling. A relative (not absolute) tolerance is used so the
+    % check is meaningful across both low-fs (e.g. ~2 Hz) and high-fs (e.g.
+    % ~50 Hz) devices.
+    fsTol = 0.001;  % 0.1% relative tolerance
+    fsRef = max(fsA, fsB);
+    if fsRef <= 0 || abs(fsA - fsB) / fsRef > fsTol
+        error('pf2:computeDyad:fsMismatch', ...
+            ['Sampling rates differ beyond tolerance (%.4f vs %.4f Hz, ' ...
+             '%.3f%% relative difference; tolerance %.2f%%). Resample both ' ...
+             'recordings to a common rate (e.g. pf2.data.resample) before ' ...
+             'computing dyad coupling.'], ...
+            fsA, fsB, 100 * abs(fsA - fsB) / max(fsRef, eps), 100 * fsTol);
     end
     fs = fsA;
 
@@ -159,16 +194,28 @@ function result = computeDyad(dataA, dataB, varargin)
         tEnd = min(tEnd, opts.TimeWindow(2));
     end
 
-    maskA = timeA >= tStart & timeA <= tEnd;
-    maskB = timeB >= tStart & timeB <= tEnd;
+    if ~(tEnd > tStart)
+        error('exploreFNIRS:hyperscanning:computeDyad', ...
+            'No overlapping time window between the two recordings.');
+    end
 
-    sigA = sigA(maskA, :);
-    sigB = sigB(maskB, :);
+    % Align onto a COMMON time grid via interpolation, rather than masking
+    % each recording's own time vector and then trimming to the shorter
+    % SAMPLE COUNT. The previous trim-based approach assumed the i-th sample
+    % of A's masked window and the i-th sample of B's masked window are
+    % simultaneous, which only holds if both recordings share an identical
+    % t0 and sampling grid; any clock offset between the two acquisition
+    % systems (common in hyperscanning setups using two separate computers)
+    % is silently reinterpreted as a lag between the two brains' signals.
+    % Interpolating both signals onto one shared time vector (built at the
+    % now tolerance-matched common fs) removes that assumption.
+    nGrid = max(2, floor((tEnd - tStart) * fs) + 1);
+    commonTime = tStart + (0:nGrid - 1)' / fs;
 
-    % Ensure equal length (trim to shorter)
-    nSamples = min(size(sigA, 1), size(sigB, 1));
-    sigA = sigA(1:nSamples, :);
-    sigB = sigB(1:nSamples, :);
+    sigA = interp1(timeA, sigA, commonTime, 'linear');
+    sigB = interp1(timeB, sigB, commonTime, 'linear');
+
+    nSamples = size(sigA, 1);
 
     if nSamples < 10
         error('exploreFNIRS:hyperscanning:computeDyad', ...
@@ -441,9 +488,15 @@ function fn = getCouplingFn(method)
             fn = @exploreFNIRS.coupling.partialCorr;
         case 'mutualinfo'
             fn = @exploreFNIRS.coupling.mutualInfo;
+        case 'plv'
+            fn = @exploreFNIRS.coupling.plv;
+        case 'imagcoherence'
+            fn = @exploreFNIRS.coupling.imagCoherence;
+        case 'wpli'
+            fn = @exploreFNIRS.coupling.wpli;
         otherwise
             error('exploreFNIRS:hyperscanning:computeDyad', ...
-                'Unknown coupling method "%s". Use: pearson, spearman, xcorr, coherence, wcoherence, granger, transferentropy, hbica, partialcorr, mutualinfo', method);
+                'Unknown coupling method "%s". Use: pearson, spearman, xcorr, coherence, wcoherence, granger, transferentropy, hbica, partialcorr, mutualinfo, plv, imagcoherence, wpli', method);
     end
 end
 

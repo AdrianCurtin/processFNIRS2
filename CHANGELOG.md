@@ -212,6 +212,8 @@
 - **TDSEPTest.m** — TDSEP mixing recovery, dimensionality reduction, reconstruction
 - **GraphMetricsTest.m** — Graph theory metrics on known topologies (K5, star, ring, block-diagonal)
 - **ClusterPermutationTest.m** — Adjacency computation, cluster finding, null distribution
+- **GroupStatsIndependenceTest.m** — group GLM subject-level aggregation, mixed-montage channel-label alignment, nuisance-regressor exclusion
+- **HyperscanningNullTest.m** — positive-metric null handling in `computeGroup`, per-element permutation denominator, `computeDyad` fs-mismatch rejection and timestamp alignment
 
 ### GUI Refactoring
 - `updateCurrentDevice` consolidated: GUI and headless paths now delegate to shared `pf2_base.gui.updateCurrentDevice`
@@ -241,6 +243,48 @@
 - Fixed `ChannelCheck` QC tooltip referencing non-existent `pctSaturated` field instead of `totalPct`
 - Fixed `ChannelCheck` ambient/marker/reference lines accumulating on mini-plots during repeated redraws
 - Eliminated repeated "Converting legacy struct to PipelineFunction" warnings during processing — `pf2_unpackMethod` now converts structs to PipelineFunction objects at unpack time (single canonical conversion point); `processStageRaw2OD` and `processStageFilterHb` retain silent fallback only as a safety net; `pf2.methods.raw.create` and `pf2.methods.oxy.create` pass methods through `pf2_unpackMethod` before memory storage
+
+**GLM & design matrix:**
+- Fixed FIR-basis designs silently producing invalid inference — `buildDesignMatrix` skipped its rank/condition check in exactly the guaranteed-rank-deficient case (more FIR lag columns than time samples), and `fitGLM` reported negative degrees of freedom from a raw `T - P`. The condition-number check now always runs for FIR bases (`pf2:buildDesignMatrix:firNearSingular`), `fitGLM` uses the design's effective rank (`pf2:fitGLM:rankDeficient`), and rank-deficient fits return NaN t-stats/p-values instead of a nonsensical negative-dof test
+- Fixed FIR designs silently ignoring event amplitude and duration — a non-default amplitude/duration under a FIR basis now warns `pf2:buildDesignMatrix:firIgnoresAmplitude` (FIR still models onset timing only)
+- Fixed `fitGLM` erroring for `Method='OLS'` when an `AROrder` was supplied — AR order applies only to AR-IRLS; OLS now warns (`pf2:fitGLM:arOrderIgnored`) and ignores it. `AROrder` also accepts a string scalar
+- Fixed `GLMExperiment.groupStats` treating every recording as an independent subject — multiple runs/sessions per participant inflated the subject count, degrees of freedom, and significance. Betas are now averaged within subject before the group-level test; subject identity resolves from `.info` (`SubjectID`/`participant_id`/…) with a `pf2:GLMExperiment:noSubjectID` warning and per-recording fallback when unavailable
+- Fixed `GLMExperiment.groupStats` crashing on mixed montages — subjects with differing channel counts now align on a common channel-label axis (NaN-padded) instead of raising a dimension-mismatch error
+- Fixed `GLMExperiment` promoting arbitrary nuisance regressors (drift, short-channel, aux/physio, motion, cardiac, respiration) to reported task conditions — condition auto-detection now excludes nuisance/aux/drift terms and anything declared in `glm.auxNuisance`
+
+**Hemoglobin conversion:**
+- Fixed case-sensitive `DPFmode` handling — the value was accepted case-insensitively at the front door but compared case-sensitively downstream, so e.g. `'ppf'` silently fell through to calculated DPF instead of selecting the PPF escape hatch. `DPFmode` is now canonicalized at every entry point (`processFNIRS2`, `processFNIRS2_GUI`) and compared case-insensitively in `processStageOD2Hb`
+- Fixed `bvoxy` silently mishandling a malformed `PartialPathlengthFactor` — a vector longer than two elements was cut to its first two, and a NaN propagated into all HbO/HbR. PPF must now be scalar or exactly two finite positive values, else `pf2_base:fnirs:bvoxy:badPPF`
+- Fixed automatic partial-volume correction (`PVC='auto'`) silently clamping short-separation channels to the Strangman model's 20 mm bound — out-of-range separations now warn `pf2_base:fnirs:processStageOD2Hb:pvcExtrapolated`, naming the affected channels
+- Fixed the GUI `ODShortRegression` option being accepted but silently ignored — it now applies OD-space short-channel regression before Beer-Lambert, matching the headless `processFNIRS2` path
+
+**Group coupling & hyperscanning:**
+- Fixed invalid group significance for strictly-positive coupling metrics — `computeGroup` tested raw PLV / imaginary coherence / wPLI / (w)coherence against a zero null, but their finite-sample null is positive (independent noise produced spuriously significant "coupling"). These metrics no longer use the zero-null t-test; they require a surrogate/permutation null (else return NaN with `pf2:computeGroup:surrogateNullRequired`), and a new `result.nullTest` field records the path taken
+- Fixed anti-conservative `permutationTest` p-values — per-element NaN surrogates were counted as non-exceedances while remaining in the denominator; exceedance count and denominator are now computed per element over the non-NaN surrogates
+- Fixed `computeDyad` treating unaligned recordings as synchronized — it clipped each recording independently and trimmed to equal sample counts while tolerating small sampling-rate differences, so clock offset/drift became artificial phase lag or Granger direction. It now errors on an fs mismatch (`pf2:computeDyad:fsMismatch`, 0.1% tolerance) and interpolates both signals onto a shared time grid
+- Fixed `coupling.surrogateTest` returning an all-NaN null when the signal contained any missing sample — the original signal was phase-randomized and FFT'd with NaNs in place; inputs are now NaN-filled before surrogate generation, matching the other coupling metrics
+- Fixed `coupling.wpli` non-debiased output returning a signed ratio instead of magnitude wPLI, and mislabeling the debiased estimator — `Debiased=false` now returns magnitude wPLI in [0,1], and a `result.estimator` field records `'wpli'` vs `'debiased-squared-wpli'` (the default, an estimator of *squared* wPLI per Vinck et al. 2011)
+- Fixed `coupling.granger` F-test subtracting an intercept degree of freedom that was never fit — the denominator dof now matches the actual model parameters
+
+**Motion correction & GUI:**
+- Fixed `pf2_MotionCorrectTDDR` returning an all-NaN channel for a constant / zero-variance segment — a zero robust spread made the Tukey biweight compute `0/0 = NaN` and poison the output; such segments now keep unit weights (there is nothing to repair)
+- Fixed `processFNIRS2_GUI` returning empty captured output — the output function guarded on `isfield(PF2,'data')`, but processed data lives at `PF2.GUIPF2.data` (`PF2.data` is never set), so `out = processFNIRS2_GUI(...)` silently dropped the processed stages
+
+**Export:**
+- Fixed `glmToTable` collapsing sessions for repeated-subject cohorts — session was reconstructed from a subject-only map, so two recordings for one participant in different sessions both exported under the last session; each recording's own session is now preserved
+- Fixed headless export opening a GUI file picker when no output path was supplied — `asSNIRF`/`asNIR`/`asBIDS`/`asTensor` now raise a clear `pf2:export:<fn>:noPath[Root]Headless` error under `-batch` instead of a low-level dialog failure
+- Added input validation to `blockAvgToTable` — out-of-range `Channels` or a malformed `TimeWindow` now error (`pf2:export:blockAvgToTable:badChannel` / `:badWindow`) instead of silently dropping data or hitting a raw indexing error
+
+### Breaking Changes
+- **`GLMExperiment.groupStats` aggregates to one value per subject.** `n_subjects` and degrees of freedom for cohorts with multiple recordings per participant will change (previously inflated by counting each recording); `stats.channel`/`channel_label` now index a montage-union label axis when channel counts differ across subjects
+- **Group coupling significance for positive-valued metrics is gated on a surrogate null.** `computeGroup` no longer reports vs-zero t-tests for PLV, imaginary coherence, wPLI, or (w)coherence; without a surrogate/permutation null these return NaN p-values with a `surrogateNullRequired` warning. Use `permutationTest` or `coupling.surrogateTest`
+- **`computeDyad` errors on sampling-rate mismatch** beyond 0.1% (previously tolerated); aligned sample values may shift slightly because both signals are now interpolated onto a shared time grid
+- **`coupling.wpli` with `Debiased=false` returns magnitude wPLI in [0,1]** (previously a signed ratio in [-1,1]); the default debiased output is documented as an estimator of *squared* wPLI and carries a `result.estimator` label
+- **`coupling.granger` p-values shift marginally** (denominator degrees of freedom corrected)
+- **`bvoxy` rejects a malformed `PartialPathlengthFactor`** (wrong length or non-finite) with `pf2_base:fnirs:bvoxy:badPPF` instead of silently truncating or propagating NaN
+- **Headless export without an explicit path now errors** (`asSNIRF`/`asNIR`/`asBIDS`/`asTensor`) instead of opening a dialog; `asSNIRF({...})` without a path performs directory batch export (the earlier single-file save-dialog behavior is gone)
+- **`pf2_base.fnirs.calcLocalCV` removed** — its logic lives as file-local subfunctions inside the SMAR functions; the standalone package function was unused
+- **`permutationTest` p-values may increase** (become less significant) where a null distribution contained partial NaNs — the previous values were anti-conservative
 
 ---
 

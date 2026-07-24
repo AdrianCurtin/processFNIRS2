@@ -113,7 +113,18 @@ if isfield(data, 'HbO') && isfield(data, 'HbR')
         fHbT = fHbO + fHbR;
     end
 
-    % Unit conversion if needed
+    % Unit conversion if needed. DPF_factor is the *effective* pathlength factor
+    % actually applied (DPF, or DPF/PVC under partial-volume correction). PVC
+    % inflates HbO by the same factor it divides out of DPF_factor, so this
+    % HbO*DPF_factor reconstruction is invariant to PVC (verified: identical
+    % rejection) — do NOT substitute a nominal DPF, which would over-reject on
+    % PVC-corrected data.
+    % KNOWN LIMITATION (not yet corrected): the hard-coded * 3 assumes a 3 cm
+    % source-detector distance rather than the device's actual per-channel
+    % geometry, so uM-processed data reconstructed here is thresholded ~1.45x
+    % more aggressively than data processed natively in mM*mm. A geometry-aware
+    % reconstruction would need re-validation against Takizawa's mM*mm
+    % calibration before changing established rejection behavior.
     if isfield(data, 'units') && strcmp(data.units, 'uM')
         dpf = 1;
         if isfield(data, 'DPF_factor')

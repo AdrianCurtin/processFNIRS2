@@ -158,6 +158,16 @@ function corrected = tddr_core(signal, sample_rate)
         % Step 3c. Robust estimate of standard deviation of the residuals
         sigma = 1.4826 * median(dev);
 
+        % Guard: a zero (or non-finite) robust spread means the derivative has
+        % no dispersion to repair — e.g. a constant/DC segment. Leaving this
+        % unguarded makes r = dev/(sigma*tune) evaluate to 0/0 = NaN, which
+        % poisons the weights and returns an all-NaN channel. There are no
+        % outliers to downweight, so keep unit weights and stop.
+        if ~(sigma > 0)
+            w = ones(size(deriv));
+            break;
+        end
+
         % Step 3d. Scale deviations by standard deviation and tuning parameter
         r = dev / (sigma * tune);
 

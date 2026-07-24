@@ -29,10 +29,19 @@ function result = permutationTest(data, pairs, varargin)
 %     .nullDist    - [nPerms x nElements] null distribution
 %     .nullMean    - Mean of null distribution
 %     .nullSD      - SD of null distribution
-%     .pvalue      - Permutation p-values (proportion of null >= observed)
+%     .pvalue      - Permutation p-values (proportion of null >= observed),
+%                    computed PER ELEMENT: both the exceedance count and the
+%                    denominator use only that element's own non-NaN
+%                    surrogate values (a permutation that produced NaN for
+%                    one channel/pair does not affect other elements'
+%                    p-values, and does not inflate this element's
+%                    denominator without also being eligible as an
+%                    exceedance)
 %     .pvalueFDR   - FDR-corrected p-values
 %     .significant - Logical mask of significant elements (after FDR)
-%     .nPerms      - Number of permutations completed
+%     .nPerms      - Number of permutations completed (rows of nullDist not
+%                    entirely NaN; individual elements may have fewer valid
+%                    surrogates -- see .pvalue)
 %     .zScore      - Z-score of observed vs null
 %
 % Algorithm:
@@ -40,7 +49,9 @@ function result = permutationTest(data, pairs, varargin)
 %     1. Randomly re-pair subjects (shuffle which B goes with which A)
 %     2. Compute group mean coupling with shuffled pairs
 %     3. Store in null distribution
-%   P-value = (# null >= observed + 1) / (nPerms + 1)
+%   For each element e independently:
+%     nValid(e) = count of non-NaN nullDist(:, e)
+%     P(e) = (# {|null(:,e)| >= |observed(e)|, non-NaN} + 1) / (nValid(e) + 1)
 %
 % References:
 %   Phipson, B. & Smyth, G. K. (2010). Permutation P-values should never
@@ -163,20 +174,44 @@ function result = permutationTest(data, pairs, varargin)
         fprintf('done.\n');
     end
 
-    % Remove failed permutations
+    % Drop permutations that failed for EVERY element (kept only so nPerms /
+    % result.nPerms reports a sane "attempted successfully" count). Do NOT use
+    % this as the p-value denominator: a permutation can fail for only SOME
+    % elements (e.g. one channel's shuffled sub-dyad computation throws while
+    % others succeed), leaving a NaN in just that element's column. Rows are
+    % kept here as long as they are not entirely NaN.
     validPerms = ~all(isnan(nullDist), 2);
     nullDist = nullDist(validPerms, :);
-    nValidPerms = size(nullDist, 1);
+    nValidPerms = size(nullDist, 1);  % reported via result.nPerms below
 
-    % Compute permutation p-values
-    % p = (# null >= observed + 1) / (nPerms + 1)
+    % Compute permutation p-values PER ELEMENT.
+    % p = (1 + sum(|null| >= |observed|, omitnan)) / (1 + nValidElem)
+    % nValidElem is the per-element count of non-NaN surrogate values. Using a
+    % single shared denominator (e.g. the count of rows not WHOLLY NaN) is
+    % anti-conservative: a NaN surrogate for one element is not an exceedance
+    % (comparisons with NaN are false in MATLAB) yet that row still counted
+    % toward the denominator, deflating the resulting p-value. Both the
+    % exceedance count and the denominator must come from the SAME per-element
+    % non-NaN set. The +1/+1 correction (never report p = 0 with finite
+    % permutations) is preserved using that per-element count.
+    %
+    % Reference:
+    %   Phipson, B. & Smyth, G. K. (2010). Permutation P-values should never
+    %   be zero: calculating exact P-values when permutations are randomly
+    %   drawn. Statistical Applications in Genetics and Molecular Biology,
+    %   9(1), Article 39. DOI: 10.2202/1544-6115.1585
     pvalues = nan(nElements, 1);
     for e = 1:nElements
         if isnan(observed(e))
             continue;
         end
-        nExceed = sum(abs(nullDist(:, e)) >= abs(observed(e)));
-        pvalues(e) = (nExceed + 1) / (nValidPerms + 1);
+        validSurr = ~isnan(nullDist(:, e));
+        nValidElem = sum(validSurr);
+        if nValidElem == 0
+            continue;  % no usable surrogates for this element; leave p as NaN
+        end
+        nExceed = sum(abs(nullDist(validSurr, e)) >= abs(observed(e)));
+        pvalues(e) = (nExceed + 1) / (nValidElem + 1);
     end
 
     % FDR correction

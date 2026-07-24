@@ -22,7 +22,8 @@ function [snirfData] = asSNIRF(fNIRcells, filepath, varargin)
 %                          Each structure should contain .raw, .time, .fs, etc.
 %                          Multiple structures create multiple /nirs groups.
 %   filepath             - Output file path or directory (optional)
-%                          If not provided, opens save dialog.
+%                          If omitted or empty, opens a save dialog (single/multi-
+%                          run struct) or a directory picker (cell-array batch).
 %                          Cell array + directory path (no .snirf ext) = batch mode.
 %                          Extension .snirf is added if missing in single-file mode.
 %   normalizeRaw         - Normalize raw data before export (default: false)
@@ -57,6 +58,9 @@ function [snirfData] = asSNIRF(fNIRcells, filepath, varargin)
 %   - Uses jsnirfy library for HDF5 writing
 %   - Probe geometry requires device config to be loaded
 %   - Python compatibility improvements over standard SNIRF writers
+%   - filepath is required in headless sessions (pf2_base.isHeadless()): the
+%     GUI save/directory dialog cannot be shown, so a missing filepath errors
+%     with 'pf2:export:asSNIRF:noPathHeadless' instead of hanging/crashing.
 %
 % Example:
 %   % Export single dataset
@@ -78,9 +82,29 @@ if(nargin < 1)
     error('pf2:asSNIRF:noData', 'No fnir file specified!');
 end
 
-if nargin < 2
-   [filename, path] = uiputfile(['*.snirf']);
-   filepath = [path filename];
+if nargin < 2 || isempty(filepath)
+   if pf2_base.isHeadless()
+       error('pf2:export:asSNIRF:noPathHeadless', ...
+           ['No output filepath was given and this session is headless (no ', ...
+            'interactive save/directory dialog available). Pass an explicit ', ...
+            'filepath (or output directory for batch export).']);
+   end
+   if iscell(fNIRcells)
+       % Cell array: batch export -> prompt for an output directory.
+       filepath = uigetdir('', 'Select output directory for batch SNIRF export');
+       if isequal(filepath, 0)   % selection cancelled
+           snirfData = [];
+           return;
+       end
+   else
+       % Single/multi-run struct: prompt for an output file.
+       [filename, path] = uiputfile('*.snirf', 'Save fNIRS data as SNIRF');
+       if isequal(filename, 0)   % selection cancelled
+           snirfData = [];
+           return;
+       end
+       filepath = fullfile(path, filename);
+   end
 end
 
 % --- Detect batch mode: cell array + directory path (no .snirf extension) ---

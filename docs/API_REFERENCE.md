@@ -151,7 +151,7 @@ Auto-attached as `data.device` by all import functions and `processFNIRS2`.
 - `useGlobalMean.m` - Use entire signal as baseline
 
 **+dpf subfolder:**
-- `setDPFmode.m` - Set DPF calculation mode (None/Fixed/Calc)
+- `setDPFmode.m` - Set DPF calculation mode (None/Fixed/Calc/PPF; case-insensitive)
 - `setFixedDPF.m` - Set fixed DPF value
 
 ### +pf2/+probe - Probe Geometry and ROI
@@ -176,6 +176,7 @@ Auto-attached as `data.device` by all import functions and `processFNIRS2`.
 - `imageROIvalues.m` - Heatmap for ROI values
 - `interpolateROIvalues.m` - Interpolated ROI visualization
 - `showProbe3D.m` - 3D probe geometry visualization
+- `showHead3D.m` - Colin27 head model (translucent scalp + brain surface) in real MNI mm with the probe overlaid; `'Markers','optodes'|'channels'|'both'` draws sources/detectors or channel midpoints, `'ShowScalp'` toggles the scalp layer, `'Cortex','colin27'|'cerebro'` selects the brain surface (visualization/QC only, not for DOT)
 - `movie.m` - Animate a biomarker over time on the cortex/probe (MP4/AVI/GIF)
 - `connectome.m` - Draw a connectivity network anchored at channel/ROI positions (2D/3D)
 - `tomographyMovie.m` - Animate a time-resolved DOT reconstruction on the cortex (MP4/AVI/GIF)
@@ -332,7 +333,6 @@ Self-contained discrete and continuous wavelet routines (no external Wavelab or 
 | `shortChannelRegression.m` | Regress out short-channel signals |
 | `extractShortChannelPCs.m` | Extract PCA components from short channels for GLM |
 | `ezBuildROI.m` | Easy ROI construction |
-| `calcLocalCV.m` | Calculate local coefficient of variation |
 
 ### +pf2_base/+external - Third-Party Libraries
 

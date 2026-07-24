@@ -18,7 +18,7 @@ function outData = processStageOD2Hb(data, time, subjectAge, DirtyBaseline, curP
 %   baseline      - Struct with fields:
 %                     startTime - Baseline start time (seconds)
 %                     blLength  - Baseline duration (seconds)
-%   dpfMode       - DPF mode: 'None', 'Fixed', or 'Calc'
+%   dpfMode       - DPF mode: 'None', 'Fixed', 'Calc', or 'PPF'
 %   dpfFixed      - Fixed DPF value (used when dpfMode is 'Fixed')
 %   defaultAge    - Default age for DPF calculation when subjectAge empty
 %
@@ -27,6 +27,14 @@ function outData = processStageOD2Hb(data, time, subjectAge, DirtyBaseline, curP
 %                     provided, overrides the DirtyBaseline and baseline
 %                     struct computation. Used by the GUI for view-relative
 %                     baseline modes.
+%   PPF             - Complete effective pathlength factor (escape hatch) used
+%                     when dpfMode is 'PPF': scalar or per-wavelength [ppf1
+%                     ppf2]. Pathlength becomes L = SD .* ppf (no DPF/PVC).
+%                     Ignored for other modes. (default: [])
+%   PVC             - Partial-volume correction divisor (>= 1) applied to the
+%                     Fixed/Calc DPF: L = SD .* DPF ./ pvc. Ignored in 'PPF'
+%                     and 'None' modes. Compute a value with
+%                     pf2_base.fnirs.strangmanPVC. (default: [] -> 1)
 %
 % Outputs:
 %   outData       - Struct containing:
@@ -63,19 +71,52 @@ arguments
     dpfFixed
     defaultAge
     options.BaselineSamples = []
+    options.PPF = []
+    options.PVC = []
 end
 
-% Determine DPF settings
-if strcmp(dpfMode, 'None')
+% Determine DPF settings. Comparisons are case-insensitive (strcmpi) as
+% defense-in-depth: processFNIRS2's validator canonicalizes DPFmode to
+% {'None','Fixed','Calc','PPF'} before it reaches here, but this function is
+% also callable directly (see BeerLambertPPFTest), so a caller-supplied
+% 'ppf'/'calc'/etc. must still select the right branch rather than silently
+% falling through to the Calc branch below.
+if strcmpi(dpfMode, 'None')
     NoPathlength = true;
 else
     NoPathlength = false;
 end
 
-if strcmp(dpfMode, 'Fixed')
+if strcmpi(dpfMode, 'Fixed')
     fixedDPF = dpfFixed;
 else
     fixedDPF = 0;
+end
+
+% PPF (the complete-effective-factor escape hatch) is routed only in 'PPF'
+% mode; the partial-volume correction PVC applies to the Fixed/Calc DPF and is
+% mutually exclusive with PPF, so it is routed in every other mode.
+if strcmpi(dpfMode, 'PPF')
+    ppfArg = options.PPF;
+    if isempty(ppfArg)
+        error('pf2_base:fnirs:processStageOD2Hb:ppfRequired', ...
+            ['dpfMode is ''PPF'' but no partial pathlength factor was ' ...
+             'supplied. Pass ''PPF'' (scalar or [ppf1 ppf2]).']);
+    end
+    pvcArg = [];
+else
+    ppfArg = [];
+    pvcArg = options.PVC;   % [] unless set; divides the Fixed/Calc DPF
+    % 'auto': a per-channel PVC from each channel's own separation (Strangman
+    % 2014), so different probe locations get different corrections.
+    if ischar(pvcArg) || (isstring(pvcArg) && isscalar(pvcArg))
+        if strcmpi(pvcArg, 'auto')
+            pvcArg = autoPVCfromProbe(curProbe);
+        else
+            error('pf2_base:fnirs:processStageOD2Hb:badPVC', ...
+                'PVC must be numeric or ''auto''; got ''%s''.', char(pvcArg));
+        end
+    end
 end
 
 if isempty(subjectAge)
@@ -117,8 +158,58 @@ curTableCh = curTableCh(curTableCh.isCh, :);
     outData.channels, ~, outData.units, outData.DPF_factor] = ...
     pf2_base.fnirs.bvoxy(data, curTableCh.OptodeNumber, curTableCh.Wavelength, ...
     curTableOpt.SD, baselineSamples, subjectAge, [], true, ...
-    'NoPathlength', NoPathlength, 'DiffPathlengthFactor', fixedDPF);
+    'NoPathlength', NoPathlength, 'DiffPathlengthFactor', fixedDPF, ...
+    'PartialPathlengthFactor', ppfArg, 'PartialVolumeCorrection', pvcArg);
 
 outData.time = time;
+
+end
+
+function pvc = autoPVCfromProbe(curProbe)
+% AUTOPVCFROMPROBE Per-optode partial-volume correction from separation
+%
+% Builds a per-optode PVC vector by looking up each channel's own source-
+% detector separation in the Strangman 2014 sensitivity model (head-wide),
+% so different probe locations receive different corrections. Aligned to the
+% TableOpt optode order (the same order bvoxy uses).
+
+if ~isstruct(curProbe) || ~isfield(curProbe, 'TableOpt') || ...
+        ~ismember('SD', curProbe.TableOpt.Properties.VariableNames)
+    error('pf2_base:fnirs:processStageOD2Hb:autoPVCnoSD', ...
+        ['PVC=''auto'' needs source-detector distances (TableOpt.SD). ' ...
+         'Supply a numeric PVC or a device with geometry.']);
+end
+
+sepMm = curProbe.TableOpt.SD(:) * 10;   % TableOpt.SD is in cm
+
+% Flag optodes whose separation falls outside the Strangman 2014 model range
+% (20-50 mm) BEFORE calling strangmanPVC, naming the affected optodes/
+% separations. A short-separation channel (e.g. an 8 mm short-channel
+% regressor) silently getting clamped to the 20 mm PVC is a correction error,
+% not a rounding nuance, so this is surfaced explicitly rather than left to
+% strangmanPVC's own generic count-only warning (below, intentionally no
+% longer suppressed -- suppressing it previously hid this exact clamping).
+outOfRange = sepMm < 20 | sepMm > 50;
+if any(outOfRange)
+    idx = find(outOfRange);
+    if ismember('OptodeNum', curProbe.TableOpt.Properties.VariableNames)
+        optLabel = mat2str(curProbe.TableOpt.OptodeNum(idx)');
+    else
+        optLabel = mat2str(idx');
+    end
+    warning('pf2_base:fnirs:processStageOD2Hb:pvcExtrapolated', ...
+        ['PVC=''auto'': optode(s) %s have separation(s) %s mm outside the ' ...
+         'Strangman 2014 model range (20-50 mm) and will be clamped to the ' ...
+         'nearest bound before computing PVC. A short-separation channel ' ...
+         'clamped to the 20 mm PVC is likely mis-corrected -- supply an ' ...
+         'explicit numeric PVC for these channels if this matters.'], ...
+        optLabel, mat2str(round(sepMm(idx)', 1)));
+end
+
+% One vectorized call for the whole montage (strangmanPVC is separation-vector
+% aware); avoids a per-channel inputParser + interp1 loop. strangmanPVC's own
+% pf2_base:fnirs:strangmanPVC:extrapolate warning is left enabled (not
+% suppressed) as a second, generic line of defense.
+pvc = pf2_base.fnirs.strangmanPVC(sepMm);
 
 end

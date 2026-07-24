@@ -180,24 +180,16 @@ end
 globalStd = std(signal, 'omitnan');
 halfWin = floor(nMotion / 2);
 
-for i = 1:T
-    lo = max(1, i - halfWin);
-    hi = min(T, i + halfWin);
-    window = signal(lo:hi);
+% Vectorized moving-window criteria (see pf2_MotionCorrectSpline for the
+% equivalence rationale): centered window of length 2*halfWin+1, shrinking at
+% the edges, reproduced by movstd/movmax/movmin with default 'shrink'
+% endpoints. ~O(T) vs the O(T*nMotion) per-sample loop.
+k = 2 * halfWin + 1;
+winStd    = movstd(signal, k, 0, 1, 'omitnan');
+ampChange = movmax(signal, k, 1, 'omitnan') - movmin(signal, k, 1, 'omitnan');
 
-    % Moving std criterion
-    winStd = std(window, 'omitnan');
-    if winStd > STDEVthresh * globalStd
-        artifactMask(i) = true;
-        continue;
-    end
-
-    % Amplitude change criterion
-    ampChange = max(window, [], 'omitnan') - min(window, [], 'omitnan');
-    if ampChange > AMPthresh
-        artifactMask(i) = true;
-    end
-end
+artifactMask = (winStd > STDEVthresh * globalStd) | (ampChange > AMPthresh);
+artifactMask = artifactMask(:);
 
 end
 

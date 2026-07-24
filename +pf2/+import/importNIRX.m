@@ -17,7 +17,7 @@ function [fNIR] = importNIRX(folderDIR,channelCheck,varargin)
 %
 % Inputs:
 %   folderDIR    - Path to NIRx recording folder or .hdr/.nirs file [char | string]
-%                  If omitted, a file selection dialog opens.
+%                  If omitted or empty, a file selection dialog opens.
 %                  Can be either:
 %                    - Full path to the .hdr or .nirs file
 %                    - Path to folder containing NIRx recording files
@@ -82,27 +82,40 @@ includeSSchannels=true;
 
 buildProbeLayout=true;
 
-if nargin < 1
-   [folderDIR,pathname] = uigetfile({'*.hdr;*.nirs';'*.*'},'Open NIRX Config file');
-  %error('Function requires at least one input argument');
-elseif ~ischar(folderDIR)
+if nargin < 1 || isempty(folderDIR)
+   [fname,pathname] = uigetfile({'*.hdr;*.nirs';'*.*'},'Open NIRX Config file');
+   if isequal(fname,0)   % selection cancelled
+       fNIR = [];
+       return;
+   end
+   folderDIR = fullfile(pathname,fname);
+elseif ~ischar(folderDIR) && ~isstring(folderDIR)
   error('pf2:importNIRX:badInput', 'Input must be a string representing a filename');
-else
-   pathname=''; 
 end
+folderDIR = char(folderDIR);
 
-if(isempty(pathname))
-    if(contains(folderDIR,'\\'))
-        folderDIR(folderDIR=='\\')='/';
+% If the input is a recording FOLDER (the documented usage) rather than a
+% file, locate the NIRx config file (.hdr, else .nirs) inside it. Without this
+% guard a folder path is split on the separator and the code cd's to the
+% PARENT, so the .wl1/.wl2/.hdr are never found.
+if isfolder(folderDIR)
+    hdr = dir(fullfile(folderDIR, '*.hdr'));
+    if isempty(hdr), hdr = dir(fullfile(folderDIR, '*.nirs')); end
+    if isempty(hdr)
+        error('pf2:importNIRX:noHdrInFolder', ...
+            'No .hdr or .nirs config file found in folder ''%s''.', folderDIR);
     end
-
-    folderDIRparts=strsplit(folderDIR,'/');
-
-    filename=folderDIRparts{end};
-
-
-    pathname=folderDIR(1:end-length(filename));
+    folderDIR = fullfile(folderDIR, hdr(1).name);
 end
+
+% Normalize Windows backslashes so the single split logic below is portable.
+folderDIR = strrep(folderDIR, '\', '/');
+
+% Always derive pathname/filename from the (now full) folderDIR path so the
+% file-dialog and direct-argument cases follow the same code path below.
+folderDIRparts=strsplit(folderDIR,'/');
+filename=folderDIRparts{end};
+pathname=folderDIR(1:end-length(filename));
 
 curdir=cd;
 cdCleanup = onCleanup(@() cd(curdir));
