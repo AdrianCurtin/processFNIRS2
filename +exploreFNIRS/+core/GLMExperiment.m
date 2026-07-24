@@ -524,6 +524,10 @@ classdef GLMExperiment < exploreFNIRS.core.Experiment
         %     short-separation, aux_*, motion, accel, cardiac, hr/heart,
         %     resp, global/gsr) as well as any name declared in
         %     gx.glm.auxNuisance. See groupStats for the same rule.
+        %   - If every candidate row is filtered out this way (or a
+        %     'Channels' selection matches no channels), betaTable returns
+        %     an empty (0-row) table with the expected variable names
+        %     rather than erroring.
 
             if ~obj.isFitted
                 error('exploreFNIRS:core:GLMExperiment:betaTable', ...
@@ -631,6 +635,31 @@ classdef GLMExperiment < exploreFNIRS.core.Experiment
                         rows{end+1} = row; %#ok<AGROW>
                     end
                 end
+            end
+
+            if isempty(rows)
+                % Nothing to export -- e.g. every auto-detected regressor
+                % was excluded as nuisance (see detectStimulusRegressors),
+                % or a 'Channels' selection matched no channels.
+                % struct2table([rows{:}]) errors on an empty cell array, so
+                % return an empty table with the expected variable names
+                % instead of crashing.
+                varNames = {'SubjectID', 'Condition', 'Channel', 'channel_label'};
+                varTypes = {'string', 'string', 'double', 'string'};
+                for b = 1:length(obj.glm.biomarkers)
+                    bio = obj.glm.biomarkers{b};
+                    varNames{end+1} = ['beta_' bio]; %#ok<AGROW>
+                    varTypes{end+1} = 'double'; %#ok<AGROW>
+                    if includeStats
+                        varNames{end+1} = ['tstat_' bio]; %#ok<AGROW>
+                        varTypes{end+1} = 'double'; %#ok<AGROW>
+                        varNames{end+1} = ['pval_' bio]; %#ok<AGROW>
+                        varTypes{end+1} = 'double'; %#ok<AGROW>
+                    end
+                end
+                T = table('Size', [0, numel(varNames)], ...
+                    'VariableTypes', varTypes, 'VariableNames', varNames);
+                return;
             end
 
             T = struct2table([rows{:}]);
@@ -1702,8 +1731,12 @@ function stimRegs = detectStimulusRegressors(regressorNames, extraExclude)
 % cardiac, motion, short-separation, aux confounds) from appearing as
 % experimental conditions in betaTable()/groupStats() output.
 %
-% Nuisance pattern (case-insensitive), matched anywhere in the name unless
-% anchored with ^/$:
+% Nuisance pattern (case-insensitive). Every token is boundary-anchored --
+% matched at the start of the name or right after a '_', and ended at the
+% end of the name, right before a '_', or right before a trailing digit --
+% so a token only matches a whole nuisance segment, never a substring
+% embedded inside a legitimate condition name (e.g. 'motion' no longer
+% matches inside 'Emotion', 'resp' no longer matches inside 'Response'):
 %   constant, intercept          - GLM baseline/offset term
 %   drift, dct, legendre, poly   - drift/basis regressors
 %   short, ss, shortsep          - short-separation channel regressors
@@ -1721,23 +1754,23 @@ function stimRegs = detectStimulusRegressors(regressorNames, extraExclude)
     nuisancePatterns = {
         '^constant$'
         '^intercept$'
-        'drift'
-        'dct'
-        'legendre'
-        'poly'
+        '(^|_)drift($|_|\d)'
+        '(^|_)dct($|_|\d)'
+        '(^|_)legendre($|_|\d)'
+        '(^|_)poly($|_|\d)'
         '^short'
         '(^|_)ss($|_)'
-        'shortsep'
+        '(^|_)shortsep'
         '^aux_'
-        'nuisance'
-        'motion'
-        'accel'
-        'cardiac'
+        '(^|_)nuisance'
+        '(^|_)motion($|_|\d)'
+        '(^|_)accel($|_|\d)'
+        '(^|_)cardiac($|_|\d)'
         '(^|_)hr($|_)'
-        'heart'
-        'resp'
-        'global'
-        'gsr'
+        '(^|_)heart'
+        '(^|_)resp($|_|\d)'
+        '(^|_)global'
+        '(^|_)gsr($|_|\d)'
         '_deriv$'
         '_disp$'
     };

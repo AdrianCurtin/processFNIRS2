@@ -104,6 +104,17 @@ if strcmpi(dpfMode, 'PPF')
              'supplied. Pass ''PPF'' (scalar or [ppf1 ppf2]).']);
     end
     pvcArg = [];
+elseif strcmpi(dpfMode, 'None')
+    % 'None' applies no DPF (output stays in mM*mm), so there is no pathlength
+    % for PVC to divide; PVC is ignored here (documented). Warn if one was
+    % explicitly supplied, and never resolve 'auto' (which would need probe
+    % geometry the None path does not require).
+    ppfArg = [];
+    pvcArg = [];
+    if ~isempty(options.PVC)
+        warning('pf2_base:fnirs:processStageOD2Hb:pvcIgnoredNone', ...
+            'PVC is ignored when dpfMode is ''None'' (no DPF to correct).');
+    end
 else
     ppfArg = [];
     pvcArg = options.PVC;   % [] unless set; divides the Fixed/Calc DPF

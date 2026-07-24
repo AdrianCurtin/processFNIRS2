@@ -150,5 +150,109 @@ classdef ResultsTableExportTest < matlab.unittest.TestCase
                 @() pf2.export.blockAvgToTable(segments, 'TimeWindow', [10 -5]), ...
                 'pf2:export:blockAvgToTable:badWindow');
         end
+
+        function glmToTableTsvExportIsTabDelimited(testCase)
+            % Regression test: a bare writetable(T, path) on a '.tsv' path
+            % throws MATLAB:table:write:UnrecognizedFileExtension in R2025b.
+            % glmToTable's private writeTable() must route '.tsv' through
+            % 'FileType','text','Delimiter','\t' instead of falling into the
+            % shared '.csv'/'.txt'/'.tsv' case.
+            tsvPath = [tempname, '.tsv'];
+            cleanupObj = onCleanup(@() deleteIfExists(tsvPath));
+
+            T = pf2.export.glmToTable(testCase.gx, 'SavePath', tsvPath);
+            testCase.verifyTrue(isfile(tsvPath), 'glmToTable did not write the .tsv file.');
+
+            firstLine = readFirstLine(tsvPath);
+            testCase.verifyTrue(contains(firstLine, sprintf('\t')), ...
+                'Exported .tsv header is not tab-delimited.');
+            testCase.verifyFalse(contains(firstLine, ','), ...
+                'A genuinely tab-delimited header should not also be comma-delimited.');
+
+            % Round-trip as a real TSV (would fail to recover columns if the
+            % file were actually comma- or default-delimited).
+            Tround = readtable(tsvPath, 'FileType', 'text', 'Delimiter', '\t');
+            testCase.verifyEqual(sort(string(Tround.Properties.VariableNames)), ...
+                sort(string(T.Properties.VariableNames)));
+            testCase.verifyEqual(height(Tround), height(T));
+        end
+
+        function blockAvgToTableTsvExportIsTabDelimited(testCase)
+            % Same .tsv regression as glmToTableTsvExportIsTabDelimited, for
+            % blockAvgToTable's own private writeTable() helper.
+            proc1 = processFNIRS2(testCase.glmSubjects{1}, ...
+                'Raw_Method', testCase.glmRaw, 'Oxy_Method', testCase.glmOxy);
+            segments = pf2.data.extractBlocks(proc1, testCase.glmBlockDefs{1}, ...
+                'PreTime', 5, 'PostTime', 15, 'SetT0', true);
+
+            tsvPath = [tempname, '.tsv'];
+            cleanupObj = onCleanup(@() deleteIfExists(tsvPath));
+
+            T = pf2.export.blockAvgToTable(segments, 'SavePath', tsvPath);
+            testCase.verifyTrue(isfile(tsvPath), 'blockAvgToTable did not write the .tsv file.');
+
+            firstLine = readFirstLine(tsvPath);
+            testCase.verifyTrue(contains(firstLine, sprintf('\t')), ...
+                'Exported .tsv header is not tab-delimited.');
+            testCase.verifyFalse(contains(firstLine, ','), ...
+                'A genuinely tab-delimited header should not also be comma-delimited.');
+
+            Tround = readtable(tsvPath, 'FileType', 'text', 'Delimiter', '\t');
+            testCase.verifyEqual(sort(string(Tround.Properties.VariableNames)), ...
+                sort(string(T.Properties.VariableNames)));
+            testCase.verifyEqual(height(Tround), height(T));
+        end
+
+        function showHead3DUsesAttachedDeviceWithoutCfgWarning(testCase)
+            % Regression test for showHead3D reloading the device via
+            % pf2.Device.load(fNIR) (keyed on info.probename) instead of the
+            % struct's already-attached .device. Give the struct a probename
+            % that does NOT correspond to any .cfg on disk -- a stand-in for a
+            % generated/in-memory montage -- so pf2.Device.load(fNIR) itself
+            % is confirmed to fail, while showHead3D (now routed through
+            % pf2_base.resolveDeviceFromData) must still render the probe
+            % headlessly with no "could not resolve probe positions" /
+            % cfg-missing warning.
+            fNIR = testCase.proc;
+            fNIR.info.probename = 'pf2_test_nonexistent_probe_cfg';
+
+            % Confirm the bug precondition: reloading by probename fails.
+            testCase.verifyError(@() pf2.Device.load(fNIR), ...
+                'pf2_base:loadDeviceCfg:fileNotFound');
+
+            pngPath = [tempname, '.png'];
+            cleanupObj = onCleanup(@() deleteIfExists(pngPath));
+
+            testCase.verifyWarningFree( ...
+                @() pf2.probe.plot.showHead3D(fNIR, 'savePath', pngPath));
+            testCase.verifyTrue(isfile(pngPath));
+            fi = dir(pngPath);
+            testCase.verifyGreaterThan(fi.bytes, 0);
+        end
+
+        function resolveDeviceFromDataReturnsAttachedDevice(testCase)
+            % Lower-level structural companion to the showHead3D check above:
+            % pf2_base.resolveDeviceFromData must hand back the struct's own
+            % .device rather than attempt a probename reload, even when
+            % info.probename would not resolve to any real .cfg.
+            fNIR = testCase.proc;
+            fNIR.info.probename = 'pf2_test_nonexistent_probe_cfg';
+
+            dev = pf2_base.resolveDeviceFromData(fNIR);
+            testCase.verifyClass(dev, 'pf2.Device');
+            testCase.verifyTrue(isequaln(dev, fNIR.device), ...
+                'resolveDeviceFromData must return the already-attached device.');
+        end
     end
+end
+
+function deleteIfExists(f)
+    if exist(f, 'file'); delete(f); end
+end
+
+function line = readFirstLine(filepath)
+    fid = fopen(filepath, 'r');
+    cleanupObj = onCleanup(@() fclose(fid));
+    line = fgetl(fid);
+    if ~ischar(line), line = ''; end
 end

@@ -76,7 +76,17 @@ function result = surrogateTest(couplingFn, x, y, fs, varargin)
 %     .minShift    - Minimum shift used (samples)
 %     .method      - Method name from couplingFn result (or 'unknown')
 %
+%   If x or y has too few finite samples to test (all-NaN, fewer than 4
+%   finite samples, or zero variance among the finite samples), the result
+%   above is INVALID rather than computed: .observed/.pvalue/.nullMean/
+%   .nullSD/.zScore are NaN, .nullDist is empty ([0x1]), .significant is
+%   false, .nPerms is 0, .minShift is NaN, .surrogateType is 'none', and a
+%   pf2:surrogateTest:insufficientData warning is emitted. See Notes.
+%
 % Algorithm:
+%   0. If x or y is too degenerate to test (see Outputs above), return the
+%      invalid result immediately -- BEFORE NaN-filling -- without calling
+%      couplingFn.
 %   1. Fill NaN values in x and y via linear interpolation (matches the
 %      sibling measures: plv.m, imagCoherence.m, wpli.m), BEFORE any other
 %      step. A single missing sample left in place would otherwise poison
@@ -107,6 +117,17 @@ function result = surrogateTest(couplingFn, x, y, fs, varargin)
 %   fprintf('wcoherence: p = %.3f\n', sr2.pvalue);
 %
 % Notes:
+%   - x or y that is all-NaN (or has fewer than 4 finite samples, or zero
+%     variance among its finite samples) is rejected UP FRONT, before NaN
+%     filling. This matters because the NaN-fill step below zero-fills an
+%     all-NaN vector (matching plv.m/imagCoherence.m/wpli.m's own fillNaN
+%     behavior for a single bad channel), and two zero-filled (i.e. constant)
+%     signals give a degenerate observed coupling value plus an equally
+%     degenerate constant null distribution -- e.g. p = 1, which reads as a
+%     legitimate non-significant result rather than "this test could not be
+%     run." Use this early return (NaN observed/pvalue,
+%     pf2:surrogateTest:insufficientData warning) to distinguish "tested and
+%     not significant" from "not testable."
 %   - x and y are NaN-filled (linear interpolation) before ANY computation --
 %     including the observed-statistic call, the autocorrelation-length FFT,
 %     and phase randomization -- so a single interior NaN sample cannot make
@@ -163,6 +184,57 @@ function result = surrogateTest(couplingFn, x, y, fs, varargin)
     if ~ismember(tail, {'right', 'both'})
         error('exploreFNIRS:coupling:surrogateTest', ...
             'Tail must be ''right'' or ''both'' (got ''%s'').', tail);
+    end
+
+    % Guard against data too degenerate to test, BEFORE any NaN filling.
+    % fillNaN (below) replaces an all-NaN vector with all zeros, so two
+    % all-NaN signals would otherwise silently become two constant-zero
+    % vectors. Many coupling measures return a degenerate "perfect" value
+    % for two identical constant signals (e.g. observed = 1), and every
+    % circular-shift/phase-randomization surrogate of a constant vector is
+    % also constant, so the null distribution collapses to that same
+    % degenerate value -- yielding p = 1 (looks like a valid, merely
+    % non-significant, result) instead of flagging that the test could not
+    % be run at all. The same problem applies more generally to signals with
+    % too few finite samples to characterize a null, or with zero variance
+    % among their finite samples (constant, non-NaN, signals). Detect this
+    % up front and return an explicitly invalid result rather than computing
+    % coupling on fabricated (zero-filled) data.
+    minFiniteSamples = 4;  % matches the short-signal floor enforced above (T < 4)
+    finiteX = x(isfinite(x));
+    finiteY = y(isfinite(y));
+    varX = 0; if numel(finiteX) > 1, varX = var(finiteX); end
+    varY = 0; if numel(finiteY) > 1, varY = var(finiteY); end
+    insufficientData = numel(finiteX) < minFiniteSamples || ...
+        numel(finiteY) < minFiniteSamples || varX == 0 || varY == 0;
+
+    if insufficientData
+        warning('pf2:surrogateTest:insufficientData', ...
+            ['x or y has too few finite samples (< %d), or zero variance ' ...
+             'among its finite samples (e.g. all-NaN or constant). A ' ...
+             'surrogate/null coupling test is not meaningful on such data. ' ...
+             'Returning an invalid result (NaN observed/pvalue, empty null ' ...
+             'distribution) instead of computing coupling on NaN-filled-to-' ...
+             'zero data.'], minFiniteSamples);
+        methodName = 'unknown';
+        try
+            nameParts = regexp(func2str(couplingFn), '\.', 'split');
+            methodName = nameParts{end};
+        catch
+        end
+        result.pvalue        = NaN;
+        result.observed      = NaN;
+        result.nullDist      = nan(0, 1);
+        result.nullMean      = NaN;
+        result.nullSD        = NaN;
+        result.zScore        = NaN;
+        result.significant   = false;
+        result.alpha         = opts.Alpha;
+        result.nPerms        = 0;
+        result.minShift      = NaN;
+        result.method        = methodName;
+        result.surrogateType = 'none';
+        return;
     end
 
     % NaN handling: linear interpolation (matches plv.m / imagCoherence.m /

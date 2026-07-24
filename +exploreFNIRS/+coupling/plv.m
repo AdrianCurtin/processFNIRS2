@@ -136,9 +136,9 @@ function result = plv(x, y, fs, varargin)
         yFilt = y;
     else
         try
-            [b, a] = butter(opts.FilterOrder, Wn, 'bandpass');
-            xFilt = filtfilt(b, a, x);
-            yFilt = filtfilt(b, a, y);
+            [b, a] = pf2_base.external.butter(opts.FilterOrder, Wn, 'bandpass');
+            xFilt = pf2_base.external.filtfilt_classic(b, a, x);
+            yFilt = pf2_base.external.filtfilt_classic(b, a, y);
         catch
             % filtfilt may fail for very short signals or extreme filter orders;
             % fall back to unfiltered signals with a warning.
@@ -149,9 +149,10 @@ function result = plv(x, y, fs, varargin)
         end
     end
 
-    % Instantaneous phase via Hilbert transform
-    phiX = angle(hilbert(xFilt));
-    phiY = angle(hilbert(yFilt));
+    % Instantaneous phase via Hilbert transform (first-party FFT analytic
+    % signal, so PLV stays free of the Signal Processing Toolbox).
+    phiX = angle(analyticSignal(xFilt));
+    phiY = angle(analyticSignal(yFilt));
 
     % PLV = |<exp(i * (phi_x - phi_y))>|
     phaseDiff = phiX - phiY;
@@ -180,4 +181,31 @@ function v = fillNaN(v)
     if all(nanIdx), v(:) = 0; return; end
     t = (1:length(v))';
     v(nanIdx) = interp1(t(~nanIdx), v(~nanIdx), t(nanIdx), 'linear', 'extrap');
+end
+
+function z = analyticSignal(x)
+% ANALYTICSIGNAL Analytic signal via FFT (toolbox-free equivalent of hilbert)
+%
+% Column-wise analytic signal z = x + i*H{x}; angle(z) is the instantaneous
+% phase. Uses the same one-sided-spectrum construction as MATLAB's hilbert(),
+% so PLV needs no Signal Processing Toolbox.
+%
+% Inputs:
+%   x - [T x 1] real signal
+%
+% Outputs:
+%   z - [T x 1] complex analytic signal
+    n = size(x, 1);
+    if n < 2
+        z = complex(x);
+        return;
+    end
+    X = fft(x, [], 1);
+    h = zeros(n, 1);
+    if mod(n, 2) == 0
+        h(1) = 1;  h(n/2 + 1) = 1;  h(2:n/2) = 2;
+    else
+        h(1) = 1;  h(2:(n + 1)/2) = 2;
+    end
+    z = ifft(X .* h, [], 1);
 end

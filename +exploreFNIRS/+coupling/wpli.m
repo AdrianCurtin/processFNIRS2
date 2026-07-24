@@ -131,7 +131,7 @@ function result = wpli(x, y, fs, varargin)
     addParameter(p, 'FreqRange',    [0.01, 0], @(v) isnumeric(v) && numel(v) == 2);
     addParameter(p, 'WindowLength', 0,         @(v) isnumeric(v) && isscalar(v) && v >= 0);
     addParameter(p, 'Overlap',      0.5,       @(v) isnumeric(v) && isscalar(v) && v >= 0 && v < 1);
-    addParameter(p, 'NFFT',        0,          @(v) isnumeric(v) && isscalar(v) && v >= 0);
+    addParameter(p, 'NFFT',        0,          @(v) isnumeric(v) && isscalar(v) && v >= 0 && v == floor(v));
     addParameter(p, 'Debiased',    true,       @(v) islogical(v) || (isnumeric(v) && isscalar(v)));
     parse(p, x, y, fs, varargin{:});
     opts = p.Results;
@@ -237,7 +237,7 @@ function result = wpli(x, y, fs, varargin)
     end
 
     % Build matrix of per-segment imaginary cross-spectra [F x nSeg]
-    F = nfft / 2 + 1;
+    F = floor(nfft / 2) + 1;   % correct one-sided length for even OR odd nfft
     imagSxy = zeros(F, nSeg);
     f = (0:F-1)' * fs / nfft;
 

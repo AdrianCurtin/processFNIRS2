@@ -7,12 +7,15 @@ classdef HyperscanningNullTest < matlab.unittest.TestCase
 %     1. exploreFNIRS.hyperscanning.computeGroup no longer runs an invalid
 %        one-sample t-test against ZERO for strictly non-negative coupling
 %        measures (PLV, |imaginary coherence|, wPLI, wavelet coherence,
-%        coherence) whose finite-sample null under independence is NOT
+%        coherence, Granger causality, mutual information, transfer entropy,
+%        HB-ICA) whose finite-sample null under independence is NOT
 %        centered at zero. Previously this produced false significance
 %        (repro: 30 independent-noise dyad PLVs gave mean ~0.19, t~14,
-%        p~2e-14 against a t-test-vs-0). computeGroup now either tests
-%        against a per-dyad surrogate/null baseline (if one is attached to
-%        the dyad results) or skips the vs-zero test and returns NaN with a
+%        p~2e-14 against a t-test-vs-0; likewise 30 independent-noise dyad
+%        mutual-information estimates gave mean ~0.11, t~40, p~0).
+%        computeGroup now either tests against a per-dyad surrogate/null
+%        baseline (if one is attached to the dyad results) or skips the
+%        vs-zero test and returns NaN with a
 %        pf2:computeGroup:surrogateNullRequired warning.
 %
 %     2. exploreFNIRS.hyperscanning.permutationTest computes its permutation
@@ -79,6 +82,80 @@ classdef HyperscanningNullTest < matlab.unittest.TestCase
                 % independent noise as significant.
                 testCase.verifyGreaterThan(min(result.pvalue(:)), 0.01, ...
                     'Independent-noise PLV must not appear significant against a valid surrogate null.');
+            end
+        end
+
+        %% (1b) computeGroup: same fix, extended to the nonnegative
+        %% information/causality measures (mutual information, Granger)
+        function noSpuriousSignificanceForIndependentMutualInfo(testCase)
+            % mutualInfo.value is a histogram-based MI/NMI estimate, which is
+            % strictly non-negative and has positive finite-sample bias under
+            % independence (documented repro: 30 independent-noise dyads gave
+            % mean MI = 0.110, t = 39.65, p ~ 0 against a naive t-test-vs-0).
+            % computeGroup must treat 'mutualinfo' the same way as PLV/wPLI/
+            % coherence: skip the vs-zero test (or use a valid surrogate
+            % baseline if one is ever attached) rather than report spurious
+            % significance.
+            rng(12);
+            nDyads = 30;
+            data = buildIndependentNoiseDyads(nDyads, 8, 1200);
+            pairs = exploreFNIRS.hyperscanning.pairSubjects(data);
+
+            lastwarn('');
+            result = exploreFNIRS.hyperscanning.computeGroup(data, pairs, ...
+                'Method', 'mutualinfo', 'Biomarker', 'HbO', ...
+                'CouplingArgs', {'NumSurrogates', 0});
+            [~, warnID] = lastwarn();
+
+            % Sanity: confirms this is a genuine exercise of the fix, not a
+            % vacuous scenario (MI for independent noise must be > 0).
+            testCase.verifyGreaterThan(mean(result.Mean, 'omitnan'), 0);
+
+            testCase.verifyTrue(isfield(result, 'nullTest'));
+            testCase.verifyTrue(ismember(result.nullTest, {'skipped', 'surrogate'}));
+
+            if strcmp(result.nullTest, 'skipped')
+                testCase.verifyEqual(warnID, 'pf2:computeGroup:surrogateNullRequired');
+                testCase.verifyTrue(all(isnan(result.pvalue(:))), ...
+                    'p-values must be NaN (not a spurious near-zero p) for independent-noise mutual information.');
+                testCase.verifyTrue(all(isnan(result.tstat(:))));
+            else
+                testCase.verifyGreaterThan(min(result.pvalue(:)), 0.01, ...
+                    'Independent-noise mutual information must not appear significant against a valid surrogate null.');
+            end
+        end
+
+        function noSpuriousSignificanceForIndependentGranger(testCase)
+            % granger.value is the raw F-statistic (result.value = fStat,
+            % clamped to >= 0 in computeGranger), so it shares the same
+            % non-negative / non-zero-centered-null problem as PLV and mutual
+            % information: a two-sided t-test of the raw F values against 0
+            % is invalid and would flag purely independent noise as
+            % "significant".
+            rng(13);
+            nDyads = 30;
+            data = buildIndependentNoiseDyads(nDyads, 8, 1200);
+            pairs = exploreFNIRS.hyperscanning.pairSubjects(data);
+
+            lastwarn('');
+            result = exploreFNIRS.hyperscanning.computeGroup(data, pairs, ...
+                'Method', 'granger', 'Biomarker', 'HbO');
+            [~, warnID] = lastwarn();
+
+            % Sanity: F-statistics are non-negative by construction.
+            testCase.verifyGreaterThanOrEqual(mean(result.Mean, 'omitnan'), 0);
+
+            testCase.verifyTrue(isfield(result, 'nullTest'));
+            testCase.verifyTrue(ismember(result.nullTest, {'skipped', 'surrogate'}));
+
+            if strcmp(result.nullTest, 'skipped')
+                testCase.verifyEqual(warnID, 'pf2:computeGroup:surrogateNullRequired');
+                testCase.verifyTrue(all(isnan(result.pvalue(:))), ...
+                    'p-values must be NaN (not a spurious near-zero p) for independent-noise Granger F.');
+                testCase.verifyTrue(all(isnan(result.tstat(:))));
+            else
+                testCase.verifyGreaterThan(min(result.pvalue(:)), 0.01, ...
+                    'Independent-noise Granger F must not appear significant against a valid surrogate null.');
             end
         end
 

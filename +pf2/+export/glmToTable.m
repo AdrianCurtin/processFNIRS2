@@ -350,8 +350,10 @@ if ~isempty(outDir) && exist(outDir, 'dir') ~= 7
 end
 
 switch lower(ext)
-    case {'.csv', '.txt', '.tsv'}
+    case {'.csv', '.txt'}
         writetable(T, savePath);
+    case '.tsv'
+        writetable(T, savePath, 'FileType', 'text', 'Delimiter', '\t');
     case {'.xlsx', '.xls'}
         writetable(T, savePath);
     otherwise

@@ -57,22 +57,24 @@ function result = computeGroup(data, pairs, varargin)
 %     .nullTest  - How the vs-zero significance test was obtained:
 %                  'zero'      - classic one-sample t-test against 0. Valid
 %                                for signed measures (pearson/spearman/xcorr
-%                                Fisher-z; granger/partialcorr/mutualinfo/
-%                                transferentropy/hbica raw values), where 0
+%                                Fisher-z; partialcorr raw values), where 0
 %                                is the correct null-hypothesis value.
 %                  'surrogate' - per-dyad surrogate/null baselines were found
 %                                attached to the dyad results and the test was
 %                                run on (observed - baseline), which IS validly
 %                                centered at 0 under the null.
 %                  'skipped'   - the coupling measure (plv, imagcoherence,
-%                                wpli, wcoherence, coherence) is strictly
-%                                non-negative with a finite-sample null that is
-%                                NOT centered at 0 (e.g. independent-noise PLV
-%                                is reliably > 0), and no per-dyad surrogate
-%                                baseline was available, so the vs-zero test
-%                                was skipped (tstat/pvalue are NaN). A
-%                                pf2:computeGroup:surrogateNullRequired warning
-%                                is emitted; use
+%                                wpli, wcoherence, coherence, granger,
+%                                mutualinfo, transferentropy, hbica) is
+%                                strictly non-negative with a finite-sample
+%                                null that is NOT centered at 0 (e.g.
+%                                independent-noise PLV is reliably > 0, and
+%                                independent-noise mutual information is
+%                                reliably > 0 as well), and no per-dyad
+%                                surrogate baseline was available, so the
+%                                vs-zero test was skipped (tstat/pvalue are
+%                                NaN). A pf2:computeGroup:surrogateNullRequired
+%                                warning is emitted; use
 %                                exploreFNIRS.hyperscanning.permutationTest or
 %                                exploreFNIRS.coupling.surrogateTest instead.
 %     .dyads     - Cell array of individual sub-dyad results
@@ -148,11 +150,19 @@ function result = computeGroup(data, pairs, varargin)
     % > 0 -- 30 independent-noise dyads gave mean PLV = 0.192, t = 13.95,
     % p = 2.15e-14 against a t-test-vs-0). A classic one-sample t-test of
     % these RAW values against 0 is therefore invalid and yields spurious
-    % "significant" group results. Contrast the correlation-family measures
-    % (pearson/spearman/xcorr) above, whose Fisher-z is legitimately centered
-    % at 0 under independence, and Granger/mutual-info/etc., which the task
-    % of fixing this bug did not extend to. See the .nullTest output field.
-    strictlyPositiveNoZeroNull = {'plv', 'imagcoherence', 'wpli', 'wcoherence', 'coherence'};
+    % "significant" group results for ANY non-negative coupling measure, not
+    % just the phase/coherence family: Granger causality (raw F-statistic,
+    % F >= 0), mutual information and transfer entropy (information-theoretic
+    % quantities, >= 0 by definition; 30 independent-noise dyads analyzed with
+    % mutual information gave mean MI = 0.110, t = 39.65, p ~ 0), and the
+    % HB-ICA coupling score (a normalized-weight product, >= 0 by
+    % construction) all share this problem and are included below. Contrast
+    % the correlation-family measures (pearson/spearman/xcorr) above, whose
+    % Fisher-z is legitimately centered at 0 under independence, and
+    % partialcorr, whose raw (signed) value is too. See the .nullTest output
+    % field.
+    strictlyPositiveNoZeroNull = {'plv', 'imagcoherence', 'wpli', 'wcoherence', ...
+        'coherence', 'granger', 'mutualinfo', 'transferentropy', 'hbica'};
     isPositiveNoZeroNullMetric = ismember(methodName, strictlyPositiveNoZeroNull);
 
     % -----------------------------------------------------------------------
@@ -422,9 +432,10 @@ function result = computeGroup(data, pairs, varargin)
                      'valid significance test for "%s".'], methodName, methodName);
             end
         else
-            % Valid vs-zero test: e.g. Granger F, partial correlation, mutual
-            % information, transfer entropy -- signed or otherwise appropriately
-            % centered at 0 (or handled by their own within-method p-values).
+            % Valid vs-zero test: partial correlation (the only remaining
+            % dispatchable method here) is signed -- its raw value can be
+            % negative or positive and is legitimately centered at 0 under
+            % independence, so the classic one-sample t-test applies directly.
             tstat = meanVals ./ max(semVals, eps);
         end
     end
@@ -512,7 +523,8 @@ function [available, baselineDyadResults] = extractSurrogateBaseline(dyadResults
 % Inspects each valid sub-dyad's computeDyad result for an attached
 % surrogate/null baseline (same shape as .values), so that strictly
 % non-negative coupling measures (PLV, |imaginary coherence|, wPLI,
-% wavelet coherence, coherence) can be tested against that baseline instead
+% wavelet coherence, coherence, Granger causality, mutual information,
+% transfer entropy, HB-ICA) can be tested against that baseline instead
 % of an invalid vs-zero t-test. Recognized fields (checked per sub-dyad, in
 % order): a top-level 'surrogateBaseline' or 'nullMean' field, or a nested
 % 'surrogate.nullMean' struct field -- the shapes computeDyad or

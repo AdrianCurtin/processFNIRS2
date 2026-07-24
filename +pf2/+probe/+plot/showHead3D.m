@@ -152,7 +152,7 @@ if ~strcmp(markers, 'none')
              'skipping. Pass a single struct, not a cell array.'], class(fNIR));
     else
         try
-            dev = pf2.Device.load(fNIR);
+            dev = pf2_base.resolveDeviceFromData(fNIR);
             if wantOpt
                 if dev.hasSDPositions()
                     [srcPos, srcLbl] = dev.sourcePositions();

@@ -240,7 +240,7 @@ for g = 1:numel(keys)
                 'Requested channel(s) [%s] exceed the available channel count (%d) for group %s.', ...
                 num2str(badCh), nChAll, k.label);
         end
-        chList = channels;
+        chList = channels(:).';   % force a row so `for ch = chList` iterates per element
     end
 
     % Determine time-mean window mask
@@ -609,8 +609,10 @@ if ~isempty(outDir) && exist(outDir, 'dir') ~= 7
 end
 
 switch lower(ext)
-    case {'.csv', '.txt', '.tsv'}
+    case {'.csv', '.txt'}
         writetable(T, savePath);
+    case '.tsv'
+        writetable(T, savePath, 'FileType', 'text', 'Delimiter', '\t');
     case {'.xlsx', '.xls'}
         writetable(T, savePath);
     otherwise

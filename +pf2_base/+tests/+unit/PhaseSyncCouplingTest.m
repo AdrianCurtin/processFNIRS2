@@ -7,13 +7,18 @@ classdef PhaseSyncCouplingTest < matlab.unittest.TestCase
     %   Imaginary coherence and wPLI must be insensitive to zero-lag coupling
     %   while responding to a genuine phase-lagged relationship.
     %
-    %   Also covers regression tests for three fixed bugs: surrogateTest
+    %   Also covers regression tests for four fixed bugs: surrogateTest
     %   returning a finite p-value when a signal has an interior NaN sample
-    %   (both signals are NaN-filled before any FFT-based step); wpli's
-    %   'Debiased' estimator naming (Debiased=true -> 'debiased-squared-wpli',
-    %   Debiased=false -> ordinary magnitude 'wpli' in [0, 1]); and granger's
-    %   F-test denominator degrees of freedom (nObs - 2*order, no spurious
-    %   intercept term subtracted).
+    %   (both signals are NaN-filled before any FFT-based step); surrogateTest
+    %   returning a degenerate "valid" result (observed = 1, p = 1) instead of
+    %   an explicitly invalid one when x or y is all-NaN (its own NaN-fill
+    %   step would otherwise zero-fill an all-NaN signal, so two all-NaN
+    %   signals silently became two constant-zero signals with a spurious
+    %   perfect-coupling observed value and a degenerate constant null);
+    %   wpli's 'Debiased' estimator naming (Debiased=true ->
+    %   'debiased-squared-wpli', Debiased=false -> ordinary magnitude 'wpli'
+    %   in [0, 1]); and granger's F-test denominator degrees of freedom
+    %   (nObs - 2*order, no spurious intercept term subtracted).
     %
     %   Example:
     %       results = runtests('pf2_base.tests.unit.PhaseSyncCouplingTest');
@@ -103,6 +108,39 @@ classdef PhaseSyncCouplingTest < matlab.unittest.TestCase
             testCase.verifyGreaterThanOrEqual(sr.pvalue, 0);
             testCase.verifyLessThanOrEqual(sr.pvalue, 1);
             testCase.verifyEqual(sr.nPerms, 50);
+        end
+
+        function surrogateTestRejectsAllNaNSignals(testCase)
+            % Regression test: surrogateTest's own NaN-fill step (fillNaN)
+            % turns an all-NaN vector into an all-ZERO vector. Two all-NaN
+            % signals would therefore previously be silently converted to two
+            % constant-zero signals, producing a degenerate observed coupling
+            % value (e.g. 1) and an equally degenerate constant null
+            % distribution, i.e. p = 1 -- indistinguishable from a genuinely
+            % tested, merely non-significant, result. surrogateTest must
+            % instead detect this BEFORE NaN-filling and return an explicitly
+            % invalid result (NaN observed/pvalue, empty null distribution)
+            % with a pf2:surrogateTest:insufficientData warning.
+            T = 200;
+            xAllNaN = nan(T, 1);
+            yAllNaN = nan(T, 1);
+
+            lastwarn('');
+            sr = exploreFNIRS.coupling.surrogateTest(@exploreFNIRS.coupling.plv, ...
+                xAllNaN, yAllNaN, testCase.fs, 'Permutations', 50);
+            [~, warnID] = lastwarn();
+
+            testCase.verifyEqual(warnID, 'pf2:surrogateTest:insufficientData');
+            testCase.verifyTrue(isnan(sr.observed), ...
+                'observed must be NaN for two all-NaN signals, not a degenerate perfect-coupling value.');
+            testCase.verifyTrue(isnan(sr.pvalue), ...
+                'pvalue must be NaN for two all-NaN signals, not a degenerate p = 1.');
+            testCase.verifyTrue(isnan(sr.nullMean));
+            testCase.verifyTrue(isnan(sr.nullSD));
+            testCase.verifyTrue(isnan(sr.zScore));
+            testCase.verifyFalse(sr.significant);
+            testCase.verifyEqual(sr.nPerms, 0);
+            testCase.verifyEmpty(sr.nullDist);
         end
 
         function wpliDebiasedFalseReturnsMagnitudeEstimator(testCase)

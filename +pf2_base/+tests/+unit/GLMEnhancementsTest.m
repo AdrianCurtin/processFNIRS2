@@ -4,9 +4,10 @@ classdef GLMEnhancementsTest < matlab.unittest.TestCase
     %   Covers: the single-gamma HRF variant (buildHRF), the FIR basis and its
     %   derivative guard, near-singular/rank-deficient FIR designs, and the
     %   amplitude/duration-ignored warning (buildDesignMatrix); automatic
-    %   AR-order selection, rank-deficient degrees-of-freedom handling, and
-    %   OLS/AROrder interaction in fitGLM; and BIC order selection in Granger
-    %   causality.
+    %   AR-order selection, rank-deficient degrees-of-freedom handling,
+    %   estimability of individual coefficients/contrasts under a
+    %   rank-deficient design with POSITIVE dof, and OLS/AROrder interaction
+    %   in fitGLM; and BIC order selection in Granger causality.
     %
     %   Example:
     %       results = runtests('pf2_base.tests.unit.GLMEnhancementsTest');
@@ -120,6 +121,91 @@ classdef GLMEnhancementsTest < matlab.unittest.TestCase
             testCase.verifyGreaterThanOrEqual(res.dof, 1);
             testCase.verifyTrue(all(isnan(res.tstat(:))));
             testCase.verifyTrue(all(isnan(res.pval(:))));
+        end
+
+        function rankDeficientWithPositiveDofYieldsNonEstimableCoefNaN(testCase)
+            % Two identical columns among several well-conditioned regressors
+            % make the design rank-deficient (rank = P-1) WITHOUT driving dof
+            % to <= 0 (T >> P here), so the existing dofInvalid path (dof<=0)
+            % does not catch this case. Before the fix, pinv(X'*X) still
+            % returned a finite (but not statistically meaningful) variance
+            % for the aliased columns, so both aliased coefficients got
+            % finite SE/t/p. Non-estimable coefficients/contrasts must be
+            % NaN'd via the null-space test regardless of dof.
+            rng(7);
+            T = 200;
+            constCol = ones(T, 1);
+            dupCol = randn(T, 1);
+            indepCol = randn(T, 1);
+            X = [constCol, dupCol, dupCol, indepCol];   % col2 == col3 (aliased)
+            names = {'const', 'dupA', 'dupB', 'indepTask'};
+
+            % Only const, (dupA+dupB), and indepTask are identifiable; dupA
+            % and dupB individually are not, so their true betas are moot.
+            trueBeta = [0.5; 0; 0; 2.0];
+            Y = X * trueBeta + 0.1 * randn(T, 1);
+
+            C = [0 1 -1 0;   % non-estimable: difference of the aliased pair
+                 0 0  0 1];  % estimable: isolates indepTask
+            contrastNames = {'dupDiff', 'indepEffect'};
+
+            testCase.verifyWarning(@() pf2_base.fnirs.fitGLM(Y, X, names, ...
+                'Contrasts', C, 'ContrastNames', contrastNames), ...
+                'pf2:fitGLM:rankDeficient');
+
+            res = pf2_base.fnirs.fitGLM(Y, X, names, ...
+                'Contrasts', C, 'ContrastNames', contrastNames);
+
+            testCase.verifyGreaterThan(res.dof, 0, ...
+                'This design has T >> P, so dof should be comfortably positive');
+
+            % (b) aliased coefficients (dupA, dupB) are non-estimable -> NaN
+            testCase.verifyTrue(all(isnan(res.tstat(2:3, :))), ...
+                'Aliased coefficients should have NaN tstat');
+            testCase.verifyTrue(all(isnan(res.pval(2:3, :))), ...
+                'Aliased coefficients should have NaN pval');
+
+            % (c) estimable coefficients (const, indepTask) remain finite
+            testCase.verifyTrue(all(isfinite(res.tstat([1 4], :))), ...
+                'Estimable coefficients should have finite tstat');
+            testCase.verifyTrue(all(isfinite(res.pval([1 4], :))), ...
+                'Estimable coefficients should have finite pval');
+
+            % (d) contrasts: the aliased-pair difference is non-estimable
+            % (NaN); a contrast over an estimable column is finite
+            testCase.verifyTrue(isnan(res.contrast.tstat(1)), ...
+                'Contrast isolating the aliased-pair difference should be NaN');
+            testCase.verifyTrue(isnan(res.contrast.pval(1)));
+            testCase.verifyTrue(isfinite(res.contrast.tstat(2)), ...
+                'Contrast over an estimable column should be finite');
+            testCase.verifyTrue(isfinite(res.contrast.pval(2)));
+        end
+
+        function fullRankSiblingOfRankDeficientDesignStaysAllFinite(testCase)
+            % Regression guard: dropping the duplicate column from the
+            % rank-deficient design above must NOT warn and must leave every
+            % coefficient/contrast stat finite (r == P -> null space empty ->
+            % nothing NaN'd).
+            rng(7);
+            T = 200;
+            constCol = ones(T, 1);
+            dupCol = randn(T, 1);
+            indepCol = randn(T, 1);
+            X = [constCol, dupCol, indepCol];   % full column rank (3 unique cols)
+            names = {'const', 'dupA', 'indepTask'};
+
+            trueBeta = [0.5; 1.0; 2.0];
+            Y = X * trueBeta + 0.1 * randn(T, 1);
+
+            C = [0 1 0];
+            testCase.verifyWarningFree(@() pf2_base.fnirs.fitGLM(Y, X, names, ...
+                'Contrasts', C));
+
+            res = pf2_base.fnirs.fitGLM(Y, X, names, 'Contrasts', C);
+            testCase.verifyTrue(all(isfinite(res.tstat(:))));
+            testCase.verifyTrue(all(isfinite(res.pval(:))));
+            testCase.verifyTrue(all(isfinite(res.contrast.tstat(:))));
+            testCase.verifyTrue(all(isfinite(res.contrast.pval(:))));
         end
 
         function olsWithAutoAROrderDoesNotError(testCase)

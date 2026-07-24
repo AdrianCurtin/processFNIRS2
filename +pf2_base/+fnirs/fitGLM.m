@@ -30,6 +30,10 @@ function results = fitGLM(Y, X, regressorNames, varargin)
 %   Schwarz, G. (1978). Estimating the Dimension of a Model. The Annals of
 %   Statistics, 6(2), 461-464. DOI: 10.1214/aos/1176344136
 %
+%   Milliken, G. A. (1971). New Criteria for Estimability for Linear
+%   Models. The Annals of Mathematical Statistics, 42(5), 1588-1594.
+%   DOI: 10.1214/aoms/1177693157
+%
 % Syntax:
 %   results = pf2_base.fnirs.fitGLM(Y, X, regressorNames)
 %   results = pf2_base.fnirs.fitGLM(Y, X, regressorNames, 'Name', Value)
@@ -85,6 +89,15 @@ function results = fitGLM(Y, X, regressorNames, varargin)
 %                   .tstat/.pval (and any .contrast.tstat/.contrast.pval) are
 %                   NaN, since they are not statistically identifiable;
 %                   .beta is still the pinv minimum-norm solution.
+%                   Separately, a rank-deficient design can have dof > 0
+%                   (e.g. two identical/aliased columns among many, giving
+%                   rank P-1) while still leaving individual coefficients
+%                   NON-ESTIMABLE. This is detected via the null space of
+%                   the design (see "Estimability" below): non-estimable
+%                   .beta entries get .se/.tstat/.pval = NaN (per channel;
+%                   .beta itself remains the pinv minimum-norm value), and
+%                   non-estimable .contrast rows get .tstat/.pval = NaN,
+%                   independently of the dof<=0 case above.
 %     .method     - Estimation method used [char]
 %     .arOrder    - AR order used (scalar; present only for AR-IRLS)
 %     .contrast   - Struct (if Contrasts provided) with fields:
@@ -98,6 +111,7 @@ function results = fitGLM(Y, X, regressorNames, varargin)
 %   4. MSE = sum(residuals.^2) / dof
 %   5. se = sqrt(diag(MSE * inv(X'*X)))
 %   6. t = beta ./ se, p = 2*tcdf(-abs(t), dof); NaN if T - r <= 0
+%   7. If r < P: NaN se for non-estimable coefficients (see "Estimability")
 %
 % Algorithm (AR-IRLS):
 %   1. Initial OLS fit
@@ -110,6 +124,24 @@ function results = fitGLM(Y, X, regressorNames, varargin)
 %   7. r = rank(Xw) (effective rank of the prewhitened design);
 %      dof = max(T - r - AROrder, 1) (warn if r < P); NaN t/p if the
 %      unclamped T - r - AROrder <= 0
+%   8. If r < P: NaN se for non-estimable coefficients of Xw (see
+%      "Estimability")
+%
+% Estimability (rank-deficient designs with dof > 0):
+%   A rank-deficient design (r < P) does not always drive dof to <= 0 --
+%   e.g. two identical/aliased columns among many well-conditioned
+%   regressors gives r = P-1, so dof = T-(P-1) can still be comfortably
+%   positive. In that regime pinv(X'*X) still returns a FINITE (but not
+%   statistically meaningful) variance for the aliased coefficients, so the
+%   dof<=0 guard above does not catch it. This is handled separately via
+%   the null space of X: N = null(X) spans the directions along which beta
+%   can shift without changing X*beta (i.e. without changing the fit). A
+%   coefficient beta_j is NON-estimable iff some column of N has a nonzero
+%   entry in row j (any(abs(N(j,:)) > tol)); its .se (and hence .tstat/
+%   .pval) is set to NaN. A contrast c is non-estimable iff c has a nonzero
+%   component along the null space, tested as norm(c * N) > tol (Milliken,
+%   1971); its .contrast.tstat/.pval are set to NaN. For full-rank designs
+%   (r == P), N is empty and nothing is changed.
 %
 % Example:
 %   events(1) = struct('name', 'TaskA', 'onsets', [10 40 70], 'duration', 20);
@@ -340,6 +372,16 @@ varBeta = diag(XtXinv);  % [P x 1]
 % Standard errors: sqrt(var(beta_j) * MSE_c) for each channel
 se = sqrt(varBeta * MSE);  % [P x C]
 
+% Estimability: a rank-deficient design can have dof > 0 (e.g. two
+% aliased columns among many well-conditioned regressors) while still
+% leaving individual coefficients non-estimable. pinv(X'*X) above returns
+% a finite variance for those coefficients regardless, so they must be
+% NaN'd explicitly via the null-space test (see file header).
+if r < P
+    nonEstCoef = nonEstimableCoefficients(X);
+    se(nonEstCoef, :) = NaN;
+end
+
 end
 
 function [beta, residuals, se, dof, Xw, residuals_w, dofInvalid] = fitARIRLS(Y, X, arOrder, maxIter, tol, useGPU)
@@ -422,7 +464,8 @@ end
 % for the same reason as the OLS path: a rank-deficient design (e.g. an FIR
 % basis with T < number of stick regressors) must not understate, zero, or
 % negate the residual dof.
-r = rank(pf2_base.accel.gather(Xw));
+XwGathered = pf2_base.accel.gather(Xw);
+r = rank(XwGathered);
 if r < P
     warning('pf2:fitGLM:rankDeficient', ...
         ['Prewhitened design matrix is rank-deficient (effective rank %d of ' ...
@@ -438,6 +481,13 @@ MSE = sum(residuals_w.^2, 1) / dof;
 XwXwinv = pinv(Xw' * Xw);
 varBeta = diag(XwXwinv);  % [P x 1]
 se = sqrt(varBeta * MSE);  % [P x C]
+
+% Estimability: same rank-deficient-with-positive-dof case as fitOLS (see
+% file header), tested on the prewhitened design Xw.
+if r < P
+    nonEstCoef = nonEstimableCoefficients(XwGathered);
+    se(nonEstCoef, :) = NaN;
+end
 
 % Final residuals in original space
 residuals = Yg - Xg * beta;
@@ -533,6 +583,11 @@ function contrast = computeContrasts(C, contrastNames, beta, se, X, dof, residua
 %
 % Outputs:
 %   contrast - Struct with .beta, .tstat, .pval, .se, .names
+%
+% Note on estimability: even when dof > 0, a rank-deficient X (see file
+% header) can make an individual contrast row non-estimable; pinv(X'*X)
+% still returns a finite (but not statistically meaningful) cSe for it.
+% Such rows are detected via the null space of X and NaN'd below.
 
 [K, P] = size(C);
 nCh = size(beta, 2);
@@ -554,6 +609,24 @@ end
 
 cTstat = cBeta ./ cSe;
 cPval = 2 * pf2_base.compat.tcdf(-abs(cTstat), dof);
+
+% Estimability: a contrast c is non-estimable iff it has a nonzero
+% component along the null space of X, i.e. norm(c * N) > tol (Milliken,
+% 1971). Only relevant when X is rank-deficient; N is empty (skipped)
+% otherwise, leaving full-rank designs unchanged.
+r = rank(X);
+if r < P
+    [~, Nspace, nsTol] = nonEstimableCoefficients(X);
+    if ~isempty(Nspace)
+        nonEstContrast = false(K, 1);
+        for k = 1:K
+            nonEstContrast(k) = norm(C(k, :) * Nspace) > nsTol;
+        end
+        cTstat(nonEstContrast, :) = NaN;
+        cPval(nonEstContrast, :) = NaN;
+    end
+end
+
 if dofInvalid
     cTstat(:) = NaN;
     cPval(:) = NaN;
@@ -572,6 +645,53 @@ contrast.tstat = cTstat;
 contrast.pval = cPval;
 contrast.se = cSe;
 contrast.names = contrastNames;
+
+end
+
+function [nonEstCoef, Nspace, nsTol] = nonEstimableCoefficients(X)
+% NONESTIMABLECOEFFICIENTS Non-estimable coefficients of a rank-deficient design
+%
+% For a rank-deficient design X ([T x P], effective rank r < P), the null
+% space of X spans the P-r directions along which beta can be shifted
+% without changing X*beta (the fitted values, and hence the data likelihood,
+% are unchanged). A coefficient beta_j is therefore NON-estimable -- not
+% uniquely determined by the data, regardless of dof -- iff some null-space
+% basis vector has a nonzero entry in row j. This is distinct from (and can
+% occur even when) dof = T - r > 0; pinv(X'*X) still returns a finite
+% variance for such a coefficient, which is not statistically meaningful and
+% must be reported as NaN rather than a finite SE/t/p (Milliken, 1971).
+%
+% The tolerance for both the null-space computation and the row/contrast
+% nonzero test is a single matrix-scale-relative value, max(size(X)) *
+% eps(norm(X)) -- the same formula MATLAB's null() uses internally by
+% default, so it stays consistent with the rank(X) test the caller already
+% performs. Basis vectors returned by null() are unit-norm, so a genuine
+% aliasing coefficient (e.g. 1/sqrt(2) for a pair of identical columns) sits
+% many orders of magnitude above this tolerance.
+%
+% Callers should only invoke this when rank(X) < size(X,2); for a full-rank
+% X, Nspace is empty and nonEstCoef is all-false (no-op), but the caller is
+% expected to skip the call entirely in that case to avoid the extra SVD.
+%
+% Inputs:
+%   X - Design matrix [T x P] (rank-deficient)
+%
+% Outputs:
+%   nonEstCoef - Logical mask [P x 1]; true where the coefficient is
+%                non-estimable
+%   Nspace     - Null-space basis [P x (P-r)] as returned by null(X, nsTol);
+%                empty if X is (numerically) full column rank
+%   nsTol      - Tolerance used for the null-space computation and the
+%                nonzero test [scalar]
+
+P = size(X, 2);
+nsTol = max(size(X)) * eps(norm(X));
+Nspace = null(X, nsTol);
+if isempty(Nspace)
+    nonEstCoef = false(P, 1);
+else
+    nonEstCoef = any(abs(Nspace) > nsTol, 2);
+end
 
 end
 
