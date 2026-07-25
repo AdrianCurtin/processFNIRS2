@@ -89,8 +89,8 @@ end
 includeSSchannels = true;
 buildProbeLayout = true;
 
-% Handle file selection if needed
-if nargin < 1
+% Handle file selection if needed (no path given, or an empty placeholder)
+if nargin < 1 || isempty(filepath)
    [filename, pathname] = uigetfile({'*.snirf;*.jsnirf','snirf files (*.snirf,*.jsnirf)';'*.*','All files (*.*)'},'Open SNIRF file');
    if isequal(filename, 0) || isequal(pathname, 0)
        error('pf2:importSNIRF:selectionCanceled', 'File selection canceled.');

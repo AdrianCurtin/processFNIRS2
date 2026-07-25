@@ -156,5 +156,65 @@ classdef ImportDirectoryTest < matlab.unittest.TestCase
             testCase.verifyTrue(isfield(allData{1}.info, 'sourcePath'));
             testCase.verifyTrue(contains(allData{1}.info.sourcePath, 'data.snirf'));
         end
+
+        function testValidBIDSTreeNoDuplicateWarning(testCase)
+            % A valid BIDS tree with repeated sub- across sessions/runs must NOT
+            % trigger a duplicate warning: the entity tuples are all distinct.
+            root = testCase.TempRoot;
+            testCase.writeBIDSFile(root, 'sub-01', 'ses-1', 'rest', '01');
+            testCase.writeBIDSFile(root, 'sub-01', 'ses-1', 'rest', '02');
+            testCase.writeBIDSFile(root, 'sub-01', 'ses-2', 'rest', '01');
+            testCase.writeBIDSFile(root, 'sub-02', 'ses-1', 'rest', '01');
+            testCase.writeDatasetDescription(root);
+
+            oldDir = cd(testCase.ProjectRoot);
+            restoreDir = onCleanup(@() cd(oldDir));
+
+            lastwarn('');
+            allData = pf2.import.importDirectory(root, '*.snirf', 'Verbose', false);
+            [~, wid] = lastwarn();
+            testCase.verifyLength(allData, 4);
+            testCase.verifyEmpty(wid, ...
+                'Distinct BIDS entity tuples should not warn about duplicates.');
+        end
+
+        function testMalformedBIDSDuplicateEntityWarns(testCase)
+            % Two files with a byte-identical entity tuple (sub/ses/task/run) in
+            % different site subfolders are indistinguishable -> must warn. Import
+            % does NOT auto-number these (unlike asBIDS export).
+            root = testCase.TempRoot;
+            testCase.writeBIDSFile(fullfile(root, 'siteA'), 'sub-01', '', 'rest', '01');
+            testCase.writeBIDSFile(fullfile(root, 'siteB'), 'sub-01', '', 'rest', '01');
+            testCase.writeDatasetDescription(root);
+
+            oldDir = cd(testCase.ProjectRoot);
+            restoreDir = onCleanup(@() cd(oldDir));
+
+            testCase.verifyWarning(...
+                @() pf2.import.importDirectory(root, '*.snirf', 'Verbose', false), ...
+                'pf2:importDirectory:duplicateBIDSEntities');
+        end
+    end
+
+    methods (Access = private)
+        function writeBIDSFile(testCase, root, sub, ses, task, run)
+            % Build a BIDS-named SNIRF under root/sub[/ses]/nirs/.
+            parts = {sub};
+            name = sub;
+            if ~isempty(ses), parts{end+1} = ses; name = [name '_' ses]; end
+            name = [name '_task-' task];
+            if ~isempty(run), name = [name '_run-' run]; end
+            name = [name '_nirs.snirf'];
+            dst = fullfile(root, parts{:}, 'nirs');
+            mkdir(dst);
+            pf2.export.asSNIRF(testCase.RawData, fullfile(dst, name));
+        end
+
+        function writeDatasetDescription(~, root)
+            % Minimal dataset_description.json so importDirectory detects BIDS.
+            fid = fopen(fullfile(root, 'dataset_description.json'), 'w');
+            fprintf(fid, '{"Name":"test","BIDSVersion":"1.8.0"}');
+            fclose(fid);
+        end
     end
 end

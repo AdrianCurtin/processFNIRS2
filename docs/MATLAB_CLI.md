@@ -72,6 +72,19 @@ matlab -batch "addpath('utils'); load('data.mat'); process_data"
 
 ## processFNIRS2 Specific Examples
 
+> **Reproducible batch runs: pass an explicit `pf2.ProcessingContext`.** A bare
+> `processFNIRS2(data)` with no context inherits the DPF mode (and other
+> settings) from the global `PF2` state, which a prior GUI session may have
+> changed - so an unattended script can silently get a different `DPFmode` than
+> intended. For reproducibility, pin the settings in a context and pass it:
+> ```matlab
+> ctx = pf2.ProcessingContext('DPFmode','Calc', 'SubjectAge',25, ...
+>     'RawMethod','x2_lpf', 'blLength',10);
+> processed = processFNIRS2(data, 'Context', ctx);   % globals never read/written
+> ```
+> In a headless session, if `DPFmode` was inherited from a non-default global,
+> `processFNIRS2` emits a one-time `pf2:processFNIRS2:batchGlobalDPF` warning.
+
 **Process a single file:**
 ```bash
 cd /Users/adriancurtin/Documents/GitHub/processFNIRS2 && \

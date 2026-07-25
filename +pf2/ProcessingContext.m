@@ -21,8 +21,12 @@ classdef ProcessingContext < pf2_base.ProcessingContext
     % Inputs (Name-Value pairs; all optional):
     %   'RawMethod'    - Name of a raw-stage method (e.g. 'OD_TDDR')
     %   'OxyMethod'    - Name of an oxy-stage method (e.g. 'takizawa_easy')
-    %   'DPFmode'      - 'None' | 'Fixed' | 'Calc'
+    %   'DPFmode'      - 'None' | 'Fixed' | 'Calc' | 'PPF'
     %   'FixedDPF'     - Fixed DPF value (used when DPFmode is 'Fixed')
+    %   'PVC'          - Partial-volume correction divisor (>=1) applied to the
+    %                    Fixed/Calc DPF: L = SD.*DPF./pvc (pf2_base.fnirs.strangmanPVC)
+    %   'PPF'          - Complete effective factor (escape hatch), scalar or
+    %                    [ppf1 ppf2] (used when DPFmode is 'PPF'; L = SD.*ppf)
     %   'SubjectAge'   - Age in years (used when DPFmode is 'Calc')
     %   'blLength'     - Baseline duration (seconds)
     %   'blStartTime'  - Baseline start (seconds)
@@ -125,6 +129,10 @@ classdef ProcessingContext < pf2_base.ProcessingContext
                     obj.dpfMode = char(val);
                 case {'fixeddpf', 'dpffixedvalue'}
                     obj.dpfFixedValue = val;
+                case {'pvc', 'partialvolumecorrection'}
+                    obj.pvc = val;
+                case {'ppf', 'partialpathlengthfactor'}
+                    obj.ppf = val;
                 case {'subjectage', 'defaultsubjectage'}
                     obj.subjectAge = val;
                 case {'bllength', 'baselinelength'}

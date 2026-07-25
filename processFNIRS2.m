@@ -113,6 +113,8 @@ if hasContextArg
     defaultSubjectAge = providedContext.subjectAge;
     defaultFixedDPF = providedContext.dpfFixedValue;
     defaultDPFmode = providedContext.dpfMode;
+    defaultPPF = providedContext.ppf;
+    defaultPVC = providedContext.pvc;
     defaultRejectLevel = providedContext.rejectLevel;
     % For method validation, use context's method libraries
     if ~isempty(providedContext.rawMethodsLib) && isfield(providedContext.rawMethodsLib, 'cfg')
@@ -142,6 +144,8 @@ else
     defaultSubjectAge = PF2.curDPF_age;
     defaultFixedDPF = PF2.curDPF_fixed;
     defaultDPFmode = PF2.dpf_mode;
+    if isfield(PF2, 'ppf'); defaultPPF = PF2.ppf; else; defaultPPF = []; end
+    if isfield(PF2, 'pvc'); defaultPVC = PF2.pvc; else; defaultPVC = []; end
     defaultRejectLevel = PF2.RejectLevel;
     rawMethodSections = PF2.myRawMethods.cfg.Sections;
     oxyMethodSections = PF2.myOxyMethods.cfg.Sections;
@@ -154,7 +158,7 @@ validScalarNum = @(x) isnumeric(x) && isscalar(x);
 validDataInput = @(x) ((isnumeric(x) && ismatrix(x))||(isstruct(x)&&(isfield(x,'raw')||isfield(x,'hbo')||isfield(x,'HbO')||isfield(x,'info'))));
 validRawMethod = @(x) ischar(validatestring(x, rawMethodSections));
 validOxyMethod = @(x) ischar(validatestring(x, oxyMethodSections));
-validDPFmode = @(x) ischar(validatestring(x,{'None','Fixed','Calc'})); % None uses no DPF factor (units mm*mMol), fixed uses one DPF for all wavelenghts,Calc attempts tocalculate wavelength*age dependent changes
+validDPFmode = @(x) ischar(validatestring(x,{'None','Fixed','Calc','PPF'})); % None uses no DPF factor (units mm*mMol), Fixed uses one DPF for all wavelengths, Calc attempts to calculate wavelength*age dependent changes, PPF uses a partial pathlength factor (L=SD.*ppf, MNE/Homer convention)
 
 
 addOptional(p,'data',[],validDataInput);
@@ -176,7 +180,10 @@ addParameter(p,'ChannelMask',[],@ismatrix); %logical matrix the size of channel 
 addParameter(p,'ShowGUI',false,@islogical); % turn true to launch GUI
 addParameter(p,'DirtyBaseline',false,@islogical); % turn to use the entire mean as the baseline period
 addParameter(p,'FixedDPF',defaultFixedDPF,validScalarPosNum); %set default uniwavelength DPF
+addParameter(p,'PPF',defaultPPF,@(x) isempty(x)||(isnumeric(x)&&isvector(x))); %complete effective pathlength factor(s) used when DPFmode is 'PPF' (escape hatch, L=SD.*ppf)
+addParameter(p,'PVC',defaultPVC,@(x) isempty(x)||(isnumeric(x)&&isvector(x))||(ischar(x)&&strcmpi(x,'auto'))||(isstring(x)&&isscalar(x))); %partial-volume correction divisor(s) (>=1) or 'auto' (per-channel from separation); applied to the Fixed/Calc DPF (L=SD.*DPF./pvc)
 addParameter(p,'DPFmode',defaultDPFmode,validDPFmode); %set role of DPF in mBLL calculations
+addParameter(p,'ODShortRegression',false,@(x) islogical(x)||iscell(x)); %OD-space short-channel regression before Beer-Lambert: true for defaults, or a cell of shortChannelRegression Name-Value options
 addParameter(p,'RejectLevel',defaultRejectLevel,@(x) isnumeric(x)&&isscalar(x)&&x<1&&x>=0); %set the level at which a channel is rejected (fChMask)
 addParameter(p,'Context',[],@(x) isempty(x) || isa(x, 'pf2_base.ProcessingContext')); %optional ProcessingContext for isolated processing
 
@@ -185,6 +192,15 @@ addParameter(p,'ImportOxyMethods','NA',@ischar);  %Path for Oxy methods cfg file
 addParameter(p,'ImportRawMethods','NA',@ischar);  %Path for Raw methods cfg file to import
 
 parse(p,varargin{:});
+
+% Canonicalize DPFmode to the canonical spelling {'None','Fixed','Calc','PPF'}.
+% validDPFmode only checks that validatestring succeeds during parsing; it
+% does not rewrite p.Results, so a case-insensitive match (e.g. 'ppf') would
+% otherwise be threaded downstream (PF2.dpf_mode / ctxDPF_mode) in its
+% original casing. Everything downstream compares dpfMode case-sensitively in
+% places, so canonicalize once here rather than relying on every consumer to
+% do it.
+canonicalDPFmode = validatestring(p.Results.DPFmode, {'None','Fixed','Calc','PPF'});
 
 % Handle ProcessingContext if provided
 ctx = p.Results.Context;
@@ -256,7 +272,9 @@ if(~ShowGUI && ~hasContextArg && isempty(data))
     PF2.baseline.blLength  = p.Results.blLength;
     PF2.curDPF_fixed       = p.Results.FixedDPF;
     PF2.curDPF_age         = p.Results.defaultSubjectAge;
-    PF2.dpf_mode           = p.Results.DPFmode;
+    PF2.dpf_mode           = canonicalDPFmode;
+    PF2.ppf                = p.Results.PPF;
+    PF2.pvc                = p.Results.PVC;
     PF2.RejectLevel        = p.Results.RejectLevel;
 
     if(~any(strcmp('Raw_Method',p.UsingDefaults)) && ...
@@ -347,6 +365,8 @@ if useContext
     ctxDPF_fixed = ctx.dpfFixedValue;
     ctxDPF_age = ctx.subjectAge;
     ctxDPF_mode = ctx.dpfMode;
+    ctxPPF = ctx.ppf;
+    ctxPVC = ctx.pvc;
     ctxRejectLevel = ctx.rejectLevel;
 
     % Override with explicit parameters if provided
@@ -363,7 +383,13 @@ if useContext
         ctxDPF_age = p.Results.defaultSubjectAge;
     end
     if ~any(strcmp(p.UsingDefaults, 'DPFmode'))
-        ctxDPF_mode = p.Results.DPFmode;
+        ctxDPF_mode = canonicalDPFmode;
+    end
+    if ~any(strcmp(p.UsingDefaults, 'PPF'))
+        ctxPPF = p.Results.PPF;
+    end
+    if ~any(strcmp(p.UsingDefaults, 'PVC'))
+        ctxPVC = p.Results.PVC;
     end
     if ~any(strcmp(p.UsingDefaults, 'RejectLevel'))
         ctxRejectLevel = p.Results.RejectLevel;
@@ -430,11 +456,34 @@ else
 
     PF2.curDPF_fixed=p.Results.FixedDPF;
     PF2.curDPF_age=p.Results.defaultSubjectAge;
-    PF2.dpf_mode=p.Results.DPFmode;
+    PF2.dpf_mode=canonicalDPFmode;
+    PF2.ppf=p.Results.PPF;
+    PF2.pvc=p.Results.PVC;
     ctxDPF_fixed = PF2.curDPF_fixed;
     ctxDPF_age = PF2.curDPF_age;
     ctxDPF_mode = PF2.dpf_mode;
+    ctxPPF = PF2.ppf;
+    ctxPVC = PF2.pvc;
     ctxRejectLevel = PF2.RejectLevel;
+
+    % Reproducibility guard: on the legacy (no-Context) path DPFmode falls back
+    % to the global PF2.dpf_mode, which a prior GUI session may have changed.
+    % Only warn when that inherited value has actually diverged from the
+    % ProcessingContext default ('Calc'): a fresh headless session initializes
+    % to 'Calc', so the common case stays silent and only a GUI-modified,
+    % silently-inherited mode trips the warning (once per session).
+    persistent batchGlobalDPFWarned
+    if isempty(batchGlobalDPFWarned); batchGlobalDPFWarned = false; end
+    if ~batchGlobalDPFWarned && pf2_base.isHeadless() ...
+            && any(strcmp(p.UsingDefaults,'DPFmode')) && ~strcmpi(ctxDPF_mode,'Calc')
+        warning('pf2:processFNIRS2:batchGlobalDPF', ...
+            ['Headless run with no ProcessingContext: DPFmode was inherited ' ...
+             'from the global PF2.dpf_mode (=''%s''), which differs from the ' ...
+             'default and may have been set by a prior GUI session. For ' ...
+             'reproducible batch runs pass an explicit pf2.ProcessingContext ' ...
+             '(see docs/MATLAB_CLI.md).'], ctxDPF_mode);
+        batchGlobalDPFWarned = true;
+    end
 
     rawMethodStr=p.Results.Raw_Method;
     oxyMethodStr=p.Results.Oxy_Method;
@@ -702,10 +751,26 @@ if(~isempty(data))
     
 
    if(outputData.ProcessRaw)
-        
+
         [fData.stage{3},fData.stage{2}]=pf2_base.fnirs.processStageRaw2OD(ctxRawMethod,fData.stage{1},fData.fs,fData.time,rawMask,fMarkers,fAux,channelNumbers,wavelengths,curOptTable,data); % Raw data processing
+
+        % Optional OD-space short-channel regression, applied BEFORE Beer-Lambert
+        % (Brigadoi & Cooper 2015) so systemic residuals are not amplified by the
+        % conversion. Opt-in only: default 'ODShortRegression' is false, leaving
+        % the pipeline byte-identical. Hb-space SSR remains available as an oxy
+        % method (pf2_SSR) that runs after conversion.
+        if ~(islogical(p.Results.ODShortRegression) && isscalar(p.Results.ODShortRegression) && ~p.Results.ODShortRegression)
+            if iscell(p.Results.ODShortRegression)
+                odSSRopts = p.Results.ODShortRegression;
+            else
+                odSSRopts = {};
+            end
+            fData.stage{3} = pf2_base.fnirs.shortChannelRegressionOD(fData.stage{3}, ...
+                channelNumbers, wavelengths, curProbe, odSSRopts{:});
+        end
+
         if(outputData.ProcessOxy)
-            fData.stage{4}=pf2_base.fnirs.processStageOD2Hb(fData.stage{3},fData.time,fData.info.Age,outputData.DirtyBaseline,curProbe,ctxBaseline,ctxDPF_mode,ctxDPF_fixed,ctxDPF_age); % Beer-Lambert conversion
+            fData.stage{4}=pf2_base.fnirs.processStageOD2Hb(fData.stage{3},fData.time,fData.info.Age,outputData.DirtyBaseline,curProbe,ctxBaseline,ctxDPF_mode,ctxDPF_fixed,ctxDPF_age,'PPF',ctxPPF,'PVC',ctxPVC); % Beer-Lambert conversion
         end
         if isfield(fData,'ROI') && isstruct(fData.ROI) && isfield(fData.ROI,'info')
             fData.stage{4}.ROI.info=fData.ROI.info; %Regenerate from info
@@ -788,6 +853,10 @@ if(nargout>0)
 
        % Store processing context for reproducibility and plot enhancement
        outfNIR.processingInfo = buildProcessingInfo(PF2, setF, ctx);
+       % Record the OD-space short-channel-regression choice (a processFNIRS2
+       % option, not a ctx/global field), so provenance is complete.
+       outfNIR.processingInfo.odShortRegression = ...
+           ~(islogical(p.Results.ODShortRegression) && isscalar(p.Results.ODShortRegression) && ~p.Results.ODShortRegression);
 
        % Attach Device object for self-describing output. procDevice is the
        % locally-threaded device (ctx.device on the context path, setF.device
@@ -937,6 +1006,8 @@ if nargin >= 3 && ~isempty(ctx) && isa(ctx, 'pf2_base.ProcessingContext')
     % Read from Context - no global access
     info.dpfMode = ctx.dpfMode;
     info.dpfValue = ctx.dpfFixedValue;
+    info.ppf = ctx.ppf;
+    info.pvc = ctx.pvc;
     info.subjectAge = ctx.subjectAge;
     info.baselineStart = ctx.baselineStartTime;
     info.baselineLength = ctx.baselineLength;
@@ -970,6 +1041,12 @@ else
     end
     if isfield(PF2, 'curDPF_fixed')
         info.dpfValue = PF2.curDPF_fixed;
+    end
+    if isfield(PF2, 'ppf')
+        info.ppf = PF2.ppf;
+    end
+    if isfield(PF2, 'pvc')
+        info.pvc = PF2.pvc;
     end
     if isfield(PF2, 'curDPF_age')
         info.subjectAge = PF2.curDPF_age;

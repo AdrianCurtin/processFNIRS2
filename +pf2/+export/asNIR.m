@@ -20,7 +20,8 @@ function [ ] = asNIR( fNIRstruct, filepath, varargin )
 %   fNIRstruct - fNIRS data structure (.raw, .time, .markers, .info) or a
 %                cell array of such structures for batch export.
 %   filepath   - Output .nir file path, or a directory path for batch export
-%                (optional). If omitted in single mode, a save dialog opens.
+%                (optional). If omitted or empty, a save dialog opens (single
+%                mode) or a directory picker opens (batch/cell-array mode).
 %
 % Name-Value Parameters (batch mode only):
 %   'Dir1'..'Dir4' - Info field names mapped to subdirectory levels
@@ -44,6 +45,11 @@ function [ ] = asNIR( fNIRstruct, filepath, varargin )
 %   % Batch export a cell array to a directory with subdir mapping
 %   pf2.export.asNIR(allData, 'output/', 'Dir1', 'Group', 'Prefix', {'SubjectID'});
 %
+% Notes:
+%   - filepath is required in headless sessions (pf2_base.isHeadless()): the
+%     GUI save/directory dialog cannot be shown, so a missing filepath errors
+%     with 'pf2:export:asNIR:noPathHeadless' instead of hanging/crashing.
+%
 % See also: pf2.export.asSNIRF, pf2.export.export, pf2.import.importNIR
 
 if(nargin<1)
@@ -53,8 +59,17 @@ end
 % --- Batch mode: cell array input ---
 if iscell(fNIRstruct)
     if nargin < 2 || isempty(filepath)
-        error('pf2:export:asNIR:noPath', ...
-            'A directory path is required for batch export.');
+        if pf2_base.isHeadless()
+            error('pf2:export:asNIR:noPathHeadless', ...
+                ['No output directory was given and this session is headless ', ...
+                 '(no interactive directory dialog available). Pass an explicit ', ...
+                 'output directory for batch export.']);
+        end
+        % No directory given: prompt for an output folder for the batch.
+        filepath = uigetdir('', 'Select output directory for batch .nir export');
+        if isequal(filepath, 0)   % selection cancelled
+            return;
+        end
     end
     opts = parseBatchOpts(varargin{:});
     paths = pf2_base.buildExportPaths(fNIRstruct, filepath, '.nir', opts);
@@ -71,9 +86,17 @@ if iscell(fNIRstruct)
     return;
 end
 
-if nargin<2
-   [filename path]=uiputfile(['*.nir']);
-    filepath=[path filename];
+if nargin<2 || isempty(filepath)
+   if pf2_base.isHeadless()
+       error('pf2:export:asNIR:noPathHeadless', ...
+           ['No output filepath was given and this session is headless (no ', ...
+            'interactive save dialog available). Pass an explicit filepath.']);
+   end
+   [filename, path]=uiputfile('*.nir', 'Save fNIRS data as .nir');
+   if isequal(filename, 0)   % selection cancelled
+       return;
+   end
+   filepath=fullfile(path, filename);
 end
 
 [ filepathdir , filename , ext ] = fileparts( filepath ) ;

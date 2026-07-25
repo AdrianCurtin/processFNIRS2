@@ -45,6 +45,7 @@ function outPath = asTensor(data, path, opts)
 %          and .processingInfo are included in the manifest when present.
 %   path - Output .h5 file path [char/string]. A trailing '.h5' is appended
 %          when missing. An existing file at this path is overwritten.
+%          If omitted or empty, a save dialog opens.
 %
 % Name-Value Parameters:
 %   'Features'        - Cell array of biomarker field names to stack along the
@@ -127,6 +128,9 @@ function outPath = asTensor(data, path, opts)
 %     json.loads(). This keeps the contract cross-language.
 %   - Windowed export truncates every window to the shortest common length so
 %     the [W x T x C x F] tensor is rectangular.
+%   - path is required in headless sessions (pf2_base.isHeadless()): the GUI
+%     save dialog cannot be shown, so a missing path errors with
+%     'pf2:export:asTensor:noPathHeadless' instead of hanging/crashing.
 %   - String datasets are written as true scalar (H5S_SCALAR) variable-length
 %     UTF-8 strings via the low-level HDF5 API, so h5py reads each as a single
 %     scalar (bytes) that json.loads() decodes directly — not a 1-element
@@ -143,7 +147,7 @@ function outPath = asTensor(data, path, opts)
 % aux base names, or true / 'all' for every aux signal present (default: {}).
 arguments
     data {mustBeA(data, 'struct')}
-    path {mustBeText}
+    path {mustBeText} = ''
     opts.Features = {}
     opts.Windows = []
     opts.QC = false
@@ -152,6 +156,20 @@ arguments
 end
 
 path = char(path);
+if isempty(path)
+    if pf2_base.isHeadless()
+        error('pf2:export:asTensor:noPathHeadless', ...
+            ['No output path was given and this session is headless (no ', ...
+             'interactive save dialog available). Pass an explicit path.']);
+    end
+    % No path given: prompt for an output file.
+    [filename, pathname] = uiputfile('*.h5', 'Save fNIRS tensor as HDF5');
+    if isequal(filename, 0)   % selection cancelled
+        outPath = '';
+        return;
+    end
+    path = fullfile(pathname, filename);
+end
 if numel(path) < 3 || ~strcmpi(path(end-2:end), '.h5')
     path = [path '.h5'];
 end

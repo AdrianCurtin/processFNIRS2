@@ -5,17 +5,34 @@ function results = fitGLM(Y, X, regressorNames, varargin)
 % or autoregressive iteratively reweighted least squares (AR-IRLS). Returns
 % beta estimates, t-statistics, p-values, and optional contrast results.
 % AR-IRLS accounts for temporal autocorrelation in fNIRS residuals by
-% prewhitening with estimated AR coefficients.
+% prewhitening with estimated AR coefficients pooled across channels.
+%
+% AR order selection: The whitening AR model is fit via Yule-Walker and the
+% coefficients are POOLED across channels (mean over channels) before
+% prewhitening. When AROrder='auto', a single order is selected by minimising
+% the median BIC across channels over the candidate range 1..round(fs/2),
+% then the pooled whitening is refit at that order. The selected order is
+% stored in results.arOrder for reproducibility. This pooled architecture is
+% intentional: a shared prewhitening filter is required for valid contrast
+% SE computation in the prewhitened space (Barker et al. 2013).
 %
 % References:
 %   Barker, J. W., Aarabi, A., & Huppert, T. J. (2013). Autoregressive
 %   model based algorithm for correcting motion and serially correlated
 %   errors in fNIRS. Biomedical Optics Express, 4(8), 1366-1379.
+%   DOI: 10.1364/BOE.4.001366
 %
 %   Huppert, T. J. (2016). Commentary on the statistical properties of
 %   noise and its implication on general linear models in functional
 %   near-infrared spectroscopy. Neurophotonics, 3(1), 010401.
 %   DOI: 10.1117/1.NPh.3.1.010401
+%
+%   Schwarz, G. (1978). Estimating the Dimension of a Model. The Annals of
+%   Statistics, 6(2), 461-464. DOI: 10.1214/aos/1176344136
+%
+%   Milliken, G. A. (1971). New Criteria for Estimability for Linear
+%   Models. The Annals of Mathematical Statistics, 42(5), 1588-1594.
+%   DOI: 10.1214/aoms/1177693157
 %
 % Syntax:
 %   results = pf2_base.fnirs.fitGLM(Y, X, regressorNames)
@@ -32,6 +49,23 @@ function results = fitGLM(Y, X, regressorNames, varargin)
 %                     Each row defines a linear combination of betas to test.
 %   'ContrastNames' - Cell array {1 x K} of contrast labels (default: {})
 %   'AROrder'       - AR model order for AR-IRLS (default: 4)
+%                     May also be 'auto' (char or scalar string), in which
+%                     case BIC is minimised over 1..round(fs/2) to select a
+%                     single order applied uniformly to all channels. BIC is
+%                     preferred over AIC at the modest run lengths typical in
+%                     fNIRS to avoid overfitting (Schwarz 1978). Requires 'fs'
+%                     when 'auto'.
+%                     NOTE: at very low sampling rates (fs <= 2 Hz, e.g. heavily
+%                     downsampled data) round(fs/2) collapses the search to
+%                     order 1; pass an explicit integer AROrder in that regime.
+%                     AROrder only affects Method='AR-IRLS' (it configures the
+%                     prewhitening filter). If Method='OLS' and an AROrder is
+%                     explicitly supplied, it has no effect and is ignored
+%                     with a pf2:fitGLM:arOrderIgnored warning rather than
+%                     being applied or raising an error.
+%   'fs'            - Sampling frequency in Hz (default: [])
+%                     Required when AROrder='auto' to bound the candidate range.
+%                     Ignored when AROrder is a fixed integer.
 %   'MaxIter'       - Maximum iterations for AR-IRLS (default: 20)
 %   'Tolerance'     - Convergence tolerance for AR-IRLS (default: 1e-4)
 %   'Accelerate'    - Acceleration mode: 'auto' (default), 'gpu', 'none'
@@ -45,8 +79,27 @@ function results = fitGLM(Y, X, regressorNames, varargin)
 %     .se         - Standard errors [P x C]
 %     .residuals  - Residual time series [T x C] (original space, unwhitened)
 %     .R2         - Coefficient of determination [1 x C]
-%     .dof        - Degrees of freedom [scalar]
+%     .dof        - Degrees of freedom [scalar]. Computed from the design's
+%                   EFFECTIVE RANK (not raw column count P) so rank-deficient
+%                   designs (e.g. an FIR basis with fewer samples than stick
+%                   regressors) cannot drive dof negative; always >= 1. A
+%                   pf2:fitGLM:rankDeficient warning is emitted when the
+%                   design is rank-deficient. If the unclamped dof (T minus
+%                   effective rank, minus AR order for AR-IRLS) is <= 0,
+%                   .tstat/.pval (and any .contrast.tstat/.contrast.pval) are
+%                   NaN, since they are not statistically identifiable;
+%                   .beta is still the pinv minimum-norm solution.
+%                   Separately, a rank-deficient design can have dof > 0
+%                   (e.g. two identical/aliased columns among many, giving
+%                   rank P-1) while still leaving individual coefficients
+%                   NON-ESTIMABLE. This is detected via the null space of
+%                   the design (see "Estimability" below): non-estimable
+%                   .beta entries get .se/.tstat/.pval = NaN (per channel;
+%                   .beta itself remains the pinv minimum-norm value), and
+%                   non-estimable .contrast rows get .tstat/.pval = NaN,
+%                   independently of the dof<=0 case above.
 %     .method     - Estimation method used [char]
+%     .arOrder    - AR order used (scalar; present only for AR-IRLS)
 %     .contrast   - Struct (if Contrasts provided) with fields:
 %                   .beta [K x C], .tstat [K x C], .pval [K x C],
 %                   .se [K x C], .names {1 x K}
@@ -54,23 +107,52 @@ function results = fitGLM(Y, X, regressorNames, varargin)
 % Algorithm (OLS):
 %   1. beta = pinv(X) * Y
 %   2. residuals = Y - X * beta
-%   3. MSE = sum(residuals.^2) / (T - P)
-%   4. se = sqrt(diag(MSE * inv(X'*X)))
-%   5. t = beta ./ se, p = 2*tcdf(-abs(t), T-P)
+%   3. r = rank(X); dof = max(T - r, 1) (warn if r < P, i.e. rank-deficient)
+%   4. MSE = sum(residuals.^2) / dof
+%   5. se = sqrt(diag(MSE * inv(X'*X)))
+%   6. t = beta ./ se, p = 2*tcdf(-abs(t), dof); NaN if T - r <= 0
+%   7. If r < P: NaN se for non-estimable coefficients (see "Estimability")
 %
 % Algorithm (AR-IRLS):
 %   1. Initial OLS fit
-%   2. Estimate AR(p) coefficients from residuals (Yule-Walker)
-%   3. Build prewhitening filter from AR coefficients
-%   4. Prewhiten Y and X
+%   2. If AROrder='auto': select order by median BIC over channels
+%   3. Estimate AR(p) coefficients from residuals (Yule-Walker) and pool
+%      across channels (mean over channels) to form a shared filter
+%   4. Prewhiten Y and X with the pooled filter
 %   5. Re-fit OLS on prewhitened data
-%   6. Repeat steps 2-5 until convergence or MaxIter
+%   6. Repeat steps 3-5 until convergence or MaxIter
+%   7. r = rank(Xw) (effective rank of the prewhitened design);
+%      dof = max(T - r - AROrder, 1) (warn if r < P); NaN t/p if the
+%      unclamped T - r - AROrder <= 0
+%   8. If r < P: NaN se for non-estimable coefficients of Xw (see
+%      "Estimability")
+%
+% Estimability (rank-deficient designs with dof > 0):
+%   A rank-deficient design (r < P) does not always drive dof to <= 0 --
+%   e.g. two identical/aliased columns among many well-conditioned
+%   regressors gives r = P-1, so dof = T-(P-1) can still be comfortably
+%   positive. In that regime pinv(X'*X) still returns a FINITE (but not
+%   statistically meaningful) variance for the aliased coefficients, so the
+%   dof<=0 guard above does not catch it. This is handled separately via
+%   the null space of X: N = null(X) spans the directions along which beta
+%   can shift without changing X*beta (i.e. without changing the fit). A
+%   coefficient beta_j is NON-estimable iff some column of N has a nonzero
+%   entry in row j (any(abs(N(j,:)) > tol)); its .se (and hence .tstat/
+%   .pval) is set to NaN. A contrast c is non-estimable iff c has a nonzero
+%   component along the null space, tested as norm(c * N) > tol (Milliken,
+%   1971); its .contrast.tstat/.pval are set to NaN. For full-rank designs
+%   (r == P), N is empty and nothing is changed.
 %
 % Example:
 %   events(1) = struct('name', 'TaskA', 'onsets', [10 40 70], 'duration', 20);
 %   [X, names] = pf2_base.fnirs.buildDesignMatrix(data.time, data.fs, events);
 %   results = pf2_base.fnirs.fitGLM(data.HbO, X, names);
 %   fprintf('TaskA beta: %.4f, p = %.4f\n', results.beta(1,1), results.pval(1,1));
+%
+%   % Automatic AR order selection via BIC
+%   results = pf2_base.fnirs.fitGLM(data.HbO, X, names, ...
+%       'Method', 'AR-IRLS', 'AROrder', 'auto', 'fs', data.fs);
+%   fprintf('Selected AR order: %d\n', results.arOrder);
 %
 % See also: pf2_base.fnirs.buildDesignMatrix, pf2_base.fnirs.buildHRF
 
@@ -82,7 +164,9 @@ p.addRequired('regressorNames', @iscell);
 p.addParameter('Method', 'OLS', @(x) ismember(upper(x), {'OLS', 'AR-IRLS'}));
 p.addParameter('Contrasts', [], @isnumeric);
 p.addParameter('ContrastNames', {}, @iscell);
-p.addParameter('AROrder', 4, @(x) isnumeric(x) && isscalar(x) && x > 0);
+p.addParameter('AROrder', 4, @(x) (isnumeric(x) && isscalar(x) && x > 0) || ...
+    ((ischar(x) || isstring(x)) && isscalar(string(x)) && strcmpi(x, 'auto')));
+p.addParameter('fs', [], @(x) isempty(x) || (isnumeric(x) && isscalar(x) && x > 0));
 p.addParameter('MaxIter', 20, @(x) isnumeric(x) && isscalar(x) && x > 0);
 p.addParameter('Tolerance', 1e-4, @(x) isnumeric(x) && isscalar(x) && x > 0);
 p.addParameter('Accelerate', 'auto', @(x) ischar(x) && ismember(lower(x), {'auto','gpu','none'}));
@@ -92,9 +176,38 @@ method = upper(p.Results.Method);
 C = p.Results.Contrasts;
 contrastNames = p.Results.ContrastNames;
 arOrder = p.Results.AROrder;
+fs_val = p.Results.fs;
 maxIter = p.Results.MaxIter;
 tol = p.Results.Tolerance;
 accelMode = lower(p.Results.Accelerate);
+
+% AROrder only affects Method='AR-IRLS' (it configures the prewhitening
+% filter); OLS never uses it. If Method='OLS' and the caller explicitly
+% supplied AROrder (fixed integer or 'auto'), ignore it with a warning
+% instead of resolving 'auto' (which could otherwise error for lack of 'fs'
+% or silently waste time selecting an order that is never used).
+arOrderSupplied = ~ismember('AROrder', p.UsingDefaults);
+autoOrder = (ischar(arOrder) || isstring(arOrder)) && strcmpi(arOrder, 'auto');
+
+if strcmp(method, 'OLS')
+    if arOrderSupplied
+        warning('pf2:fitGLM:arOrderIgnored', ...
+            ['AROrder only applies to Method=''AR-IRLS''; the supplied AROrder ' ...
+             'has no effect under Method=''OLS'' and is ignored.']);
+    end
+    % autoOrder is intentionally not resolved here: OLS never uses arOrder.
+elseif autoOrder
+    % Resolve 'auto' AR order: requires fs to bound the candidate range
+    if isempty(fs_val)
+        error('pf2:fitGLM:autoOrderNeedsFs', ...
+            'AROrder=''auto'' requires the ''fs'' parameter to bound the candidate range.');
+    end
+    % Candidate range: 1..round(fs/2). Bounded at T/4 as a stability guard.
+    [T_check, ~] = size(Y);
+    maxCand = min(round(fs_val / 2), floor(T_check / 4));
+    maxCand = max(maxCand, 1);
+    arOrder = selectAROrderBIC(Y, X, maxCand);
+end
 
 [T, nCh] = size(Y);
 P = size(X, 2);
@@ -133,17 +246,28 @@ end
 % Xw and residuals_w hold prewhitened versions (AR-IRLS) or original (OLS)
 switch method
     case 'OLS'
-        [beta, residuals, se, dof] = fitOLS(Y, X, useGPU);
+        [beta, residuals, se, dof, dofInvalid] = fitOLS(Y, X, useGPU);
         Xw = X;
         residuals_w = residuals;
 
     case 'AR-IRLS'
-        [beta, residuals, se, dof, Xw, residuals_w] = fitARIRLS(Y, X, arOrder, maxIter, tol, useGPU);
+        [beta, residuals, se, dof, Xw, residuals_w, dofInvalid] = ...
+            fitARIRLS(Y, X, arOrder, maxIter, tol, useGPU);
 end
 
 % --- Compute statistics ---
 tstat = beta ./ se;
 pval = 2 * pf2_base.compat.tcdf(-abs(tstat), dof);
+if dofInvalid
+    % The unclamped degrees of freedom (T minus the design's effective rank,
+    % minus AR order for AR-IRLS) was <= 0 -- e.g. an FIR design with fewer
+    % samples than stick regressors. dof was clamped to 1 above purely to
+    % keep tcdf() from dividing by a non-positive dof; the resulting t/p
+    % values are not statistically identifiable, so report them as NaN.
+    % beta remains the pinv minimum-norm solution.
+    tstat(:) = NaN;
+    pval(:) = NaN;
+end
 
 % R-squared
 SSres = sum(residuals.^2, 1);
@@ -160,6 +284,9 @@ results.R2 = R2;
 results.dof = dof;
 results.method = method;
 results.regressorNames = regressorNames;
+if strcmp(method, 'AR-IRLS')
+    results.arOrder = arOrder;  % scalar; documents the pooled whitening order
+end
 
 % --- Contrast testing ---
 % Use prewhitened X and residuals so contrast SEs are consistent with
@@ -169,14 +296,14 @@ results.regressorNames = regressorNames;
 % diagnostics/plotting), while contrasts use prewhitened residuals
 % (for valid statistical inference under AR-IRLS).
 if ~isempty(C)
-    results.contrast = computeContrasts(C, contrastNames, beta, se, Xw, dof, residuals_w);
+    results.contrast = computeContrasts(C, contrastNames, beta, se, Xw, dof, residuals_w, dofInvalid);
 end
 
 end
 
 %%_Subfunctions_________________________________________________________
 
-function [beta, residuals, se, dof] = fitOLS(Y, X, useGPU)
+function [beta, residuals, se, dof, dofInvalid] = fitOLS(Y, X, useGPU)
 % FITOLS Ordinary least squares estimation
 %
 % Inputs:
@@ -185,10 +312,12 @@ function [beta, residuals, se, dof] = fitOLS(Y, X, useGPU)
 %   useGPU - Whether to use GPU for matrix operations
 %
 % Outputs:
-%   beta      - Coefficients [P x C]
-%   residuals - Residuals [T x C]
-%   se        - Standard errors [P x C]
-%   dof       - Degrees of freedom [scalar]
+%   beta       - Coefficients [P x C]
+%   residuals  - Residuals [T x C]
+%   se         - Standard errors [P x C]
+%   dof        - Degrees of freedom [scalar], clamped to >= 1
+%   dofInvalid - True if the unclamped dof (T - effective rank) was <= 0,
+%                meaning t/p-values are not statistically identifiable
 
 [T, ~] = size(Y);
 P = size(X, 2);
@@ -216,8 +345,22 @@ residuals = Yg - Xg * beta;
 beta = pf2_base.accel.gather(beta);
 residuals = pf2_base.accel.gather(residuals);
 
-% Degrees of freedom
-dof = T - P;
+% Degrees of freedom: use the EFFECTIVE RANK of X, not the raw column count
+% P. A rank-deficient design (e.g. an FIR basis with T < number of stick
+% regressors) would otherwise drive T - P to zero or negative; pinv(X)
+% above already returns the minimum-norm beta for such designs, so the
+% residual dof must be computed from the rank actually used.
+r = rank(X);
+if r < P
+    warning('pf2:fitGLM:rankDeficient', ...
+        ['Design matrix is rank-deficient (effective rank %d of %d columns); ' ...
+         'using the effective rank for degrees-of-freedom. Coefficients are ' ...
+         'the minimum-norm (pinv) solution and are not uniquely identified.'], ...
+        r, P);
+end
+dofRaw = T - r;
+dofInvalid = dofRaw <= 0;
+dof = max(dofRaw, 1);
 
 % Mean squared error per channel
 MSE = sum(residuals.^2, 1) / dof;
@@ -229,9 +372,19 @@ varBeta = diag(XtXinv);  % [P x 1]
 % Standard errors: sqrt(var(beta_j) * MSE_c) for each channel
 se = sqrt(varBeta * MSE);  % [P x C]
 
+% Estimability: a rank-deficient design can have dof > 0 (e.g. two
+% aliased columns among many well-conditioned regressors) while still
+% leaving individual coefficients non-estimable. pinv(X'*X) above returns
+% a finite variance for those coefficients regardless, so they must be
+% NaN'd explicitly via the null-space test (see file header).
+if r < P
+    nonEstCoef = nonEstimableCoefficients(X);
+    se(nonEstCoef, :) = NaN;
 end
 
-function [beta, residuals, se, dof, Xw, residuals_w] = fitARIRLS(Y, X, arOrder, maxIter, tol, useGPU)
+end
+
+function [beta, residuals, se, dof, Xw, residuals_w, dofInvalid] = fitARIRLS(Y, X, arOrder, maxIter, tol, useGPU)
 % FITARIRLS Autoregressive iteratively reweighted least squares
 %
 % When GPU is enabled, data is transferred once at the start and kept on
@@ -251,9 +404,12 @@ function [beta, residuals, se, dof, Xw, residuals_w] = fitARIRLS(Y, X, arOrder, 
 %   beta        - Coefficients [P x C]
 %   residuals   - Residuals [T x C] (original space)
 %   se          - Standard errors [P x C]
-%   dof         - Effective degrees of freedom [scalar]
+%   dof         - Effective degrees of freedom [scalar], clamped to >= 1
 %   Xw          - Prewhitened design matrix [T x P]
 %   residuals_w - Prewhitened residuals [T x C]
+%   dofInvalid  - True if the unclamped dof (T - effective rank of Xw -
+%                 arOrder) was <= 0, meaning t/p-values are not
+%                 statistically identifiable
 
 [T, nCh] = size(Y);
 P = size(X, 2);
@@ -303,13 +459,35 @@ for iter = 1:maxIter
     prevBeta = beta;
 end
 
-% Final statistics from prewhitened fit
-dof = max(T - P - arOrder, 1);
+% Final statistics from prewhitened fit. Degrees of freedom use the
+% EFFECTIVE RANK of the prewhitened design Xw (not the raw column count P),
+% for the same reason as the OLS path: a rank-deficient design (e.g. an FIR
+% basis with T < number of stick regressors) must not understate, zero, or
+% negate the residual dof.
+XwGathered = pf2_base.accel.gather(Xw);
+r = rank(XwGathered);
+if r < P
+    warning('pf2:fitGLM:rankDeficient', ...
+        ['Prewhitened design matrix is rank-deficient (effective rank %d of ' ...
+         '%d columns); using the effective rank for degrees-of-freedom. ' ...
+         'Coefficients are the minimum-norm (pinv) solution and are not ' ...
+         'uniquely identified.'], r, P);
+end
+dofRaw = T - r - arOrder;
+dofInvalid = dofRaw <= 0;
+dof = max(dofRaw, 1);
 residuals_w = Yw - Xw * beta;
 MSE = sum(residuals_w.^2, 1) / dof;
 XwXwinv = pinv(Xw' * Xw);
 varBeta = diag(XwXwinv);  % [P x 1]
 se = sqrt(varBeta * MSE);  % [P x C]
+
+% Estimability: same rank-deficient-with-positive-dof case as fitOLS (see
+% file header), tested on the prewhitened design Xw.
+if r < P
+    nonEstCoef = nonEstimableCoefficients(XwGathered);
+    se(nonEstCoef, :) = NaN;
+end
 
 % Final residuals in original space
 residuals = Yg - Xg * beta;
@@ -388,7 +566,7 @@ Yw(1:order, :) = 0;
 
 end
 
-function contrast = computeContrasts(C, contrastNames, beta, se, X, dof, residuals)
+function contrast = computeContrasts(C, contrastNames, beta, se, X, dof, residuals, dofInvalid)
 % COMPUTECONTRASTS Compute contrast statistics
 %
 % Inputs:
@@ -397,11 +575,19 @@ function contrast = computeContrasts(C, contrastNames, beta, se, X, dof, residua
 %   beta          - Coefficients [P x C]
 %   se            - Standard errors [P x C]
 %   X             - Design matrix [T x P]
-%   dof           - Degrees of freedom [scalar]
+%   dof           - Degrees of freedom [scalar], clamped to >= 1
 %   residuals     - Residuals [T x C]
+%   dofInvalid    - True if the unclamped dof was <= 0; contrast t/p-values
+%                   are set to NaN in that case (mirrors the main-effect
+%                   NaN handling in fitGLM)
 %
 % Outputs:
 %   contrast - Struct with .beta, .tstat, .pval, .se, .names
+%
+% Note on estimability: even when dof > 0, a rank-deficient X (see file
+% header) can make an individual contrast row non-estimable; pinv(X'*X)
+% still returns a finite (but not statistically meaningful) cSe for it.
+% Such rows are detected via the null space of X and NaN'd below.
 
 [K, P] = size(C);
 nCh = size(beta, 2);
@@ -424,6 +610,30 @@ end
 cTstat = cBeta ./ cSe;
 cPval = 2 * pf2_base.compat.tcdf(-abs(cTstat), dof);
 
+% Estimability: a contrast c is non-estimable iff it has a nonzero
+% component along the null space of X, i.e. norm(c * N) > tol (Milliken,
+% 1971). Only relevant when X is rank-deficient; N is empty (skipped)
+% otherwise, leaving full-rank designs unchanged.
+r = rank(X);
+if r < P
+    [~, Nspace, ~, zeroTol] = nonEstimableCoefficients(X);
+    if ~isempty(Nspace)
+        nonEstContrast = false(K, 1);
+        for k = 1:K
+            nonEstContrast(k) = norm(C(k, :) * Nspace) > zeroTol;
+        end
+        cTstat(nonEstContrast, :) = NaN;
+        cPval(nonEstContrast, :) = NaN;
+        cSe(nonEstContrast, :) = NaN;   % SE of a non-estimable contrast is undefined
+    end
+end
+
+if dofInvalid
+    cTstat(:) = NaN;
+    cPval(:) = NaN;
+    cSe(:) = NaN;
+end
+
 % Default contrast names
 if isempty(contrastNames) || length(contrastNames) ~= K
     contrastNames = cell(1, K);
@@ -437,5 +647,142 @@ contrast.tstat = cTstat;
 contrast.pval = cPval;
 contrast.se = cSe;
 contrast.names = contrastNames;
+
+end
+
+function [nonEstCoef, Nspace, nsTol, zeroTol] = nonEstimableCoefficients(X)
+% NONESTIMABLECOEFFICIENTS Non-estimable coefficients of a rank-deficient design
+%
+% For a rank-deficient design X ([T x P], effective rank r < P), the null
+% space of X spans the P-r directions along which beta can be shifted
+% without changing X*beta (the fitted values, and hence the data likelihood,
+% are unchanged). A coefficient beta_j is therefore NON-estimable -- not
+% uniquely determined by the data, regardless of dof -- iff some null-space
+% basis vector has a nonzero entry in row j. This is distinct from (and can
+% occur even when) dof = T - r > 0; pinv(X'*X) still returns a finite
+% variance for such a coefficient, which is not statistically meaningful and
+% must be reported as NaN rather than a finite SE/t/p (Milliken, 1971).
+%
+% The tolerance for both the null-space computation and the row/contrast
+% nonzero test is a single matrix-scale-relative value, max(size(X)) *
+% eps(norm(X)) -- the same formula MATLAB's null() uses internally by
+% default, so it stays consistent with the rank(X) test the caller already
+% performs. Basis vectors returned by null() are unit-norm, so a genuine
+% aliasing coefficient (e.g. 1/sqrt(2) for a pair of identical columns) sits
+% many orders of magnitude above this tolerance.
+%
+% Callers should only invoke this when rank(X) < size(X,2); for a full-rank
+% X, Nspace is empty and nonEstCoef is all-false (no-op), but the caller is
+% expected to skip the call entirely in that case to avoid the extra SVD.
+%
+% Inputs:
+%   X - Design matrix [T x P] (rank-deficient)
+%
+% Outputs:
+%   nonEstCoef - Logical mask [P x 1]; true where the coefficient is
+%                non-estimable
+%   Nspace     - Null-space basis [P x (P-r)] as returned by null(X, nsTol);
+%                empty if X is (numerically) full column rank
+%   nsTol      - Tolerance used for the null-space computation and the
+%                nonzero test [scalar]
+
+P = size(X, 2);
+% Scale-dependent singular-value threshold for the null-space computation.
+nsTol = max(size(X)) * eps(norm(X));
+Nspace = null(X, nsTol);
+% The null() basis columns are orthonormal (dimensionless, O(1) entries), so
+% the nonzero test must use a DIMENSIONLESS tolerance. Reusing nsTol here would
+% fail on a rescaled design (e.g. X*1e15 -> nsTol ~ 400), letting genuine
+% +/-0.707 aliasing entries slip below threshold and retain finite statistics.
+zeroTol = max(size(X)) * eps;
+if isempty(Nspace)
+    nonEstCoef = false(P, 1);
+else
+    nonEstCoef = any(abs(Nspace) > zeroTol, 2);
+end
+
+end
+
+function order = selectAROrderBIC(Y, X, maxOrder)
+% SELECTARORDERBIC Select AR model order by minimising median BIC across channels
+%
+% Evaluates AR models of order 1..maxOrder on the OLS residuals of Y regressed
+% on the DESIGN MATRIX X (Y - X*beta), using the Yule-Walker estimate and BIC
+% from the prewhitened residual variance. Residualizing the design first is
+% important: fNIRS channels have strong task-evoked and drift autocorrelation
+% that would otherwise inflate the selected order relative to the actual
+% post-fit residual the AR-IRLS whitening loop removes. The candidate with the
+% minimum MEDIAN BIC across non-degenerate channels is chosen, yielding a
+% single scalar order for the pooled whitening filter.
+%
+% BIC is used instead of AIC because fNIRS recordings have modest T (a few
+% hundred to a few thousand samples), where AIC tends to overfit
+% (Schwarz 1978). BIC = T*log(sigma^2) + p*log(T).
+%
+% Channels whose residual variance is near zero (degenerate/flat) are
+% excluded from the BIC aggregation to avoid numerical instability.
+%
+% Inputs:
+%   Y        - Data matrix [T x C]
+%   maxOrder - Maximum candidate AR order [scalar]
+%
+% Outputs:
+%   order - Selected AR model order [scalar integer]
+
+[T, nCh] = size(Y);
+
+% Residuals from the actual design (task + drift), not just the channel mean,
+% so the AR order reflects the noise the whitening loop removes.
+if nargin < 2 || isempty(X)
+    Yc = Y - mean(Y, 1);
+elseif size(X, 1) == T
+    Yc = Y - X * (X \ Y);       % OLS residuals
+else
+    Yc = Y - mean(Y, 1);        % shape mismatch: fall back to mean removal
+end
+
+% Variance floor for degenerate channel detection
+varFloor = 1e-12 * max(var(Yc, 0, 1), [], 'omitnan');
+
+bicMat = nan(maxOrder, nCh);
+
+for q = 1:maxOrder
+    if T <= q + 1
+        break;
+    end
+    % Yule-Walker AR(q) fit
+    arC = yulewalkMulti(Yc, q);      % [q x nCh]
+    meanAR = mean(arC, 2);           % pool for BIC residual estimate
+
+    % Prewhitened residuals for BIC
+    Yw = applyARFilter(Yc, meanAR);  % [T x nCh]
+    Yw = Yw((q+1):end, :);          % drop zeroed-out leading rows
+    Teff = size(Yw, 1);
+    if Teff < 1
+        break;
+    end
+
+    sigma2 = sum(Yw .^ 2, 1) / Teff;  % [1 x nCh]
+
+    % Exclude degenerate channels from BIC
+    goodCh = sigma2 > varFloor & isfinite(sigma2);
+    if any(goodCh)
+        bic_q = Teff * log(max(sigma2, eps)) + q * log(Teff);  % [1 x nCh]
+        bic_q(~goodCh) = NaN;
+        bicMat(q, :) = bic_q;
+    end
+end
+
+% Aggregate: median BIC per candidate order over good channels
+medBIC = median(bicMat, 2, 'omitnan');
+
+if all(isnan(medBIC))
+    warning('pf2:fitGLM:autoOrderFallback', ...
+        'BIC order selection produced all NaN; falling back to AR(1).');
+    order = 1;
+    return;
+end
+
+[~, order] = min(medBIC);
 
 end

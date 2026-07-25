@@ -150,6 +150,8 @@ classdef GUIContext < pf2_base.ProcessingContext
             parentCtx = pf2_base.ProcessingContext.fromGlobals();
             obj.dpfMode = parentCtx.dpfMode;
             obj.dpfFixedValue = parentCtx.dpfFixedValue;
+            obj.pvc = parentCtx.pvc;
+            obj.ppf = parentCtx.ppf;
             obj.subjectAge = parentCtx.subjectAge;
             obj.baselineStartTime = parentCtx.baselineStartTime;
             obj.baselineLength = parentCtx.baselineLength;
@@ -201,6 +203,8 @@ classdef GUIContext < pf2_base.ProcessingContext
             % ProcessingContext is one-directional and never writes globals.)
             PF2.dpf_mode = obj.dpfMode;
             PF2.curDPF_fixed = obj.dpfFixedValue;
+            PF2.pvc = obj.pvc;
+            PF2.ppf = obj.ppf;
             PF2.curDPF_age = obj.subjectAge;
 
             PF2.baseline.startTime = obj.baselineStartTime;
@@ -234,6 +238,8 @@ classdef GUIContext < pf2_base.ProcessingContext
             % Sync DPF values to GUI-specific fields
             PF2.GUIPF2.dpf_mode = obj.dpfMode;
             PF2.GUIPF2.curDPF_fixed = obj.dpfFixedValue;
+            PF2.GUIPF2.pvc = obj.pvc;
+            if isempty(obj.ppf); PF2.GUIPF2.ppf = 6; else; PF2.GUIPF2.ppf = obj.ppf; end
             PF2.GUIPF2.curDPF_age = obj.subjectAge;
 
             % Sync baseline

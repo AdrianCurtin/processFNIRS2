@@ -1,10 +1,11 @@
 classdef CacheTest < matlab.unittest.TestCase
-% CACHETEST Unit tests for persistent caching in fitProbe2D and estimateAbsorb
+% CACHETEST Unit tests for persistent caching in fitProbe2D, and bvoxy determinism
 %
 %   Verifies that:
 %     - fitProbe2D caches results and returns identical output on repeat calls
 %     - fitProbe2D cache can be cleared via '__clear__' sentinel
-%     - estimateAbsorb (via bvoxy) caches extinction coefficients
+%     - bvoxy is deterministic across repeated calls (its former extinction
+%       cache was removed; recompute was measured faster than the cache lookup)
 %     - Cached results are numerically identical to fresh computations
 %
 %   Example:
@@ -134,7 +135,9 @@ classdef CacheTest < matlab.unittest.TestCase
     methods (Test)
         function testBvoxyRepeatedCallsSameResult(testCase)
             % Verify bvoxy produces identical results on repeated calls
-            % (tests that estimateAbsorb cache doesn't corrupt output)
+            % (bvoxy is a pure function; the old estimateAbsorb extinction cache
+            % was removed as it was slower than recompute, so this just checks
+            % determinism)
             data = pf2.import.sampleData.fNIR2000();
             proc1 = processFNIRS2(data);
             proc2 = processFNIRS2(data);

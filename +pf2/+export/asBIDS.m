@@ -31,6 +31,7 @@ function bidsRoot = asBIDS(allData, rootDir, opts)
 %              Each is exported as one BIDS recording. Subject/session/task/run
 %              are resolved from each struct's .info (see below).
 %   rootDir  - Output BIDS dataset root directory (created if absent).
+%              If omitted or empty, a directory picker opens.
 %
 % Name-Value Parameters:
 %   'Task'         - Task label for every recording, overriding any per-record
@@ -80,6 +81,9 @@ function bidsRoot = asBIDS(allData, rootDir, opts)
 %     validate.
 %   - Processed hemoglobin (HbO/HbR/...) is not part of raw BIDS-NIRS; the
 %     .snirf carries raw intensity, matching pf2.export.asSNIRF.
+%   - rootDir is required in headless sessions (pf2_base.isHeadless()): the
+%     GUI directory dialog cannot be shown, so a missing rootDir errors with
+%     'pf2:export:asBIDS:noRootHeadless' instead of hanging/crashing.
 %
 % See also: pf2.export.asSNIRF, pf2.import.importSNIRF, pf2.probe.montage,
 %           pf2.data.infoToTable
@@ -99,7 +103,17 @@ end
 
 % --- Normalize inputs ---
 if isempty(rootDir)
-    error('pf2:asBIDS:noRoot', 'An output dataset root directory is required.');
+    if pf2_base.isHeadless()
+        error('pf2:export:asBIDS:noRootHeadless', ...
+            ['No output rootDir was given and this session is headless (no ', ...
+             'interactive directory dialog available). Pass an explicit rootDir.']);
+    end
+    % No dataset root given: prompt for an output directory.
+    rootDir = uigetdir('', 'Select output directory for BIDS dataset');
+    if isequal(rootDir, 0)   % selection cancelled
+        bidsRoot = '';
+        return;
+    end
 end
 if isstruct(allData)
     allData = {allData};

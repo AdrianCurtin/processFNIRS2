@@ -37,18 +37,22 @@ function [tbl, descriptor] = montage(data, opts)
 %
 % Outputs:
 %   tbl        - Per-channel montage table [nCh rows] with columns:
-%                  Channel    - Channel index (1-based) [double]; includes
-%                               short-separation channels
-%                  Source     - Source optode index [double]
-%                  Detector   - Detector optode index [double]
-%                  X_mni      - MNI x in device coordinate units [double]
-%                  Y_mni      - MNI y [double]
-%                  Z_mni      - MNI z [double]
-%                  SD_mm      - Source-detector distance [double]
-%                  ShortSep   - Short-separation channel flag [logical]
-%                  BA         - Nearest Brodmann area number [double] (if requested)
-%                  BA_name    - Brodmann area name [string] (if requested)
-%                  BA_dist_mm - Distance to that BA in mm [double] (if requested)
+%                  Channel      - Channel index (1-based) [double]; includes
+%                                 short-separation channels
+%                  ChannelLabel - 'S#_D#' string label [string]; preferred
+%                                 when present in device.Probe TableOpt, else
+%                                 synthesized as sprintf('S%d_D%d', src, det).
+%                                 Falls back to 'Ch#' when no src/det info.
+%                  Source       - Source optode index [double]
+%                  Detector     - Detector optode index [double]
+%                  X_mni        - MNI x in device coordinate units [double]
+%                  Y_mni        - MNI y [double]
+%                  Z_mni        - MNI z [double]
+%                  SD_mm        - Source-detector distance [double]
+%                  ShortSep     - Short-separation channel flag [logical]
+%                  BA           - Nearest Brodmann area number [double] (if requested)
+%                  BA_name      - Brodmann area name [string] (if requested)
+%                  BA_dist_mm   - Distance to that BA in mm [double] (if requested)
 %                Position/BA/Source/Detector columns are NaN/<missing> when
 %                unavailable.
 %   descriptor - Montage-level descriptor struct with fields:
@@ -73,9 +77,10 @@ function [tbl, descriptor] = montage(data, opts)
 %   5. Optionally serialize to JSON / CSV / XLSX
 %
 % Example:
-%   % Inspect the montage of a sample dataset
+%   % Inspect the montage of a sample dataset (includes ChannelLabel column)
 %   data = pf2.import.sampleData();
 %   tbl = pf2.probe.montage(data)
+%   disp(tbl.ChannelLabel)   % e.g. ["S1_D1"; "S1_D2"; ...]
 %
 %   % Write a portable JSON sidecar next to an export
 %   [tbl, descriptor] = pf2.probe.montage(data, 'SavePath', 'sub-01_montage.json');
@@ -156,6 +161,14 @@ src = optColumn(optTbl, {'SrcIdx', 'SourceIndex', 'Source'}, nCh);
 det = optColumn(optTbl, {'DetIdx', 'DetectorIndex', 'Detector'}, nCh);
 wvPer = perChannelWavelengths(optTbl, nCh);
 
+% ChannelLabel: prefer pre-built labels in TableOpt.ChannelLabel (SNIRF
+% path), else synthesize from src/det indices as 'S#_D#' (all other
+% importers and config-file paths). Fall back to 'Ch#' when neither is
+% available. pf2.probe.channelLabels applies the same precedence for
+% betaTable / glmToTable; the synthesis is kept in sync with the local
+% subfunction below.
+chanLabel = synthesizeChannelLabels(optTbl, src, det, nCh);
+
 % --- Brodmann lookup (optional) ---
 baNum  = nan(nCh, 1);
 baName = strings(nCh, 1);
@@ -179,8 +192,8 @@ if doBrodmann
 end
 
 % --- Assemble per-channel table ---
-tbl = table(chan, src, det, pos(:,1), pos(:,2), pos(:,3), sd, ss, ...
-    'VariableNames', {'Channel', 'Source', 'Detector', ...
+tbl = table(chan, chanLabel, src, det, pos(:,1), pos(:,2), pos(:,3), sd, ss, ...
+    'VariableNames', {'Channel', 'ChannelLabel', 'Source', 'Detector', ...
     'X_mni', 'Y_mni', 'Z_mni', 'SD_mm', 'ShortSep'});
 if doBrodmann
     tbl.BA = baNum;
@@ -219,6 +232,7 @@ descriptor.coordinateSystem = struct( ...
 chans = struct('channel', cell(1, nCh));
 for k = 1:nCh
     chans(k).channel = chan(k);
+    chans(k).channelLabel = char(chanLabel(k));
     chans(k).source = src(k);
     chans(k).detector = det(k);
     chans(k).mni = [pos(k,1), pos(k,2), pos(k,3)];
@@ -297,6 +311,54 @@ for i = 1:numel(names)
 end
 
 end
+
+function labels = synthesizeChannelLabels(optTbl, src, det, n)
+% SYNTHESIZECHANNELLABELS Build S#_D# string labels for each channel
+%
+% Prefers pre-built ChannelLabel column in TableOpt (SNIRF import path);
+% otherwise synthesizes from src/det as 'S#_D#'. Falls back to 'Ch#' for
+% channels whose src or det index is NaN (layout-only devices).
+%
+% Inputs:
+%   optTbl - Optode table (TableOpt) or []; may carry a ChannelLabel column
+%   src    - [n x 1] source indices (NaN where unknown)
+%   det    - [n x 1] detector indices (NaN where unknown)
+%   n      - Channel count
+%
+% Outputs:
+%   labels - [n x 1] string array of channel labels
+
+labels = strings(n, 1);
+
+% Prefer pre-built labels when they exist (SNIRF path builds them in importSNIRF)
+if istable(optTbl) && ismember('ChannelLabel', optTbl.Properties.VariableNames)
+    raw = optTbl.ChannelLabel;
+    m = min(numel(raw), n);
+    for k = 1:m
+        v = raw(k);
+        if iscell(v), v = v{1}; end
+        s = string(v);
+        if strlength(s) > 0 && ~ismissing(s)
+            labels(k) = s;
+        end
+    end
+end
+
+% Fill any still-empty entries by synthesis
+for k = 1:n
+    if strlength(labels(k)) == 0 || ismissing(labels(k))
+        sk = src(k);
+        dk = det(k);
+        if ~isnan(sk) && ~isnan(dk)
+            labels(k) = sprintf('S%d_D%d', sk, dk);
+        else
+            labels(k) = sprintf('Ch%d', k);
+        end
+    end
+end
+
+end
+
 
 function wvPer = perChannelWavelengths(optTbl, n)
 % PERCHANNELWAVELENGTHS Nonzero wavelength set for each channel

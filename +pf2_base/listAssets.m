@@ -40,6 +40,8 @@ assets = {
     'mni_t1'                        'MNI T1 brain volume'               'brain'
     'brodmann'                      'Brodmann area mapping'             'brain'
     'cerebro_1020'                  '10-20 EEG coordinate table'        'brain'
+    'colin27_scalp'                 'Colin27 scalp/head surface (MNI)'  'brain'
+    'colin27_brain'                 'Colin27 brain-mask surface (MNI)'  'brain'
     'sideprofile'                   'Side profile brain image'          'profile'
     'rcSlice'                       'Coronal slice image'               'profile'
     'topprofile'                    'Top profile brain image'           'profile'

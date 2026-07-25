@@ -17,7 +17,7 @@ function [fNIR] = importNIRX(folderDIR,channelCheck,varargin)
 %
 % Inputs:
 %   folderDIR    - Path to NIRx recording folder or .hdr/.nirs file [char | string]
-%                  If omitted, a file selection dialog opens.
+%                  If omitted or empty, a file selection dialog opens.
 %                  Can be either:
 %                    - Full path to the .hdr or .nirs file
 %                    - Path to folder containing NIRx recording files
@@ -82,27 +82,40 @@ includeSSchannels=true;
 
 buildProbeLayout=true;
 
-if nargin < 1
-   [folderDIR,pathname] = uigetfile({'*.hdr;*.nirs';'*.*'},'Open NIRX Config file');
-  %error('Function requires at least one input argument');
-elseif ~ischar(folderDIR)
+if nargin < 1 || isempty(folderDIR)
+   [fname,pathname] = uigetfile({'*.hdr;*.nirs';'*.*'},'Open NIRX Config file');
+   if isequal(fname,0)   % selection cancelled
+       fNIR = [];
+       return;
+   end
+   folderDIR = fullfile(pathname,fname);
+elseif ~ischar(folderDIR) && ~isstring(folderDIR)
   error('pf2:importNIRX:badInput', 'Input must be a string representing a filename');
-else
-   pathname=''; 
 end
+folderDIR = char(folderDIR);
 
-if(isempty(pathname))
-    if(contains(folderDIR,'\\'))
-        folderDIR(folderDIR=='\\')='/';
+% If the input is a recording FOLDER (the documented usage) rather than a
+% file, locate the NIRx config file (.hdr, else .nirs) inside it. Without this
+% guard a folder path is split on the separator and the code cd's to the
+% PARENT, so the .wl1/.wl2/.hdr are never found.
+if isfolder(folderDIR)
+    hdr = dir(fullfile(folderDIR, '*.hdr'));
+    if isempty(hdr), hdr = dir(fullfile(folderDIR, '*.nirs')); end
+    if isempty(hdr)
+        error('pf2:importNIRX:noHdrInFolder', ...
+            'No .hdr or .nirs config file found in folder ''%s''.', folderDIR);
     end
-
-    folderDIRparts=strsplit(folderDIR,'/');
-
-    filename=folderDIRparts{end};
-
-
-    pathname=folderDIR(1:end-length(filename));
+    folderDIR = fullfile(folderDIR, hdr(1).name);
 end
+
+% Normalize Windows backslashes so the single split logic below is portable.
+folderDIR = strrep(folderDIR, '\', '/');
+
+% Always derive pathname/filename from the (now full) folderDIR path so the
+% file-dialog and direct-argument cases follow the same code path below.
+folderDIRparts=strsplit(folderDIR,'/');
+filename=folderDIRparts{end};
+pathname=folderDIR(1:end-length(filename));
 
 curdir=cd;
 cdCleanup = onCleanup(@() cd(curdir));
@@ -256,6 +269,17 @@ for i=1:size(files,1)
             device.Probe{p}.TableCh.SourceIndex(:)=probeInfo.SD.MeasList(:,1);
             device.Probe{p}.TableCh.DetectorIndex(:)=probeInfo.SD.MeasList(:,2);
 
+            % Flag real-channel columns (the OD->Hb stage selects data(:,isCh)).
+            % NIRX raw carries no time/marker columns, so every measurement is a
+            % channel; dark columns are those with no valid wavelength. Match the
+            % toolbox-wide convention (importOxy3, loadDeviceCfg): isCh EXCLUDES
+            % dark columns, so downstream consumers (processStageOD2Hb, qc.sci,
+            % dot.channelGeometry) never treat a dark column as a measurement.
+            validCh=~isnan(device.Probe{p}.TableCh.OptodeNumber);
+            device.Probe{p}.TableCh.isDark=(isnan(device.Probe{p}.TableCh.Wavelength) ...
+                | device.Probe{p}.TableCh.Wavelength==0) & validCh;
+            device.Probe{p}.TableCh.isCh=validCh(:) & ~device.Probe{p}.TableCh.isDark(:);
+
             device.Probe{p}.SrcPos=table();
             device.Probe{p}.SrcPos.x_2d=device.Probe{p}.SrcPosX(:);
             device.Probe{p}.SrcPos.y_2d=device.Probe{p}.SrcPosY(:);
@@ -334,6 +358,12 @@ for i=1:size(files,1)
             device.Probe{p}.ChannelList= 1:numCh;
             device.Probe{p}.Wavelength=probeInfo.SD.Lambda(device.Probe{p}.wvI);
             device.Info.NumberChannels=device.Info.NumberChannels+numCh;
+
+            % Assemble the canonical per-channel optode table from the geometry
+            % computed above so processFNIRS2 / pf2.Device can resolve this
+            % probe (device resolution, MNI positions, SD distances) without a
+            % .cfg. Mirrors the TableOpt that pf2_base.loadDeviceCfg emits.
+            device.Probe{p}.TableOpt=pf2_base.buildOptodeTable(device.Probe{p});
 
 
 

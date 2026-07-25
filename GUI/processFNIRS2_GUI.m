@@ -62,6 +62,11 @@ global outputData
 
 pf2_base.applyLightTheme(hObject);
 
+% Force a separate, floating window. Newer MATLAB desktops (R2026+) dock new
+% figures into the main MATLAB window by default; this toolbox's GUIs are
+% designed as standalone windows.
+set(hObject, 'WindowStyle', 'normal');
+
 [~,pf2ver,~]=pf2_base.pf2version();
 set(handles.uipanel_device_info,'Title',sprintf('ProcessFNIRS2 %s',pf2ver));
 
@@ -102,7 +107,7 @@ validScalarNum = @(x) isnumeric(x) && isscalar(x);
 validDataInput = @(x) ((isnumeric(x) && ismatrix(x))||(isstruct(x)&&(isfield(x,'raw')||isfield(x,'hbo')||isfield(x,'HbO')||isfield(x,'info'))));
 validRawMethod = @(x) ischar(validatestring(x,PF2.myRawMethods.cfg.Sections));
 validOxyMethod = @(x) ischar(validatestring(x,PF2.myOxyMethods.cfg.Sections));
-validDPFmode = @(x) ischar(validatestring(x,{'None','Fixed','Calc'}));
+validDPFmode = @(x) ischar(validatestring(x,{'None','Fixed','Calc','PPF'}));
 
 
 addOptional(p,'data',[],validDataInput);
@@ -126,6 +131,11 @@ addParameter(p,'ChannelMask',[],@ismatrix); %logical matrix the size of channel 
 addParameter(p,'ShowGUI',true,@islogical); %adds bool to show gui even when output is defined
 addParameter(p,'DirtyBaseline',false,@islogical); % turn to use the entire mean as the baseline period
 addParameter(p,'FixedDPF',PF2.curDPF_fixed,validScalarPosNum); %set default uniwavelength DPF
+if isfield(PF2,'ppf'); guiDefaultPPF = PF2.ppf; else; guiDefaultPPF = []; end
+addParameter(p,'PPF',guiDefaultPPF,@(x) isempty(x)||(isnumeric(x)&&isvector(x))); %complete effective factor used when DPFmode is 'PPF' (escape hatch, L=SD.*ppf)
+if isfield(PF2,'pvc'); guiDefaultPVC = PF2.pvc; else; guiDefaultPVC = []; end
+addParameter(p,'PVC',guiDefaultPVC,@(x) isempty(x)||(isnumeric(x)&&isvector(x))||(ischar(x)&&strcmpi(x,'auto'))||(isstring(x)&&isscalar(x))); %partial-volume correction divisor(s) or 'auto', applied to the Fixed/Calc DPF
+addParameter(p,'ODShortRegression',false,@(x) islogical(x)||iscell(x)); %OD-space short-channel regression before Beer-Lambert (accepted for parity with processFNIRS2)
 addParameter(p,'DPFmode',PF2.dpf_mode,validDPFmode); %set role of DPF in mBLL calculations
 addParameter(p,'RejectLevel',PF2.RejectLevel,@(x) isnumeric(x)&&isscalar(x)&&x<1&&x>=0); %set the level at which a channel is rejected (fChMask)
 
@@ -154,7 +164,10 @@ end
 
 PF2.curDPF_fixed=p.Results.FixedDPF;
 PF2.curDPF_age=p.Results.defaultSubjectAge;
-PF2.dpf_mode=p.Results.DPFmode;
+PF2.dpf_mode=validatestring(p.Results.DPFmode,{'None','Fixed','Calc','PPF'}); % canonicalize casing (case-insensitive accept -> canonical stored value)
+PF2.ppf=p.Results.PPF;
+PF2.pvc=p.Results.PVC;
+PF2.odShortRegression=p.Results.ODShortRegression;
 
 data=p.Results.data;
 
@@ -180,6 +193,11 @@ PF2.GUIPF2.figHandle=handles.figure1;
 PF2.GUIPF2.curDPF_age=PF2.curDPF_age;
 PF2.GUIPF2.curDPF_fixed=PF2.curDPF_fixed;
 PF2.GUIPF2.dpf_mode=PF2.dpf_mode;
+% Partial pathlength factor (used in 'PPF' mode). Default to a sensible 0.1 so
+% PPF mode is usable out of the box; edited via the reused DPF value box.
+if isempty(PF2.ppf); PF2.GUIPF2.ppf=6; else; PF2.GUIPF2.ppf=PF2.ppf; end  % bare effective-factor default (DPF-magnitude)
+PF2.GUIPF2.pvc=PF2.pvc;   % so guiPVCValue() reads any PVC set via processFNIRS2('PVC',...)
+PF2.GUIPF2.odShortRegression=PF2.odShortRegression;   % so processFNIR_GUI applies OD-space SSR before Beer-Lambert
 
 PF2.GUIPF2.baseline=PF2.baseline;
 PF2.GUIPF2.baseline.relative2View=false; %GUI option to rebaseline to start of view when moving window
@@ -500,6 +518,21 @@ if(outputData.ProcessRaw)
         [PF2.GUIPF2.data.stage{3},PF2.GUIPF2.data.stage{2}]=pf2_base.fnirs.processStageRaw2OD(rawMethod,PF2.GUIPF2.data.stage{1},fs,PF2.GUIPF2.data.time,rawMask,PF2.GUIPF2.data.markers,PF2.GUIPF2.data.Aux,channelNumbers,wavelengths,curOptTable,PF2.GUIPF2.data,true);
     end
 
+    % Optional OD-space short-channel regression, applied BEFORE Beer-Lambert
+    % (Brigadoi & Cooper 2015) so systemic residuals are not amplified by the
+    % conversion. Mirrors the headless path (processFNIRS2.m's 'ODShortRegression'
+    % handling): opt-in only, default false leaves the pipeline byte-identical.
+    odShortRegression = guiODShortRegressionValue();
+    if ~(islogical(odShortRegression) && isscalar(odShortRegression) && ~odShortRegression)
+        if iscell(odShortRegression)
+            odSSRopts = odShortRegression;
+        else
+            odSSRopts = {};
+        end
+        PF2.GUIPF2.data.stage{3} = pf2_base.fnirs.shortChannelRegressionOD(PF2.GUIPF2.data.stage{3}, ...
+            channelNumbers, wavelengths, curProbe, odSSRopts{:});
+    end
+
     if(outputData.ProcessOxy)
         PF2.GUIPF2.data.stage{4}=processStageOD2Hb(PF2.GUIPF2.data.stage{3},PF2.GUIPF2.curDPF_age); % Beer-Lambert conversion
     end
@@ -595,7 +628,8 @@ if ~useViewRelativeBaseline
     % Standard processing - delegate directly
     outData = pf2_base.fnirs.processStageOD2Hb(data, PF2.GUIPF2.data.time, subAge, ...
         outputData.DirtyBaseline, curProbe, baseline, ...
-        PF2.GUIPF2.dpf_mode, PF2.GUIPF2.curDPF_fixed, PF2.GUIPF2.curDPF_age);
+        PF2.GUIPF2.dpf_mode, PF2.GUIPF2.curDPF_fixed, PF2.GUIPF2.curDPF_age, ...
+        'PPF', guiPPFValue(), 'PVC', guiPVCValue());
 else
     % Compute baseline samples for view-relative/window-only modes
     if outputData.DirtyBaseline && ~PF2.GUIPF2.processWindowOnly
@@ -619,7 +653,44 @@ else
     outData = pf2_base.fnirs.processStageOD2Hb(data, PF2.GUIPF2.data.time, subAge, ...
         false, curProbe, baseline, ...
         PF2.GUIPF2.dpf_mode, PF2.GUIPF2.curDPF_fixed, PF2.GUIPF2.curDPF_age, ...
-        'BaselineSamples', baselineSamples);
+        'BaselineSamples', baselineSamples, 'PPF', guiPPFValue(), 'PVC', guiPVCValue());
+end
+
+
+function pvc = guiPVCValue()
+% GUIPVCVALUE Current partial-volume correction from GUI state ([] -> no PVC)
+global PF2
+if isfield(PF2, 'GUIPF2') && isfield(PF2.GUIPF2, 'pvc')
+    pvc = PF2.GUIPF2.pvc;
+else
+    pvc = [];
+end
+
+
+function ppf = guiPPFValue()
+% GUIPPFVALUE Current partial pathlength factor from GUI state (default 6)
+
+global PF2
+if isfield(PF2, 'GUIPF2') && isfield(PF2.GUIPF2, 'ppf') && ~isempty(PF2.GUIPF2.ppf)
+    ppf = PF2.GUIPF2.ppf;
+else
+    ppf = 6;
+end
+
+
+function val = guiODShortRegressionValue()
+% GUIODSHORTREGRESSIONVALUE Current OD-space short-channel regression option
+%
+% Mirrors guiPPFValue()/guiPVCValue(): reads the value stored from
+% processFNIRS2_GUI's 'ODShortRegression' parameter (false, true, or a cell
+% array of pf2_base.fnirs.shortChannelRegressionOD Name-Value options).
+% Default false leaves the pipeline byte-identical (opt-in only).
+
+global PF2
+if isfield(PF2, 'GUIPF2') && isfield(PF2.GUIPF2, 'odShortRegression')
+    val = PF2.GUIPF2.odShortRegression;
+else
+    val = false;
 end
 
 
@@ -837,6 +908,15 @@ end
 
 set(handles.edit_DPF_fixed,'String',num2str(PF2.GUIPF2.curDPF_fixed,'%.2f'));
 
+% Ensure the DPF-mode dropdown offers PPF (the .fig ships None/Fixed/Calc);
+% append it once so the reused value box can be interpreted as a partial
+% pathlength factor when selected.
+dpfModeItems = cellstr(get(handles.popupmenu_dpf_mode,'String'));
+if ~any(strcmp(dpfModeItems,'PPF'))
+    dpfModeItems{end+1} = 'PPF';
+    set(handles.popupmenu_dpf_mode,'String',dpfModeItems);
+end
+
 switch(PF2.GUIPF2.dpf_mode)
     case 'None'
         set(handles.popupmenu_dpf_mode,'Value',1);
@@ -850,6 +930,12 @@ switch(PF2.GUIPF2.dpf_mode)
         set(handles.popupmenu_dpf_mode,'Value',3);
          set(handles.edit_DPF_fixed,'Enable','off');
           set(handles.edit_DPF_age,'Enable','on');
+    case 'PPF'
+        set(handles.popupmenu_dpf_mode,'Value',find(strcmp(dpfModeItems,'PPF'),1));
+        % Reuse the fixed-value box to enter the partial pathlength factor.
+        set(handles.edit_DPF_fixed,'Enable','on');
+        set(handles.edit_DPF_fixed,'String',num2str(PF2.GUIPF2.ppf(1),'%.2f'));
+        set(handles.edit_DPF_age,'Enable','off');
     otherwise
         set(handles.popupmenu_dpf_mode,'Value',3);
          set(handles.edit_DPF_fixed,'Enable','off');
@@ -954,7 +1040,7 @@ if(nargout>0)
            end
        end
     
-   if(isfield(PF2,'data')&&isfield(PF2.GUIPF2.data,'stage')&&(size(PF2.GUIPF2.data.stage,2)==5))
+   if(isfield(PF2,'GUIPF2')&&isfield(PF2.GUIPF2,'data')&&isfield(PF2.GUIPF2.data,'stage')&&(size(PF2.GUIPF2.data.stage,2)==5))
        if(outputData.ProcessOxy&&~isempty(PF2.GUIPF2.data.stage{5}))
             stage5fields=fields(PF2.GUIPF2.data.stage{5});
             for i=1:length(stage5fields)
@@ -3057,7 +3143,21 @@ switch(curSelectedValue)
         set(handles.edit_DPF_fixed,'Enable','off');
         set(handles.edit_DPF_age,'Enable','on');
     otherwise
-        PF2.GUIPF2.dpf_mode='None';
+        % Resolve by label so the dynamically appended 'PPF' entry works
+        % regardless of its index.
+        items = cellstr(get(handles.popupmenu_dpf_mode,'String'));
+        if curSelectedValue <= numel(items) && strcmp(items{curSelectedValue},'PPF')
+            PF2.GUIPF2.dpf_mode='PPF';
+            % The fixed-value box now enters the partial pathlength factor.
+            if ~isfield(PF2.GUIPF2,'ppf') || isempty(PF2.GUIPF2.ppf)
+                PF2.GUIPF2.ppf=6;
+            end
+            set(handles.edit_DPF_fixed,'Enable','on');
+            set(handles.edit_DPF_fixed,'String',num2str(PF2.GUIPF2.ppf(1),'%.2f'));
+            set(handles.edit_DPF_age,'Enable','off');
+        else
+            PF2.GUIPF2.dpf_mode='None';
+        end
 end
 
 processFNIR_GUI();
@@ -3090,7 +3190,25 @@ function edit_DPF_fixed_Callback(hObject, eventdata, handles)
 %        str2double(get(hObject,'String')) returns contents of edit_DPF_fixed as a double
 global PF2
 
-newDPFfixed=str2double(get(handles.edit_DPF_fixed,'String'));
+newVal=str2double(get(handles.edit_DPF_fixed,'String'));
+
+% In PPF mode this box carries the complete effective pathlength factor (the
+% escape hatch, L=SD.*ppf); allow the wider positive range (~0.05-15) and store
+% it in PF2.GUIPF2.ppf instead of the DPF. Must be > 0.
+if isfield(PF2.GUIPF2,'dpf_mode') && strcmp(PF2.GUIPF2.dpf_mode,'PPF')
+    if isnan(newVal)||newVal<=0
+        newVal=6;
+    elseif(newVal>15)
+        newVal=15;
+    end
+    set(handles.edit_DPF_fixed,'String',num2str(newVal,'%.2f'));
+    PF2.GUIPF2.ppf=newVal;
+    processFNIR_GUI();      % reprocess and refresh plots like the DPF path does
+    updatePlots(handles);
+    return;
+end
+
+newDPFfixed=newVal;
 if(newDPFfixed>10)
     newDPFfixed=10;
 elseif(newDPFfixed<1)

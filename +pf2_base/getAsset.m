@@ -19,6 +19,8 @@ function [data, assetPath] = getAsset(assetName, varargin)
 %                   'mni_t1'           - MNI T1 brain volume
 %                   'brodmann'         - Brodmann area mapping
 %                   'cerebro_1020'     - 10-20 EEG coordinate table
+%                   'colin27_scalp'    - Colin27 scalp/head surface (MNI mm)
+%                   'colin27_brain'    - Colin27 intracranial surface (MNI mm)
 %
 %                 Profile Images (.png):
 %                   'sideprofile'      - Side profile brain image
@@ -76,6 +78,8 @@ assetRegistry = {
     'mni_t1',           'mni_t1.mat'
     'brodmann',         'brodmann.mat'
     'cerebro_1020',     'cerebro_1020_table.mat'
+    'colin27_scalp',    'colin27_scalp.mat'
+    'colin27_brain',    'colin27_brain.mat'
 
     % Profile images (.png)
     'sideprofile',      'sideprofile_mid.png'
