@@ -134,10 +134,18 @@ savePath   = char(ip.Results.SavePath);
 
 % --- Validate Channels/TimeWindow up front (clear error, not a low-level
 % indexing crash or a silently-garbage result) ---
-if ~isempty(channels) && (any(mod(channels, 1) ~= 0) || any(channels < 1))
+if ~isempty(channels) && (~isreal(channels) || ~isvector(channels) || any(~isfinite(channels)) ...
+        || any(mod(channels, 1) ~= 0) || any(channels < 1))
     error('pf2:export:blockAvgToTable:badChannel', ...
-        'Channels must be positive integer indices (>= 1); got [%s].', ...
-        num2str(channels));
+        'Channels must be a real, finite vector of positive integer indices (>= 1); got [%s].', ...
+        num2str(channels(:).'));
+end
+
+% Normalize to a row so every per-channel loop (`for ch = channels`) iterates
+% one channel at a time -- including a user-supplied column vector -- across
+% the flat-cell, nested-cell, and pre-computed grand-average dispatch paths.
+if ~isempty(channels)
+    channels = channels(:).';
 end
 if ~isempty(timeWin) && (numel(timeWin) ~= 2 || ~isnumeric(timeWin) || timeWin(1) >= timeWin(2))
     error('pf2:export:blockAvgToTable:badWindow', ...
@@ -240,7 +248,7 @@ for g = 1:numel(keys)
                 'Requested channel(s) [%s] exceed the available channel count (%d) for group %s.', ...
                 num2str(badCh), nChAll, k.label);
         end
-        chList = channels(:).';   % force a row so `for ch = chList` iterates per element
+        chList = channels;   % already normalized to a row in the main function
     end
 
     % Determine time-mean window mask

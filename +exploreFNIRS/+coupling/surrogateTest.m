@@ -201,12 +201,18 @@ function result = surrogateTest(couplingFn, x, y, fs, varargin)
     % up front and return an explicitly invalid result rather than computing
     % coupling on fabricated (zero-filled) data.
     minFiniteSamples = 4;  % matches the short-signal floor enforced above (T < 4)
-    finiteX = x(isfinite(x));
-    finiteY = y(isfinite(y));
-    varX = 0; if numel(finiteX) > 1, varX = var(finiteX); end
-    varY = 0; if numel(finiteY) > 1, varY = var(finiteY); end
-    insufficientData = numel(finiteX) < minFiniteSamples || ...
-        numel(finiteY) < minFiniteSamples || varX == 0 || varY == 0;
+    % Base the counts/variances on JOINTLY finite samples (both signals
+    % observed at the same time point). Two signals whose finite spans do not
+    % overlap -- or overlap in fewer than minFiniteSamples points -- cannot be
+    % coupled, even when each is individually well-populated; otherwise
+    % interpolation fabricates the missing halves and yields a spurious
+    % "significant" result.
+    both = isfinite(x) & isfinite(y);
+    xBoth = x(both);
+    yBoth = y(both);
+    varX = 0; if numel(xBoth) > 1, varX = var(xBoth); end
+    varY = 0; if numel(yBoth) > 1, varY = var(yBoth); end
+    insufficientData = numel(xBoth) < minFiniteSamples || varX == 0 || varY == 0;
 
     if insufficientData
         warning('pf2:surrogateTest:insufficientData', ...

@@ -2,6 +2,9 @@
 
 ## Unreleased
 
+## v1.1 (2026-07-24)
+Phase-synchrony coupling metrics, GLM group statistics, result-table/BIDS export, Beer–Lambert extensions (PPF mode, partial-volume correction, OD-space short-channel regression), in-memory device geometry, a cortical head render, and a broad correctness/robustness pass across GLM, hyperscanning statistics, hemoglobin conversion, export, and the importers.
+
 ### New Features
 
 **Processing Methods:**
@@ -80,6 +83,11 @@
   - Block-shuffle surrogate p-values
   - Supports sliding window mode
 - Both methods registered in `computeMatrix` and `computeDyad` dispatch
+- `exploreFNIRS.coupling.plv()` — phase-locking value (Hilbert-phase synchrony); band-pass + a first-party FFT analytic signal, so it requires no Signal Processing Toolbox
+- `exploreFNIRS.coupling.wpli()` — weighted phase-lag index; debiased-squared (default) and magnitude estimators, robust to zero-lag/volume-conduction (Vinck et al. 2011)
+- `exploreFNIRS.coupling.imagCoherence()` — imaginary part of coherency; insensitive to zero-lag mixing (Nolte et al. 2004)
+- `exploreFNIRS.coupling.surrogateTest()` — surrogate/permutation significance for any coupling metric, with autocorrelation-aware circular-shift and phase-randomization nulls
+- PLV / wPLI / imaginary coherence registered in `computeDyad` dispatch
 
 **Neural Efficiency Analysis:**
 - `exploreFNIRS.core.plotNeuralEfficiency()` — scatter plot of brain activation vs behavioral performance
@@ -215,6 +223,12 @@
 - **GroupStatsIndependenceTest.m** — group GLM subject-level aggregation, mixed-montage channel-label alignment, nuisance-regressor exclusion
 - **HyperscanningNullTest.m** — positive-metric null handling in `computeGroup`, per-element permutation denominator, `computeDyad` fs-mismatch rejection and timestamp alignment
 - **BuildOptodeTableTest.m** — `buildOptodeTable` schema contract: expected columns, OptodeNum sorting, source/detector recovery (NaN when unmatched), geometry-column omission, short-separation derivation
+- **PhaseSyncCouplingTest.m** — PLV / wPLI / imaginary coherence and `surrogateTest` (identical-signal PLV, zero-lag robustness, magnitude vs debiased-squared estimator, NaN/insufficient-data handling)
+- **GLMEnhancementsTest.m** — FIR basis rank/singularity guard, single-gamma HRF, AR-order selection, and rank-deficient estimability (aliased coefficients/contrasts NaN, invariant under rescaling)
+- **BeerLambertPPFTest.m** — PPF mode, case-insensitive DPFmode, PPF/PVC validation, and PVC extrapolation warning
+- **StrangmanPVCTest.m** — Strangman partial-volume correction lookup and extrapolation behavior
+- **ShortChannelRegressionODTest.m** — OD-space short-channel regression
+- **ResultsTableExportTest.m** — `blockAvgToTable` / `glmToTable` schema, session preservation, channel-vector handling, TSV export, and headless-path guards
 
 ### GUI Refactoring
 - `updateCurrentDevice` consolidated: GUI and headless paths now delegate to shared `pf2_base.gui.updateCurrentDevice`
@@ -279,6 +293,16 @@
 - Fixed `glmToTable` collapsing sessions for repeated-subject cohorts — session was reconstructed from a subject-only map, so two recordings for one participant in different sessions both exported under the last session; each recording's own session is now preserved
 - Fixed headless export opening a GUI file picker when no output path was supplied — `asSNIRF`/`asNIR`/`asBIDS`/`asTensor` now raise a clear `pf2:export:<fn>:noPath[Root]Headless` error under `-batch` instead of a low-level dialog failure
 - Added input validation to `blockAvgToTable` — out-of-range `Channels` or a malformed `TimeWindow` now error (`pf2:export:blockAvgToTable:badChannel` / `:badWindow`) instead of silently dropping data or hitting a raw indexing error
+- Fixed `blockAvgToTable` crashing on a column-vector `Channels` (e.g. `[1;2]`) — the channel selection is normalized to a row so it iterates per element rather than as one vector-valued loop pass
+
+**Review-driven hardening (stress-case edges):**
+- `computeGroup` now also skips the invalid zero-null t-test for the remaining nonnegative metrics — Granger (F-statistic), mutual information, transfer entropy, and HB-ICA — not just the phase-synchrony metrics; all require a surrogate/permutation null
+- Rank-deficient GLM estimability is now per-coefficient and per-contrast via a null-space test with a scale-invariant (dimensionless) tolerance, so aliased coefficients/contrasts are NaN'd correctly even when the design is rescaled; a non-estimable contrast's standard error is also NaN (previously only its t/p were)
+- `fitGLM` bases the surrogate insufficient-data guard and `surrogateTest` on JOINTLY finite samples, so signals whose finite spans do not overlap are reported invalid instead of being interpolated into a spurious "significant" coupling
+- Nuisance-regressor auto-detection is boundary-anchored consistently — legitimate conditions like `Emotion`, `Response`, and `GlobalLocal` are kept, while documented nuisance names (`motion`, `resp`/`respiration`, `accel`/`accelerometer`, `heart`/`heartrate`, `global`, drift bases) are still excluded
+- `bvoxy` rejects a non-finite `PartialVolumeCorrection` (NaN/Inf) instead of producing all-NaN hemoglobin (`pf2_base:fnirs:bvoxy:pvcInvalid`); `dpfMode='None'` now ignores PVC with a warning rather than resolving `'auto'` (which needlessly required probe geometry)
+- `wpli` accepts integer `NFFT` (odd or even) and uses `floor(nfft/2)+1` for the one-sided spectrum instead of crashing on odd values; a non-integer `NFFT` is rejected up front
+- `plv` is now free of the Signal Processing Toolbox (first-party Butterworth filtering + an FFT-based analytic signal), so wPLI's "use PLV instead" toolbox-free recommendation is actually valid
 
 ### Breaking Changes
 - **`GLMExperiment.groupStats` aggregates to one value per subject.** `n_subjects` and degrees of freedom for cohorts with multiple recordings per participant will change (previously inflated by counting each recording); `stats.channel`/`channel_label` now index a montage-union label axis when channel counts differ across subjects

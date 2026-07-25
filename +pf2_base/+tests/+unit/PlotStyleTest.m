@@ -3,6 +3,29 @@ classdef PlotStyleTest < matlab.unittest.TestCase
     %
     %   results = runtests('pf2_base.tests.unit.PlotStyleTest');
 
+    properties
+        PrevForceLightMode
+    end
+
+    methods (TestMethodSetup)
+        function forceLightMode(testCase)
+            % The theme-dependent assertions here (createFigure's background
+            % color) must not depend on ambient/leaked dark-theme state:
+            % PlotStyle.isDarkMode() reads groot's defaultFigureColor, which
+            % other rendering tests (and exportgraphics) can flip to dark and
+            % not restore. Pin light mode per test and restore the previous
+            % preference in teardown so this class is order-independent.
+            testCase.PrevForceLightMode = pf2_base.plot.PlotStyle.getForceLightMode();
+            pf2_base.plot.PlotStyle.setForceLightMode(true);
+        end
+    end
+
+    methods (TestMethodTeardown)
+        function restoreLightMode(testCase)
+            pf2_base.plot.PlotStyle.setForceLightMode(testCase.PrevForceLightMode);
+        end
+    end
+
     methods (Test)
 
         function testDefaultProperties(testCase)

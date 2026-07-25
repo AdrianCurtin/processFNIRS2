@@ -190,6 +190,23 @@ classdef PhaseSyncCouplingTest < matlab.unittest.TestCase
                 testCase.verifyNotEmpty(res.values, sprintf('%s produced no values', m{1}));
             end
         end
+
+        function surrogateTestRejectsNonOverlappingFinite(testCase)
+            % Two signals that are each individually well-populated but whose
+            % finite spans do NOT overlap cannot be coupled: the guard must be
+            % based on jointly-finite samples, returning an invalid result
+            % rather than fabricating the missing halves via interpolation.
+            T = 200;
+            x = nan(T, 1);  y = nan(T, 1);
+            x(1:80)     = sin((1:80)'/3);      % x observed only early
+            y(120:200)  = cos((120:200)'/3);   % y observed only in a disjoint span
+            testCase.verifyWarning(@() exploreFNIRS.coupling.surrogateTest( ...
+                @exploreFNIRS.coupling.plv, x, y, testCase.fs), ...
+                'pf2:surrogateTest:insufficientData');
+            r = exploreFNIRS.coupling.surrogateTest(@exploreFNIRS.coupling.plv, x, y, testCase.fs);
+            testCase.verifyTrue(isnan(r.observed) && isnan(r.pvalue), ...
+                'Non-overlapping finite spans must return NaN observed/pvalue');
+        end
     end
 end
 

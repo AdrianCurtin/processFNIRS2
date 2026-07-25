@@ -236,5 +236,40 @@ classdef GLMEnhancementsTest < matlab.unittest.TestCase
             testCase.verifyTrue(isscalar(res.modelOrder));
             testCase.verifyGreaterThanOrEqual(res.modelOrder, 1);
         end
+
+        function estimabilityDetectedUnderRescaling(testCase)
+            % A rank-deficient design scaled up by a huge factor must STILL
+            % flag its aliased coefficients: the null-space entry test uses a
+            % dimensionless tolerance, so it does not degrade when the matrix
+            % scale (and null()'s own singular-value tolerance) blows up.
+            rng(11); T = 200;
+            c = ones(T,1); d = randn(T,1); ind = randn(T,1);
+            X = [c, d, d, ind];   % col2 == col3 (aliased)
+            names = {'const','dupA','dupB','indep'};
+            Y = X*[0.5;0;0;2] + 0.1*randn(T,1);
+            res = pf2_base.fnirs.fitGLM(Y, X*1e15, names);
+            testCase.verifyTrue(all(isnan(res.tstat(2:3, :))), ...
+                'Aliased coefficients must stay NaN even with the design rescaled 1e15');
+            testCase.verifyTrue(all(isfinite(res.tstat([1 4], :))), ...
+                'Estimable coefficients must remain finite under rescaling');
+        end
+
+        function nonEstimableContrastHasNaNStandardError(testCase)
+            % A non-estimable contrast must NaN its standard error too, not
+            % just its t-statistic and p-value.
+            rng(12); T = 200;
+            c = ones(T,1); d = randn(T,1); ind = randn(T,1);
+            X = [c, d, d, ind];
+            names = {'const','dupA','dupB','indep'};
+            Y = X*[0.5;0;0;2] + 0.1*randn(T,1);
+            C = [0 1 -1 0;   % non-estimable: difference of the aliased pair
+                 0 0  0 1];  % estimable
+            res = pf2_base.fnirs.fitGLM(Y, X, names, 'Contrasts', C, ...
+                'ContrastNames', {'dupDiff','indep'});
+            testCase.verifyTrue(isnan(res.contrast.se(1)), ...
+                'SE of a non-estimable contrast must be NaN');
+            testCase.verifyTrue(isfinite(res.contrast.se(2)), ...
+                'SE of an estimable contrast must be finite');
+        end
     end
 end

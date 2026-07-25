@@ -616,20 +616,22 @@ cPval = 2 * pf2_base.compat.tcdf(-abs(cTstat), dof);
 % otherwise, leaving full-rank designs unchanged.
 r = rank(X);
 if r < P
-    [~, Nspace, nsTol] = nonEstimableCoefficients(X);
+    [~, Nspace, ~, zeroTol] = nonEstimableCoefficients(X);
     if ~isempty(Nspace)
         nonEstContrast = false(K, 1);
         for k = 1:K
-            nonEstContrast(k) = norm(C(k, :) * Nspace) > nsTol;
+            nonEstContrast(k) = norm(C(k, :) * Nspace) > zeroTol;
         end
         cTstat(nonEstContrast, :) = NaN;
         cPval(nonEstContrast, :) = NaN;
+        cSe(nonEstContrast, :) = NaN;   % SE of a non-estimable contrast is undefined
     end
 end
 
 if dofInvalid
     cTstat(:) = NaN;
     cPval(:) = NaN;
+    cSe(:) = NaN;
 end
 
 % Default contrast names
@@ -648,7 +650,7 @@ contrast.names = contrastNames;
 
 end
 
-function [nonEstCoef, Nspace, nsTol] = nonEstimableCoefficients(X)
+function [nonEstCoef, Nspace, nsTol, zeroTol] = nonEstimableCoefficients(X)
 % NONESTIMABLECOEFFICIENTS Non-estimable coefficients of a rank-deficient design
 %
 % For a rank-deficient design X ([T x P], effective rank r < P), the null
@@ -685,12 +687,18 @@ function [nonEstCoef, Nspace, nsTol] = nonEstimableCoefficients(X)
 %                nonzero test [scalar]
 
 P = size(X, 2);
+% Scale-dependent singular-value threshold for the null-space computation.
 nsTol = max(size(X)) * eps(norm(X));
 Nspace = null(X, nsTol);
+% The null() basis columns are orthonormal (dimensionless, O(1) entries), so
+% the nonzero test must use a DIMENSIONLESS tolerance. Reusing nsTol here would
+% fail on a rescaled design (e.g. X*1e15 -> nsTol ~ 400), letting genuine
+% +/-0.707 aliasing entries slip below threshold and retain finite statistics.
+zeroTol = max(size(X)) * eps;
 if isempty(Nspace)
     nonEstCoef = false(P, 1);
 else
-    nonEstCoef = any(abs(Nspace) > nsTol, 2);
+    nonEstCoef = any(abs(Nspace) > zeroTol, 2);
 end
 
 end

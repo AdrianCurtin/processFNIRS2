@@ -149,6 +149,30 @@ classdef ResultsTableExportTest < matlab.unittest.TestCase
             testCase.verifyError( ...
                 @() pf2.export.blockAvgToTable(segments, 'TimeWindow', [10 -5]), ...
                 'pf2:export:blockAvgToTable:badWindow');
+            % Matrix-shaped Channels must be rejected up front, not hit a
+            % low-level any()||any() error.
+            testCase.verifyError( ...
+                @() pf2.export.blockAvgToTable(segments, 'Channels', [1 2; 3 4]), ...
+                'pf2:export:blockAvgToTable:badChannel');
+        end
+
+        function blockAvgToTableColumnChannelsAllPaths(testCase)
+            % A column-vector Channels must iterate per element on BOTH the
+            % flat-cell path and the pre-computed grand-average (struct) path;
+            % the GA path previously threw MATLAB:nonLogicalConditional.
+            proc1 = processFNIRS2(testCase.glmSubjects{1}, ...
+                'Raw_Method', testCase.glmRaw, 'Oxy_Method', testCase.glmOxy);
+            segments = pf2.data.extractBlocks(proc1, testCase.glmBlockDefs{1}, ...
+                'PreTime', 5, 'PostTime', 15, 'SetT0', true);
+
+            % Flat-cell path with a column vector
+            Tflat = pf2.export.blockAvgToTable(segments, 'Channels', [1; 2]);
+            testCase.verifyEqual(numel(unique(Tflat.channel)), 2);
+
+            % Grand-average struct path with a column vector (the incomplete-fix case)
+            ga = pf2.data.blockAverage(segments);
+            Tga = pf2.export.blockAvgToTable(ga, 'Channels', [1; 2]);
+            testCase.verifyEqual(numel(unique(Tga.channel)), 2);
         end
 
         function glmToTableTsvExportIsTabDelimited(testCase)
@@ -223,8 +247,15 @@ classdef ResultsTableExportTest < matlab.unittest.TestCase
             pngPath = [tempname, '.png'];
             cleanupObj = onCleanup(@() deleteIfExists(pngPath));
 
-            testCase.verifyWarningFree( ...
-                @() pf2.probe.plot.showHead3D(fNIR, 'savePath', pngPath));
+            % If showHead3D fails to resolve the attached device (the
+            % regression), it falls into its catch and emits probeLoadFailed,
+            % skipping the overlay. Promote just that warning to an error so
+            % this test catches the regression precisely, without tripping on
+            % benign graphics/age warnings that a broad verifyWarningFree flags.
+            wState = warning('error', 'pf2:probe:plot:showHead3D:probeLoadFailed');
+            restoreWarn = onCleanup(@() warning(wState));
+
+            pf2.probe.plot.showHead3D(fNIR, 'savePath', pngPath);
             testCase.verifyTrue(isfile(pngPath));
             fi = dir(pngPath);
             testCase.verifyGreaterThan(fi.bytes, 0);
