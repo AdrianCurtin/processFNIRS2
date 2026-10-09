@@ -1,14 +1,20 @@
 # Changelog
 
-## Unreleased
-
-### Added
-
-- Author ORCIDs in `CITATION.cff`, which GitHub's "Cite this repository" and Zenodo archiving read.
+## v1.2.0 (2026-10-09)
+processFNIRS2 moves to the AyazLab organization.
 
 ### Changed
 
 - The repository moved to the AyazLab organization: https://github.com/AyazLab/processFNIRS2. Old GitHub URLs redirect. The documentation site is now https://ayazlab.github.io/processFNIRS2/; the old `adriancurtin.github.io` address does not redirect.
+- `CITATION.cff`, the README citation, and the documentation links point at the new location.
+
+## v1.1.2 (2026-10-09)
+Citation metadata ahead of Zenodo archiving.
+
+### Added
+
+- Author ORCIDs in `CITATION.cff`, which GitHub's "Cite this repository" and Zenodo archiving read.
+- `pf2version` reports the current release; v1.1.1 shipped reporting v1.1.0.
 
 ## v1.1.1 (2026-10-09)
 SMAR motion-artifact functions on raw intensity, and QC power-spectrum crash and channel-mapping fixes.

@@ -29,7 +29,7 @@ function [outStr,pf2ver,dateStr]=pf2version()
 %
 % See also: pf2_initialize, processFNIRS2
 
-pf2ver='v1.1.2';
+pf2ver='v1.2.0';
 dateStr='October 9 2026';
 
 
