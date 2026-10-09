@@ -686,9 +686,10 @@ exGby(i) =
 ### Motion Artifact Correction
 | Function | Purpose |
 |----------|---------|
-| `pf2_SMAR.m` | Sliding Motion Artifact Rejection |
-| `pf2_SMAR2.m` | SMAR v2.0 (improved algorithm) |
-| `pf2_SMAR2_mask.m` | SMAR2 with masking |
+| `pf2_SMAR.m` | Sliding Motion Artifact Rejection (raw intensity) |
+| `pf2_SMAR_mask.m` | SMAR as a temporal mask (raw intensity) |
+| `pf2_SMAR2.m` | SMAR v2.0, adaptive dCV thresholds (raw intensity) |
+| `pf2_sSMART.m` | SMAR2 detection with interpolated reconstruction (raw intensity) |
 | `pf2_fnirs_MARA.m` | Movement Artifact Reduction Algorithm |
 | `pf2_MotionCorrectTDDR.m` | Temporal Derivative Distribution Repair |
 | `pf2_MotionCorrectSpline.m` | Spline interpolation motion correction |

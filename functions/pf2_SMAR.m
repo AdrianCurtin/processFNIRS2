@@ -6,9 +6,20 @@ function [Xcorr, maskCV]=pf2_SMAR(x,N,tauUp,tauLow)
 % a sliding window. Samples with CV values exceeding a threshold are marked
 % as artifacts and replaced with NaN.
 %
+% SMAR operates on raw light intensity only. The CV (std/mean) is a relative
+% measure of fluctuation that is meaningful only for a strictly positive
+% signal with a stable DC level, which detected intensity provides. Optical
+% density and hemoglobin are baseline-relative and hover around zero, so
+% their windowed mean approaches zero and the CV is unbounded; applied to
+% them, SMAR rejects most of the recording. In a processing pipeline, place
+% pf2_SMAR before pf2_Intensity2OD.
+%
 % Reference:
-%   Ayaz, H. et al. (2010). Sliding-window motion artifact rejection for
-%   Functional Near-Infrared Spectroscopy. Conf Proc IEEE Eng Med Biol Soc.
+%   Ayaz, H., Izzetoglu, M., Shewokis, P. A., & Onaral, B. (2010).
+%   Sliding-window motion artifact rejection for Functional Near-Infrared
+%   Spectroscopy. 2010 Annual International Conference of the IEEE
+%   Engineering in Medicine and Biology, 6567-6570.
+%   DOI: 10.1109/iembs.2010.5627113
 %
 % Syntax:
 %   [Xcorr, maskCV] = pf2_SMAR(x)
@@ -17,8 +28,11 @@ function [Xcorr, maskCV]=pf2_SMAR(x,N,tauUp,tauLow)
 %   [Xcorr, maskCV] = pf2_SMAR(x, N, tauUp, tauLow)
 %
 % Inputs:
-%   x       - Input signal matrix [T x C] where T=samples, C=channels
-%             Can be raw intensity, optical density, or hemoglobin data
+%   x       - Raw light intensity matrix [T x C] where T=samples,
+%             C=channels. Must be strictly positive (before
+%             pf2_Intensity2OD). Not valid for optical density or
+%             hemoglobin data; a warning is issued for channels whose
+%             values are not all positive.
 %   N       - Window length in samples for CV calculation (default: 10)
 %             Typical range: 5-20 samples. Larger windows are more robust
 %             but less sensitive to brief artifacts. If N is even, it will
@@ -28,9 +42,9 @@ function [Xcorr, maskCV]=pf2_SMAR(x,N,tauUp,tauLow)
 %             Typical range: 0.01-0.1 depending on data quality.
 %             Lower values = more aggressive artifact rejection.
 %   tauLow  - Lower CV threshold (default: -1, disabled)
-%             When positive, samples with |CV| < tauLow are also rejected.
-%             Useful for detecting saturated or "flat" signals when using
-%             dark/ambient channel data. Set to -1 to disable.
+%             When positive, samples with |CV| < tauLow are also rejected,
+%             flagging implausibly flat (e.g. saturated or clipped)
+%             intensity. Set to -1 to disable.
 %
 % Outputs:
 %   Xcorr   - Corrected signal matrix [T x C], same size as input
@@ -39,21 +53,30 @@ function [Xcorr, maskCV]=pf2_SMAR(x,N,tauUp,tauLow)
 %             Can be used for further processing or visualization
 %
 % Algorithm:
-%   1. Compute local CV in sliding window: CV = std(window) / mean(window)
+%   1. Compute local CV of the intensity in a sliding window:
+%      CV = std(window) / mean(window)
 %   2. Mark samples where |CV| > tauUp OR |CV| < tauLow OR CV is NaN
 %   3. Replace marked samples with NaN
 %
 % Example:
-%   % Basic usage with defaults
-%   [corrected, mask] = pf2_SMAR(rawData);
+%   % Basic usage with defaults on raw intensity
+%   data = pf2.import.sampleData.fNIR2000();
+%   [corrected, mask] = pf2_SMAR(data.raw);
+%
+%   % In a raw pipeline: low-pass, then SMAR, then optical density
+%   pipe = pf2_base.RawPipeline('SMAR_OD');
+%   pipe = pipe.add('pf2_lpf', 'freq_cut', 0.1);
+%   pipe = pipe.add('pf2_SMAR');
+%   pipe = pipe.add('pf2_Intensity2OD');
 %
 %   % More aggressive rejection
-%   [corrected, mask] = pf2_SMAR(rawData, 15, 0.015);
+%   [corrected, mask] = pf2_SMAR(data.raw, 15, 0.015);
 %
-%   % With lower bound for ambient channel cleaning
-%   [corrected, mask] = pf2_SMAR(ambientData, 10, 0.025, 0.001);
+%   % Also reject flat (saturated/clipped) stretches
+%   [corrected, mask] = pf2_SMAR(data.raw, 10, 0.025, 0.001);
 %
-% See also: pf2_SMAR2, pf2_fnirs_MARA, pf2_MotionCorrectTDDR, calcLocalCV
+% See also: pf2_SMAR_mask, pf2_SMAR2, pf2_Intensity2OD, pf2_fnirs_MARA,
+%           pf2_MotionCorrectTDDR, calcLocalCV
 
 
 if nargin<1
@@ -72,6 +95,15 @@ end
 
 if(N<1)
     error('pf2:smar:invalidWindowLength', 'Invalid Window Length');
+end
+
+nonPos = any(x <= 0, 1);
+if any(nonPos)
+    warning('pf2:smar:nonPositiveInput', ...
+        ['pf2_SMAR expects strictly positive raw light intensity, but %d of %d ' ...
+         'channels contain zero or negative values. Optical density and ' ...
+         'hemoglobin data are not valid SMAR input; apply SMAR before ' ...
+         'pf2_Intensity2OD.'], nnz(nonPos), numel(nonPos));
 end
 
 CVx=calcLocalCV(x,N);

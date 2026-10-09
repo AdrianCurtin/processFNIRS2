@@ -2,6 +2,25 @@
 
 ## Unreleased
 
+### Fixes
+
+**SMAR motion-artifact family (`pf2_SMAR`, `pf2_SMAR_mask`, `pf2_SMAR2`, `pf2_sSMART`):**
+- These functions now run on raw light intensity only, before `pf2_Intensity2OD`. Their coefficient-of-variation test divides by the windowed mean, which is near zero for optical density and hemoglobin, so on OD they rejected most of a recording (94% of the fNIR2000 sample for `pf2_SMAR`). The function library now marks them raw-stage, and each warns when given non-positive input.
+- The `OD_SMAR` seed now runs a 0.1 Hz low-pass, then SMAR, then the OD conversion, the order used in published SMAR work. On startup, a stored `OD_SMAR` that still matches the old seed exactly is replaced; edited copies are left alone (run `pf2.methods.resetDefaults('raw')` to re-seed them).
+- Saved methods no longer pin a registered function's `requiresOD`/`validStages`; the function library is authoritative, so methods saved with the old flags can place SMAR before the OD conversion.
+- `pf2_SMAR2`: new defaults `tauArtifact = 10`, `tauClean = 1`, `minSeg = N + 2`. The old defaults rejected most of an artifact-free recording, and `tauClean = 0` (the previous library default) masked whole channels; `tauClean` must now be > 0. Artifact segment indices (`MA_idx`) are now in input rows, masked segments no longer grow by a sample, the recording edges are evaluated with a shrinking window instead of always rejected, `chNum` is validated, and a window spanning the whole recording warns instead of silently passing artifacts.
+- `pf2_sSMART`: gap filling no longer extrapolates past the last clean sample (`pchip`/`spline`/`makima` previously diverged at the recording edges). Detection runs on raw intensity, with shift correction and interpolation done on log intensity. Empty arguments now select defaults, `minSeg = -1` (the library default) selects the automatic N+2, and channels masked in full raise a warning.
+- Removed the `pf2_SMAR2_mask` library entry, which referenced a function that no longer exists.
+
+**Quality control (`pf2.qc.powerSpectrum`, `pf2.qc.sci`, `pf2.qc.pipeline.assess`):**
+- `pf2.qc.powerSpectrum` no longer errors with "Index in position 2 exceeds array bounds" when every channel is masked bad; it returns an empty result and `assess` fails the cardiac check for all channels. This crash surfaced through the cardiac check in `assess` and `pf2.qc.ChannelCheck`.
+- `powerSpectrum` clamps the Welch window to between 3 samples and the recording length, so recordings shorter than `WindowLength` no longer error in `pwelch`.
+- `powerSpectrum` on raw data now reads each channel's first non-dark wavelength column from the device layout. It previously assumed 2 interleaved columns per channel, so on devices with a dark column (fNIR1200, fNIR2000, fNIR3000) most channels were analyzed on a dark or wrong-wavelength column. Cardiac results on raw data from these devices change accordingly.
+- `assess`, `sci`, and `powerSpectrum` map channel k to the k-th entry of the device channel list, as `processFNIRS2` does. On the merged Hitachi probe (`fNIR_Hitachi_3x5_merged`), whose channel numbers are non-contiguous, results previously landed on the wrong channels and some channels were never assessed. A `.device` that is not a `pf2.Device` is now ignored instead of erroring.
+- Recordings too short for a measure now skip it instead of reporting a meaningless result. SCI and cardiac need 5 cycles of the cardiac band's lower edge (10 s for the default band) and report `skipped` with a `skipReason`, without penalizing channels; SCI previously failed every channel on short data and errored at 2 s. `powerSpectrum` peak bands carry `skipped`/`skipReason` under the same rule (10 s cardiac, 50 s respiratory, 100 s Mayer), so Mayer detection is now skipped on recordings under 100 s.
+- `pf2.qc.pipeline.report` prints each skipped check's actual reason instead of always "not applicable at this fs", and `assess` now carries the Takizawa skip reason.
+- `pf2.qc.plotQuality` renders PSD results with no channels or an all-zero spectrum instead of erroring.
+
 ## v1.1 (2026-07-24)
 Phase-synchrony coupling metrics, GLM group statistics, result-table/BIDS export, Beer–Lambert extensions (PPF mode, partial-volume correction, OD-space short-channel regression), in-memory device geometry, a cortical head render, and a broad correctness/robustness pass across GLM, hyperscanning statistics, hemoglobin conversion, export, and the importers.
 

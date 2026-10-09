@@ -15,6 +15,11 @@ function report = assess(data, opts)
 %   saturation - Raw intensity at floor (0) or ceiling (device max) (raw)
 %   sci        - Scalp coupling index via cardiac cross-correlation (raw)
 %   cardiac    - Cardiac peak presence in power spectrum (raw)
+%
+%   sci and cardiac are skipped (channels not penalized, with a
+%   skipReason) when the sampling rate cannot reach the cardiac band or
+%   the recording spans fewer than 5 cycles of CardiacBand(1) (10 s for
+%   the default band). takizawa likewise skips recordings under 10 s.
 %   cov        - Coefficient of variation of raw signal (raw)
 %   takizawa   - 4-rule hemoglobin QC (filtered Hb)
 %
@@ -79,18 +84,21 @@ fs = data.fs;
 nRawCols = size(data.raw, 2);
 
 %% Resolve channel layout from Device or fallback
-hasDev = isfield(data, 'device') && ~isempty(data.device);
+hasDev = isfield(data, 'device') && isa(data.device, 'pf2.Device');
 if hasDev
     dev = data.device;
     nChannels = dev.nChannels;
     wavelengths = dev.wavelengthSet;
     nWl = numel(wavelengths);
-    % Build per-channel column map from Device
+    % Build per-channel column map from Device. Channel k is the k-th
+    % entry of the channel list (as in processFNIRS2), which differs from
+    % the raw channel number on merged probes with non-contiguous numbering
     chNums = dev.channelNumbers();
     wlVec = dev.wavelengths();
+    chList = dev.channelList();
     chColMapWl = cell(1, nChannels); % columns per wavelength (excl dark)
     for ch = 1:nChannels
-        wlCols = find(chNums == ch & wlVec > 0);
+        wlCols = find(chNums == chList(ch) & wlVec > 0);
         chColMapWl{ch} = wlCols;
     end
 elseif isfield(data, 'info') && isfield(data.info, 'synthetic') ...
@@ -331,17 +339,30 @@ for ci = 1:numel(checks)
             % Need Nyquist > ~1.0 Hz (fs > ~2 Hz) for reliable detection.
             nyq = fs / 2;
             minUsableCardiacHz = 1.0;
+            % A spectral peak needs several beats: at least 5 cycles of
+            % the band's lower edge (10 s for the default band), the same
+            % minimum pf2.qc.sci and pf2.qc.powerSpectrum apply
+            minCardiacDuration = 5 / opts.CardiacBand(1);
+            durationSec = size(data.raw, 1) / fs;
+            cardiacSkipReason = '';
             if nyq <= minUsableCardiacHz
-                % Cannot meaningfully detect cardiac peaks at this fs
+                cardiacSkipReason = sprintf(...
+                    'Sampling rate (%.1f Hz) too low for cardiac peak detection (Nyquist=%.1f Hz, need >%.1f Hz)', ...
+                    fs, nyq, minUsableCardiacHz);
+            elseif durationSec < minCardiacDuration
+                cardiacSkipReason = sprintf(...
+                    'Recording too short (%.1f s < %.0f s) for cardiac peak detection', ...
+                    durationSec, minCardiacDuration);
+            end
+            if ~isempty(cardiacSkipReason)
+                % Cannot meaningfully detect cardiac peaks
                 report.cardiac.detected = false(1, nChannels);
                 report.cardiac.snr = nan(1, nChannels);
                 report.cardiac.freq = nan(1, nChannels);
                 report.cardiac.pass = true(1, nChannels);
                 report.cardiac.threshold = opts.CardiacSNR;
                 report.cardiac.skipped = true;
-                report.cardiac.skipReason = sprintf(...
-                    'Sampling rate (%.1f Hz) too low for cardiac peak detection (Nyquist=%.1f Hz, need >%.1f Hz)', ...
-                    fs, nyq, minUsableCardiacHz);
+                report.cardiac.skipReason = cardiacSkipReason;
                 passMatrix(ci, :) = true;
             else
                 psdResult = pf2.qc.powerSpectrum(data, ...
@@ -408,6 +429,9 @@ for ci = 1:numel(checks)
             report.takizawa.ruleNames = tkReport.ruleNames;
             report.takizawa.pass = tkReport.pass;
             report.takizawa.skipped = tkReport.skipped;
+            if tkReport.skipped
+                report.takizawa.skipReason = tkReport.skipReason;
+            end
             passMatrix(ci, :) = tkReport.pass;
     end
 end

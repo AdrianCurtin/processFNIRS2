@@ -135,6 +135,12 @@ if(~isfield(PF2,'myRawMethods')||~isfield(PF2,'baseline'))
                'First-time seeding error: %s', ME.message);
        end
    end
+
+   % Existing install: replace stored seed methods saved from a since-corrected
+   % seed definition (user-edited methods are left alone).
+   if ~firstTimeRaw
+       migrateStaleRawSeeds();
+   end
    
    PF2.curDPF_fixed=5.93;   %Default differential pathlength for adult human head (van der Zee 1992)
    PF2.dpf_mode='Calc';   %Default age to calculate differential pathlength factor from.
@@ -154,3 +160,43 @@ if(~isfield(PF2,'myRawMethods')||~isfield(PF2,'baseline'))
 end
 
 
+function migrateStaleRawSeeds()
+% MIGRATESTALERAWSEEDS Re-seed stored raw methods saved from an outdated seed
+%
+% OD_SMAR used to run pf2_Intensity2OD before pf2_SMAR. SMAR's
+% coefficient-of-variation test is only valid on raw light intensity, so on
+% optical density it rejected nearly every sample. A stored OD_SMAR that
+% still matches that exact old seed (same steps and the seed's default SMAR
+% parameters N=10, tauUp=0.025, tauLow=-1) is replaced with the current seed.
+% A method the user has edited, including changed parameters, is left alone.
+%
+% Inputs:
+%   None (reads and updates global PF2.myRawMethods)
+%
+% Outputs:
+%   None
+
+global PF2
+try
+    if ~pf2_base.isnestedfield(PF2, 'myRawMethods.cfg.OD_SMAR')
+        return
+    end
+    method = pf2_base.pf2_unpackMethod(PF2.myRawMethods.cfg.OD_SMAR);
+    names = cellfun(@(f) f.funcName, method.F, 'UniformOutput', false);
+    if ~isequal(names, {'pf2_Intensity2OD', 'pf2_SMAR'})
+        return
+    end
+    smar = method.F{2};
+    [isArg, idx] = ismember({'N', 'tauUp', 'tauLow'}, smar.argNames);
+    if ~all(isArg) || ~isequal(method.F{1}.argNames, {'x'}) || ...
+            ~isequal(smar.argDefaults(idx), {10, 0.025, -1})
+        return
+    end
+    p = pf2_base.methods.seeds.raw.OD_SMAR();
+    p.save('raw', 'Replace', true);
+    fprintf(['Updated stored raw method OD_SMAR: SMAR now runs on raw ' ...
+        'intensity before the optical density conversion.\n']);
+catch ME
+    warning('pf2:initialize:seedMigrationFailed', ...
+        'Could not update stored raw method OD_SMAR: %s', ME.message);
+end

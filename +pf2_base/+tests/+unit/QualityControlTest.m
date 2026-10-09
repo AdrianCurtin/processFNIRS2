@@ -5,7 +5,8 @@ classdef QualityControlTest < matlab.unittest.TestCase
     %     - SCI (Scalp Coupling Index): cardiac correlation, dead channels,
     %       threshold classification, explicit wavelength params, output dims
     %     - Power Spectrum: known sinusoid peaks, cardiac/respiratory detection,
-    %       noise-only, HbO signal, channel subset, output dimensions
+    %       noise-only, HbO signal, channel subset, output dimensions,
+    %       all channels masked, short recordings, device raw-column mapping
     %     - plotQuality: SCI bar chart, PSD overlay, PSD tiled
     %
     %   Example:
@@ -264,6 +265,203 @@ classdef QualityControlTest < matlab.unittest.TestCase
             testCase.verifyLessThanOrEqual(max(result.freqs), freqRange(2));
         end
 
+        function testPSDAllChannelsMasked(testCase)
+            % Every channel masked bad: empty result, no index error
+            data = testCase.dataWithHeart;
+            data.fchMask(:) = 0;
+            result = pf2.qc.powerSpectrum(data, 'Signal', 'raw');
+            testCase.verifyEmpty(result.channels, ...
+                'No channels should be analyzed when all are masked.');
+            testCase.verifySize(result.psd, [numel(result.freqs), 0], ...
+                'PSD should have zero columns when all channels are masked.');
+            testCase.verifySize(result.cardiac.detected, [1, 0], ...
+                'Cardiac detection should be empty when all channels are masked.');
+
+            report = pf2.qc.pipeline.assess(data, 'Checks', {'cardiac'});
+            testCase.verifySize(report.cardiac.pass, [1, 4], ...
+                'assess should still report one cardiac result per channel.');
+            testCase.verifyFalse(any(report.cardiac.pass), ...
+                'Masked channels should fail the cardiac check.');
+
+            fig = pf2.qc.plotQuality(result, 'Visible', 'off', 'Layout', 'tiled');
+            testCase.addTeardown(@() close(fig));
+            testCase.verifyTrue(ishandle(fig), ...
+                'plotQuality tiled should render an empty PSD result.');
+        end
+
+        function testPSDShortRecording(testCase)
+            % Recording shorter than WindowLength: window is clamped
+            data = pf2_base.tests.synthetic.generateFNIRS( ...
+                'duration', 5, 'fs', 10, 'nChannels', 4, ...
+                'addHeartbeat', true, 'seed', 1);
+            result = pf2.qc.powerSpectrum(data, 'Signal', 'raw', ...
+                'WindowLength', 10, 'Overlap', 0.99);
+            testCase.verifyEqual(result.channels, 1:4, ...
+                'All channels should be analyzed on a short recording.');
+            testCase.verifyFalse(any(isnan(result.psd(:))), ...
+                'Short-recording PSD should be finite.');
+
+            % Window shorter than 3 samples is raised to 3
+            result = pf2.qc.powerSpectrum(data, 'Signal', 'raw', ...
+                'WindowLength', 0.05);
+            testCase.verifyFalse(any(isnan(result.psd(:))), ...
+                'A sub-3-sample window should be raised, not error or NaN.');
+            testCase.verifyGreaterThan(max(result.psd(:)), 0, ...
+                'A raised 3-sample window should still yield power.');
+        end
+
+        function testPSDTooFewSamples(testCase)
+            % Under 3 samples: zero PSD with per-channel results, no error
+            data = pf2_base.tests.synthetic.generateFNIRS( ...
+                'duration', 60, 'fs', 10, 'nChannels', 4, 'seed', 1);
+            data.raw = data.raw(1:2, :);
+            data.time = data.time(1:2);
+            result = pf2.qc.powerSpectrum(data, 'Signal', 'raw');
+            testCase.verifyEqual(result.channels, 1:4, ...
+                'Channels should be kept when there are too few samples.');
+            testCase.verifySize(result.psd, [numel(result.freqs), 4], ...
+                'PSD should keep one column per channel.');
+            testCase.verifyEqual(result.cardiac.detected, false(1, 4), ...
+                'No cardiac peak should be detected from 2 samples.');
+
+            % An all-zero spectrum has no positive power for the log axis
+            fig = pf2.qc.plotQuality(result, 'Visible', 'off', 'Layout', 'tiled');
+            testCase.addTeardown(@() close(fig));
+            testCase.verifyTrue(ishandle(fig), ...
+                'plotQuality should render an all-zero PSD.');
+        end
+
+        function testPSDBandsSkippedOnShortRecording(testCase)
+            % Bands are skipped when the recording spans fewer than 5
+            % cycles of the band's lower edge (10/50/100 s)
+            result = pf2.qc.powerSpectrum(testCase.dataWithHeart, ...
+                'Signal', 'raw');   % 60 s recording
+            testCase.verifyFalse(result.cardiac.skipped, ...
+                'Cardiac band should be assessed on 60 s of data.');
+            testCase.verifyFalse(result.respiratory.skipped, ...
+                'Respiratory band should be assessed on 60 s of data.');
+            testCase.verifyTrue(result.mayer.skipped, ...
+                'Mayer band needs 100 s and should be skipped on 60 s of data.');
+            testCase.verifyFalse(any(result.mayer.detected), ...
+                'A skipped band should report no detections.');
+            testCase.verifyNotEmpty(result.mayer.skipReason, ...
+                'A skipped band should say why.');
+        end
+
+        function testAssessSkipsCardiacChecksOnShortRecording(testCase)
+            % Under 10 s, SCI and cardiac are skipped, not failed
+            data = pf2_base.tests.synthetic.generateFNIRS( ...
+                'duration', 5, 'fs', 10, 'nChannels', 4, ...
+                'addHeartbeat', true, 'seed', 1);
+            report = pf2.qc.pipeline.assess(data, 'Checks', {'sci', 'cardiac'});
+            for c = {'sci', 'cardiac'}
+                testCase.verifyTrue(report.(c{1}).skipped, ...
+                    sprintf('%s should be skipped on a 5 s recording.', c{1}));
+                testCase.verifyTrue(all(report.(c{1}).pass), ...
+                    sprintf('A skipped %s check should not penalize channels.', c{1}));
+                testCase.verifySubstring(report.(c{1}).skipReason, 'too short', ...
+                    sprintf('%s skipReason should name the short recording.', c{1}));
+            end
+
+            % 2 s used to error inside the SCI bandpass filter
+            data = pf2_base.tests.synthetic.generateFNIRS( ...
+                'duration', 2, 'fs', 10, 'nChannels', 4, 'seed', 1);
+            result = pf2.qc.sci(data);
+            testCase.verifyTrue(result.skipped, ...
+                'SCI should skip, not error, on a 2 s recording.');
+        end
+
+        function testPSDRawUsesDeviceColumns(testCase)
+            % fNIR2000 has a dark column per channel; PSD must read the
+            % first real wavelength column of each channel
+            data = pf2.import.sampleData.fNIR2000();
+            dev = data.device;
+            chNums = dev.channelNumbers();
+            wl = dev.wavelengths();
+            expectedCol = find(chNums == 2 & wl > 0, 1);
+            % Pin the layout: the old interleaved guess, (2-1)*2+1 = 3,
+            % must differ from the real column for this test to discriminate
+            testCase.assumeNotEqual(expectedCol, 3, ...
+                'fNIR2000 layout changed; test no longer discriminates.');
+            ref = pf2.qc.powerSpectrum(struct('raw', data.raw(:, expectedCol), ...
+                'fs', data.fs, 'fchMask', 1), 'Signal', 'raw', 'DetectPeaks', false);
+            result = pf2.qc.powerSpectrum(data, 'Signal', 'raw', ...
+                'Channels', 2, 'DetectPeaks', false);
+            testCase.verifyEqual(result.psd, ref.psd, 'AbsTol', 1e-12, ...
+                'Channel 2 PSD should come from its first non-dark column.');
+        end
+
+        function testPSDRawDeviceWithPartialMask(testCase)
+            % Masked channels are skipped and the rest stay aligned with
+            % their own device columns
+            data = pf2.import.sampleData.fNIR2000();
+            data.fchMask(:) = 1;
+            data.fchMask([1 5]) = 0;
+            result = pf2.qc.powerSpectrum(data, 'Signal', 'raw', ...
+                'DetectPeaks', false);
+            expectedCh = find(data.fchMask);
+            testCase.verifyEqual(result.channels, expectedCh, ...
+                'Only unmasked channels should be analyzed, in order.');
+
+            chNums = data.device.channelNumbers();
+            wl = data.device.wavelengths();
+            k = find(expectedCh == 6);
+            col = find(chNums == 6 & wl > 0, 1);
+            ref = pf2.qc.powerSpectrum(struct('raw', data.raw(:, col), ...
+                'fs', data.fs, 'fchMask', 1), 'Signal', 'raw', 'DetectPeaks', false);
+            testCase.verifyEqual(result.psd(:, k), ref.psd, 'AbsTol', 1e-12, ...
+                'Channel 6 PSD should come from its own device column.');
+        end
+
+        function testPSDRawNonDeviceStructFallsBack(testCase)
+            % A .device that is not a pf2.Device is ignored, not called
+            data = testCase.dataWithHeart;
+            data.device = struct('name', 'x');
+            result = pf2.qc.powerSpectrum(data, 'Signal', 'raw');
+            testCase.verifyEqual(result.channels, 1:4, ...
+                'A non-pf2.Device .device should fall back to the interleaved layout.');
+        end
+
+        function testPSDRawNonContiguousChannelNumbers(testCase)
+            % Merged probes number channels non-contiguously; channel k
+            % must map to the k-th entry of the device channel list, as
+            % processFNIRS2 does
+            [data, dev, chList] = mergedHitachiData(testCase);
+            result = pf2.qc.powerSpectrum(data, 'Signal', 'raw', ...
+                'DetectPeaks', false);
+            testCase.verifyEqual(result.channels, 1:dev.nChannels, ...
+                'Every channel position should map to a device channel.');
+
+            chNums = dev.channelNumbers();
+            col = find(chNums == chList(end) & dev.wavelengths() > 0, 1);
+            ref = pf2.qc.powerSpectrum(struct('raw', data.raw(:, col), ...
+                'fs', data.fs, 'fchMask', 1), 'Signal', 'raw', 'DetectPeaks', false);
+            testCase.verifyEqual(result.psd(:, end), ref.psd, 'AbsTol', 1e-12, ...
+                'The last channel should read the last listed channel''s column.');
+        end
+
+        function testSCIUsesDeviceChannelList(testCase)
+            % SCI returns one value per listed device channel
+            [data, dev] = mergedHitachiData(testCase);
+            result = pf2.qc.sci(data);
+            testCase.verifyEqual(numel(result.sci), dev.nChannels, ...
+                'SCI should return one value per device channel.');
+        end
+
+        function testAssessUsesDeviceChannelList(testCase)
+            % A channel that is flat in the raw data must be flagged at its
+            % own position in the report
+            [data, dev, chList] = mergedHitachiData(testCase);
+            k = dev.nChannels;
+            cols = dev.channelNumbers() == chList(k) & dev.wavelengths() > 0;
+            data.raw(:, cols) = 100;
+            report = pf2.qc.pipeline.assess(data, 'Checks', {'cov'});
+            testCase.verifyEqual(numel(report.cov.values), dev.nChannels, ...
+                'assess should report one CoV value per device channel.');
+            testCase.verifyEqual(report.cov.values(k), 0, 'AbsTol', 1e-12, ...
+                'The flat channel should have zero CoV at its own position.');
+        end
+
     end
 
 
@@ -306,4 +504,18 @@ classdef QualityControlTest < matlab.unittest.TestCase
 
     end
 
+end
+
+
+function [data, dev, chList] = mergedHitachiData(testCase)
+% MERGEDHITACHIDATA Random raw data on the merged Hitachi + fNIR probe,
+% whose channel list (5-16, 21-42) differs from its raw channel numbers
+dev = pf2.Device.load('fNIR_Hitachi_3x5_merged');
+chList = dev.channelList();
+testCase.assumeFalse(isequal(chList, 1:dev.nChannels), ...
+    'Merged Hitachi cfg is now contiguous; test no longer discriminates.');
+rng(1);
+nRaw = numel(dev.channelNumbers());
+data = struct('raw', randn(300, nRaw) + 100, 'fs', 10, ...
+    'time', (0:299)' / 10, 'fchMask', ones(1, dev.nChannels), 'device', dev);
 end
