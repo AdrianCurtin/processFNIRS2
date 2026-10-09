@@ -87,7 +87,7 @@ matlab -batch "addpath('utils'); load('data.mat'); process_data"
 
 **Process a single file:**
 ```bash
-cd /Users/adriancurtin/Documents/GitHub/processFNIRS2 && \
+cd /path/to/processFNIRS2 && \
 matlab -batch "
     data = pf2.import.importNIR('path/to/file.nir');
     processed = processFNIRS2(data);
@@ -98,7 +98,7 @@ matlab -batch "
 **Import and export SNIRF:**
 ```bash
 matlab -batch "
-    cd('/Users/adriancurtin/Documents/GitHub/processFNIRS2');
+    cd('/path/to/processFNIRS2');
     data = pf2.import.importSNIRF('input.snirf');
     processed = processFNIRS2(data);
     pf2.export.asSNIRF(processed, 'output.snirf');
@@ -107,7 +107,7 @@ matlab -batch "
 
 **Export an HDF5 tensor for foundation-model training (headless):**
 ```bash
-cd /Users/adriancurtin/Documents/GitHub/processFNIRS2 && \
+cd /path/to/processFNIRS2 && \
 matlab -batch "
     data = pf2.import.sampleData.fNIR2000();
     proc = processFNIRS2(data);
@@ -120,7 +120,7 @@ matlab -batch "
 **Batch process a directory:**
 ```bash
 matlab -batch "
-    cd('/Users/adriancurtin/Documents/GitHub/processFNIRS2');
+    cd('/path/to/processFNIRS2');
     allData = pf2.import.importDirectory('data/', '*.nir', ...
         'Dir1', 'Group', 'Dir2', 'SubjectID');
     allData = processFNIRS2(allData);
@@ -131,7 +131,7 @@ matlab -batch "
 **Batch process files individually (manual loop):**
 ```bash
 matlab -batch "
-    cd('/Users/adriancurtin/Documents/GitHub/processFNIRS2');
+    cd('/path/to/processFNIRS2');
     files = dir('data/*.nir');
     for i = 1:length(files)
         data = pf2.import.importNIR(fullfile(files(i).folder, files(i).name));
@@ -145,7 +145,7 @@ matlab -batch "
 ## Full Pattern with Error Handling
 
 ```bash
-cd /Users/adriancurtin/Documents/GitHub/processFNIRS2 && \
+cd /path/to/processFNIRS2 && \
 /Applications/MATLAB_R2025b.app/bin/matlab -batch "
     try
         data = pf2.import.importNIR('input.nir');

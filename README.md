@@ -353,7 +353,7 @@ If you use processFNIRS2 in your research, please cite the software
 (machine-readable metadata is in [CITATION.cff](CITATION.cff)):
 
 > Curtin, A., & Ayaz, H. (2026). *processFNIRS2* (version 1.1.2)
-> [Computer software]. https://github.com/AdrianCurtin/processFNIRS2
+> [Computer software]. https://github.com/AyazLab/processFNIRS2
 
 A companion publication and archival DOI will be added here when available.
 

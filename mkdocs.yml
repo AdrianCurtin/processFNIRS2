@@ -1,8 +1,8 @@
 site_name: processFNIRS2
 site_description: A modular MATLAB toolbox for fNIRS data analysis
-site_url: https://adriancurtin.github.io/processFNIRS2/
-repo_url: https://github.com/AdrianCurtin/processFNIRS2
-repo_name: AdrianCurtin/processFNIRS2
+site_url: https://ayazlab.github.io/processFNIRS2/
+repo_url: https://github.com/AyazLab/processFNIRS2
+repo_name: AyazLab/processFNIRS2
 edit_uri: edit/master/docs/
 docs_dir: docs
 site_dir: site

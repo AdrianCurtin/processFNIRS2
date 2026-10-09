@@ -1,10 +1,10 @@
 # processFNIRS2 Documentation
 
 Reference documentation for the processFNIRS2 MATLAB fNIRS analysis toolbox.
-New here? Start with the [project README](https://github.com/AdrianCurtin/processFNIRS2/blob/master/README.md)
+New here? Start with the [project README](https://github.com/AyazLab/processFNIRS2/blob/master/README.md)
 for installation and a quick start, then come back for the deeper references
 below. Runnable tutorials live in
-[`examples/scripts/`](https://github.com/AdrianCurtin/processFNIRS2/tree/master/examples/scripts).
+[`examples/scripts/`](https://github.com/AyazLab/processFNIRS2/tree/master/examples/scripts).
 
 ## Reference
 
@@ -20,11 +20,11 @@ below. Runnable tutorials live in
 
 ## Also useful
 
-- [Project README](https://github.com/AdrianCurtin/processFNIRS2/blob/master/README.md) — overview, install, quick start.
-- [CONTRIBUTING](https://github.com/AdrianCurtin/processFNIRS2/blob/master/CONTRIBUTING.md) — dev setup, tests, and coding conventions.
-- [exploreFNIRS README](https://github.com/AdrianCurtin/processFNIRS2/blob/master/ExploreFNIRS_README.md) — the group-analysis module's own guide.
-- [CHANGELOG](https://github.com/AdrianCurtin/processFNIRS2/blob/master/CHANGELOG.md) — release notes.
-- [Examples index](https://github.com/AdrianCurtin/processFNIRS2/blob/master/examples/scripts/README.md) — runnable, copy-pasteable tutorials grouped by topic.
+- [Project README](https://github.com/AyazLab/processFNIRS2/blob/master/README.md) — overview, install, quick start.
+- [CONTRIBUTING](https://github.com/AyazLab/processFNIRS2/blob/master/CONTRIBUTING.md) — dev setup, tests, and coding conventions.
+- [exploreFNIRS README](https://github.com/AyazLab/processFNIRS2/blob/master/ExploreFNIRS_README.md) — the group-analysis module's own guide.
+- [CHANGELOG](https://github.com/AyazLab/processFNIRS2/blob/master/CHANGELOG.md) — release notes.
+- [Examples index](https://github.com/AyazLab/processFNIRS2/blob/master/examples/scripts/README.md) — runnable, copy-pasteable tutorials grouped by topic.
 
 > Development roadmaps, research notes, and contributor-facing design docs are
 > maintained under `internal/` and are intentionally not part of the shipped

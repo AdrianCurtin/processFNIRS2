@@ -10,8 +10,8 @@ type: software
 version: 1.1.2
 date-released: "2026-10-09"
 license: GPL-3.0-or-later
-repository-code: "https://github.com/AdrianCurtin/processFNIRS2"
-url: "https://github.com/AdrianCurtin/processFNIRS2"
+repository-code: "https://github.com/AyazLab/processFNIRS2"
+url: "https://github.com/AyazLab/processFNIRS2"
 keywords:
   - fNIRS
   - functional near-infrared spectroscopy

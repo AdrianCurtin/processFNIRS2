@@ -6,6 +6,10 @@
 
 - Author ORCIDs in `CITATION.cff`, which GitHub's "Cite this repository" and Zenodo archiving read.
 
+### Changed
+
+- The repository moved to the AyazLab organization: https://github.com/AyazLab/processFNIRS2. Old GitHub URLs redirect. The documentation site is now https://ayazlab.github.io/processFNIRS2/; the old `adriancurtin.github.io` address does not redirect.
+
 ## v1.1.1 (2026-10-09)
 SMAR motion-artifact functions on raw intensity, and QC power-spectrum crash and channel-mapping fixes.
 

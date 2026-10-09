@@ -12,7 +12,7 @@ MATLAB on Windows too, but the drive prefix differs):
 
 ```matlab
 % macOS / Linux
-cd /Users/adriancurtin/Documents/GitHub/processFNIRS2   % or addpath(genpath(pwd))
+cd /path/to/processFNIRS2   % or addpath(genpath(pwd))
 
 % Windows (either form works)
 cd 'C:\Users\YOU\Documents\GitHub\processFNIRS2'

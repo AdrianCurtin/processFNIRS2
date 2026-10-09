@@ -367,5 +367,5 @@ flowchart TB
 | Internal infrastructure / shared utility | `+pf2_base` (the right subpackage). |
 | Tests | `+pf2_base/+tests`. |
 
-See [CONTRIBUTING.md](https://github.com/AdrianCurtin/processFNIRS2/blob/master/CONTRIBUTING.md)
+See [CONTRIBUTING.md](https://github.com/AyazLab/processFNIRS2/blob/master/CONTRIBUTING.md)
 for setup, tests, and coding conventions.
