@@ -19,7 +19,8 @@ function result = powerSpectrum(data, opts)
 %                    (default: 'auto')
 %   'Channels'     - [1 x C] channel indices to analyze. Default: all good
 %                    channels from fchMask. (default: [])
-%   'WindowLength' - PSD window length in seconds (default: 10)
+%   'WindowLength' - PSD window length in seconds; clamped to between
+%                    3 samples and the recording length (default: 10)
 %   'Overlap'      - Fractional overlap between windows, 0 to <1
 %                    (default: 0.5)
 %   'FreqRange'    - [1x2] frequency range to return in Hz. Upper bound is
@@ -28,7 +29,11 @@ function result = powerSpectrum(data, opts)
 %
 % Inputs:
 %   data - fNIRS data struct. Must contain .fs and the selected signal
-%          field (.raw, .HbO, .HbR, or .OD).
+%          field (.raw, .HbO, .HbR, or .OD). For raw data, an optional
+%          .device (pf2.Device) selects each channel's first non-dark
+%          wavelength column, with channel k taken as the k-th entry of
+%          the device channel list; without it, columns are assumed
+%          interleaved.
 %
 % Outputs:
 %   result - Struct with fields:
@@ -39,9 +44,16 @@ function result = powerSpectrum(data, opts)
 %            .fs        - Sampling rate
 %
 %            When DetectPeaks = true, also includes:
-%            .cardiac      - struct with .freq, .power, .snr, .detected
-%            .respiratory  - struct with .freq, .power, .detected
-%            .mayer        - struct with .freq, .power, .detected
+%            .cardiac      - struct with .freq, .power, .snr, .detected,
+%                            .skipped, .skipReason
+%            .respiratory  - struct with .freq, .power, .detected,
+%                            .skipped, .skipReason
+%            .mayer        - struct with .freq, .power, .detected,
+%                            .skipped, .skipReason
+%            A band is skipped (detected = false, freq/power NaN) when
+%            the recording spans fewer than 5 cycles of the band's lower
+%            edge: under 10 s for cardiac, 50 s for respiratory, 100 s
+%            for Mayer.
 %
 % Algorithm:
 %   1. Select signal from data struct based on Signal parameter
@@ -108,22 +120,39 @@ end
 
 %% Select columns from signal data
 if strcmp(signalType, 'raw')
-    % For raw data, resolve which columns to use per channel
-    % Use first wavelength of each channel pair (alternating layout)
+    % For raw data, resolve the first wavelength column of each channel
     nRawCols = size(sigData, 2);
-    if isfield(data, 'info') && isfield(data.info, 'synthetic') ...
-            && isfield(data.info.synthetic, 'wavelengths')
-        nWl = numel(data.info.synthetic.wavelengths);
-    elseif isfield(data, 'probeinfo')
-        nWl = 2;  % Default assumption
+    if isfield(data, 'device') && isa(data.device, 'pf2.Device')
+        % Device layout: skip dark columns (wavelength 0) and handle
+        % non-interleaved column orders. Channel k is the k-th entry of
+        % the device channel list (as in processFNIRS2), so non-contiguous
+        % numbering such as merged probes still maps by position.
+        chNums = data.device.channelNumbers();
+        wlVec = data.device.wavelengths();
+        chList = data.device.channelList();
+        colIndices = nan(1, numel(channels));
+        for k = 1:numel(channels)
+            if channels(k) < 1 || channels(k) > numel(chList)
+                continue;
+            end
+            c = find(chNums == chList(channels(k)) & wlVec > 0, 1);
+            if ~isempty(c) && c <= nRawCols
+                colIndices(k) = c;
+            end
+        end
     else
-        nWl = 2;  % Default: 2 wavelengths
+        if isfield(data, 'info') && isfield(data.info, 'synthetic') ...
+                && isfield(data.info.synthetic, 'wavelengths')
+            nWl = numel(data.info.synthetic.wavelengths);
+        else
+            nWl = 2;  % Default: 2 interleaved wavelengths
+        end
+        colIndices = (channels - 1) * nWl + 1;
+        colIndices(colIndices > nRawCols) = NaN;
     end
-    % Map channel index to first wavelength column
-    colIndices = (channels - 1) * nWl + 1;
-    colIndices(colIndices > nRawCols) = [];
-    channels = channels(1:numel(colIndices));
-    sigMatrix = sigData(:, colIndices);
+    keep = ~isnan(colIndices);
+    channels = channels(keep);
+    sigMatrix = sigData(:, colIndices(keep));
 else
     % HbO, HbR, OD — columns map directly to channels
     validCh = channels(channels <= size(sigData, 2));
@@ -139,9 +168,28 @@ freqRange = opts.FreqRange;
 freqRange(2) = min(freqRange(2), nyquist);
 
 %% Compute PSD using Welch's method
-windowSamples = round(opts.WindowLength * fs);
-overlapSamples = round(windowSamples * opts.Overlap);
+% Clamp the window to [3, recording length]: pwelch rejects windows longer
+% than the signal, and the welchPSD Hann window has zero power under 3
+nSamples = size(sigMatrix, 1);
+windowSamples = min(max(round(opts.WindowLength * fs), 3), nSamples);
+overlapSamples = min(round(windowSamples * opts.Overlap), windowSamples - 1);
 nfft = max(256, 2^nextpow2(windowSamples));
+
+if nChannels == 0 || nSamples < 3
+    % Nothing to analyze (e.g. every channel masked bad): return empty
+    % per-channel results instead of indexing into an empty matrix
+    f = (0:nfft/2)' * fs / nfft;
+    f = f(f >= freqRange(1) & f <= freqRange(2));
+    result.psd = zeros(numel(f), nChannels);
+    result.freqs = f;
+    result.channels = channels;
+    result.signal = signalType;
+    result.fs = fs;
+    if opts.DetectPeaks
+        result = detectAllBands(result, nSamples / fs);
+    end
+    return;
+end
 
 % Check for pwelch availability
 hasPwelch = ~isempty(which('pwelch'));
@@ -182,9 +230,7 @@ result.fs = fs;
 
 %% Detect physiological peaks
 if opts.DetectPeaks
-    result.cardiac = detectBandPeak(f, psdMatrix, [0.5, 2.5], 'cardiac');
-    result.respiratory = detectBandPeak(f, psdMatrix, [0.1, 0.5], 'respiratory');
-    result.mayer = detectBandPeak(f, psdMatrix, [0.05, 0.15], 'mayer');
+    result = detectAllBands(result, nSamples / fs);
 end
 
 end
@@ -287,6 +333,37 @@ for ch = 1:nChannels
     end
 
     psdMatrix(:, ch) = psdAccum / nWindows;
+end
+
+end
+
+
+function result = detectAllBands(result, durationSec)
+% DETECTALLBANDS Run peak detection for each physiological band
+%
+% A band needs the recording to span at least minCycles cycles of its
+% lower edge; shorter recordings cannot resolve a peak there, so the band
+% is reported as skipped rather than as a spurious detection or miss.
+
+minCycles = 5;
+bandDefs = {'cardiac', [0.5, 2.5]; 'respiratory', [0.1, 0.5]; 'mayer', [0.05, 0.15]};
+
+for b = 1:size(bandDefs, 1)
+    name = bandDefs{b, 1};
+    limits = bandDefs{b, 2};
+    minDuration = minCycles / limits(1);
+    if durationSec < minDuration
+        bandResult = detectBandPeak(result.freqs, zeros(size(result.psd)), limits, name);
+        bandResult.skipped = true;
+        bandResult.skipReason = sprintf( ...
+            'Recording too short (%.1f s < %.0f s) for %s band [%.2f, %.2f] Hz', ...
+            durationSec, minDuration, name, limits(1), limits(2));
+    else
+        bandResult = detectBandPeak(result.freqs, result.psd, limits, name);
+        bandResult.skipped = false;
+        bandResult.skipReason = '';
+    end
+    result.(name) = bandResult;
 end
 
 end

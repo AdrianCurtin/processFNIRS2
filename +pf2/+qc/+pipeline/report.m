@@ -43,12 +43,13 @@ for ci = 1:nChecks
     checkName = checks{ci};
     if isfield(qcReport, checkName) && isfield(qcReport.(checkName), 'skipped') ...
             && qcReport.(checkName).skipped
-        reason = '';
-        if isfield(qcReport.(checkName), 'skipReason')
-            reason = [' — ' qcReport.(checkName).skipReason];
+        % The reason says why (low sampling rate, short recording, ...)
+        reason = ' (not applicable to this recording)';
+        if isfield(qcReport.(checkName), 'skipReason') ...
+                && ~isempty(qcReport.(checkName).skipReason)
+            reason = [': ' qcReport.(checkName).skipReason];
         end
-        fprintf('  Note: %s check SKIPPED (not applicable at this fs)%s\n', ...
-            capitalize(checkName), reason);
+        fprintf('  Note: %s check SKIPPED%s\n', capitalize(checkName), reason);
     end
 end
 fprintf('\n');

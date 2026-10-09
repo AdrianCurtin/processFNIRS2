@@ -36,9 +36,11 @@ function result = sci(data, opts)
 %          .raw  - [T x C_raw] raw light intensity
 %          .fs   - Sampling frequency (Hz)
 %          Wavelength layout resolved from (in order):
-%            1. Explicit Wavelengths/ChannelNumbers parameters
-%            2. data.probeinfo.Probe{1}.TableCh
-%            3. data.info.synthetic.wavelengths (alternating ch1_wl1, ch1_wl2, ...)
+%            1. data.device (pf2.Device); channel i is the i-th entry of
+%               the device channel list
+%            2. Explicit Wavelengths/ChannelNumbers parameters
+%            3. data.probeinfo.Probe{1}.TableCh
+%            4. data.info.synthetic.wavelengths (alternating ch1_wl1, ch1_wl2, ...)
 %
 % Outputs:
 %   result - Struct with fields:
@@ -48,6 +50,12 @@ function result = sci(data, opts)
 %            .threshold - Threshold used
 %            .cardiacBand - [low, high] Hz
 %            .fs        - Sampling rate
+%            .skipped   - true when SCI could not be computed (sampling
+%                         rate below the cardiac band, or a recording
+%                         shorter than 5 cycles of CardiacBand(1), i.e.
+%                         10 s for the default band); .sci is then NaN and
+%                         .isGood true so channels are not penalized
+%            .skipReason - Reason for the skip (only when skipped)
 %
 % Algorithm:
 %   1. Resolve wavelength layout from data or explicit parameters
@@ -124,6 +132,28 @@ if cardiacBand(2) >= nyquist
     cardiacBand(2) = clampedHigh;
 end
 
+%% Check recording length: the cardiac correlation needs several beats
+% (at least 5 cycles of the band's lower edge, 10 s for the default band),
+% and the bandpass filter needs more samples than its padding length
+minCycles = 5;
+minDuration = minCycles / cardiacBand(1);
+nSamples = size(data.raw, 1);
+durationSec = nSamples / fs;
+minSamples = 3 * (2 * opts.FilterOrder) + 1;
+if durationSec < minDuration || nSamples < minSamples
+    result.sci = nan(1, nChannels);
+    result.isGood = true(1, nChannels);
+    result.channels = 1:nChannels;
+    result.threshold = opts.Threshold;
+    result.cardiacBand = cardiacBand;
+    result.fs = fs;
+    result.skipped = true;
+    result.skipReason = sprintf( ...
+        'Recording too short (%.1f s < %.0f s) for cardiac band [%.1f, %.1f] Hz', ...
+        durationSec, minDuration, cardiacBand(1), cardiacBand(2));
+    return;
+end
+
 %% Compute SCI for each channel
 sciValues = zeros(1, nChannels);
 
@@ -187,12 +217,15 @@ if isfield(data, 'device') && isa(data.device, 'pf2.Device')
     wl = data.device.wavelengths();
     chNums = data.device.channelNumbers();
 
-    uniqueCh = unique(chNums(chNums > 0 & ~isnan(chNums)));
-    nChannels = numel(uniqueCh);
+    % Channel i is the i-th entry of the device channel list (as in
+    % processFNIRS2), which can differ from the unique raw channel numbers
+    % on merged probes
+    chList = data.device.channelList();
+    nChannels = numel(chList);
     channelMap = zeros(nChannels, 2);
 
     for i = 1:nChannels
-        cols = find(chNums == uniqueCh(i) & wl > 0 & ~isnan(wl));
+        cols = find(chNums == chList(i) & wl > 0 & ~isnan(wl));
         if numel(cols) >= 2
             channelMap(i, :) = cols(1:2);
         end

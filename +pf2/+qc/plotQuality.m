@@ -152,6 +152,11 @@ end
 
 nCh = numel(channels);
 layout = lower(char(opts.Layout));
+if nCh == 0
+    % No channels (e.g. all masked bad): tiled has no subplots to title,
+    % so draw a single empty axes instead
+    layout = 'overlay';
+end
 
 % Physiological bands for shading
 bands = struct();
@@ -244,10 +249,13 @@ function drawBandShading(ax, freqs, psdMatrix, bands, bandColors, bandLabels)
 
 fMin = min(freqs);
 fMax = max(freqs);
-yLimits = [min(psdMatrix(psdMatrix > 0), [], 'all') * 0.1, ...
-           max(psdMatrix(:), [], 'all') * 10];
-if isempty(yLimits) || any(isnan(yLimits)) || yLimits(1) >= yLimits(2)
+% An all-zero (or empty) spectrum, e.g. from a recording too short for a
+% PSD, has no positive power to scale a log axis to
+posPower = psdMatrix(psdMatrix > 0 & isfinite(psdMatrix));
+if isempty(posPower)
     yLimits = [1e-10, 1];
+else
+    yLimits = [min(posPower) * 0.1, max(posPower) * 10];
 end
 
 bandNames = {'mayer', 'respiratory', 'cardiac'};
