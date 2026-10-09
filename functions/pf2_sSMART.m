@@ -6,6 +6,11 @@ function [x_recon, maskCV, MA_idx] = pf2_sSMART(x, fs, chNum, tauArtifact, tauCl
 % Optionally corrects DC baseline shifts caused by optode displacement
 % during artifacts before interpolating.
 %
+% Operates on raw light intensity, before pf2_Intensity2OD: SMAR2's CV
+% criterion is only meaningful on a positive signal. Shift correction and
+% interpolation are done on log10 intensity, where motion-induced coupling
+% changes are additive and the result matches interpolating optical density.
+%
 % References:
 %   sSMART method:
 %     Curtin, A., & Ayaz, H. (2019). sSMART: statistical Sliding Motion
@@ -27,33 +32,39 @@ function [x_recon, maskCV, MA_idx] = pf2_sSMART(x, fs, chNum, tauArtifact, tauCl
 %       tauClean, minSeg, ArtifactTime, InterpMethod, ShiftCorrect)
 %
 % Inputs:
-%   x             - Input signal matrix [T x C] where T=samples, C=channels
-%                   Typically optical density data after log transform.
+%   x             - Raw light intensity matrix [T x C] where T=samples,
+%                   C=channels. Must be strictly positive (before
+%                   pf2_Intensity2OD). Not valid for optical density or
+%                   hemoglobin data.
 %   fs            - Sampling frequency in Hz. Used to convert ArtifactTime
 %                   to samples for the SMAR2 detection window.
 %   chNum         - Channel number mapping [1 x C] (default: 1:size(x,2))
 %                   Passed to SMAR2 for wavelength pairing. Channels with
 %                   the same chNum are grouped so that if either wavelength
 %                   has an artifact, both are masked.
-%   tauArtifact   - Artifact detection threshold multiplier (default: 3)
-%                   Passed to SMAR2. Lower = more aggressive rejection.
-%   tauClean      - Clean boundary threshold multiplier (default: 1)
-%                   Passed to SMAR2. Controls artifact region expansion.
-%   minSeg        - Minimum clean segment length in samples (default: N/2)
-%                   Passed to SMAR2. Short clean gaps between artifacts
-%                   are merged into a single artifact region.
-%   ArtifactTime  - Expected artifact duration in seconds (default: 10)
-%                   Converted to samples (N = round(ArtifactTime * fs))
-%                   for the SMAR2 CV sliding window.
+%   tauArtifact   - Artifact detection threshold multiplier (default: SMAR2
+%                   default). Passed to SMAR2. Lower = more aggressive.
+%   tauClean      - Clean boundary threshold multiplier (default: SMAR2
+%                   default). Passed to SMAR2. Controls artifact expansion.
+%   minSeg        - Minimum clean segment length in samples (default: SMAR2
+%                   default, N+2). Short clean gaps between artifacts are
+%                   merged into a single artifact region. A negative value
+%                   (e.g. -1, the library default) also selects N+2, which
+%                   scales with ArtifactTime and fs.
+%   ArtifactTime  - SMAR2 CV window length in seconds (default: 10)
+%                   Converted to samples (N = round(ArtifactTime * fs)).
 %   InterpMethod  - Interpolation method for gap filling (default: 'pchip')
-%                   'pchip'  - Piecewise cubic Hermite. Shape-preserving,
-%                              no overshoot. Good general default.
+%                   'pchip'  - Piecewise cubic Hermite. Shape-preserving
+%                              between clean samples. Good general default.
 %                   'spline' - Cubic spline. Smoother (C2 continuous) but
 %                              can overshoot near sharp transitions.
 %                   'linear' - Linear. No overshoot, but creates kinks at
 %                              gap boundaries. Fast.
 %                   'makima' - Modified Akima. Compromise between pchip
-%                              and spline — smooth with less overshoot.
+%                              and spline, smooth with less overshoot.
+%                   Samples before the first or after the last clean sample
+%                   are never extrapolated; they hold the nearest clean value.
+%   (Empty inputs [] select the default.)
 %   ShiftCorrect  - Logical flag to correct DC baseline shifts (default: false)
 %                   When true, measures the DC level on each side of every
 %                   artifact gap and removes the offset so post-artifact
@@ -63,9 +74,10 @@ function [x_recon, maskCV, MA_idx] = pf2_sSMART(x, fs, chNum, tauArtifact, tauCl
 %                   shift is applied to all subsequent data.
 %
 % Outputs:
-%   x_recon - Reconstructed signal [T x C], same size as input.
+%   x_recon - Reconstructed intensity [T x C], same size as input.
 %             Artifact regions are filled via interpolation.
-%             When ShiftCorrect is false, clean data is preserved exactly.
+%             When ShiftCorrect is false, clean data is preserved (to
+%             floating-point precision of the log round trip).
 %             When ShiftCorrect is true, post-artifact clean data may be
 %             shifted to remove DC offsets.
 %   maskCV  - Logical artifact mask [T+2 x C] from SMAR2 (true = artifact).
@@ -75,26 +87,31 @@ function [x_recon, maskCV, MA_idx] = pf2_sSMART(x, fs, chNum, tauArtifact, tauCl
 %
 % Algorithm:
 %   1. Convert ArtifactTime to samples: N = round(ArtifactTime * fs)
-%   2. Run SMAR2 detection (adaptive dCV thresholds, wavelength pairing)
-%   3. If ShiftCorrect: for each artifact gap, measure mean level in a
+%   2. Run SMAR2 detection on the intensity (adaptive dCV thresholds,
+%      wavelength pairing)
+%   3. Move to log10 intensity
+%   4. If ShiftCorrect: for each artifact gap, measure the mean level in a
 %      1-second window before and after the gap. Shift all data after the
 %      gap by the difference so baselines align. Applied cumulatively
 %      across gaps (each measurement uses already-corrected data).
-%   4. For each channel with NaN gaps:
+%   5. For each channel with NaN gaps:
 %      a. Use non-NaN samples as interpolation knots
-%      b. Fill gaps with chosen interpolation method
-%      c. Fill any remaining edge NaN with nearest clean value
-%   5. Channels with < 2 clean samples are left as-is
+%      b. Fill interior gaps with the chosen interpolation method
+%      c. Fill leading/trailing gaps with the nearest clean value
+%   6. Return to intensity. Channels with < 2 clean samples are left as-is
+%      (a warning lists channels that stay entirely NaN)
 %
 % Example:
+%   data = pf2.import.sampleData.fNIR2000();
+%   wl = data.device.wavelengths();
+%   raw = data.raw(:, wl > 0);
+%
 %   % Basic usage (pchip default, no shift correction)
-%   [corrected, mask, idx] = pf2_sSMART(odData, 10);
+%   [corrected, mask, idx] = pf2_sSMART(raw, data.fs);
+%   od = pf2_Intensity2OD(corrected);
 %
 %   % With baseline shift correction for optode displacement
-%   [corrected, mask, idx] = pf2_sSMART(odData, 10, [], [], [], [], [], [], true);
-%
-%   % Spline interpolation + shift correction
-%   [corrected, mask, idx] = pf2_sSMART(odData, 10, [], 4, 2, 10, 5, 'spline', true);
+%   [corrected, mask, idx] = pf2_sSMART(raw, data.fs, [], [], [], [], [], [], true);
 %
 % Notes:
 %   - The sSMART method (statistical CV thresholding plus interpolated
@@ -114,16 +131,18 @@ function [x_recon, maskCV, MA_idx] = pf2_sSMART(x, fs, chNum, tauArtifact, tauCl
 %     recording and channels can drift relative to one another. It targets
 %     step-like displacement shifts only; if a gap straddles a genuine slow
 %     hemodynamic change, that real signal is removed along with the shift.
+%     With many gaps the corrections compound into an aggressive high-pass
+%     that can remove slow hemodynamics, so check the rejection rate first.
 %     Leave it off unless clear baseline jumps from optode displacement are
 %     visible, and inspect the reconstructed output before trusting it.
 %
-% See also: pf2_SMAR2, pf2_SMAR, pf2_MotionCorrectTDDR, interp1
+% See also: pf2_SMAR2, pf2_SMAR, pf2_Intensity2OD, pf2_MotionCorrectTDDR, interp1
 
 % --- Defaults ---
 if nargin < 9 || isempty(ShiftCorrect), ShiftCorrect = false; end
 if nargin < 8 || isempty(InterpMethod), InterpMethod = 'pchip'; end
-if nargin < 7, ArtifactTime = 10; end
-if nargin < 6, minSeg = []; end
+if nargin < 7 || isempty(ArtifactTime), ArtifactTime = 10; end
+if nargin < 6 || (~isempty(minSeg) && minSeg < 0), minSeg = []; end
 if nargin < 5, tauClean = []; end
 if nargin < 4, tauArtifact = []; end
 if nargin < 3 || isempty(chNum), chNum = 1:size(x, 2); end
@@ -134,26 +153,15 @@ if ~ismember(InterpMethod, validMethods)
         'InterpMethod must be one of: %s', strjoin(validMethods, ', '));
 end
 
-N = round(ArtifactTime * fs);
+N = max(1, round(ArtifactTime * fs));
 
-% Build SMAR2 argument list, letting it use its own defaults for empty args
-smar2Args = {x, N, chNum};
-if ~isempty(tauArtifact)
-    smar2Args{end+1} = tauArtifact;
-    if ~isempty(tauClean)
-        smar2Args{end+1} = tauClean;
-        if ~isempty(minSeg)
-            smar2Args{end+1} = minSeg;
-        end
-    end
-end
+% --- Step 1: Detect artifacts (SMAR2 applies its defaults to empty args) ---
+[Xcorr, maskCV, MA_idx] = pf2_SMAR2(x, N, chNum, tauArtifact, tauClean, minSeg);
 
-% --- Step 1: Detect artifacts ---
-[Xcorr, maskCV, MA_idx] = pf2_SMAR2(smar2Args{:});
-
-% --- Step 2: Correct baseline shifts across artifact gaps ---
+% --- Step 2: Move to log intensity; correct baseline shifts across gaps ---
 [nSamples, numCh] = size(x);
-x_recon = Xcorr;
+x_recon = log10(Xcorr);
+x_recon(~isfinite(x_recon)) = NaN;
 
 if ShiftCorrect
     bw = ceil(fs);  % boundary window: 1 second of samples
@@ -209,15 +217,27 @@ for ch = 1:numCh
         continue;
     end
 
-    % Interpolate across gaps
-    x_recon(:, ch) = interp1(timeIdx(good), signal(good), timeIdx, InterpMethod);
+    % Interpolate interior gaps. Pass NaN as the extrapolation value:
+    % pchip/spline/makima otherwise extrapolate past the last clean sample
+    % by default, which diverges at the recording edges.
+    x_recon(:, ch) = interp1(timeIdx(good), signal(good), timeIdx, InterpMethod, NaN);
 
-    % Handle any remaining edge NaN (leading/trailing beyond clean range)
+    % Leading/trailing gaps (beyond the clean range) hold the nearest value
     remaining = isnan(x_recon(:, ch));
     if any(remaining)
         x_recon(remaining, ch) = interp1( ...
             timeIdx(good), signal(good), timeIdx(remaining), 'nearest', 'extrap');
     end
 end
+
+allNaN = all(isnan(x_recon), 1) & ~all(isnan(x), 1);
+if any(allNaN)
+    warning('pf2:sSMART:channelFullyMasked', ...
+        ['%d channel(s) were masked in full and could not be reconstructed ' ...
+         '(columns %s); they are returned as NaN.'], ...
+        nnz(allNaN), mat2str(find(allNaN)));
+end
+
+x_recon = 10.^x_recon;
 
 end

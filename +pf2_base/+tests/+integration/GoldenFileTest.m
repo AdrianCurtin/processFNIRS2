@@ -55,22 +55,22 @@ classdef GoldenFileTest < matlab.unittest.TestCase
                     'Input data has changed - golden file may need regeneration');
             end
 
-            % Set methods from params
+            % Resolve methods from params. Shipped methods are rebuilt from
+            % their seed factories, so the golden checks the shipped
+            % definition regardless of the stored methods (which a user or
+            % a test-isolated prefdir may have edited or not seeded).
+            ctx = pf2.ProcessingContext();
             if isfield(golden.params, 'rawMethod')
-                rawMethod = golden.params.rawMethod;
-                % Handle temp methods that may not exist
-                global PF2
-                if ~ismember(rawMethod, PF2.myRawMethods.cfg.Sections) && ~strcmp(rawMethod, 'None')
-                    testCase.assumeFail(sprintf('Raw method ''%s'' not available', rawMethod));
-                end
-                pf2.methods.raw.setMethod(rawMethod);
+                m = testCase.resolveMethod(golden.params.rawMethod, 'raw');
+                if ischar(m), ctx.setRawMethod(m); else, ctx.rawMethod = m; end
             end
             if isfield(golden.params, 'oxyMethod')
-                pf2.methods.oxy.setMethod(golden.params.oxyMethod);
+                m = testCase.resolveMethod(golden.params.oxyMethod, 'oxy');
+                if ischar(m), ctx.setOxyMethod(m); else, ctx.oxyMethod = m; end
             end
 
             % Process
-            processed = processFNIRS2(data);
+            processed = ctx.process(data);
 
             % Compare output
             result = compareOutputs(golden.output, extractOutput(processed), 1e-10);
@@ -78,31 +78,57 @@ classdef GoldenFileTest < matlab.unittest.TestCase
                 sprintf('Golden file mismatch for %s:\n%s', fileName, strjoin(result.failures, '\n')));
         end
 
+        function method = resolveMethod(testCase, name, stage)
+            % Shipped seed -> method struct; any other name (including
+            % 'None') is returned for the context to resolve, and must
+            % exist in the stored method library
+            name = char(name);
+            if strcmp(name, 'None')
+                method = name;
+                return
+            end
+            seedFcn = sprintf('pf2_base.methods.seeds.%s.%s', stage, name);
+            if exist(seedFcn, 'file')
+                method = feval(seedFcn).toMethod();
+                return
+            end
+            lib = pf2_base.resolveMethodsLib(stage);
+            testCase.assumeTrue(ismember(name, lib.cfg.Sections), ...
+                sprintf('%s method ''%s'' is neither a shipped seed nor stored', stage, name));
+            method = name;
+        end
+
         function runFunctionGolden(testCase, golden, fileName)
             % Load sample data
             data = pf2.import.sampleData.fNIR2000();
-            od = pf2_Intensity2OD(data.raw);
+            testCase.assumeTrue(isfield(golden.params, 'function'), ...
+                'Golden file params missing ''function'' field');
+            funcName = golden.params.function;
+
+            % Each function's golden is generated from its valid input
+            % domain: SMAR on raw intensity, everything else on OD
+            switch funcName
+                case 'pf2_SMAR'
+                    input = data.raw;
+                otherwise
+                    input = pf2_Intensity2OD(data.raw);
+            end
 
             % Verify input hash
             if isfield(golden, 'inputHash')
-                actualHash = pf2_base.tests.golden.computeHash(od);
+                actualHash = pf2_base.tests.golden.computeHash(input);
                 testCase.assertEqual(actualHash, golden.inputHash, ...
                     'Input data has changed - golden file may need regeneration');
             end
 
             % Run function based on params
-            if isfield(golden.params, 'function')
-                funcName = golden.params.function;
-                switch funcName
-                    case 'pf2_MotionCorrectTDDR'
-                        actualOutput = struct('corrected', pf2_MotionCorrectTDDR(od, golden.params.fs));
-                    case 'pf2_SMAR'
-                        actualOutput = struct('corrected', pf2_SMAR(od, 10));
-                    otherwise
-                        testCase.assumeFail(sprintf('Unknown function: %s', funcName));
-                end
-            else
-                testCase.assumeFail('Golden file params missing ''function'' field');
+            switch funcName
+                case 'pf2_MotionCorrectTDDR'
+                    actualOutput = struct('corrected', pf2_MotionCorrectTDDR(input, golden.params.fs));
+                case 'pf2_SMAR'
+                    actualOutput = struct('corrected', pf2_SMAR(input, 10));
+                otherwise
+                    testCase.assumeFail(sprintf('Unknown function: %s', funcName));
             end
 
             % Compare output

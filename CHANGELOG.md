@@ -2,6 +2,16 @@
 
 ## Unreleased
 
+### Fixes
+
+**SMAR motion-artifact family (`pf2_SMAR`, `pf2_SMAR_mask`, `pf2_SMAR2`, `pf2_sSMART`):**
+- These functions now run on raw light intensity only, before `pf2_Intensity2OD`. Their coefficient-of-variation test divides by the windowed mean, which is near zero for optical density and hemoglobin, so on OD they rejected most of a recording (94% of the fNIR2000 sample for `pf2_SMAR`). The function library now marks them raw-stage, and each warns when given non-positive input.
+- The `OD_SMAR` seed now runs a 0.1 Hz low-pass, then SMAR, then the OD conversion, the order used in published SMAR work. On startup, a stored `OD_SMAR` that still matches the old seed exactly is replaced; edited copies are left alone (run `pf2.methods.resetDefaults('raw')` to re-seed them).
+- Saved methods no longer pin a registered function's `requiresOD`/`validStages`; the function library is authoritative, so methods saved with the old flags can place SMAR before the OD conversion.
+- `pf2_SMAR2`: new defaults `tauArtifact = 10`, `tauClean = 1`, `minSeg = N + 2`. The old defaults rejected most of an artifact-free recording, and `tauClean = 0` (the previous library default) masked whole channels; `tauClean` must now be > 0. Artifact segment indices (`MA_idx`) are now in input rows, masked segments no longer grow by a sample, the recording edges are evaluated with a shrinking window instead of always rejected, `chNum` is validated, and a window spanning the whole recording warns instead of silently passing artifacts.
+- `pf2_sSMART`: gap filling no longer extrapolates past the last clean sample (`pchip`/`spline`/`makima` previously diverged at the recording edges). Detection runs on raw intensity, with shift correction and interpolation done on log intensity. Empty arguments now select defaults, `minSeg = -1` (the library default) selects the automatic N+2, and channels masked in full raise a warning.
+- Removed the `pf2_SMAR2_mask` library entry, which referenced a function that no longer exists.
+
 ## v1.1 (2026-07-24)
 Phase-synchrony coupling metrics, GLM group statistics, result-table/BIDS export, Beer–Lambert extensions (PPF mode, partial-volume correction, OD-space short-channel regression), in-memory device geometry, a cortical head render, and a broad correctness/robustness pass across GLM, hyperscanning statistics, hemoglobin conversion, export, and the importers.
 

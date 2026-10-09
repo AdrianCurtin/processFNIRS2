@@ -349,6 +349,38 @@ classdef SignalProcessingTest < matlab.unittest.TestCase
             testCase.verifyClass(mask, 'logical', ...
                 'SMAR mask should be logical type');
         end
+
+        function testSMARWarnsOnNonPositiveInput(testCase)
+            % SMAR's CV criterion is only valid on positive raw intensity;
+            % baseline-relative input (OD/Hb) must warn
+
+            intensity = 100 + randn(500, 2);
+            od = pf2_Intensity2OD(intensity);
+
+            testCase.verifyWarningFree(@() pf2_SMAR(intensity));
+            testCase.verifyWarning(@() pf2_SMAR(od), 'pf2:smar:nonPositiveInput');
+            testCase.verifyWarning(@() pf2_SMAR_mask(od), 'pf2:smarMask:nonPositiveInput');
+        end
+
+        function testSMARRunsBeforeIntensity2OD(testCase)
+            % pf2_SMAR is a raw-intensity step: the shipped OD_SMAR seed
+            % runs low-pass, then SMAR, then Intensity2OD
+
+            p = pf2_base.methods.seeds.raw.OD_SMAR();
+            names = cellfun(@(s) s.funcName, p.steps, 'UniformOutput', false);
+            iSMAR = find(strcmp(names, 'pf2_SMAR'));
+            testCase.verifyLessThan(find(strcmp(names, 'pf2_lpf')), iSMAR, ...
+                'OD_SMAR must low-pass before SMAR (filtering after spreads its NaN gaps)');
+            testCase.verifyLessThan(iSMAR, ...
+                find(strcmp(names, 'pf2_Intensity2OD')), ...
+                'OD_SMAR must run SMAR before the OD conversion');
+
+            pf = p.steps{iSMAR};
+            testCase.verifyFalse(pf.requiresOD, ...
+                'pf2_SMAR must not require optical density input');
+            testCase.verifyEqual(pf.validStages, 1, ...
+                'pf2_SMAR is valid only at the raw stage');
+        end
     end
 
     %% Conversion Tests

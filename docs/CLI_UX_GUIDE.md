@@ -124,7 +124,7 @@ disp('✓ processFNIRS2 is working correctly!');
 
 | Method | Description |
 |--------|-------------|
-| **SMAR** | Sliding-window Motion Artifact Rejection - detects and interpolates artifacts |
+| **SMAR** | Sliding-window Motion Artifact Rejection - rejects (NaNs) raw-intensity samples with high local coefficient of variation |
 | **TDDR** | Temporal Derivative Distribution Repair - robust to spike artifacts |
 | **MARA** | Movement Artifact Reduction Algorithm - spline-based correction |
 | **Wavelet** | Frequency-based artifact removal |

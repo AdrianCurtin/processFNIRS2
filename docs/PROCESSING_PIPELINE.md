@@ -109,10 +109,13 @@ correction. Run `pf2.methods.raw.list()` for the authoritative live set.
 |--------|----------|
 | `None` | Optical-density conversion only (no motion/filter step) |
 | `OD_TDDR` | Log→OD, then TDDR motion correction |
-| `OD_SMAR` | Log→OD, then SMAR sliding-window motion artifact rejection |
+| `OD_SMAR` | 0.1 Hz low-pass and SMAR sliding-window motion artifact rejection on raw intensity, then Log→OD |
 
 `OD_TDDR` and `OD_SMAR` are the shipped raw seeds (restored by
-`pf2.methods.resetDefaults`). Band-pass filtering is applied at the oxy stage
+`pf2.methods.resetDefaults`). SMAR's coefficient-of-variation test is only
+meaningful on positive light intensity, so `pf2_SMAR` must run before
+`pf2_Intensity2OD`. Low-pass filtering goes before SMAR, since filtering
+after it spreads the NaN gaps SMAR leaves. Band-pass filtering is applied at the oxy stage
 via the `BPF` method (below). To build other raw chains — e.g. spline or
 wavelet motion correction, or a raw-stage band-pass — use the Pipeline API;
 the underlying functions (`pf2_MotionCorrectSpline`, `pf2_MotionCorrectSplineSG`,

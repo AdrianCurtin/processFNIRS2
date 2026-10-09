@@ -1,21 +1,23 @@
 function [Xcorr, maskCV, MA_idx]=pf2_SMAR2(x,N,chNum,tauArtifact,tauClean,minSeg)
 % PF2_SMAR2 Enhanced Sliding Motion Artifact Rejection (v2.0) for fNIRS data
 %
-% An improved version of the SMAR algorithm with adaptive thresholding and
-% artifact region expansion. Uses the temporal derivative of the coefficient
-% of variation (dCV) for more robust artifact detection, and expands artifact
-% regions to capture onset/offset transitions.
+% An adaptive variant of the SMAR algorithm. Instead of a fixed threshold on
+% the coefficient of variation (CV), it detects abrupt changes in the CV
+% (its temporal derivative, dCV) relative to each channel's typical dCV, then
+% expands each detection to the surrounding stretch of elevated dCV.
 %
-% Key improvements over pf2_SMAR:
-%   - Adaptive thresholds based on median CV of the signal
-%   - Two-threshold approach (artifact detection + clean boundary)
-%   - Artifact region expansion to capture full artifact extent
-%   - Wavelength pairing: rejects both wavelengths if either has artifact
-%   - Minimum segment merging to avoid isolated artifact islands
+% Like pf2_SMAR, it operates on raw light intensity only. The CV (std/mean)
+% is meaningful only for a strictly positive signal with a stable DC level;
+% optical density and hemoglobin are baseline-relative and hover around zero,
+% so their CV is unbounded. In a processing pipeline, place pf2_SMAR2 before
+% pf2_Intensity2OD.
 %
 % Reference:
-%   Ayaz, H. et al. (2010). Sliding-window motion artifact rejection for
-%   Functional Near-Infrared Spectroscopy. Conf Proc IEEE Eng Med Biol Soc.
+%   Ayaz, H., Izzetoglu, M., Shewokis, P. A., & Onaral, B. (2010).
+%   Sliding-window motion artifact rejection for Functional Near-Infrared
+%   Spectroscopy. 2010 Annual International Conference of the IEEE
+%   Engineering in Medicine and Biology, 6567-6570.
+%   DOI: 10.1109/iembs.2010.5627113
 %
 % Syntax:
 %   [Xcorr, maskCV, MA_idx] = pf2_SMAR2(x)
@@ -23,192 +25,193 @@ function [Xcorr, maskCV, MA_idx]=pf2_SMAR2(x,N,chNum,tauArtifact,tauClean,minSeg
 %   [Xcorr, maskCV, MA_idx] = pf2_SMAR2(x, N, chNum, tauArtifact, tauClean, minSeg)
 %
 % Inputs:
-%   x           - Input signal matrix [T x C] where T=samples, C=channels
-%                 Typically optical density data after log transform
+%   x           - Raw light intensity matrix [T x C] where T=samples,
+%                 C=channels. Must be strictly positive (before
+%                 pf2_Intensity2OD). Not valid for optical density or
+%                 hemoglobin data; a warning is issued for channels whose
+%                 values are not all positive.
 %   N           - Window length in samples for CV calculation (default: 10)
-%                 Typical range: 5-20 samples. Odd values recommended.
-%   chNum       - Channel number mapping [1 x C] (default: 1:size(x,2))
-%                 Used to pair wavelengths: channels with same chNum are
-%                 grouped, and if any channel in a group has an artifact,
-%                 all channels in that group are masked.
-%   tauArtifact - Artifact detection threshold multiplier (default: 3)
-%                 Threshold = median(CV)*2 + std(upperCV)*tauArtifact
-%                 Typical range: 2-5. Lower = more aggressive rejection.
+%                 Made odd if even. Typical range: 5-20 samples.
+%   chNum       - Channel number mapping [1 x C] (default: 1:C, no pairing)
+%                 Columns with the same chNum (e.g. the two wavelengths of
+%                 one source-detector pair) are masked together: if any of
+%                 them has an artifact, all are masked. Must have one entry
+%                 per column of x.
+%   tauArtifact - Artifact detection threshold multiplier (default: 10)
+%                 A sample is detected when |dCV| > median(|dCV|)*tauArtifact,
+%                 with the median taken per channel. Lower = more aggressive.
+%                 |dCV| is heavy-tailed, so values below ~8 flag a large
+%                 share of artifact-free data.
 %   tauClean    - Clean boundary threshold multiplier (default: 1)
-%                 Used to expand artifact regions to "clean" boundaries.
-%                 Should be less than tauArtifact.
-%   minSeg      - Minimum clean segment length in samples (default: N/2)
-%                 Short clean segments between artifacts are merged.
-%                 Prevents fragmented masking.
+%                 Each detection is expanded to the surrounding run of
+%                 samples with |dCV| > median(|dCV|)*tauClean. Must be > 0
+%                 and is normally below tauArtifact.
+%   minSeg      - Minimum clean segment length in samples (default: N+2)
+%                 Clean gaps shorter than this between two masked segments
+%                 are masked too. Values >= N+1 bridge the separate dCV
+%                 peaks at an artifact's onset and offset, so short
+%                 artifacts are masked in full.
+%   (Empty inputs [] select the default.)
 %
 % Outputs:
 %   Xcorr   - Corrected signal matrix [T x C], same size as input
 %             Artifact samples are replaced with NaN values
 %   maskCV  - Logical mask [T+2 x C] indicating artifacts (true = artifact)
-%             Note: Padded by 1 sample at start and end for edge handling
+%             Padded by one false row at start and end (legacy layout):
+%             maskCV(2:end-1,:) aligns with the rows of x.
 %   MA_idx  - Cell array {1 x C} of artifact segment indices
-%             Each cell contains [Mx2] matrix with [start_idx, end_idx]
-%             rows for each detected artifact segment
+%             Each cell contains an [M x 2] matrix of [start_idx, end_idx]
+%             rows of x for each masked segment
 %
 % Algorithm:
-%   1. Compute local CV and its temporal derivative (dCV) in sliding window
-%   2. Calculate adaptive thresholds from median and upper-tail std of CV
-%   3. Mark samples where |dCV| exceeds artifact threshold
-%   4. Expand marked regions to clean threshold boundaries
-%   5. Apply wavelength pairing (if chNum has duplicates)
-%   6. Merge short inter-artifact segments (< minSeg)
-%   7. Replace masked samples with NaN
+%   1. Compute local CV in a centered sliding window (shrinking at the
+%      recording edges) and its temporal derivative dCV
+%   2. Detect samples where |dCV| > median(|dCV|)*tauArtifact (or dCV is
+%      NaN, e.g. from NaN input)
+%   3. Expand each detection to its surrounding run of
+%      |dCV| > median(|dCV|)*tauClean
+%   4. Pair columns sharing a chNum (mask union)
+%   5. Merge masked segments separated by fewer than minSeg clean samples
+%   6. Replace masked samples with NaN
 %
 % Example:
-%   % Basic usage
-%   [corrected, mask, idx] = pf2_SMAR2(odData);
+%   data = pf2.import.sampleData.fNIR2000();
+%   wl = data.device.wavelengths();
+%   raw = data.raw(:, wl > 0);
+%   [corrected, mask, idx] = pf2_SMAR2(raw);
+%   fprintf('Rejected %.1f%% of samples\n', 100*mean(mask(2:end-1,:), 'all'));
 %
-%   % With wavelength pairing (channels 1-18 for wavelength 1, 1-18 for wavelength 2)
+%   % Wavelength pairing (columns 1-18 and 19-36 are the same 18 channels)
 %   chNum = [1:18, 1:18];
-%   [corrected, mask, idx] = pf2_SMAR2(odData, 10, chNum);
-%
-%   % Conservative settings (less rejection)
-%   [corrected, mask, idx] = pf2_SMAR2(odData, 10, [], 4, 2, 10);
+%   [corrected, mask, idx] = pf2_SMAR2(raw, 10, chNum);
 %
 % Notes:
-%   - The adaptive thresholding, two-threshold artifact expansion, and
-%     wavelength pairing are processFNIRS2 extensions of the original SMAR
-%     algorithm (Ayaz 2010). The original paper uses a single fixed CV
-%     threshold; this implementation derives thresholds from signal statistics.
+%   - The dCV-based adaptive threshold, two-threshold artifact expansion,
+%     segment merging, and wavelength pairing are processFNIRS2 extensions
+%     of the original SMAR algorithm (Ayaz 2010), which uses a single fixed
+%     CV threshold (see pf2_SMAR).
+%   - The defaults were calibrated on artifact-free synthetic intensity and
+%     the fNIR2000/fNIR1200 sample recordings (about 4% of artifact-free
+%     fNIR2000 samples rejected). Check the rejection rate on your own data.
 %
-% See also: pf2_SMAR, pf2_fnirs_MARA, pf2_MotionCorrectTDDR, calcLocalCV
+% See also: pf2_SMAR, pf2_sSMART, pf2_Intensity2OD, pf2_MotionCorrectTDDR
 
 if nargin<1
     error('pf2:smar2:notEnoughInputs', 'Not enough Input arguments');
-elseif nargin==1
-     N=10;  %Default Window Length
 end
-
-if(nargin<3||isempty(chNum))
-   chNum=1:size(x,2); 
+if nargin<2 || isempty(N)
+    N=10;  %Default Window Length
 end
-
-if(nargin<4)
-     tauArtifact=3;
+if nargin<3 || isempty(chNum)
+    chNum=1:size(x,2);
 end
-if(nargin<5)
-     tauClean=1;
+if nargin<4 || isempty(tauArtifact)
+    tauArtifact=10;
 end
-
-if(nargin<6)
-    minSeg=N/2;
+if nargin<5 || isempty(tauClean)
+    tauClean=1;
+end
+if nargin<6 || isempty(minSeg)
+    minSeg=N+2;
 end
 
 if(N<1)
     error('pf2:smar2:invalidWindowLength', 'Invalid Window Length');
 end
-len=size(x,1);
+if ~(tauClean>0)
+    error('pf2:smar2:invalidTauClean', ...
+        ['tauClean must be > 0 (got %g). With tauClean <= 0 every sample ' ...
+         'counts as elevated, so any detection masks the whole channel.'], tauClean);
+end
+if numel(chNum)~=size(x,2)
+    error('pf2:smar2:chNumLength', ...
+        'chNum must have one entry per column of x (%d), got %d.', ...
+        size(x,2), numel(chNum));
+end
 
-[CVx,dCVx]=calcLocalCV(x,N);
-aCVx=abs(CVx);
+nonPos = any(x <= 0, 1);
+if any(nonPos)
+    warning('pf2:smar2:nonPositiveInput', ...
+        ['pf2_SMAR2 expects strictly positive raw light intensity, but %d of %d ' ...
+         'channels contain zero or negative values. Optical density and ' ...
+         'hemoglobin data are not valid SMAR input; apply SMAR before ' ...
+         'pf2_Intensity2OD.'], nnz(nonPos), numel(nonPos));
+end
+
+[len, nCh]=size(x);
+
+% The adaptive threshold compares each sample's |dCV| with the channel's
+% typical |dCV|. When the (odd-rounded) window spans the whole recording,
+% every window holds the same samples, dCV is zero everywhere, and nothing
+% can be detected; return unmasked rather than silently passing artifacts.
+Nodd = N + (rem(N,2)==0);
+if len <= Nodd
+    warning('pf2:smar2:insufficientData', ...
+        ['Recording has %d samples but the SMAR2 window is %d samples, so ' ...
+         'artifacts cannot be detected. Returning the input unmasked; use ' ...
+         'a window shorter than the recording.'], len, Nodd);
+    Xcorr = x;
+    maskCV = false(len+2, nCh);
+    MA_idx = repmat({zeros(0,2)}, 1, nCh);
+    return
+end
+
+[~,dCVx]=calcLocalCV(x,N);
 adCVx=abs(dCVx);
-CVx_median=nanmedian(aCVx,1);
-dCVx_median=nanmedian(adCVx,1);
-aCVx_lower=aCVx;
-aCVx_lower(aCVx_lower<(2.*repmat(CVx_median,[size(aCVx_lower,1),1])))=nan;
-lowerStd=nanstd(aCVx_lower);
+dCVx_median=median(adCVx,1,'omitnan');
 
-% Adaptive thresholds (pf2 extension of Ayaz 2010 SMAR)
-CVthreshold=CVx_median*2+lowerStd.*tauArtifact;
-CVthresholdClean=CVx_median*2+lowerStd.*tauClean;
-
+% Adaptive thresholds relative to each channel's typical |dCV|
 dCVthreshold=dCVx_median.*tauArtifact;
 dCVthresholdClean=dCVx_median.*tauClean;
 
-aCVxm=[zeros(1,size(x,2));aCVx;zeros(1,size(x,2))];
-adCVxm=[zeros(1,size(x,2));adCVx;zeros(1,size(x,2))];
+detected=adCVx>dCVthreshold|isnan(adCVx);
+elevated=adCVx>dCVthresholdClean|isnan(adCVx);
 
-maskCV=adCVxm>dCVthreshold|isnan(adCVxm);
-maskCVclean=adCVxm>dCVthresholdClean|isnan(adCVxm);
-
-dMask=diff(maskCV);
-aMask=abs(dMask);
-dMaskClean=diff(maskCVclean);
-
-MA_idx=cell(1,size(x,2));
-
-for(i=1:size(x,2))
-   segStart=find(dMaskClean(:,i)==1);
-   segEnd=find(dMaskClean(:,i)==-1);
-   
-   numSegs=length(segStart);
-   
-   
-   for(t=1:numSegs)
-       if(sum(aMask(segStart(t):segEnd(t),i))>0)
-          maskCV(max(segStart(t),1):segEnd(t),i)=true;
-       end
-   end
-   
+% Expand each detection to its surrounding run of elevated |dCV|
+mask=detected;
+for i=1:nCh
+    [runStart, runEnd]=findRuns(elevated(:,i));
+    for t=1:numel(runStart)
+        if any(detected(runStart(t):runEnd(t),i))
+            mask(runStart(t):runEnd(t),i)=true;
+        end
+    end
 end
 
+% Wavelength pairing: mask union across columns sharing a chNum
 [uCh,~,uChIdx]=unique(chNum);
-
 if(length(uCh)<length(chNum))
-   for i=1:length(uCh)
-      chMatch=find(uChIdx==i);
-      
-      if(length(chMatch)<=1)
-          continue;
-      end
-      
-      temp=any(maskCV(:,chMatch),2);
-      
-      maskCV(:,chMatch)=repmat(temp,[1,length(chMatch)]);
-      
-   end
+    for i=1:length(uCh)
+        chMatch=find(uChIdx==i);
+        if(length(chMatch)<=1)
+            continue;
+        end
+        mask(:,chMatch)=repmat(any(mask(:,chMatch),2),[1,length(chMatch)]);
+    end
 end
 
-for(i=1:size(x,2))
-   dX=diff([0;maskCV(:,i);0]);
-   
-   segMaskStart=find(dX==1);
-   segMaskEnd=find(dX==-1);
-   
-   numMaskSegs=length(segMaskStart);
-   
-   maskSegIdx=nan(numMaskSegs,2);
-   maskCount=0;
-   t2=0;
-   for(t=1:numMaskSegs)
-       if(t2>=t)
-           continue;
-       end
-       
-       t2=t;
-       while t2<numMaskSegs&&(segMaskStart(t2+1)-segMaskEnd(t2))<minSeg
-           t2=t2+1;    
-           if(t2>=numMaskSegs)
-               break;
-           end
-       end
-       maskCV(max(segMaskStart(t),1):min(segMaskEnd(t2),len),i)=true;
-       maskCount=maskCount+1;
-       maskSegIdx(maskCount,:)=[max(segMaskStart(t),1),min(len,segMaskEnd(t2))];
-       
-       t=t2;
-       
-   end
-   maskSegIdx(isnan(maskSegIdx(:,1)),:)=[];
-   MA_idx{i}=maskSegIdx;
+% Merge masked segments separated by short clean gaps
+MA_idx=cell(1,nCh);
+for i=1:nCh
+    [segStart, segEnd]=findRuns(mask(:,i));
+    if isempty(segStart)
+        MA_idx{i}=zeros(0,2);
+        continue;
+    end
+    gap=segStart(2:end)-segEnd(1:end-1)-1;
+    keep=[true; gap(:)>=minSeg];
+    mergedStart=segStart(keep);
+    mergedEnd=segEnd([keep(2:end); true]);
+    for t=1:numel(mergedStart)
+        mask(mergedStart(t):mergedEnd(t),i)=true;
+    end
+    MA_idx{i}=[mergedStart(:), mergedEnd(:)];
 end
-
-
-
-
 
 Xcorr=x;
+Xcorr(mask)=nan;
 
-
-
-Xcorr(maskCV(2:end-1,:))=nan;
-    
-    
+maskCV=[false(1,nCh); mask; false(1,nCh)];
 
 end
 
@@ -216,12 +219,30 @@ end
 %%_Subfunctions_________________________________________________________
 
 %__________________________________________________________________________
+function [runStart, runEnd] = findRuns(v)
+% FINDRUNS Start and end indices of each run of true values in a vector
+%
+% Inputs:
+%   v - Logical column vector [T x 1]
+%
+% Outputs:
+%   runStart - Column vector of first indices of each true run
+%   runEnd   - Column vector of last indices of each true run
+
+d=diff([false; v(:); false]);
+runStart=find(d==1);
+runEnd=find(d==-1)-1;
+
+end
+
+%__________________________________________________________________________
 function [CVx, dCVx] = calcLocalCV(x,N)
 % CALCLOCALCV Calculate local coefficient of variation and its derivative
 %
 % Computes the coefficient of variation (CV = std/mean) within a sliding
 % window centered at each sample, plus its first temporal derivative (dCV).
-% Used internally by pf2_SMAR2 for adaptive motion artifact detection.
+% The window shrinks at the recording edges, so edge samples are evaluated
+% rather than rejected outright. Used internally by pf2_SMAR2.
 %
 % Inputs:
 %   x - Input signal matrix [T x C] where T=samples, C=channels
@@ -229,7 +250,8 @@ function [CVx, dCVx] = calcLocalCV(x,N)
 %
 % Outputs:
 %   CVx  - Coefficient of variation matrix [T x C]
-%   dCVx - First temporal derivative of CVx [T x C], leading sample = 0
+%   dCVx - First temporal derivative of CVx [T x C] (backward difference;
+%          the first sample uses the forward difference)
 
 if nargin<1
     error('pf2:smar2:notEnoughInputs', 'Not enough Input arguments');
@@ -239,28 +261,23 @@ if(N<1)
     error('pf2:smar2:invalidWindowLength', 'Invalid Window Length');
 end
 
-l=size(x);
-len=l(1);%length
-
 if(rem(N,2)==0)
-   
-    N=N+1; 
-   
+    N=N+1;
 end
 
-wSize=(N-1)/2;
-
-% Vectorized local CV via movmean/movstd, with the same endpoint NaNs the loop
-% (i=wSize+1:len-wSize) produced. ~40x faster; matches the per-sample loop to
-% floating-point precision (movstd/movmean differ from a fresh per-window
-% nanstd/nanmean at the ULP level; zero mask flips on real/random data). See
-% pf2_SMAR for the full equivalence rationale.
+% Vectorized local CV via movmean/movstd (O(T) per channel). 'omitnan'
+% computes each window over its non-NaN samples; windows shrink at the edges.
 mu = movmean(x, N, 1, 'omitnan');
 sd = movstd(x, N, 0, 1, 'omitnan');
 CVx = sd ./ mu;
-CVx([1:min(wSize,len), max(1,len-wSize+1):len], :) = NaN;
 
+% Backward difference; the first sample takes the forward difference so a
+% change at the very start of the recording is seen like any other.
 dCVx=diff(CVx);
-dCVx=[zeros([1,size(CVx,2)]);dCVx];
+if isempty(dCVx)
+    dCVx=zeros(size(CVx));
+else
+    dCVx=[dCVx(1,:);dCVx];
+end
 
 end

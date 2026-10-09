@@ -840,15 +840,24 @@ classdef PipelineFunction
             else
                 desc = cfgDesc;
             end
-            if isfield(s, 'validStages') && ~isempty(s.validStages)
+            % validStages/requiresOD describe the function's input domain,
+            % which the function library owns. For a registered function the
+            % library wins over flags embedded in a saved method, so a
+            % corrected domain (e.g. pf2_SMAR moving from OD to raw
+            % intensity) reaches methods saved before the correction. The
+            % embedded flags remain the fallback for unregistered functions.
+            registered = ~isempty(cfgName) || ~isempty(cfgStages);
+            if registered && ~isempty(cfgStages)
+                stages = cfgStages;
+            elseif isfield(s, 'validStages') && ~isempty(s.validStages)
                 stages = s.validStages;
             else
                 stages = cfgStages;
             end
-            if isfield(s, 'requiresOD')
-                reqOD = s.requiresOD;
-            else
+            if registered || ~isfield(s, 'requiresOD')
                 reqOD = cfgReqOD;
+            else
+                reqOD = s.requiresOD;
             end
             % Coerce to logical: cfg INI eval gives 0/1 doubles.
             if ~islogical(reqOD), reqOD = logical(reqOD); end
