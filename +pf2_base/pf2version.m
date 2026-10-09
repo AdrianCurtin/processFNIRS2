@@ -29,8 +29,8 @@ function [outStr,pf2ver,dateStr]=pf2version()
 %
 % See also: pf2_initialize, processFNIRS2
 
-pf2ver='v1.1.0';
-dateStr='July 24 2026';
+pf2ver='v1.1.2';
+dateStr='October 9 2026';
 
 
 verString=sprintf('processFNIRS2 Release %s\n',pf2ver);

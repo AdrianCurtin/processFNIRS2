@@ -7,8 +7,8 @@ abstract: >-
   signal processing, hemoglobin conversion, quality control, and group-level
   statistics.
 type: software
-version: 1.1.0
-date-released: "2026-07-24"
+version: 1.1.2
+date-released: "2026-10-09"
 license: GPL-3.0-or-later
 repository-code: "https://github.com/AdrianCurtin/processFNIRS2"
 url: "https://github.com/AdrianCurtin/processFNIRS2"
@@ -24,10 +24,11 @@ authors:
     given-names: Adrian
     email: adrian.b.curtin@drexel.edu
     affiliation: Drexel University
-    # orcid: "https://orcid.org/0000-0000-0000-0000"   # add ORCID if available
+    orcid: "https://orcid.org/0000-0002-7108-7057"
   - family-names: Ayaz
     given-names: Hasan
     affiliation: Drexel University
+    orcid: "https://orcid.org/0000-0001-5514-2741"
 # Additional code contributors to review and promote to authors as appropriate
 # (e.g. Pratusha Reddy, Lei Wang, Nicholas DeFilippis, Yigit Topoglu). Add full
 # names / affiliations / ORCIDs before release.

@@ -2,6 +2,13 @@
 
 ## Unreleased
 
+### Added
+
+- Author ORCIDs in `CITATION.cff`, which GitHub's "Cite this repository" and Zenodo archiving read.
+
+## v1.1.1 (2026-10-09)
+SMAR motion-artifact functions on raw intensity, and QC power-spectrum crash and channel-mapping fixes.
+
 ### Fixes
 
 **SMAR motion-artifact family (`pf2_SMAR`, `pf2_SMAR_mask`, `pf2_SMAR2`, `pf2_sSMART`):**
